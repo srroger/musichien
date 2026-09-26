@@ -27,13 +27,49 @@ Question ExerciseSession::buildQuestion()
 
     question.target = drawTarget();
 
-    question.rootMidiNumber = drawRootMidiNumber( question.target );
+    // The direction is drawn BEFORE the root, because the root depends on it: the room an interval
+    // needs is on one side or the other.
+    question.direction = drawDirection();
+
+    question.rootMidiNumber = drawRootMidiNumber( question.target, question.direction );
 
     // The grid is built from the PALETTE and the target, and it is clamped to the palette by the
     // AnswerGrid itself: a question can never offer an interval the player has not met.
     question.choices = AnswerGrid::build( m_palette, question.target, m_settings.choiceCount, m_randomEngine );
 
     return question;
+}
+
+IntervalDirection ExerciseSession::drawDirection()
+{
+    // The shares are read as WEIGHTS rather than as percentages: the draw is made inside their total,
+    // whatever that total is. Changing them to 5 / 3 / 2 therefore changes nothing but the proportions,
+    // which is what anyone editing them would expect.
+    const std::int32_t total =
+      m_settings.ascendingShare + m_settings.descendingShare + m_settings.harmonicShare;
+
+    if( total <= 0 )
+    {
+        // Every share at zero is a configuration mistake. Ascending is what the application teaches
+        // first, so it is the safe answer rather than a question that could not be sounded at all.
+        return IntervalDirection::Ascending;
+    }
+
+    std::uniform_int_distribution<std::int32_t> distribution{ 1, total };
+
+    const std::int32_t draw = distribution( m_randomEngine );
+
+    if( draw <= m_settings.ascendingShare )
+    {
+        return IntervalDirection::Ascending;
+    }
+
+    if( draw <= ( m_settings.ascendingShare + m_settings.descendingShare ) )
+    {
+        return IntervalDirection::Descending;
+    }
+
+    return IntervalDirection::Harmonic;
 }
 
 Interval ExerciseSession::drawTarget()
@@ -47,23 +83,43 @@ Interval ExerciseSession::drawTarget()
     return m_palette.at( distribution( m_randomEngine ) );
 }
 
-std::int32_t ExerciseSession::drawRootMidiNumber( const Interval & p_target )
+std::int32_t ExerciseSession::drawRootMidiNumber( const Interval & p_target,
+                                                  IntervalDirection p_direction )
 {
-    // The ceiling of the range is lowered by the size of the interval: the UPPER note has to stay
-    // below the highest playable note, and that is what stops a wide interval from being played half
-    // outside the comfortable range of a phone speaker.
-    const std::int32_t highestRoot = std::min( m_settings.highestRootMidiNumber,
-                                               m_settings.highestPlayableMidiNumber - p_target.semitones() );
+    const std::int32_t intervalSize = p_target.semitones();
 
-    if( highestRoot < m_settings.lowestRootMidiNumber )
+    std::int32_t lowestRoot = m_settings.lowestRootMidiNumber;
+    std::int32_t highestRoot = m_settings.highestRootMidiNumber;
+
+    // The root is the note the interval is played FROM, so what it needs depends on the direction:
+    //
+    //   * going up, or sounding the two notes at once, it is the UPPER note that must stay under the
+    //     ceiling;
+    //   * going down, it is the room BELOW the root that matters.
+    //
+    // Getting this wrong is silent: the notes would simply be played outside the comfortable range of a
+    // phone speaker, which sounds like a slightly odd question rather than like a bug.
+    if( ( p_direction == IntervalDirection::Ascending ) || ( p_direction == IntervalDirection::Harmonic ) )
     {
-        // The settings have been changed to something that cannot hold this interval. Returning the
-        // lowest root keeps the note playable, which is better than a root drawn from an empty range
-        // and an out of tune question nobody could explain.
-        return m_settings.lowestRootMidiNumber;
+        highestRoot = std::min( highestRoot, m_settings.highestPlayableMidiNumber - intervalSize );
     }
 
-    std::uniform_int_distribution<std::int32_t> distribution{ m_settings.lowestRootMidiNumber, highestRoot };
+    if( p_direction == IntervalDirection::Descending )
+    {
+        lowestRoot = std::max( lowestRoot, m_settings.lowestPlayableMidiNumber + intervalSize );
+    }
+
+    if( highestRoot < lowestRoot )
+    {
+        // The settings have been changed to something that cannot hold this interval. Returning the
+        // middle of the window keeps the question playable, which is better than a note outside the
+        // range, an empty draw, and a question nobody could explain.
+        return std::clamp( m_settings.lowestRootMidiNumber,
+                           m_settings.lowestPlayableMidiNumber,
+                           m_settings.highestPlayableMidiNumber );
+    }
+
+    std::uniform_int_distribution<std::int32_t> distribution{ lowestRoot, highestRoot };
 
     return distribution( m_randomEngine );
 }

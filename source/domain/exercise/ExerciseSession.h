@@ -64,18 +64,37 @@ struct SessionSettings
     // nobody can judge.
     std::optional<std::int32_t> lives{ 5 };
 
-    // Range the lowest note of a question is drawn from.
+    // Range both notes of a question have to stay inside, whatever the direction.
     //
-    // The root moves from one question to the next ON PURPOSE. A session where every interval starts
-    // on the same note teaches the sound of that note as much as the interval, and a player would then
-    // recognise the key rather than the distance.
-    std::int32_t lowestRootMidiNumber{ 55 };
+    // Two octaves wide, and wider than the window below on purpose: it is the window that decides how
+    // much variety the player hears, and this range is only the safety net around it.
+    std::int32_t lowestPlayableMidiNumber{ 40 };
 
-    std::int32_t highestRootMidiNumber{ 67 };
-
-    // The highest note the application will play: the root is chosen so that the upper note stays
-    // below it. C6 leaves the whole range comfortable on a phone speaker.
     std::int32_t highestPlayableMidiNumber{ 84 };
+
+    // The window the note a question STARTS ON is drawn from.
+    //
+    // Two octaves, and the range above narrows it further depending on the size of the interval and its
+    // direction. The first version used a single octave, which meant two questions in five started on
+    // the same note - and Roger heard it, and said so.
+    std::int32_t lowestRootMidiNumber{ 50 };
+
+    std::int32_t highestRootMidiNumber{ 74 };
+
+    // How often each direction is drawn, out of their total.
+    //
+    // ALL THREE, and this is the point: an interval heard only upwards is half an interval.
+    //
+    //   * descending is the SAME distance heard the other way, and it is a separate skill: the ear that
+    //     recognises a rising fifth does not automatically recognise a falling one;
+    //   * the harmonic form drops the melody altogether and leaves only the colour, which is the
+    //     hardest of the three - hence the smallest share.
+    //
+    // The three are also what the statistics will have to separate: "I recognise fifths" means nothing
+    // if it does not say in which direction.
+    std::int32_t ascendingShare{ 50 };
+    std::int32_t descendingShare{ 30 };
+    std::int32_t harmonicShare{ 20 };
 
     // Silence left between the two notes of a question, as heard.
     //
@@ -177,8 +196,12 @@ private:
     // An interval of the palette, drawn evenly.
     [[nodiscard]] Interval drawTarget();
 
-    // A root note that leaves room for the interval above it.
-    [[nodiscard]] std::int32_t drawRootMidiNumber( const Interval & p_target );
+    // How the question is sounded: one way among ascending, descending and both at once.
+    [[nodiscard]] IntervalDirection drawDirection();
+
+    // A root note that leaves room for the interval, in the direction the question will be played.
+    [[nodiscard]] std::int32_t drawRootMidiNumber( const Interval & p_target,
+                                                   IntervalDirection p_direction );
 
     // Gives a new interval to the player, or takes the newest one back when they struggle.
     void widenPalette();

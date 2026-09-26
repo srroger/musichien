@@ -29,6 +29,22 @@ namespace
 
 constexpr std::size_t SESSION_QUESTION_COUNT = 10;
 
+// A session that ALWAYS goes up.
+//
+// The direction is drawn at random in a real session, so a test asserting "the question was heard as a
+// melody" would fail roughly one time in five - and a test that fails at random teaches nothing except
+// to be ignored. Pinning the direction is what makes these tests precise instead of tolerant.
+[[nodiscard]] domain::SessionSettings ascendingOnlySettings()
+{
+    domain::SessionSettings settings;
+
+    settings.ascendingShare = 100;
+    settings.descendingShare = 0;
+    settings.harmonicShare = 0;
+
+    return settings;
+}
+
 // The interval the session just asked, as the screen reads it.
 [[nodiscard]] std::int32_t heardDistance( const ExerciseSessionController & p_controller )
 {
@@ -45,7 +61,7 @@ void answerCorrectly( ExerciseSessionController & p_controller )
 TEST( ExerciseSessionControllerTest, starting_a_session_asks_the_first_question )
 {
     domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer };
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
     EXPECT_FALSE( controller.running() );
 
@@ -65,7 +81,7 @@ TEST( ExerciseSessionControllerTest, starting_a_session_asks_the_first_question 
 TEST( ExerciseSessionControllerTest, every_choice_is_ready_to_display )
 {
     domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer };
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
     controller.startSession();
 
@@ -85,7 +101,7 @@ TEST( ExerciseSessionControllerTest, every_choice_is_ready_to_display )
 TEST( ExerciseSessionControllerTest, the_right_answer_scores_and_the_verdict_is_heard )
 {
     domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer };
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
     controller.startSession();
     answerCorrectly( controller );
@@ -95,17 +111,23 @@ TEST( ExerciseSessionControllerTest, the_right_answer_scores_and_the_verdict_is_
     EXPECT_FALSE( controller.isAsking() );
     EXPECT_EQ( domain::SessionScore::BASE_XP_PER_SUCCESS, controller.experience() );
 
-    // The verdict is played AGAIN: a screen that only says "wrong" teaches nothing, and the same holds
-    // for a screen that only says "right".
-    EXPECT_EQ( 2, notePlayer.playedMelodies().size() );
+    // The verdict is played AGAIN - as a chord, which the next test checks in detail. The point here
+    // is that the screen never only says "right": it always says it again out loud.
+    EXPECT_EQ( 1, notePlayer.playedMelodies().size() );
+    EXPECT_EQ( 1, notePlayer.playedChords().size() );
 }
 
-TEST( ExerciseSessionControllerTest, a_wrong_answer_costs_a_life_and_asks_again )
+TEST( ExerciseSessionControllerTest, a_wrong_answer_is_played_again_and_announced )
 {
     domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer };
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
     controller.startSession();
+
+    int wrongAnswerCount = 0;
+
+    // No QtTest here: the signal is counted with a plain connection, which is all this needs.
+    QObject::connect( &controller, &ExerciseSessionController::wrongAnswerGiven, [&wrongAnswerCount] { ++wrongAnswerCount; } );
 
     controller.answer( heardDistance( controller ) + 1 );
 
@@ -120,12 +142,39 @@ TEST( ExerciseSessionControllerTest, a_wrong_answer_costs_a_life_and_asks_again 
     // The wrong answer is remembered, so that the verdict can be read against it.
     EXPECT_EQ( heardDistance( controller ) + 1,
                controller.answeredInterval().value( "semitones" ).toInt() );
+
+    // The interval is heard AGAIN immediately, and as a melody: there is something to catch up on, and
+    // it is the melody that gives the second note its meaning.
+    EXPECT_EQ( 2, notePlayer.playedMelodies().size() );
+    EXPECT_TRUE( notePlayer.playedChords().empty() );
+
+    // And the screen is told, so that it can answer with its body - the shake, and one day a vibration.
+    EXPECT_EQ( 1, wrongAnswerCount );
+}
+
+TEST( ExerciseSessionControllerTest, a_correct_answer_is_heard_again_as_a_chord )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    controller.startSession();
+    answerCorrectly( controller );
+
+    // One melody for the question, and ONE CHORD for the verdict: the two notes together are twice as
+    // short as the melody, and a genuinely different listen of the same interval.
+    EXPECT_EQ( 1, notePlayer.playedMelodies().size() );
+    ASSERT_EQ( 1, notePlayer.playedChords().size() );
+
+    EXPECT_EQ( 2, notePlayer.playedChords().front().notes.size() );
+
+    // A success is not a mistake: nothing is announced to the screen.
+    EXPECT_EQ( 0, notePlayer.stopCount() );
 }
 
 TEST( ExerciseSessionControllerTest, the_answer_is_offered_after_three_wrong_ones )
 {
     domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer };
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
     controller.startSession();
 
@@ -151,7 +200,7 @@ TEST( ExerciseSessionControllerTest, the_answer_is_offered_after_three_wrong_one
 TEST( ExerciseSessionControllerTest, a_perfect_session_earns_its_star )
 {
     domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer };
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
     controller.startSession();
 
@@ -172,7 +221,7 @@ TEST( ExerciseSessionControllerTest, a_perfect_session_earns_its_star )
 TEST( ExerciseSessionControllerTest, replaying_counts_and_costs_experience )
 {
     domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer };
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
     controller.startSession();
 
@@ -190,7 +239,7 @@ TEST( ExerciseSessionControllerTest, replaying_counts_and_costs_experience )
 TEST( ExerciseSessionControllerTest, leaving_the_loop_releases_the_sound_and_the_session )
 {
     domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer };
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
     controller.startSession();
 

@@ -24,9 +24,12 @@ constexpr int NO_LIFE_LIMIT = -1;
 
 }    // namespace
 
-ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_notePlayer, QObject * p_parent )
+ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_notePlayer,
+                                                      domain::SessionSettings p_settings,
+                                                      QObject * p_parent )
   : QObject{ p_parent }
   , m_notePlayer{ p_notePlayer }
+  , m_settings{ p_settings }
 {
 }
 
@@ -142,7 +145,7 @@ void ExerciseSessionController::startSession()
     // source, on purpose.
     std::random_device entropySource;
 
-    m_session = std::make_unique<domain::ExerciseSession>( entropySource() );
+    m_session = std::make_unique<domain::ExerciseSession>( entropySource(), m_settings );
 
     emit runningChanged();
 
@@ -194,18 +197,29 @@ void ExerciseSessionController::answer( int p_semitones )
         return;
     }
 
-    m_session->answer( p_semitones );
+    const bool isCorrect = m_session->answer( p_semitones );
 
     // Always, and not only when the question is over: a wrong answer closes the grid in, and the
     // screen must show the grid that exists rather than the one it had a moment ago.
     refreshChoices();
 
-    // When the question is over - right or wrong or revealed - the interval is heard AGAIN. The
-    // verdict is something to listen to, not only something to read: that single replay is what turns
-    // a mistake into a lesson.
-    if( m_session->state() != domain::SessionState::Asking )
+    if( isCorrect )
     {
+        // A correct answer is heard again as a CHORD: the two notes together, one block instead of two,
+        // which is twice as short - and a genuinely different listen of the same interval, the colour
+        // without the melody. Roger asked for it to stop the success from dragging, and the reason to
+        // keep it is musical: hearing the interval both ways is what seals it.
+        playCurrentQuestionAsChord();
+    }
+    else
+    {
+        // A wrong answer is heard again IMMEDIATELY, and in its original form: there is something to
+        // catch up on, and the melody is what gives the second note its meaning.
         playCurrentQuestion();
+
+        // And it is announced, so that the screen can answer with its BODY - a shake today, a
+        // vibration tomorrow. The controller knows what happened; how it should feel is not its job.
+        emit wrongAnswerGiven();
     }
 
     emit scoreChanged();
@@ -309,6 +323,25 @@ void ExerciseSessionController::playCurrentQuestion()
     const std::array<domain::Note, 2> ascendingNotes{ rootNote, upperNote };
 
     m_notePlayer.playMelody( ascendingNotes, m_session->settings().melodicGap );
+}
+
+void ExerciseSessionController::playCurrentQuestionAsChord()
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    const domain::Note rootNote{ question.rootMidiNumber };
+    const domain::Note upperNote = rootNote.transposedBy( question.target.semitones() );
+
+    // The two notes TOGETHER, whatever the direction of the question was: on a correct answer the
+    // player already knows which way it went, and what is left to hear is the colour.
+    const std::array<domain::Note, 2> notes{ rootNote, upperNote };
+
+    m_notePlayer.playChord( notes );
 }
 
 }    // namespace musichien::ui

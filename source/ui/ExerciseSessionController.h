@@ -67,7 +67,12 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
 
 public:
-    explicit ExerciseSessionController( domain::NotePlayer & p_notePlayer, QObject * p_parent = nullptr );
+    // The settings of the session to come, provided by the caller rather than written here: they are
+    // data of the game, they will come from the profile of the player, and a test needs to be able to
+    // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
+    explicit ExerciseSessionController( domain::NotePlayer & p_notePlayer,
+                                        domain::SessionSettings p_settings = {},
+                                        QObject * p_parent = nullptr );
 
     [[nodiscard]] bool running() const noexcept;
     [[nodiscard]] int questionNumber() const noexcept;
@@ -115,6 +120,13 @@ signals:
     void sessionChanged();
     void scoreChanged();
 
+    // A wrong answer has just been given, and the question is still being asked.
+    //
+    // The screen answers it with its body - a shake today, a vibration tomorrow - and the controller
+    // has no opinion about that: it knows WHAT happened, not how it should feel. Note that this is a
+    // wrong ATTEMPT, not the end of a question: a player who is told the answer has not made a mistake.
+    void wrongAnswerGiven();
+
 private:
     // Rebuilds the list of choices from the question being asked, and only then notifies. Called
     // whenever the question changes AND whenever the grid closes in after a mistake.
@@ -123,7 +135,13 @@ private:
     // Plays the interval of the question being asked, from its own root note.
     void playCurrentQuestion();
 
+    // Plays the same two notes TOGETHER, whatever direction the question was asked in.
+    void playCurrentQuestionAsChord();
+
     domain::NotePlayer & m_notePlayer;
+
+    // Kept so that every session this controller starts uses the same rules.
+    domain::SessionSettings m_settings;
 
     // Empty until a session starts: the bench is what the application shows before that.
     std::unique_ptr<domain::ExerciseSession> m_session;

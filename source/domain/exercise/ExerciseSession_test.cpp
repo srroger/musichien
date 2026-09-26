@@ -380,21 +380,72 @@ TEST( ExerciseSessionTest, the_root_note_moves_from_one_question_to_the_next )
     EXPECT_GT( roots.size(), 1 );
 }
 
-TEST( ExerciseSessionTest, the_upper_note_never_goes_above_the_ceiling )
+TEST( ExerciseSessionTest, both_notes_stay_inside_the_playable_range )
 {
     ExerciseSession session{ TEST_SEED, unlimitedLivesSettings() };
 
-    const std::int32_t ceiling = session.settings().highestPlayableMidiNumber;
+    const SessionSettings & settings = session.settings();
 
     for( std::size_t index = 0; index < 10; ++index )
     {
         const Question & question = session.currentQuestion();
 
-        EXPECT_LE( question.rootMidiNumber + question.target.semitones(), ceiling );
+        const std::int32_t firstNote = question.rootMidiNumber;
+
+        // The second note depends on the DIRECTION, and getting this wrong in the code is silent: the
+        // notes would simply be played at the edge of what a phone speaker can do, which sounds like a
+        // slightly odd question rather than like a bug.
+        const std::int32_t secondNote =
+          ( question.direction == IntervalDirection::Descending )
+            ? ( firstNote - question.target.semitones() )
+            : ( firstNote + question.target.semitones() );
+
+        EXPECT_GE( std::min( firstNote, secondNote ), settings.lowestPlayableMidiNumber );
+        EXPECT_LE( std::max( firstNote, secondNote ), settings.highestPlayableMidiNumber );
 
         answerCorrectly( session );
         session.advance();
     }
+}
+
+TEST( ExerciseSessionTest, the_three_directions_all_come_up_in_a_session )
+{
+    // A long session, so that the draw has every chance to show all three. One interval heard only
+    // upwards is half an interval: descending is the same distance heard the other way and a separate
+    // skill, and the harmonic form leaves only the colour.
+    SessionSettings settings = unlimitedLivesSettings();
+    settings.questionCount = 200;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    std::size_t ascendingCount = 0;
+    std::size_t descendingCount = 0;
+    std::size_t harmonicCount = 0;
+
+    for( std::size_t index = 0; index < settings.questionCount; ++index )
+    {
+        switch( session.currentQuestion().direction )
+        {
+            case IntervalDirection::Ascending:
+                ++ascendingCount;
+                break;
+
+            case IntervalDirection::Descending:
+                ++descendingCount;
+                break;
+
+            case IntervalDirection::Harmonic:
+                ++harmonicCount;
+                break;
+        }
+
+        answerCorrectly( session );
+        session.advance();
+    }
+
+    EXPECT_GT( ascendingCount, 0 );
+    EXPECT_GT( descendingCount, 0 );
+    EXPECT_GT( harmonicCount, 0 );
 }
 
 }    // namespace musichien::domain
