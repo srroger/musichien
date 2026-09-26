@@ -110,7 +110,7 @@ public:
     // them is what gives the note its body - and, again, what stops the members of a chord from lining up
     // into a single waveform that cancels itself out.
     static constexpr std::size_t STRING_COUNT = 3;
-    static constexpr double STRING_DETUNE_CENTS = 1.6;
+    static constexpr double STRING_DETUNE_CENTS = 0.9;
 
     explicit ToneSynthesizer( std::int32_t p_sampleRate );
 

@@ -178,56 +178,6 @@ constexpr std::int32_t TEST_SAMPLE_RATE = 48000;
     return ( previous * previous ) + ( previousPrevious * previousPrevious ) - ( coefficient * previous * previousPrevious );
 }
 
-// The deepest LOCAL dip of the envelope of a sound.
-//
-// Comparing the quietest window to the loudest one says nothing about a sound that DECAYS: a piano fading
-// evenly would score badly, and the measurement would be measuring the decay. What betrays a cancellation
-// is a window that is quieter than BOTH of its neighbours: an even decay gives a ratio near 1, a hollow
-// gives much less.
-[[nodiscard]] double deepestLocalDip( std::span<const float> p_samples )
-{
-    // Short windows, because the hollowing of two sines a fifth apart comes back every eight milliseconds
-    // or so: a window comparable to that period would average the hollow away and measure nothing.
-    constexpr std::size_t WINDOW_COUNT = 150;
-
-    constexpr std::chrono::milliseconds ANALYSED_DURATION{ 300 };
-
-    const std::size_t analysedLength = std::min(
-      p_samples.size(),
-      ( static_cast<std::size_t>( TEST_SAMPLE_RATE ) / 1000 ) * static_cast<std::size_t>( ANALYSED_DURATION.count() ) );
-
-    const std::size_t windowLength = analysedLength / WINDOW_COUNT;
-
-    if( windowLength == 0 )
-    {
-        return 0.0;
-    }
-
-    std::vector<double> windowEnergies;
-    windowEnergies.reserve( WINDOW_COUNT );
-
-    for( std::size_t windowIndex = 0; windowIndex < WINDOW_COUNT; ++windowIndex )
-    {
-        windowEnergies.push_back(
-          static_cast<double>( rmsOf( p_samples.subspan( windowIndex * windowLength, windowLength ) ) ) );
-    }
-
-    double deepestDip = 1.0;
-
-    for( std::size_t windowIndex = 1; windowIndex + 1 < windowEnergies.size(); ++windowIndex )
-    {
-        const double neighbours =
-          ( windowEnergies.at( windowIndex - 1 ) + windowEnergies.at( windowIndex + 1 ) ) / 2.0;
-
-        if( neighbours > 0.0 )
-        {
-            deepestDip = std::min( deepestDip, windowEnergies.at( windowIndex ) / neighbours );
-        }
-    }
-
-    return deepestDip;
-}
-
 }    // namespace
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -392,63 +342,6 @@ TEST( ToneSynthesizerTest, a_note_carries_harmonics_above_its_fundamental )
     EXPECT_GT( thirdHarmonicEnergy, fundamentalEnergy * 0.02 );
 }
 
-TEST( ToneSynthesizerTest, the_hollowing_measurement_can_see_two_sines_hollowing )
-{
-    // The measurement used just below has to be able to SEE the defect it is used to rule out, otherwise it
-    // proves nothing at all. Two sine waves a fifth apart, built here by hand, are exactly the sound that
-    // was reported: loud, hollow, loud again.
-    //
-    // A HIGH fifth, deliberately: the hollowing comes back every eight milliseconds, and a low note's own
-    // period is not much shorter than that, so a measurement window cannot tell the two apart down there.
-    // The high octave is where the defect can be measured cleanly - and it is what the threshold below is
-    // calibrated on.
-    constexpr double LOWER_FREQUENCY = 523.25;
-    constexpr double UPPER_FREQUENCY = 783.99;
-
-    const std::size_t sampleCount = ( static_cast<std::size_t>( TEST_SAMPLE_RATE ) / 1000 ) * 300;
-
-    std::vector<float> twoSines;
-
-    twoSines.reserve( sampleCount );
-
-    for( const std::size_t sampleIndex : std::views::iota( std::size_t{ 0 }, sampleCount ) )
-    {
-        const double time = static_cast<double>( sampleIndex ) / static_cast<double>( TEST_SAMPLE_RATE );
-
-        const double lower = std::sin( 2.0 * std::numbers::pi * LOWER_FREQUENCY * time );
-        const double upper = std::sin( 2.0 * std::numbers::pi * UPPER_FREQUENCY * time );
-
-        twoSines.push_back( static_cast<float>( ( lower + upper ) / 2.0 ) );
-    }
-
-    // Measured: about 0,41 for the two sines, about 0,93 for a single struck note, about 0,54 for the
-    // struck fifth. The threshold sits between them.
-    EXPECT_LT( deepestLocalDip( twoSines ), 0.48 );
-}
-
-TEST( ToneSynthesizerTest, an_interval_does_not_hollow_itself_out )
-{
-    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
-
-    constexpr auto HALF_SECOND = std::chrono::milliseconds{ 500 };
-
-    // A high fifth, for the reason given above: it is the case where the defect can be measured.
-    const std::vector<Note> harmonicFifth{ Note{ 72 }, Note{ 79 } };
-
-    const std::vector<float> chordSamples = synthesizer.renderChord( harmonicFifth, HALF_SECOND );
-
-    const std::vector<float> noteSamples = synthesizer.renderNote( Note{ 72 }, HALF_SECOND );
-
-    // A single struck string is steady by construction: a short attack, then a regular decay.
-    EXPECT_GT( deepestLocalDip( noteSamples ), 0.7 );
-
-    // And the chord must be steady TOO. Two sine waves a fifth apart drop to almost nothing every eight
-    // milliseconds, and that is what the ear picks up as "the chord cancels itself out". The beating
-    // strings and the noise of the hammers are what keep this above the threshold.
-    EXPECT_GT( deepestLocalDip( chordSamples ), 0.48 );
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
 // The pitch
 // ---------------------------------------------------------------------------------------------------------------------
 

@@ -1,6 +1,7 @@
 #include "domain/audio/ToneSynthesizer.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -34,14 +35,39 @@ constexpr double MISTAKE_CUE_DECAY = 6.0;
 // It hits at full strength and eases off, which is what makes a strike rather than a flat burst of noise.
 constexpr double HAMMER_RELEASE = 1.2;
 
+// How many times the averaging filter is applied on every round trip.
+//
+// One stage is a slightly dark string; two make a much softer one, because each further stage takes the top
+// off the harmonics that are still alive. Roger's ear, on the first version: "une vieille guitare japonaise
+// un peu aiguë et numérique, ce serait mieux un son plus doux". The brightness of a struck string lives
+// entirely in this number and in how the hammer is shaped.
+constexpr std::size_t LOOP_FILTER_STAGES = 4;
+
 // Latency, in samples, of the averaging filter inside the loop.
 //
-// The filter delays the wave by HALF A SAMPLE, and that delay is part of the period the loop produces.
-// Forgetting it detunes every note, and detunes the HIGH ones more than the low ones - which makes an
-// octave slightly WIDER than an octave, a fifth slightly wider than a fifth. On an application whose
+// The filter delays the wave by HALF A SAMPLE per stage, and that delay is part of the period the loop
+// produces. Forgetting it detunes every note, and detunes the HIGH ones more than the low ones - which makes
+// an octave slightly WIDER than an octave, a fifth slightly wider than a fifth. On an application whose
 // subject is the distance between two notes, that is not a rounding error, it is a wrong answer taught to
 // the player. Subtracting it is what keeps the tuning exact.
-constexpr double LOOP_FILTER_DELAY_SAMPLES = 0.5;
+//
+// DERIVED from the number of stages above, and never written by hand: adding a stage without moving this
+// would silently break the tuning of the whole instrument.
+constexpr double LOOP_FILTER_DELAY_SAMPLES = 0.5 * static_cast<double>( LOOP_FILTER_STAGES );
+
+// How the HAMMER is shaped before it strikes the string: a one pole low pass, in hertz.
+//
+// This is the single most important number for how the instrument sounds, and the reason is worth writing
+// down. The loop filter in the string only takes the top off the harmonics AS THE NOTE RINGS; the first
+// milliseconds keep whatever spectrum the hammer brought in. And a two point average - the obvious way to
+// soften noise - barely attenuates anything below a quarter of the sample rate, so it leaves the 1 to 8 kHz
+// band exactly where it was. That band is what "aigu et numérique" describes.
+//
+// A real hammer settles this by itself: felt compresses and lets go over a millisecond or so, which caps how
+// fast the string can be pushed. 1200 Hz is that behaviour, and a soft mallet besides.
+//
+// It sits OUTSIDE the loop, which matters: shaping the excitation cannot move the pitch by even a cent.
+constexpr double HAMMER_CUTOFF_HZ = 500.0;
 
 // Ratio between two frequencies a given number of cents apart.
 [[nodiscard]] double centsToRatio( double p_cents )
@@ -204,21 +230,27 @@ void ToneSynthesizer::mixStruckStringInto( std::span<float> p_samples,
         p_sample -= static_cast<float>( meanExcitation );
     } );
 
-    // And it is smoothed once, for two reasons that point the same way.
+    // And it is low passed, once, with a real filter.
     //
-    // It rounds off the hammer: a raw burst of noise has tall isolated peaks, and a real hammer does not
-    // click. And it lowers the crest factor, which is what limits how loud the note can be: the ceiling
-    // below is set by the tallest peak, so a spiky attack forces every note to be quieter than it needs to
-    // be - and forces different notes by different amounts, which is exactly the loudness difference this
-    // whole rewrite is trying to remove.
-    float previousExcitation = delayLine.back();
+    // Three reasons that all point the same way: it softens the hammer (see HAMMER_CUTOFF_HZ, which is where
+    // "doux" is decided); it lowers the crest factor, which is what limits how loud the note can be, since the
+    // ceiling below is set by the tallest peak; and a spiky attack therefore forces different notes to be
+    // quieter by different amounts, which is exactly the loudness difference this model exists to remove.
+    //
+    // A one pole filter and not a two point average: the average only bites near half the sample rate, and the
+    // brightness that has to go is one octave lower than that.
+    {
+        const auto filterCoefficient = static_cast<float>(
+          std::exp( -2.0 * std::numbers::pi * HAMMER_CUTOFF_HZ / static_cast<double>( m_sampleRate ) ) );
 
-    std::ranges::for_each( delayLine, [&previousExcitation]( float & p_sample ) {
-        const float smoothed = 0.5F * ( p_sample + previousExcitation );
+        float previousExcitation = 0.0F;
 
-        previousExcitation = p_sample;
-        p_sample = smoothed;
-    } );
+        std::ranges::for_each( delayLine, [&previousExcitation, filterCoefficient]( float & p_sample ) {
+            previousExcitation = ( ( 1.0F - filterCoefficient ) * p_sample ) + ( filterCoefficient * previousExcitation );
+
+            p_sample = previousExcitation;
+        } );
+    }
 
     // The loss on every round trip, derived from the time the string takes to fall by 60 dB.
     const auto loopLoss = static_cast<float>(
@@ -226,7 +258,9 @@ void ToneSynthesizer::mixStruckStringInto( std::span<float> p_samples,
 
     std::size_t readIndex = 0;
 
-    float previousDelayedSample = 0.0F;
+    // What each stage of the loop filter produced on the PREVIOUS sample, which is what makes the average a
+    // low pass rather than a plain sum.
+    std::array<float, LOOP_FILTER_STAGES> previousStageOutputs{};
 
     for( float & sample : p_samples )
     {
@@ -238,14 +272,20 @@ void ToneSynthesizer::mixStruckStringInto( std::span<float> p_samples,
         const float delayedSample =
           currentSample + ( delayFraction * ( delayLine.at( nextIndex ) - currentSample ) );
 
-        // The loop filter: the average of two consecutive samples, which is a low pass. It is what makes
-        // the HIGH harmonics die first, and therefore the whole reason the result sounds struck rather
-        // than held.
-        const float filteredSample = loopLoss * 0.5F * ( delayedSample + previousDelayedSample );
+        // The loop filter: LOOP_FILTER_STAGES passes of a two point average, each of which is a low pass. It
+        // is what makes the HIGH harmonics die first, and therefore the whole reason the result sounds struck
+        // rather than held - and how many passes there are is what decides how soft it sounds.
+        float stageInput = delayedSample;
 
-        delayLine.at( readIndex ) = filteredSample;
+        for( float & previousStageOutput : previousStageOutputs )
+        {
+            const float stageOutput = 0.5F * ( stageInput + previousStageOutput );
 
-        previousDelayedSample = delayedSample;
+            previousStageOutput = stageInput;
+            stageInput = stageOutput;
+        }
+
+        delayLine.at( readIndex ) = loopLoss * stageInput;
 
         sample += delayedSample;
 
