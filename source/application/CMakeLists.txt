@@ -27,6 +27,36 @@ musichienFunction_ConfigureTarget(musichien_app)
 # displayed file, so that a change in a .qml file triggers a rebuild of the resources.
 target_sources(musichien_app PRIVATE ${MUSICHIEN_QML_FILES})
 
+# ---------------------------------------------------------------------------------------------------------------------
+# QML import scanning - what makes the Android package able to start
+#
+# Qt EMBEDS, inside the Android package, the QML plugins the application actually imports: the
+# QtQuick controls, their Material style, the layouts... To decide which ones, it runs
+# 'qmlimportscanner' over the directories declared in the deployment settings.
+#
+# Those directories come from the QT_QML_ROOT_PATH property. When it is NOT set, Qt falls back to the
+# SOURCE_DIR of the TARGET - see _qt_internal_android_get_qml_root_paths in Qt6AndroidGradleHelpers.cmake.
+# Here that is 'source/application', which contains NO QML AT ALL: the QML files live in the ui
+# module. The scanner therefore finds nothing, bundles no plugin, and the application dies on the
+# phone, right after a successful install, with:
+#
+#     QQmlApplicationEngine failed to load component
+#     qrc:/qml/Main.qml:16:1: module "QtQuick.Controls" plugin
+#     "qml_QtQuick_Controls_qtquickcontrols2plugin" not found
+#
+# Nothing warns at build time, and the desktop build is unaffected, because there the plugins are
+# taken from the Qt installation on the machine. Only the phone reveals it.
+#
+# Naming the directory that holds the QML files is the whole fix. It is exported by the ui module,
+# which owns them, so that moving a QML file only means updating one line there.
+# ---------------------------------------------------------------------------------------------------------------------
+if(ANDROID)
+    set_target_properties(musichien_app PROPERTIES
+        QT_QML_ROOT_PATH "${MUSICHIEN_QML_ROOT_PATH}"
+    )
+endif()
+
+
 # The version comes from the single project() call of the top level CMakeLists.txt.
 target_compile_definitions(musichien_app PRIVATE MUSICHIEN_VERSION="${PROJECT_VERSION}")
 
