@@ -15,6 +15,7 @@ set(MUSICHIEN_QML_RESOURCE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc PARENT
 # Listed explicitly rather than globbed: a new QML file must be added here on purpose, which keeps
 # the build honest and reproducible.
 set(MUSICHIEN_QML_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/qml/ExerciseScreen.qml
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/Main.qml
     PARENT_SCOPE
 )
@@ -36,6 +37,10 @@ set(MUSICHIEN_QML_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR} PARENT_SCOPE)
 # rules of the game stay in the domain, where they are testable without a graphical interface.
 # ---------------------------------------------------------------------------------------------------------------------
 musichienFunction_AddLibrary(ui
+    ExerciseSessionController.h
+    ExerciseSessionController.cpp
+    IntervalDescription.h
+    IntervalDescription.cpp
     IntervalPlaybackController.h
     IntervalPlaybackController.cpp
 )
@@ -58,6 +63,7 @@ if(MUSICHIEN_BUILD_TESTING)
 
     musichienFunction_AddTest(ui
         musichien_ui
+        ExerciseSessionController_test.cpp
         IntervalPlaybackController_test.cpp
     )
 

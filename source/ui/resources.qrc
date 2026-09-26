@@ -10,6 +10,7 @@
 -->
 <RCC>
     <qresource prefix="/">
+        <file>qml/ExerciseScreen.qml</file>
         <file>qml/Main.qml</file>
     </qresource>
 </RCC>

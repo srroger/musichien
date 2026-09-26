@@ -92,6 +92,9 @@ ApplicationWindow {
             id: scrollView
 
             anchors.fill: parent
+            // A session takes over the screen: the bench is not hidden, it is simply not what the
+            // application is doing at that moment.
+            visible: !ExerciseController.running
             clip: true
             // No horizontal scrolling: the content is laid out to fit the width it is given, and a
             // sideways scroll on a phone is always an accident.
@@ -146,6 +149,21 @@ ApplicationWindow {
 
                 Item {
                     Layout.preferredHeight: 8
+                }
+
+                // The way into the loop. It sits above the bench on purpose: the bench is a tool for
+                // building the project, and playing is what the application is FOR.
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 58
+                    highlighted: true
+                    text: qsTr("Jouer")
+                    onClicked: ExerciseController.startSession()
+                }
+
+                Item {
+                    Layout.preferredHeight: 6
                 }
 
                 Button {
@@ -338,6 +356,15 @@ ApplicationWindow {
 
             }
 
+        }
+
+        // The loop itself, and the only thing the player ever sees of it: the bench below is a tool for
+        // building the project, this is the game.
+        ExerciseScreen {
+            id: exerciseScreen
+
+            anchors.fill: parent
+            visible: ExerciseController.running
         }
 
         gradient: Gradient {

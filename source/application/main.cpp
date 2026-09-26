@@ -6,6 +6,7 @@
 // =====================================================================================================================
 
 #include "infrastructure/audio/QAudioNotePlayer.h"
+#include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
 
 #include <QGuiApplication>
@@ -75,6 +76,16 @@ int main( int p_argumentCount, char * p_arguments[] )
                                   QML_MODULE_MINOR_VERSION,
                                   "IntervalController",
                                   &intervalController );
+
+    // The exercise screen has its own view model. It receives the SAME port, and neither controller
+    // knows the other exists: the bench and the loop are two independent uses of the same domain.
+    musichien::ui::ExerciseSessionController exerciseController{ notePlayer };
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "ExerciseController",
+                                  &exerciseController );
 
     QQmlApplicationEngine qmlEngine;
 

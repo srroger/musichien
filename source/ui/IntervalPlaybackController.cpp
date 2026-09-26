@@ -1,6 +1,7 @@
 #include "ui/IntervalPlaybackController.h"
 
 #include "domain/music/Interval.h"
+#include "ui/IntervalDescription.h"
 
 #include <QString>
 
@@ -17,35 +18,11 @@ namespace
 // Middle C, the reference note of every exercise of the first world.
 constexpr std::int32_t ROOT_MIDI_NUMBER = 60;
 
-// A perfect fifth above the root: seven semitones.
-constexpr std::int32_t PERFECT_FIFTH_SEMITONES = 7;
-
 // Silence left between the two notes of a melodic interval.
 //
 // Long enough to hear two distinct notes, short enough to still hear them as one interval. This value
 // is a musical decision, not a technical one: it will be tuned by ear.
 constexpr std::chrono::milliseconds MELODIC_GAP{ 280 };
-
-// Describes an interval for the interface.
-//
-// Every key is filled every time, and the interface reads them without checking: an empty map is what
-// says "nothing to name", and it is what a single note produces.
-//
-// 'identifier' is the stable name a save file would keep, 'name' is the one a human reads. The rest
-// describes the MODEL rather than the interval, and exists so that the model can be seen while it is
-// being tested: the exercise screens will simply ignore the keys they do not need.
-[[nodiscard]] QVariantMap describeInterval( const domain::Interval & p_interval )
-{
-    return QVariantMap{
-      { QStringLiteral( "identifier" ), QString::fromStdString( p_interval.identifier() ) },
-      { QStringLiteral( "name" ), QString::fromStdString( p_interval.name() ) },
-      { QStringLiteral( "semitones" ), p_interval.semitones() },
-      { QStringLiteral( "intervalClass" ), p_interval.intervalClass() },
-      { QStringLiteral( "octaveSpan" ), p_interval.octaveSpan() },
-      { QStringLiteral( "number" ), p_interval.number() },
-      { QStringLiteral( "isCompound" ), p_interval.isCompound() },
-    };
-}
 
 }    // namespace
 
