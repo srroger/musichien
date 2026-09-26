@@ -13,8 +13,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# setup_env.sh is sourced into a normal shell and must not inherit 'set -u': nounset would abort it on
+# the first variable that is not defined yet. The option is restored right after the source.
+set +u
 # shellcheck source=setup_env.sh
 source "${SCRIPT_DIR}/setup_env.sh"
+set -u
+
 
 echo "Opening Qt Creator with the Musichien environment..."
 

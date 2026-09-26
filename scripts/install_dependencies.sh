@@ -163,10 +163,14 @@ echo "--- Step 4/4: source built dependencies ----------------------------------
 
 if [ "${WITH_SUPERBUILD}" = "ON" ]; then
 
+    # setup_env.sh must not inherit 'set -u': nounset would abort it on the first undefined variable.
+    set +u
     source "${SCRIPT_DIR}/setup_env.sh"
+    set -u
 
     cmake --preset "Superbuild Musichien"
     cmake --build --preset "Build Superbuild Musichien"
+
 
     echo "  dependencies installed into ${MUSICHIEN_EXTERNAL_DIR}"
 

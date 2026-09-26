@@ -13,6 +13,28 @@
 # =====================================================================================================================
 
 # ---------------------------------------------------------------------------------------------------------------------
+# Guard: this file only does anything useful when it is SOURCED.
+#
+# Executed instead of sourced, it would still print the summary at the end, but every export would be
+# lost the moment the script terminates. The user would see nothing wrong, while the build quietly
+# used the Qt of the machine. Failing loudly is the only safe behaviour here.
+# ---------------------------------------------------------------------------------------------------------------------
+if [ -n "${BASH_VERSION:-}" ] && [ "${BASH_SOURCE[0]:-}" = "${0:-}" ]; then
+    echo "Musichien: ERROR - this script must be SOURCED, not executed."
+    echo ""
+    echo "           Wrong:  scripts/setup_env.sh"
+    echo "           Right:  source scripts/setup_env.sh"
+    echo ""
+    return 1 2>/dev/null || exit 1
+fi
+
+# ---------------------------------------------------------------------------------------------------------------------
+# This file is sourced into arbitrary shells, including shells running with 'set -u'. Every reference
+# to a variable that may not be defined yet therefore uses the ${VAR:-} form. Without that precaution,
+# 'set -u' inherited from a caller script aborts the whole environment setup on the first line.
+# ---------------------------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------------------------------
 # Root of the project
 # ---------------------------------------------------------------------------------------------------------------------
 if [ -n "${BASH_SOURCE[0]}" ]; then
@@ -27,11 +49,11 @@ export MUSICHIEN_PROJECT_DIR
 #
 # Follows the convention of the other projects: a sibling folder holding every pinned dependency.
 # ---------------------------------------------------------------------------------------------------------------------
-if [ -z "${MUSICHIEN_EXTERNAL_DIR}" ]; then
-    MUSICHIEN_EXTERNAL_DIR="$(cd "${MUSICHIEN_PROJECT_DIR}/../Roger-externals" 2>/dev/null && pwd)"
+if [ -z "${MUSICHIEN_EXTERNAL_DIR:-}" ]; then
+    MUSICHIEN_EXTERNAL_DIR="$(cd "${MUSICHIEN_PROJECT_DIR}/../Roger-externals" 2>/dev/null && pwd || true)"
 fi
 
-if [ -z "${MUSICHIEN_EXTERNAL_DIR}" ]; then
+if [ -z "${MUSICHIEN_EXTERNAL_DIR:-}" ]; then
     echo "Musichien: WARNING - no external dependencies directory found."
     echo "           Create it and re-source this script:"
     echo "             mkdir -p ${MUSICHIEN_PROJECT_DIR}/../Roger-externals"
@@ -44,9 +66,10 @@ fi
 #
 # CLANG_DIR is expected by CMakePresets.json.
 # ---------------------------------------------------------------------------------------------------------------------
-if [ -z "${CLANG_DIR}" ]; then
+if [ -z "${CLANG_DIR:-}" ]; then
     export CLANG_DIR="/usr/bin"
 fi
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 # CMake and Ninja
@@ -55,10 +78,11 @@ fi
 # them as well means the build does not change when the system versions are upgraded.
 # The newest pinned version wins; the system tool is used only if none is pinned.
 # ---------------------------------------------------------------------------------------------------------------------
-if [ -n "${MUSICHIEN_EXTERNAL_DIR}" ]; then
+if [ -n "${MUSICHIEN_EXTERNAL_DIR:-}" ]; then
 
     PINNED_CMAKE_DIR="$(find "${MUSICHIEN_EXTERNAL_DIR}" -maxdepth 1 -mindepth 1 -type d -name 'cmake-*' \
                         2>/dev/null | sort -V | tail -n 1)"
+
 
     if [ -n "${PINNED_CMAKE_DIR}" ] && [ -x "${PINNED_CMAKE_DIR}/bin/cmake" ]; then
         export PATH="${PINNED_CMAKE_DIR}/bin:${PATH}"
@@ -94,7 +118,10 @@ fi
 # Prints "<version><TAB><directory>" for every pinned Qt installation found.
 musichien_list_pinned_qt_installations()
 {
+    [ -n "${MUSICHIEN_EXTERNAL_DIR:-}" ] || return 0
+
     if [ -d "${MUSICHIEN_EXTERNAL_DIR}/Qt" ]; then
+
         find "${MUSICHIEN_EXTERNAL_DIR}/Qt" -maxdepth 1 -mindepth 1 -type d -name '6.*' 2>/dev/null |
         while IFS= read -r versionDirectory; do
             printf '%s\t%s\n' "$(basename "${versionDirectory}")" "${versionDirectory}/gcc_64"
@@ -107,7 +134,8 @@ musichien_list_pinned_qt_installations()
     done
 }
 
-if [ -z "${MUSICHIEN_QT_DIR}" ] || [ "${MUSICHIEN_QT_IS_FALLBACK:-0}" = "1" ]; then
+if [ -z "${MUSICHIEN_QT_DIR:-}" ] || [ "${MUSICHIEN_QT_IS_FALLBACK:-0}" = "1" ]; then
+
 
     TAB_CHARACTER="$(printf '\t')"
 
@@ -128,8 +156,9 @@ if [ -z "${MUSICHIEN_QT_DIR}" ] || [ "${MUSICHIEN_QT_IS_FALLBACK:-0}" = "1" ]; t
 
 fi
 
-if [ -z "${MUSICHIEN_QT_DIR}" ]; then
-    echo "Musichien: WARNING - no pinned Qt found in '${MUSICHIEN_EXTERNAL_DIR}'."
+if [ -z "${MUSICHIEN_QT_DIR:-}" ]; then
+    echo "Musichien: WARNING - no pinned Qt found in '${MUSICHIEN_EXTERNAL_DIR:-}'."
+
     echo "           Falling back to the Qt installed on this machine (/usr):"
     echo "           the build is then NOT reproducible. See docs/BUILD_AND_SETUP.md"
     export MUSICHIEN_QT_DIR="/usr"
@@ -151,7 +180,7 @@ echo "--------------------------------------------------------------------------
 echo "  MUSICHIEN_PROJECT_DIR   = ${MUSICHIEN_PROJECT_DIR}"
 echo "  MUSICHIEN_EXTERNAL_DIR  = ${MUSICHIEN_EXTERNAL_DIR:-<not set>}"
 echo "  MUSICHIEN_QT_VERSION    = ${MUSICHIEN_QT_VERSION:-<not found>}"
-echo "  MUSICHIEN_QT_DIR        = ${MUSICHIEN_QT_DIR}"
+echo "  MUSICHIEN_QT_DIR        = ${MUSICHIEN_QT_DIR:-<not set>}"
 echo "  CLANG_DIR               = ${CLANG_DIR}"
 echo "  cmake                   = $(command -v cmake) ($(cmake --version 2>/dev/null | head -1))"
 echo "  ninja                   = $(command -v ninja)"
