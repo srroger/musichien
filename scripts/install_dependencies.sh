@@ -168,6 +168,14 @@ fi
 
 AQT="$(command -v aqt || echo "${HOME}/.local/bin/aqt")"
 
+# aqt writes an "aqtinstall.log" file in the current directory. Running it from a temporary directory
+# keeps the project tree clean.
+run_aqt()
+{
+    ( cd /tmp && "${AQT}" "$@" )
+}
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # 3. Qt
 #
@@ -217,16 +225,17 @@ QT_MODULES=(
 echo "  selected Qt version: ${QT_VERSION}"
 echo "  modules: ${QT_MODULES[*]}"
 echo "  installing Qt for the desktop (linux_gcc_64)..."
-"${AQT}" install-qt linux desktop "${QT_VERSION}" linux_gcc_64 \
+run_aqt install-qt linux desktop "${QT_VERSION}" linux_gcc_64 \
     -m "${QT_MODULES[@]}" \
     -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
 
 if [ "${WITH_ANDROID}" = "ON" ]; then
     echo "  installing Qt for Android (android_arm64_v8a) with the same modules..."
-    "${AQT}" install-qt linux android "${QT_VERSION}" android_arm64_v8a \
+    run_aqt install-qt linux android "${QT_VERSION}" android_arm64_v8a \
         -m "${QT_MODULES[@]}" \
         --autodesktop -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
 fi
+
 
 
 echo

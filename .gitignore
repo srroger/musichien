@@ -11,6 +11,15 @@
 /out/
 
 # ---------------------------------------------------------------------------------------------------------------------
+# Tool output
+#
+# aqt (the Qt installer) writes aqtinstall.log in the current directory when it is not run from a
+# temporary one. scripts/install_dependencies.sh now avoids that, but the ignore rule stays as a
+# safety net.
+# ---------------------------------------------------------------------------------------------------------------------
+aqtinstall.log
+
+# ---------------------------------------------------------------------------------------------------------------------
 # CMake and IDE artefacts
 # ---------------------------------------------------------------------------------------------------------------------
 CMakeUserPresets.json
