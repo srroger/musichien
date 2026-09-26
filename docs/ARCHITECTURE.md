@@ -114,10 +114,14 @@ perdre. Exportable et importable : l'utilisateur n'est jamais prisonnier de l'ap
 
 | Sujet | État |
 |---|---|
-| **Réflexion C++26 (P2996)** | ❌ **indisponible** sur la toolchain actuelle : `-freflection` est inconnu de Clang 22 et `<experimental/meta>` n'existe pas. À activer dès qu'un support stable arrive. |
-| **Sortie audio basse latence** | À faire. `QAudioSink` en premier lieu ; `Oboe` directement si la latence est insuffisante. |
-| **SoundFonts** | À choisir. C'est la façon économique d'avoir plusieurs instruments crédibles. |
-| **Android** | NDK **r27c (27.2.12479018)** imposé par Qt — la version de référence des binaires Qt officiels. |
+| **Qt minimum : 6.11** | ✅ **Vérifié et imposé.** Qt 6.10 et antérieurs ne compilent pas en C++26 (`std::saturate_cast` renommé en `std::saturating_cast`). Refus explicite au moment de la configuration. |
+| **Layout audio de sortie** | ✅ Le **layout du périphérique** est utilisé (stéréo en général) et le signal **mono est dupliqué sur tous les canaux**. Demander un flux **mono** faisait sortir le son du **canal gauche uniquement**, selon le back-end. |
+| **Format d'échantillon** | ⚠️ **Float 32 bits exigé.** Le repli vers **Int16** n'est pas implémenté : si un périphérique ne propose que de l'Int16, la lecture reste silencieuse avec un message clair. À faire si Android le réclame. |
+| **Latence audio** | À mesurer. Aucune optimisation de latence n'a encore été faite : le tampon complet est poussé en une seule écriture, ce qui convient à une note mais pas à un métronome. |
+| **Réflexion C++26 (P2996)** | ❌ **indisponible** : `-freflection` inconnu de Clang 22, `<experimental/meta>` absent. À activer dès qu'un support stable arrive. |
+| **SoundFonts** | À choisir : c'est la façon économique d'avoir plusieurs instruments crédibles. |
+| **Android** | NDK **r27c (27.2.12479018)** imposé par Qt, et **JDK 21** (jamais le JDK 26 du système). |
+
 
 ---
 
