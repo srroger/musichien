@@ -104,4 +104,103 @@ TEST( IntervalTest, a_single_note_contains_no_interval )
     EXPECT_TRUE( intervalsOf( singleNote ).empty() );
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// Simple and compound intervals
+//
+// These tests pin down the boundary the whole model rests on: an interval KEEPS its octaves, so a
+// ninth is not a second, and the naming follows the theory as far as the fifteenth.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( IntervalTest, an_octave_is_a_perfect_octave )
+{
+    constexpr Note lowerNote{ 60 };    // C4
+    constexpr Note upperNote{ 72 };    // C5
+
+    const Interval interval = intervalBetween( lowerNote, upperNote );
+
+    EXPECT_EQ( 12, interval.semitones() );
+    EXPECT_EQ( "P8", interval.identifier() );
+    EXPECT_EQ( "Perfect octave", interval.name() );
+    EXPECT_TRUE( interval.isCompound() );
+    EXPECT_FALSE( interval.isSimple() );
+    EXPECT_EQ( 1, interval.octaveSpan() );
+    EXPECT_EQ( 8, interval.number() );
+}
+
+TEST( IntervalTest, a_ninth_is_not_a_second )
+{
+    constexpr Note tonic{ 60 };        // C4
+    constexpr Note ninthNote{ 74 };    // D5, one octave above the second
+
+    const Interval second = intervalFromSemitones( 2 );
+    const Interval ninth = intervalBetween( tonic, ninthNote );
+
+    EXPECT_EQ( "M2", second.identifier() );
+    EXPECT_EQ( "M9", ninth.identifier() );
+    EXPECT_EQ( "Major ninth", ninth.name() );
+    EXPECT_EQ( 9, ninth.number() );
+
+    // Both are the same colour heard one register higher, which is exactly what the class expresses.
+    EXPECT_EQ( second.intervalClass(), ninth.intervalClass() );
+    EXPECT_TRUE( second.isSimple() );
+    EXPECT_TRUE( ninth.isCompound() );
+}
+
+TEST( IntervalTest, the_chord_extensions_of_jazz_are_named )
+{
+    // The eleventh and the thirteenth are what an extended chord is built on, and naming them is the
+    // whole reason the model stopped throwing the octaves away.
+    const Interval eleventh = intervalFromSemitones( 17 );
+
+    EXPECT_EQ( "P11", eleventh.identifier() );
+    EXPECT_EQ( "Perfect eleventh", eleventh.name() );
+    EXPECT_EQ( 11, eleventh.number() );
+
+    const Interval thirteenth = intervalFromSemitones( 21 );
+
+    EXPECT_EQ( "M13", thirteenth.identifier() );
+    EXPECT_EQ( "Major thirteenth", thirteenth.name() );
+    EXPECT_EQ( 13, thirteenth.number() );
+}
+
+TEST( IntervalTest, a_falling_octave_is_still_an_octave )
+{
+    constexpr Note upperNote{ 72 };    // C5
+    constexpr Note lowerNote{ 60 };    // C4
+
+    EXPECT_EQ( "P8", intervalBetween( upperNote, lowerNote ).identifier() );
+}
+
+TEST( IntervalTest, nothing_reaches_past_the_fifteenth )
+{
+    // Two whole octaves: the widest interval that still has a name of its own.
+    const Interval doubleOctave = intervalFromSemitones( MAXIMUM_INTERVAL_SEMITONES );
+
+    EXPECT_EQ( "P15", doubleOctave.identifier() );
+    EXPECT_EQ( "Perfect fifteenth", doubleOctave.name() );
+    EXPECT_EQ( 15, doubleOctave.number() );
+
+    // Anything wider is reduced rather than wrapped. Wrapping would silently turn an unplayable
+    // request into a valid but WRONG interval, which is far worse than a saturated one.
+    EXPECT_EQ( doubleOctave, intervalFromSemitones( 30 ) );
+    EXPECT_EQ( doubleOctave, intervalFromSemitones( 127 ) );
+    EXPECT_EQ( doubleOctave, intervalFromSemitones( -127 ) );
+}
+
+TEST( IntervalTest, every_interval_up_to_the_fifteenth_is_named )
+{
+    // The naming tables are indexed by the number of the interval, so this test is what guarantees
+    // that no distance can ever reach past them: it walks the whole usable range.
+    for( std::int32_t semitones = 0; semitones <= MAXIMUM_INTERVAL_SEMITONES; ++semitones )
+    {
+        const Interval interval = intervalFromSemitones( semitones );
+
+        EXPECT_EQ( semitones, interval.semitones() );
+        EXPECT_FALSE( interval.identifier().empty() ) << "semitones = " << semitones;
+        EXPECT_FALSE( interval.name().empty() ) << "semitones = " << semitones;
+        EXPECT_GE( interval.number(), 1 ) << "semitones = " << semitones;
+        EXPECT_LE( interval.number(), 15 ) << "semitones = " << semitones;
+    }
+}
+
 }    // namespace musichien::domain
