@@ -42,6 +42,14 @@ public:
     // Plays the notes at the same time, the way a harmonic interval or a chord is heard.
     virtual void playChord( std::span<const Note> p_notes ) = 0;
 
+    // Plays the short cue that marks a mistake.
+    //
+    // A cue is NOT an interval, and the domain says so here rather than leaving the distinction to the
+    // adapter: it has no pitch, it is not something to be recognised, and it must never be mistaken for
+    // one of the sounds being taught. What it sounds like is the adapter's business - that a mistake is
+    // AUDIBLE is the domain's.
+    virtual void playMistakeCue() = 0;
+
     // Stops everything immediately. Called when the screen is left or the application goes to the
     // background: an audio stream left open on a phone is a battery drain and a bug.
     virtual void stopAll() = 0;

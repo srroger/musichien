@@ -10,6 +10,14 @@
 -->
 <RCC>
     <qresource prefix="/">
+        <file>qml/ExerciseScreen.qml</file>
         <file>qml/Main.qml</file>
+        <!--
+          The content files live at the root of the project, as docs/ARCHITECTURE.md requires, and the
+          alias gives each one the runtime path it has on disk: ':/assets/content/...'. An alias rather
+          than a relative path is what keeps the resource path identical to the real one, which is what
+          removes a whole class of "found on the desktop, missing on the phone" bugs.
+        -->
+        <file alias="assets/content/interval-hints.json">../../assets/content/interval-hints.json</file>
     </qresource>
 </RCC>

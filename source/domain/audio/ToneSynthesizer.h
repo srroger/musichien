@@ -40,6 +40,26 @@ public:
     // difference would be a hint that has nothing to do with the interval.
     static constexpr float TARGET_PEAK_AMPLITUDE = 0.75F;
 
+    // Peak level of the cue that marks a mistake, deliberately BELOW the notes.
+    //
+    // Noise at the same peak as a tone sounds much louder than the tone, and a cue is there to be
+    // noticed, not to make the player jump. Two sounds that are meant to carry different weights should
+    // not be normalised to the same number.
+    static constexpr float MISTAKE_CUE_PEAK_AMPLITUDE = 0.30F;
+
+    // The cue that marks a mistake, as a SHORT NOISE BURST.
+    //
+    // Noise, and not a note: this is a musical decision before it is a technical one. A cue with a pitch
+    // would teach the ear to associate a note with failure, and what a note means is exactly what this
+    // application exists to train. A noise burst has no pitch to learn, which is the whole point.
+    //
+    // The sequence comes from a FIXED seed: the domain owns no entropy source of its own, and two runs
+    // must produce the same cue. It is also what makes the burst testable.
+    [[nodiscard]] std::vector<float> renderMistakeCue( std::chrono::milliseconds p_duration ) const;
+
+    // How long the cue lasts: short enough to be a punctuation mark rather than a sound of its own.
+    static constexpr std::chrono::milliseconds MISTAKE_CUE_DURATION{ 90 };
+
     explicit ToneSynthesizer( std::int32_t p_sampleRate );
 
     [[nodiscard]] std::int32_t sampleRate() const noexcept { return m_sampleRate; }
@@ -63,6 +83,9 @@ public:
 private:
     // Applies the fade in and the fade out over a buffer already filled with the raw waveform.
     void applyEnvelope( std::span<float> p_samples ) const;
+
+    // Scales the buffer so that its peak equals p_targetPeak.
+    static void normalisePeakTo( std::span<float> p_samples, float p_targetPeak );
 
     // Scales the buffer so that its peak equals TARGET_PEAK_AMPLITUDE.
     static void normalisePeak( std::span<float> p_samples );

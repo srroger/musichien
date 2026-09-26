@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <numbers>
+#include <random>
 #include <ranges>
 #include <span>
 
@@ -16,6 +18,18 @@ namespace
 
 // Full turn, in radians, used to convert a frequency into an angular step.
 constexpr double TWO_PI = 2.0 * std::numbers::pi;
+
+// Seed of the noise of the mistake cue.
+//
+// Fixed, and deliberately so: the domain owns no entropy source of its own, and the same cue must come
+// out of every run and every machine. A cue that changed each time would also be impossible to test.
+constexpr std::uint32_t MISTAKE_CUE_SEED = 20260926U;
+
+// How fast the noise burst dies out, as an exponent applied over its whole length.
+//
+// Chosen so that the end of the burst is around a thousandth of its start: silence, to the ear, without
+// needing a separate fade. The envelope is applied on top of it all the same - see renderMistakeCue.
+constexpr double MISTAKE_CUE_DECAY = 6.0;
 
 }    // namespace
 
@@ -175,6 +189,11 @@ void ToneSynthesizer::applyEnvelope( std::span<float> p_samples ) const
 
 void ToneSynthesizer::normalisePeak( std::span<float> p_samples )
 {
+    normalisePeakTo( p_samples, TARGET_PEAK_AMPLITUDE );
+}
+
+void ToneSynthesizer::normalisePeakTo( std::span<float> p_samples, float p_targetPeak )
+{
     if( p_samples.empty() )
     {
         return;
@@ -191,9 +210,50 @@ void ToneSynthesizer::normalisePeak( std::span<float> p_samples )
         return;
     }
 
-    const float gain = TARGET_PEAK_AMPLITUDE / peak;
+    const float gain = p_targetPeak / peak;
 
     std::ranges::for_each( p_samples, [gain]( float & p_sample ) { p_sample *= gain; } );
+}
+
+std::vector<float> ToneSynthesizer::renderMistakeCue( std::chrono::milliseconds p_duration ) const
+{
+    const std::size_t sampleCount = sampleCountFor( p_duration );
+
+    std::vector<float> samples( sampleCount, 0.0F );
+
+    if( sampleCount == 0 )
+    {
+        return samples;
+    }
+
+    // The seed is fixed: see the header. The draw itself is uniform over the whole range of a sample,
+    // which is the simplest way to get something with no pitch and no memory.
+    // The constant seed is the POINT here, and the check cannot know that: a cue has to be the same
+    // every time, and a cue that changed would be impossible to recognise.
+    // NOLINTNEXTLINE(bugprone-random-generator-seed, cert-msc32-c, cert-msc51-cpp)
+    std::mt19937 noiseEngine{ MISTAKE_CUE_SEED };
+
+    std::uniform_real_distribution<float> amplitudeDistribution{ -1.0F, 1.0F };
+
+    for( const std::size_t sampleIndex : std::views::iota( std::size_t{ 0 }, sampleCount ) )
+    {
+        // A decay over the whole burst, so that it reads as a brief "thud" rather than a hiss.
+        const float progress = static_cast<float>( sampleIndex ) / static_cast<float>( sampleCount );
+
+        const auto decay =
+          static_cast<float>( std::exp( -MISTAKE_CUE_DECAY * static_cast<double>( progress ) ) );
+
+        samples.at( sampleIndex ) = amplitudeDistribution( noiseEngine ) * decay;
+    }
+
+    // The same fade in and fade out as a note, and for the same reason: a burst that starts or stops
+    // abruptly adds a CLICK of its own, which is the artefact the envelope exists to remove.
+    applyEnvelope( samples );
+
+    // And a LOWER target than a note, because noise at the same peak sounds louder than a tone.
+    normalisePeakTo( samples, MISTAKE_CUE_PEAK_AMPLITUDE );
+
+    return samples;
 }
 
 }    // namespace musichien::domain

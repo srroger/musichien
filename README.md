@@ -13,7 +13,8 @@ ni traçage, ni compte utilisateur, et **ne peut techniquement pas communiquer s
 
 | Règle | Comment elle est garantie |
 |---|---|
-| **Hors-ligne** | L'application ne déclare **aucune permission `INTERNET`**. Sans cette déclaration, Android refuse tout accès réseau : ce n'est pas une promesse, c'est une impossibilité technique. |
+| **Hors-ligne** | L'application ne déclare **aucune permission `INTERNET`**, et le build **refuse** de produire un paquet qui en demanderait une. Sans cette déclaration, Android maintient le processus hors du groupe `inet` : ce n'est pas une promesse, c'est une impossibilité technique. |
+| **Permissions maîtrisées** | Deux permissions seulement sont acceptées, et **chacune doit se justifier** : `POST_NOTIFICATIONS` (afficher le rappel) et `RECORD_AUDIO` (le pilier chant). Toute autre fait **échouer le build**. La liste vit dans `scripts/build_android.sh`, chaque entrée avec sa raison d'être. |
 | **Aucun traçage** | Aucun SDK Google, Firebase, analytics, publicité ou achat intégré. Jamais. |
 | **Données locales** | Tout vit dans le dossier privé de l'application, avec export/import JSON pour ne jamais être prisonnier. |
 | **Libre** | Licence **GPL-3.0** : toute version dérivée doit rester libre. |

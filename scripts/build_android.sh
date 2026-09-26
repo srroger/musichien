@@ -170,22 +170,63 @@ read_declared_permissions()
     fi
 }
 
-# Refuses to go on when a package requests a SYSTEM permission.
+# ---------------------------------------------------------------------------------------------------------------------
+# The permissions the application is allowed to ask Android for.
 #
-# Only the ones starting with 'android.permission.' matter: those are what grants a capability, the
-# network first of all.
+# Musichien is offline, local and private: it must never be able to reach the network. That is not a
+# declaration of intent, it is a property of the package, and verifying it is the whole point of this
+# script.
 #
-# The package's own permission does not, and cannot be avoided. androidx.core declares one named
-# after the application ('<package>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION') with a signature
-# protection level. It is declared BY the application, can only be held by applications signed with
-# the same key, grants nothing outside of itself, and never shows up in the system settings.
+# The list is deliberately tiny, and every entry has to justify itself:
+#
+#   POST_NOTIFICATIONS  the daily reminder. It answers one question and one only - "may I display a
+#                       notification?" - and grants access to NOTHING: no network, no file, no
+#                       camera, no microphone, no location. It is asked at run time, and refusing it
+#                       costs the reminder and nothing else.
+#
+#   RECORD_AUDIO        the voice pillar. Singing an interval back is half of ear training - one does
+#                       not learn to read without learning to write - which is why this one is
+#                       accepted even though it opens a real hardware input.
+#
+#   VIBRATE             a short buzz when an answer is wrong, doubling the shake of the screen so that
+#                       a mistake is felt and not only seen. It is a NORMAL permission: Android shows
+#                       no dialog for it, it grants access to NOTHING - no network, no file, no
+#                       camera, no microphone, no location - and the only hardware it reaches is the
+#                       vibrating motor.
+#
+# INTERNET is absent from this list, and can never be added to it: see the first rule below.
+# ---------------------------------------------------------------------------------------------------------------------
+ALLOWED_SYSTEM_PERMISSIONS=(
+    "android.permission.POST_NOTIFICATIONS"
+    "android.permission.RECORD_AUDIO"
+    "android.permission.VIBRATE"
+)
+
+# Refuses to go on when a package asks for a system permission it has no business asking for.
+#
+# Two rules, in this order:
+#
+#   1. 'android.permission.INTERNET' is forbidden, ALWAYS. It is what separates an application that
+#      can reach the network from one that cannot, and the second is the reason this project exists
+#      in the shape it has. The check is spelled out so that adding it to the allowlist above by
+#      accident would not be enough;
+#
+#   2. every other system permission must appear in that allowlist. A permission that is not there
+#      was not thought through, and an unthinking permission is how a private application quietly
+#      stops being one.
+#
+# The package's own permission is a different thing, and is not checked here: androidx.core declares
+# one named after the application ('<package>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION') with a
+# signature protection level. It is declared BY the application, can only be held by applications
+# signed with the same key, grants nothing outside of itself, and never shows up in the settings.
 #
 # The whole list is printed either way: a new entry must never go unnoticed.
-check_no_system_permission()
+check_declared_permissions()
 {
     local packagePath="$1"
     local declaredPermissions=""
     local systemPermissions=""
+    local unexpectedPermissions=""
 
     declaredPermissions="$(read_declared_permissions "${packagePath}" |
                           grep -oE '(android\.)?permission\.[A-Za-z0-9_.]+' | sort -u || true)"
@@ -204,20 +245,50 @@ check_no_system_permission()
         return 0
     fi
 
+    # Rule 1, the one that can never be relaxed, whatever the reason.
+    if printf '%s\n' "${systemPermissions}" | grep -qE '^android\.permission\.INTERNET$'; then
+        echo
+        echo "  ==============================================================================================="
+        echo "  FAILED - the package requests android.permission.INTERNET."
+        echo "  ==============================================================================================="
+        echo
+        echo "  This one is not negotiable. Without this declaration, Android keeps the process out of the"
+        echo "  'inet' group and every socket() call fails: the ABSENCE of the permission is the guarantee,"
+        echo "  and it is the kernel that enforces it, not our code."
+        echo
+        echo "  Most likely cause: androiddeployqt found its INSERT_PERMISSIONS marker again in"
+        echo "  source/android/AndroidManifest.xml and filled it with the permissions declared by the Qt"
+        echo "  modules. See the header of that file and cmake/musichienAndroid.cmake."
+        echo "  ==============================================================================================="
+        exit 1
+    fi
+
+    # Rule 2, the allowlist.
+    for permission in ${systemPermissions}; do
+        if ! printf '%s\n' "${ALLOWED_SYSTEM_PERMISSIONS[@]}" | grep -qxF "${permission}"; then
+            unexpectedPermissions="${unexpectedPermissions}${permission}"$'\n'
+        fi
+    done
+
+    if [ -n "${unexpectedPermissions}" ]; then
+        echo
+        echo "  ==============================================================================================="
+        echo "  FAILED - the package requests system permissions that are not in the allowlist."
+        echo "  ==============================================================================================="
+        printf '%s' "${unexpectedPermissions}" | sed 's/^/    /'
+        echo
+        echo "  A new permission is a decision, not a detail: it has to be justified, written down in"
+        echo "  ALLOWED_SYSTEM_PERMISSIONS at the top of this script, and explained in the project charter."
+        echo "  'android.permission.INTERNET' will never be accepted, whatever the argument."
+        echo "  ==============================================================================================="
+        exit 1
+    fi
+
     echo
-    echo "  ==============================================================================================="
-    echo "  FAILED - the package requests SYSTEM permissions."
-    echo "  ==============================================================================================="
+    echo "  OK - every system permission asked for is one the project decided to accept:"
     printf '%s\n' "${systemPermissions}" | sed 's/^/    /'
-    echo
-    echo "  Musichien must request NOTHING from the system. An 'android.permission.INTERNET' would let"
-    echo "  the application reach the network, which is exactly what the project promises never to do."
-    echo
-    echo "  Most likely cause: androiddeployqt found its INSERT_PERMISSIONS marker again in"
-    echo "  source/android/AndroidManifest.xml and filled it with the permissions declared by the Qt"
-    echo "  modules. See the header of that file and cmake/musichienAndroid.cmake."
-    echo "  ==============================================================================================="
-    exit 1
+
+    return 0
 }
 
 if [ -n "${APK_ANALYZER}" ]; then
@@ -226,11 +297,11 @@ else
     echo "  inspector: aapt2"
 fi
 
-check_no_system_permission "${PACKAGE_FILE}"
+check_declared_permissions "${PACKAGE_FILE}"
 
 echo
-echo "  OK - no system permission. The package cannot use the network, the camera or the microphone:"
-echo "       Android itself refuses, because the capabilities are not declared."
+echo "  Musichien stays unable to reach the network: 'android.permission.INTERNET' is absent, and this"
+echo "  build refuses to produce a package that would ask for it."
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Signing
@@ -346,10 +417,10 @@ PACKAGE_FILE="${SIGNED_PACKAGE_FILE}"
 # installed: a verification is only worth anything when it points at the artifact it approved.
 echo
 echo "  Re-checking the signed package..."
-check_no_system_permission "${PACKAGE_FILE}"
+check_declared_permissions "${PACKAGE_FILE}"
 
 echo
-echo "  OK - the signed package requests no system permission either."
+echo "  OK - the signed package passes the same check: what was verified is what will be installed."
 
 
 # ---------------------------------------------------------------------------------------------------------------------

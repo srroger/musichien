@@ -47,6 +47,7 @@ public:
     void playNote( const domain::Note & p_note ) override;
     void playMelody( std::span<const domain::Note> p_notes, std::chrono::milliseconds p_gap ) override;
     void playChord( std::span<const domain::Note> p_notes ) override;
+    void playMistakeCue() override;
     void stopAll() override;
 
     [[nodiscard]] std::chrono::milliseconds noteDuration() const override;
