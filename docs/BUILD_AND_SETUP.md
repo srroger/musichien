@@ -47,7 +47,8 @@ scripts/install_dependencies.sh --with-android --with-superbuild
 |---|---|
 | 1 | Installe les paquets système manquants (`pacman`) |
 | 2 | Installe **`aqtinstall`** via `pipx` |
-| 3 | **Découvre** la dernière version Qt disponible sur le miroir, puis l'installe dans `Roger-externals/Qt/` |
+| 3 | **Découvre** la dernière version Qt disponible sur le miroir, puis l'installe **avec les modules du projet** dans `Roger-externals/Qt/` |
+
 | 4 | Construit **GoogleTest 1.18.0** et **nlohmann/json 3.12.0** via le superbuild |
 
 ### Pourquoi `aqtinstall` et pas l'installeur officiel ?
@@ -69,7 +70,27 @@ C'est un **choix assumé** :
 
 Le superbuild du projet sert donc uniquement à ce que **nous** compilons : GoogleTest et nlohmann/json.
 
+### ⚠️ Les modules Qt sont **séparés**
+
+`aqt` n'installe par défaut que **qtbase** et **qtdeclarative**. Tout le reste est un **module
+distinct**, et un module manquant fait échouer `find_package(Qt6 COMPONENTS ...)` avec un message
+qui n'indique **pas** quoi faire :
+
+```
+Failed to find required Qt component "Multimedia".
+```
+
+| Module | Pourquoi Musichien en a besoin |
+|---|---|
+| **qtmultimedia** | `QAudioSink` / `QAudioSource` : **toute la sortie audio** du projet |
+| **qtshadertools** | Compilation des effets de shader QML à l'exécution |
+| **qt5compat** | `Qt5Compat.GraphicalEffects` : flou, halo, ombre portée — le « juice » du jeu |
+
+Le script les installe automatiquement, et la liste est une simple variable (`QT_MODULES`) en tête du
+script : **ajouter un module plus tard se fait en une ligne**.
+
 ### ⚠️ Pourquoi Qt 6.11 est un **minimum absolu**
+
 
 **Qt 6.10 et antérieurs ne compilent pas en C++26** avec une bibliothèque standard récente. Le projet
 refuse désormais ces versions au moment de la configuration, avec un message explicite.

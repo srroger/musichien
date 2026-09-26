@@ -200,15 +200,34 @@ if [ "$(printf '%s\n' "6.11" "${QT_VERSION}" | sort -V | head -n 1)" != "6.11" ]
 fi
 
 
+# Qt modules the project needs, ON TOP OF the base installation.
+#
+# aqt only installs qtbase and qtdeclarative by default. Everything else is a separate module, and a
+# missing one makes find_package(Qt6 COMPONENTS ...) fail with a message that does not say what to do.
+#
+#   qtmultimedia  -> QAudioSink / QAudioSource: the whole audio output of the application
+#   qtshadertools -> required to compile QML shader effects at run time
+#   qt5compat     -> Qt5Compat.GraphicalEffects: blur, glow, drop shadow - the "juice" of the game
+QT_MODULES=(
+    qtmultimedia
+    qtshadertools
+    qt5compat
+)
+
 echo "  selected Qt version: ${QT_VERSION}"
+echo "  modules: ${QT_MODULES[*]}"
 echo "  installing Qt for the desktop (linux_gcc_64)..."
-"${AQT}" install-qt linux desktop "${QT_VERSION}" linux_gcc_64 -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
+"${AQT}" install-qt linux desktop "${QT_VERSION}" linux_gcc_64 \
+    -m "${QT_MODULES[@]}" \
+    -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
 
 if [ "${WITH_ANDROID}" = "ON" ]; then
-    echo "  installing Qt for Android (android_arm64_v8a)..."
+    echo "  installing Qt for Android (android_arm64_v8a) with the same modules..."
     "${AQT}" install-qt linux android "${QT_VERSION}" android_arm64_v8a \
+        -m "${QT_MODULES[@]}" \
         --autodesktop -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
 fi
+
 
 echo
 echo "  Qt installed into: ${MUSICHIEN_EXTERNAL_DIR}/Qt/${QT_VERSION}"
