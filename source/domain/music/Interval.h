@@ -19,7 +19,6 @@
 #include <string_view>
 #include <vector>
 
-
 namespace musichien::domain
 {
 
@@ -68,7 +67,6 @@ enum class IntervalQuality
 // ---------------------------------------------------------------------------------------------------------------------
 class Interval
 {
-
 public:
     // The default interval is the unison: it is the neutral answer when no note has been played yet.
     // Required so that the answer tables of the exercises can be built as plain arrays.
@@ -80,8 +78,8 @@ public:
     // share the same identity. Normalising in the constructor makes every Interval valid by
     // construction, and removes any possibility of a half-normalised instance somewhere else.
     constexpr Interval( std::int32_t p_semitones, IntervalQuality p_quality ) noexcept
-        : m_semitones{ semitonesInSimpleForm( p_semitones ) }
-        , m_quality{ p_quality }
+      : m_semitones{ semitonesInSimpleForm( p_semitones ) }
+      , m_quality{ p_quality }
     {
     }
 
@@ -93,7 +91,6 @@ public:
     {
         return ( m_semitones >= 0 ) && ( m_semitones < SEMITONES_PER_OCTAVE );
     }
-
 
     // English name of the interval, for instance "Perfect fifth" or "Major third".
     [[nodiscard]] std::string name() const;
@@ -108,11 +105,9 @@ public:
     }
 
 private:
-    std::int32_t    m_semitones{ 0 };
+    std::int32_t m_semitones{ 0 };
     IntervalQuality m_quality{ IntervalQuality::Perfect };
 };
-
-
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Concepts
@@ -121,10 +116,10 @@ private:
 // ---------------------------------------------------------------------------------------------------------------------
 
 // Anything that exposes its notes as a contiguous sequence, for instance a std::vector<Note>.
-template < typename NoteContainer >
+template<typename NoteContainer>
 concept NoteContainerLike = requires( const NoteContainer & p_container ) {
     { std::span{ p_container } };
-    requires std::same_as< std::ranges::range_value_t< NoteContainer >, Note >;
+    requires std::same_as<std::ranges::range_value_t<NoteContainer>, Note>;
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -141,12 +136,11 @@ concept NoteContainerLike = requires( const NoteContainer & p_container ) {
 // its simple form first, and every simple form has a name.
 [[nodiscard]] Interval intervalFromSemitones( std::int32_t p_semitones );
 
-
 // Turns a sequence of notes into the sequence of the intervals it contains.
 // Shows the ranges pipeline style expected everywhere: no index, no manual loop.
-[[nodiscard]] std::vector< Interval > intervalsOf( std::span< const Note > p_notes );
+[[nodiscard]] std::vector<Interval> intervalsOf( std::span<const Note> p_notes );
 
 // Names of every simple interval, used to build the answer choices of an exercise.
-[[nodiscard]] const std::array< Interval, 12 > & allSimpleIntervals();
+[[nodiscard]] const std::array<Interval, 12> & allSimpleIntervals();
 
 }    // namespace musichien::domain

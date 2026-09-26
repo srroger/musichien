@@ -1,4 +1,5 @@
 #include "domain/music/Interval.h"
+
 #include "domain/music/Note.h"
 
 #include <gtest/gtest.h>
@@ -50,8 +51,8 @@ TEST( NoteTest, transposition_stays_inside_the_playable_range )
 
 TEST( IntervalTest, a_fifth_is_seven_semitones )
 {
-    constexpr Note tonic{ 60 };      // C4
-    constexpr Note dominant{ 67 };   // G4
+    constexpr Note tonic{ 60 };       // C4
+    constexpr Note dominant{ 67 };    // G4
 
     const Interval interval = intervalBetween( tonic, dominant );
 
@@ -75,9 +76,9 @@ TEST( IntervalTest, a_descending_fifth_is_still_a_fifth )
 TEST( IntervalTest, every_simple_interval_is_named )
 {
     // A ranges pipeline rather than a loop: the intent is visible at a glance.
-    const std::array< Interval, 12 > & simpleIntervals = allSimpleIntervals();
+    const std::array<Interval, 12> & simpleIntervals = allSimpleIntervals();
 
-    for ( const Interval & interval : simpleIntervals )
+    for( const Interval & interval : simpleIntervals )
     {
         EXPECT_TRUE( interval.isSimple() ) << "interval " << interval.semitones() << " is not simple";
         EXPECT_FALSE( interval.name().empty() );
@@ -87,9 +88,9 @@ TEST( IntervalTest, every_simple_interval_is_named )
 
 TEST( IntervalTest, intervals_of_a_melody_are_chained )
 {
-    const std::vector< Note > melody{ Note{ 60 }, Note{ 64 }, Note{ 67 } };    // C, E, G
+    const std::vector<Note> melody{ Note{ 60 }, Note{ 64 }, Note{ 67 } };    // C, E, G
 
-    const std::vector< Interval > intervals = intervalsOf( melody );
+    const std::vector<Interval> intervals = intervalsOf( melody );
 
     ASSERT_EQ( 2, intervals.size() );
     EXPECT_EQ( "M3", intervals.at( 0 ).identifier() );
@@ -98,7 +99,7 @@ TEST( IntervalTest, intervals_of_a_melody_are_chained )
 
 TEST( IntervalTest, a_single_note_contains_no_interval )
 {
-    const std::vector< Note > singleNote{ Note{ 60 } };
+    const std::vector<Note> singleNote{ Note{ 60 } };
 
     EXPECT_TRUE( intervalsOf( singleNote ).empty() );
 }

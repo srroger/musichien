@@ -35,7 +35,7 @@ public:
     // A note is only ever built from an explicit MIDI number: no implicit conversion from int,
     // which would make a mix-up between a note and a semitone count compile silently.
     explicit constexpr Note( std::int32_t p_midiNumber ) noexcept
-        : m_midiNumber{ p_midiNumber }
+      : m_midiNumber{ p_midiNumber }
     {
     }
 
