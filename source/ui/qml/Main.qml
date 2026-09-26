@@ -54,6 +54,15 @@ ApplicationWindow {
         });
     }
 
+    // Chooses how the intervals are listened to. The switch is what displays it, and this function is
+    // the only path to it: every button goes through here rather than writing the view model behind
+    // the switch's back, because two places writing the same state is how a control ends up
+    // contradicting what was just played.
+    function chooseListeningMode(p_harmonicPlayback) {
+        harmonicSwitch.checked = p_harmonicPlayback;
+        IntervalController.harmonicPlayback = p_harmonicPlayback;
+    }
+
     // How far above the root the interval sits, in words. A helper rather than a long expression
     // inside a binding, because the same phrasing will be needed on the answer screen.
     function octaveSpanLabel(p_octaveSpan) {
@@ -163,11 +172,7 @@ ApplicationWindow {
                     height: 52
                     text: qsTr("Quinte, en accord")
                     onClicked: {
-                        // Choosing HOW to listen is the one thing this screen decides, and it decides
-                        // it on the view model rather than on the switch: the switch then follows, as
-                        // it follows every other change. Two places writing the same state is how a
-                        // control ends up contradicting what was just played.
-                        IntervalController.harmonicPlayback = true;
+                        mainWindow.chooseListeningMode(true);
                         mainWindow.playInterval(7);
                     }
                 }
@@ -227,8 +232,14 @@ ApplicationWindow {
 
                             width: 62
                             height: 46
+                            // The Material style pads a button by 24 dp on each side, which leaves
+                            // 14 dp for the text of a 62 dp button and elides even 'P1' to an
+                            // ellipsis. These buttons hold two or three characters: they do not need
+                            // the padding, they need the room.
+                            leftPadding: 6
+                            rightPadding: 6
                             text: modelData.identifier
-                            font.pixelSize: 14
+                            font.pixelSize: 15
                             highlighted: wasHeard
                             onClicked: mainWindow.playInterval(modelData.semitones)
                         }
@@ -248,18 +259,14 @@ ApplicationWindow {
                     Switch {
                         id: harmonicSwitch
 
+                        // The switch is the single place this screen decides how to listen, and
+                        // chooseListeningMode() is the only way in: every button goes through it.
+                        // A plain two way binding is silently destroyed by the first tap of the user,
+                        // and a Binding with a restore mode was measured on the device without
+                        // pushing the change through either. Two explicit lines are worth more here
+                        // than a subtlety nobody can verify.
+                        checked: IntervalController.harmonicPlayback
                         onToggled: IntervalController.harmonicPlayback = checked
-
-                        // A two way binding, written the way Qt 6 asks for one. A plain
-                        // "checked: IntervalController.harmonicPlayback" would be silently destroyed
-                        // by the first tap of the user, and the switch would then ignore every later
-                        // change made elsewhere - including the one made by the button above.
-                        // RestoreBindingOrValue puts the binding back once the tap is over.
-                        Binding on checked {
-                            value: IntervalController.harmonicPlayback
-                            restoreMode: Binding.RestoreBindingOrValue
-                        }
-
                     }
 
                     Text {
