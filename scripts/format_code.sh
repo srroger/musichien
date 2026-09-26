@@ -49,9 +49,12 @@ else
     if [ ${#QML_FILES[@]} -eq 0 ]; then
         echo "  no QML file found"
     else
-        "${QML_FORMAT}" --inplace --normalize "${QML_FILES[@]}"
+        # --inplace  : write the result back into the file
+        # --newline  : force LF, consistently with .editorconfig and .gitattributes
+        "${QML_FORMAT}" --inplace --newline unix "${QML_FILES[@]}"
         echo "  formatted ${#QML_FILES[@]} QML file(s)"
     fi
+
 
 fi
 

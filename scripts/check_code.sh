@@ -77,16 +77,26 @@ elif [ ! -f "${COMPILE_COMMANDS}" ]; then
     echo "  ${COMPILE_COMMANDS} not found"
     echo "  configure the project first:  cmake --preset \"Clang-Debug Musichien\""
 else
-    echo "  running clang-tidy over ${COMPILE_COMMANDS}"
-    if clang-tidy -p "${PROJECT_DIR}/../Musichien-build/Clang-Debug" \
-                  --config-file="${PROJECT_DIR}/.clang-tidy" \
-                  $(find source -type f -name '*.cpp' ! -name '*_test.cpp') 2>&1 | tail -40; then
-        echo "  OK"
-    else
+
+    # Careful: piping clang-tidy into 'tail' would make the 'if' test the status of 'tail', which is
+    # always zero. The output is therefore captured first, and inspected for findings.
+    set +e
+    TIDY_OUTPUT="$(clang-tidy -p "${PROJECT_DIR}/../Musichien-build/Clang-Debug" \
+                              --config-file="${PROJECT_DIR}/.clang-tidy" \
+                              $(find source -type f -name '*.cpp' ! -name '*_test.cpp') 2>&1)"
+    TIDY_STATUS=$?
+    set -e
+
+    printf '%s\n' "${TIDY_OUTPUT}" | tail -30
+
+    if [ ${TIDY_STATUS} -ne 0 ] || printf '%s' "${TIDY_OUTPUT}" | grep -qE 'warning:|error:'; then
         echo "  FAILED - see the findings above"
         FAILURE_COUNT=$((FAILURE_COUNT + 1))
+    else
+        echo "  OK - no finding"
     fi
 fi
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Result
