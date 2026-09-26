@@ -119,6 +119,11 @@ add_custom_command(
 
 add_custom_target(musichien_build_id ALL DEPENDS ${MUSICHIEN_BUILD_ID_HEADER})
 
+# And the application depends on it EXPLICITLY, which 'ALL' does not cover: the Android build asks for a
+# precise target - the package - and a target marked ALL is then never built. Without this line the header is
+# simply missing on a phone build, and main.cpp fails to compile.
+add_dependencies(musichien_app musichien_build_id)
+
 target_include_directories(musichien_app PRIVATE ${CMAKE_BINARY_DIR}/generated)
 
 target_link_libraries(musichien_app PRIVATE
