@@ -230,11 +230,22 @@ run_aqt install-qt linux desktop "${QT_VERSION}" linux_gcc_64 \
     -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
 
 if [ "${WITH_ANDROID}" = "ON" ]; then
+
+    # IMPORTANT: since Qt 6.8, the Android packages are NO LONGER in the "linux_x64/android"
+    # repository. That one stopped at Qt 6.7.3, in September 2024. They are published in the cross
+    # platform repository "all_os/android", which is why the host is "all_os" here and not "linux".
+    #
+    # Symptom of getting this wrong: 'aqt list-qt linux android' shows nothing newer than 6.7.3, and
+    # one could wrongly conclude that Qt dropped Android support. It did not.
+    #
+    # --autodesktop is not needed: the desktop Qt was installed just above, and that is all aqt
+    # requires. It is used for the host tools, androiddeployqt among them.
     echo "  installing Qt for Android (android_arm64_v8a) with the same modules..."
-    run_aqt install-qt linux android "${QT_VERSION}" android_arm64_v8a \
+    run_aqt install-qt all_os android "${QT_VERSION}" android_arm64_v8a \
         -m "${QT_MODULES[@]}" \
-        --autodesktop -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
+        -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
 fi
+
 
 
 
