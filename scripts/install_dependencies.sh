@@ -74,7 +74,7 @@ REQUIRED_TOOLS=(
 )
 
 echo
-echo "--- Step 1/4: required tools -----------------------------------------------------------"
+echo "--- Step 1/5: required tools -----------------------------------------------------------"
 
 MISSING_PACKAGES=()
 
@@ -102,6 +102,21 @@ else
     echo "  Packages to install: ${MISSING_PACKAGES[*]}"
     echo "  The next command asks for your administrator password (sudo)."
     echo
+
+    # A rolling release does not support partial upgrades, and this is not theoretical: installing one
+    # package on a machine that has not been upgraded for a while can produce a binary whose library
+    # dependencies are newer than the ones installed. The symptom appears at run time, in a tool that
+    # has nothing to do with this project, as 'error while loading shared libraries'. 'adb' was broken
+    # exactly that way here, by an android-tools built against a libprotobuf newer than the installed
+    # one - hence this warning.
+    PENDING_UPDATE_COUNT="$(pacman -Qu 2>/dev/null | wc -l || echo 0)"
+
+    if [ "${PENDING_UPDATE_COUNT}" -gt 50 ]; then
+        echo "  WARNING: ${PENDING_UPDATE_COUNT} packages are waiting to be upgraded on this machine."
+        echo "           Installing a single package now may leave one of them unusable until the whole"
+        echo "           system is upgraded. Consider running 'sudo pacman -Syu' first."
+        echo
+    fi
 
     if ! sudo pacman -S --needed --noconfirm "${MISSING_PACKAGES[@]}"; then
         echo
@@ -151,7 +166,7 @@ fi
 # interactive step. It is therefore the right tool for a reproducible, scriptable setup.
 # ---------------------------------------------------------------------------------------------------------------------
 echo
-echo "--- Step 2/4: aqtinstall ----------------------------------------------------------------"
+echo "--- Step 2/5: aqtinstall ----------------------------------------------------------------"
 
 if ! pacman -Q python-pipx >/dev/null 2>&1; then
     sudo pacman -S --needed --noconfirm python-pipx
@@ -183,7 +198,7 @@ run_aqt()
 # guessing a version number is always a risk of a confusing failure.
 # ---------------------------------------------------------------------------------------------------------------------
 echo
-echo "--- Step 3/4: Qt ------------------------------------------------------------------------"
+echo "--- Step 3/5: Qt ------------------------------------------------------------------------"
 
 # The newest 6.x version offered for the desktop, used as the reference version.
 QT_VERSION="${MUSICHIEN_QT_VERSION:-}"
@@ -253,12 +268,115 @@ echo
 echo "  Qt installed into: ${MUSICHIEN_EXTERNAL_DIR}/Qt/${QT_VERSION}"
 
 # ---------------------------------------------------------------------------------------------------------------------
-# 4. Dependencies built from source
+# 4. Android SDK and NDK
+#
+# The SDK command line tools are enough: no Android Studio, no account, no interactive step. They
+# bring 'sdkmanager', which then installs everything else.
+#
+# Nothing here is guessed:
+#
+#   * the NDK revision is the one Qt itself was compiled against. It is read from Qt's own toolchain
+#     file, which records the exact path used when Qt was built, rather than being assumed;
+#   * the compile platform and the build tools follow the same rule: Qt's CMake takes the newest
+#     platform installed as its compileSdk, and the Android Gradle Plugin 9.x requires build tools 36.
+#
+# Note that the SDK brings its OWN adb, in 'platform-tools'. scripts/setup_env.sh puts it first on the
+# PATH on purpose: the 'android-tools' package of the distribution can be broken by a partial upgrade,
+# and then every call fails with a missing libprotobuf that has nothing to do with this project.
+# ---------------------------------------------------------------------------------------------------------------------
+if [ "${WITH_ANDROID}" = "ON" ]; then
+
+    echo
+    echo "--- Step 4/5: Android SDK and NDK ------------------------------------------------------------"
+
+    ANDROID_SDK_DIR="${MUSICHIEN_EXTERNAL_DIR}/android-sdk"
+    ANDROID_SDK_MANAGER="${ANDROID_SDK_DIR}/cmdline-tools/latest/bin/sdkmanager"
+
+    # The build number of the command line tools, as published by Google. Validated against the
+    # download server; see docs/BUILD_AND_SETUP.md for how to find a newer one.
+    ANDROID_COMMAND_LINE_TOOLS_BUILD="13114758"
+
+    # API 36 (Android 16) and build tools 36.0.0.
+    #
+    # API 37 does NOT exist in the stable channel yet: Qt 6.12 would like to target it, which is why
+    # cmake/musichienAndroid.cmake pins the target SDK to 36 to stay coherent with what can actually
+    # be compiled. Asking sdkmanager for android-37 fails with 'Failed to find package'.
+    ANDROID_PLATFORM_PACKAGE="platforms;android-36"
+    ANDROID_BUILD_TOOLS_PACKAGE="build-tools;36.0.0"
+
+    # Android NDK r27c, the revision Qt 6.12 was built with.
+    #   read from <Qt>/android_arm64_v8a/lib/cmake/Qt6/qt.toolchain.cmake
+    ANDROID_NDK_REVISION="27.2.12479018"
+
+    mkdir -p "${ANDROID_SDK_DIR}"
+
+    if [ -x "${ANDROID_SDK_MANAGER}" ]; then
+        echo "  SDK command line tools already installed"
+    else
+        echo "  installing the SDK command line tools..."
+
+        ANDROID_TOOLS_ARCHIVE="$(mktemp -t musichien-android-tools-XXXXXX.zip)"
+
+        if ! curl --location --fail --silent --show-error --output "${ANDROID_TOOLS_ARCHIVE}" \
+             "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_COMMAND_LINE_TOOLS_BUILD}_latest.zip"; then
+            echo "  ERROR: could not download the SDK command line tools. Check the network connection."
+            rm -f "${ANDROID_TOOLS_ARCHIVE}"
+            exit 1
+        fi
+
+        # The archive holds a single 'cmdline-tools' directory, and sdkmanager only works from a path
+        # named 'cmdline-tools/latest': that layout is imposed by the SDK, not chosen here.
+        ANDROID_TOOLS_EXTRACT_DIRECTORY="$(mktemp -d -t musichien-android-tools-XXXXXX)"
+
+        unzip -q "${ANDROID_TOOLS_ARCHIVE}" -d "${ANDROID_TOOLS_EXTRACT_DIRECTORY}"
+
+        mkdir -p "${ANDROID_SDK_DIR}/cmdline-tools"
+        rm -rf "${ANDROID_SDK_DIR}/cmdline-tools/latest"
+        mv "${ANDROID_TOOLS_EXTRACT_DIRECTORY}/cmdline-tools" "${ANDROID_SDK_DIR}/cmdline-tools/latest"
+
+        rm -rf "${ANDROID_TOOLS_EXTRACT_DIRECTORY}" "${ANDROID_TOOLS_ARCHIVE}"
+
+        echo "  installed into ${ANDROID_SDK_DIR}/cmdline-tools/latest"
+    fi
+
+    # sdkmanager is a Java program, and Gradle and the Android Gradle Plugin do not support the JDK 26
+    # installed on this machine. JDK 21 is used here exactly as scripts/setup_env.sh does.
+    export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
+
+    if [ ! -x "${JAVA_HOME}/bin/java" ]; then
+        echo "  ERROR: JDK 21 was not found in ${JAVA_HOME}."
+        echo "         Install it first: sudo pacman -S jdk21-openjdk"
+        exit 1
+    fi
+
+    echo "  accepting the SDK licences (required before anything can be downloaded)..."
+    # 'yes' receives SIGPIPE once sdkmanager closes the pipe, which would abort the script under
+    # 'set -o pipefail'. Hence the explicit '|| true'.
+    yes | "${ANDROID_SDK_MANAGER}" --sdk_root="${ANDROID_SDK_DIR}" --licenses >/dev/null 2>&1 || true
+
+    echo "  installing: platform-tools, ${ANDROID_PLATFORM_PACKAGE}, ${ANDROID_BUILD_TOOLS_PACKAGE}, ndk;${ANDROID_NDK_REVISION}"
+    echo "  (the NDK alone is about 1 GB: this takes a few minutes the first time)"
+
+    "${ANDROID_SDK_MANAGER}" --sdk_root="${ANDROID_SDK_DIR}" \
+        "platform-tools" \
+        "${ANDROID_PLATFORM_PACKAGE}" \
+        "${ANDROID_BUILD_TOOLS_PACKAGE}" \
+        "ndk;${ANDROID_NDK_REVISION}"
+
+    echo
+    echo "  Android SDK installed into: ${ANDROID_SDK_DIR}"
+    echo "  NOTE: add your user to the kvm group to be able to use an emulator, then log out:"
+    echo "          sudo gpasswd -a ${USER} kvm"
+fi
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# 5. Dependencies built from source
 #
 # GoogleTest and nlohmann/json, through the superbuild presets of the project itself.
 # ---------------------------------------------------------------------------------------------------------------------
 echo
-echo "--- Step 4/4: source built dependencies -------------------------------------------------"
+echo "--- Step 5/5: source built dependencies -------------------------------------------------"
 
 if [ "${WITH_SUPERBUILD}" = "ON" ]; then
 

@@ -120,7 +120,9 @@ perdre. Exportable et importable : l'utilisateur n'est jamais prisonnier de l'ap
 | **Latence audio** | À mesurer. Aucune optimisation de latence n'a encore été faite : le tampon complet est poussé en une seule écriture, ce qui convient à une note mais pas à un métronome. |
 | **Réflexion C++26 (P2996)** | ❌ **indisponible** : `-freflection` inconnu de Clang 22, `<experimental/meta>` absent. À activer dès qu'un support stable arrive. |
 | **SoundFonts** | À choisir : c'est la façon économique d'avoir plusieurs instruments crédibles. |
-| **Android** | NDK **r27c (27.2.12479018)** imposé par Qt, et **JDK 21** (jamais le JDK 26 du système). |
+| **Android** | ✅ **Fonctionne de bout en bout.** APK `arm64-v8a` construite, **relue sans aucune permission système**, signée puis installée par `scripts/build_android.sh`. NDK **r27c (27.2.12479018)**, imposé par Qt 6.12 ; **JDK 21** (jamais le JDK 26 du système) ; plateforme **android-36**. |
+| **Portabilité de la bibliothèque standard** | ⚠️ **Contrainte de conception, pas un détail.** Le NDK r27c embarque **libc++ 18**, plus ancienne que le **libstdc++ 16** du poste de développement. Le domaine doit donc se limiter aux fonctionnalités présentes dans **les deux** : pas de `std::views::adjacent`, pas de `std::span::at`. C'est le prix à payer pour que **le code testé sur la machine soit exactement celui qui tourne sur le téléphone** — un seul chemin, testé une fois. |
+| **`INTERNET` : promesse ou garantie ?** | ✅ **Garantie, et vérifiée deux fois.** Qt réclame `INTERNET` via **deux canaux** distincts (`QT_ANDROID_PERMISSIONS` et les `<module>-android-dependencies.xml` lus par `androiddeployqt`). Les deux sont fermés, et `scripts/build_android.sh` relit les permissions dans l'APK **compilée puis signée**. Sans `android.permission.INTERNET`, Android exclut le processus du groupe `inet` : c'est le noyau qui refuse, pas le code. |
 
 
 ---
@@ -132,6 +134,6 @@ perdre. Exportable et importable : l'utilisateur n'est jamais prisonnier de l'ap
 | Dépendance à Qt / au système de fichiers dans `domain` | Détruit la testabilité, qui est la raison d'être de cette architecture |
 | Logique métier dans un fichier `.qml` | Non testable, et impossible à réutiliser |
 | Chaîne de caractères française en dur dans le code | Les textes passent par `qsTr()` |
-| Accès réseau, SDK de traçage, publicité, achat intégré | Aucune permission `INTERNET` déclarée, par choix |
+| Accès réseau, SDK de traçage, publicité, achat intégré | Aucune permission `INTERNET` déclarée, et `scripts/build_android.sh` **refuse** de produire une APK qui en demanderait une |
 | Version codée en dur ailleurs que dans `cmake/musichienVersions.cmake` | Une seule source de vérité |
 | Formatage et logique dans le même commit | Rend le `git blame` inutilisable |

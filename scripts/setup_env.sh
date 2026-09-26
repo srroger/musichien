@@ -172,6 +172,79 @@ fi
 
 
 # ---------------------------------------------------------------------------------------------------------------------
+# Android
+#
+# Nothing here is needed by a desktop build: a machine that only runs the application on the computer
+# never has to install any of it. Everything is exported from the pinned external directory, never
+# from the system.
+#
+# ANDROID_SDK_ROOT and ANDROID_NDK_ROOT are the two variables the NDK toolchain, Qt's toolchain file
+# and androiddeployqt all look for. Exporting them is what makes the cross compilation work with no
+# interactive step and no Qt Creator.
+# ---------------------------------------------------------------------------------------------------------------------
+if [ -n "${MUSICHIEN_EXTERNAL_DIR:-}" ]; then
+
+    MUSICHIEN_ANDROID_SDK_CANDIDATE="${MUSICHIEN_EXTERNAL_DIR}/android-sdk"
+
+    if [ -d "${MUSICHIEN_ANDROID_SDK_CANDIDATE}" ]; then
+
+        export MUSICHIEN_ANDROID_SDK_DIR="${MUSICHIEN_ANDROID_SDK_CANDIDATE}"
+        export ANDROID_SDK_ROOT="${MUSICHIEN_ANDROID_SDK_DIR}"
+        export ANDROID_HOME="${MUSICHIEN_ANDROID_SDK_DIR}"
+
+        # The newest NDK wins, exactly like the pinned CMake and Ninja above. Several NDKs can live
+        # side by side, and Qt was compiled against one precise revision: r27c here, which is the
+        # only one this project is expected to use.
+        MUSICHIEN_ANDROID_NDK_DIR="$(find "${MUSICHIEN_ANDROID_SDK_DIR}/ndk" -maxdepth 1 -mindepth 1 -type d \
+                                    2>/dev/null | sort -V | tail -n 1)"
+
+        if [ -n "${MUSICHIEN_ANDROID_NDK_DIR}" ]; then
+            export MUSICHIEN_ANDROID_NDK_DIR
+            export ANDROID_NDK_ROOT="${MUSICHIEN_ANDROID_NDK_DIR}"
+        fi
+
+        # The platform-tools of the SDK goes FIRST on the PATH, on purpose.
+        #
+        # The 'android-tools' package of the distribution can be broken by a partial upgrade: its
+        # binary then asks for a libprotobuf that is newer than the installed one, and every call
+        # fails with 'cannot open shared object file'. The adb shipped inside the SDK has no such
+        # dependency. Putting it first means the project always talks to a working adb, whatever
+        # state the system packages are in.
+        export PATH="${MUSICHIEN_ANDROID_SDK_DIR}/platform-tools:${PATH}"
+
+        if [ -x "${MUSICHIEN_ANDROID_SDK_DIR}/cmdline-tools/latest/bin/sdkmanager" ]; then
+            export PATH="${MUSICHIEN_ANDROID_SDK_DIR}/cmdline-tools/latest/bin:${PATH}"
+        fi
+    fi
+
+    # Qt for Android lives next to the desktop Qt chosen above, in the same version directory:
+    #   .../Qt/<version>/gcc_64              <- the desktop build
+    #   .../Qt/<version>/android_arm64_v8a   <- the phone build
+    # Deriving one from the other guarantees that both always share the same Qt version.
+    if [ -d "${MUSICHIEN_QT_DIR:-/nonexistent}/lib/cmake/Qt6" ] &&
+       [ -d "${MUSICHIEN_QT_DIR%/gcc_64}/android_arm64_v8a/lib/cmake/Qt6" ]; then
+        export MUSICHIEN_QT_ANDROID_DIR="${MUSICHIEN_QT_DIR%/gcc_64}/android_arm64_v8a"
+    fi
+
+fi
+
+# ---------------------------------------------------------------------------------------------------------------------
+# JDK
+#
+# Gradle and the Android Gradle Plugin do not support the JDK 26 installed on this machine: the build
+# fails with obscure messages about unsupported class file versions. JDK 21 is what the Android
+# toolchain of Qt expects, so JAVA_HOME is pinned to it.
+#
+# JAVA_HOME is left untouched when it already designates a 21, so that a deliberate choice wins.
+# ---------------------------------------------------------------------------------------------------------------------
+if [ -d "/usr/lib/jvm/java-21-openjdk" ]; then
+    case "${JAVA_HOME:-}" in
+        *java-21*) ;;
+        *) export JAVA_HOME="/usr/lib/jvm/java-21-openjdk" ;;
+    esac
+fi
+
+# ---------------------------------------------------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------------------------------------------------
 echo "-----------------------------------------------------------------------------------------------------"
@@ -186,9 +259,23 @@ echo "  cmake                   = $(command -v cmake) ($(cmake --version 2>/dev/
 echo "  ninja                   = $(command -v ninja)"
 echo "-----------------------------------------------------------------------------------------------------"
 
+if [ -n "${MUSICHIEN_ANDROID_SDK_DIR:-}" ]; then
+echo "  Android (only needed by the Android presets)"
+echo "    MUSICHIEN_ANDROID_SDK_DIR  = ${MUSICHIEN_ANDROID_SDK_DIR}"
+echo "    ANDROID_NDK_ROOT           = ${ANDROID_NDK_ROOT:-<not installed>}"
+echo "    MUSICHIEN_QT_ANDROID_DIR   = ${MUSICHIEN_QT_ANDROID_DIR:-<not installed>}"
+echo "    JAVA_HOME                  = ${JAVA_HOME:-<not set>}"
+echo "    adb                        = $(command -v adb || echo '<not found>')"
+echo "-----------------------------------------------------------------------------------------------------"
+fi
+
 echo "  Useful commands:"
 echo "    cmake --preset \"Clang-Debug Musichien\""
 echo "    cmake --build --preset \"Build Clang-Debug Musichien\""
 echo "    ctest --preset \"CTest Clang-Debug Musichien\""
 echo "    ./Musichien-build/Clang-Debug/bin/musichien"
+if [ -n "${MUSICHIEN_QT_ANDROID_DIR:-}" ]; then
+echo "    scripts/build_android.sh"
+fi
+
 echo "-----------------------------------------------------------------------------------------------------"

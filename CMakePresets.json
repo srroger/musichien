@@ -76,6 +76,28 @@
                 "CMAKE_C_COMPILER": "$env{CLANG_DIR}/clang",
                 "CMAKE_CXX_COMPILER": "$env{CLANG_DIR}/clang++"
             }
+        },
+        {
+            "name": "Android-Release Musichien",
+            "displayName": "Musichien - Android (Release, arm64-v8a)",
+            "description": "Cross compilation for the phone, with the pinned NDK and Qt for Android",
+            "inherits": "base",
+            "binaryDir": "${sourceDir}/../Musichien-build/Android-Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_TOOLCHAIN_FILE": "$env{MUSICHIEN_QT_ANDROID_DIR}/lib/cmake/Qt6/qt.toolchain.cmake",
+                "ANDROID_ABI": "arm64-v8a",
+                "ANDROID_PLATFORM": "android-28",
+                "ANDROID_STL": "c++_shared",
+                "MUSICHIEN_EXTERNAL_DIR": "$env{MUSICHIEN_EXTERNAL_DIR}",
+                "MUSICHIEN_QT_DIR": "$env{MUSICHIEN_QT_ANDROID_DIR}",
+                "QT_HOST_PATH": "$env{MUSICHIEN_QT_DIR}",
+                "MUSICHIEN_BUILD_TESTING": "OFF",
+                "MUSICHIEN_BUILD_SHARED_LIBS": "OFF",
+                "MUSICHIEN_ENABLE_CLANG_TIDY": "OFF",
+                "MUSICHIEN_ENABLE_QML_INSPECTION": "OFF"
+            }
         }
     ],
     "buildPresets": [
@@ -94,6 +116,10 @@
         {
             "name": "Build Superbuild Musichien",
             "configurePreset": "Superbuild Musichien"
+        },
+        {
+            "name": "Build Android-Release Musichien",
+            "configurePreset": "Android-Release Musichien"
         }
     ],
     "testPresets": [

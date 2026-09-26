@@ -5,7 +5,16 @@
 # logic of its own. See docs/ARCHITECTURE.md.
 # =====================================================================================================================
 
-add_executable(musichien_app
+# qt_add_executable, and NOT the plain add_executable from CMake.
+#
+# This is not a stylistic preference. qt_add_executable marks the target as one Qt expects to
+# finalize, and that finalization is what creates the Android deployment targets. With a plain
+# add_executable, the 'apk' target is created but stays EMPTY: the build reports success and produces
+# no package at all, which is a very expensive kind of silence.
+#
+# On the desktop the two calls are equivalent for this project: qt_add_executable only adds the
+# platform entry point handling that WIN32_EXECUTABLE / MACOSX_BUNDLE set explicitly below.
+qt_add_executable(musichien_app
     main.cpp
     # The QML resources, declared by the ui module. Referencing the .qrc file from here is what makes
     # CMake compile the QML into the executable.
@@ -44,3 +53,17 @@ set_target_properties(musichien_app PROPERTIES
 )
 
 set_target_properties(musichien_app PROPERTIES FOLDER "application")
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Android packaging
+#
+# Only meaningful when cross compiling for a phone. A desktop build has no manifest, no package and
+# no permission to argue about, so this is deliberately kept out of the way.
+#
+# See cmake/musichienAndroid.cmake: it is what turns the privacy promise of the project into a
+# property of the installed package rather than an intention.
+# ---------------------------------------------------------------------------------------------------------------------
+if(ANDROID)
+    include(musichienAndroid)
+endif()
+
