@@ -64,7 +64,8 @@ Elles vivent dans `MUSICHIEN_EXTERNAL_DIR` (par défaut `../Roger-externals`) et
 
 | Dépendance | Version | Installée par | Rôle |
 |---|---|---|---|
-| **Qt** | découverte par `aqt` | `aqtinstall` (sans compte Qt) | Framework applicatif, interface QML |
+| **Qt** | **≥ 6.11 obligatoire** | `aqtinstall` (sans compte Qt) | Framework applicatif, interface QML |
+
 | **GoogleTest / GoogleMock** | **1.18.0** | superbuild (depuis les sources) | Tests unitaires |
 | **nlohmann/json** | **3.12.0** | superbuild (en-têtes seuls) | Fichier de sauvegarde et fichiers de contenu |
 

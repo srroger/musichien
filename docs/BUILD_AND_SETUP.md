@@ -69,6 +69,34 @@ C'est un **choix assumé** :
 
 Le superbuild du projet sert donc uniquement à ce que **nous** compilons : GoogleTest et nlohmann/json.
 
+### ⚠️ Pourquoi Qt 6.11 est un **minimum absolu**
+
+**Qt 6.10 et antérieurs ne compilent pas en C++26** avec une bibliothèque standard récente. Le projet
+refuse désormais ces versions au moment de la configuration, avec un message explicite.
+
+Le détail technique, parce qu'il vaut la peine d'être connu :
+
+| | Qt 6.10.1 | Qt 6.11.1 |
+|---|---|---|
+| `q26numeric.h` contient | `using std::saturate_cast;` | `using std::saturating_cast;` |
+| Nom du trait | celui du **brouillon** C++26 | celui de la **norme finale** |
+| Résultat avec GCC 16 | ❌ erreur de compilation | ✅ compile |
+
+Le nom a été changé **tardivement** dans le processus de normalisation de C++26 : `saturate_cast` est
+devenu `saturating_cast`. Qt 6.10 a été écrit avant ce renommage. Comme `__cpp_lib_saturation_arithmetic`
+est bien défini par GCC 16, Qt 6.10 prend la branche `using std::saturate_cast;` — qui n'existe plus.
+
+**Le symptôme est trompeur** : l'erreur ne parle pas de Qt mais de `std::saturate_cast`, et elle est
+levée depuis un en-tête Qt, très loin de la vraie cause.
+
+> [!tip] Comment Qt 6.11 a corrigé le problème
+> ```cpp
+> #if defined(__cpp_lib_saturation_arithmetic) && __cpp_lib_saturation_arithmetic >= 202603L
+> using std::saturating_cast;
+> ```
+> Ils vérifient la **version** du macro et utilisent le **nom final**. C'est la bonne façon de faire.
+
+
 ---
 
 ## 3. Environnement de développement
