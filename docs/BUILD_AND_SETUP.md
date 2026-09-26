@@ -417,6 +417,18 @@ sur le module qui possède les QML.
 > promesse centrale du projet, et elle est **contrôlée**, pas espérée — deux fois, sur le paquet
 > compilé puis sur le paquet **signé**, celui qui sera réellement installé.
 
+Le jour où le rappel ou le micro arrive, il suffit d'écrire la permission dans
+`source/android/AndroidManifest.xml` :
+
+```xml
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+```
+
+Vérifié le 2026-09-26 en déclarant les deux temporairement : une permission écrite **là** arrive bien
+dans l'APK, alors que celles des modules Qt (`CAMERA`, `BLUETOOTH`, `ACCESS_NETWORK_STATE`…)
+**n'y arrivent pas**, faute de marqueur `INSERT_PERMISSIONS`. Notre manifeste est donc la seule
+porte, et le contrôle du script la garde étroite.
+
 
 ---
 
