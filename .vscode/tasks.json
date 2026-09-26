@@ -1,0 +1,69 @@
+{
+    // =================================================================================================================
+    // Musichien - build, test and quality tasks
+    //
+    // Ctrl+Shift+B           -> default build task (CMake: build)
+    // Ctrl+Shift+P -> Run Task -> the others
+    // =================================================================================================================
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "CMake: build (Clang-Debug)",
+            "type": "shell",
+            "command": "cmake --build --preset 'Build Clang-Debug Musichien'",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "CMake: build (Clang-RelWithDebInfo)",
+            "type": "shell",
+            "command": "cmake --build --preset 'Build Clang-RelWithDebInfo Musichien'",
+            "group": "build",
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "CMake: configure",
+            "type": "shell",
+            "command": "cmake --preset 'Clang-Debug Musichien'",
+            "problemMatcher": []
+        },
+        {
+            "label": "CTest: run",
+            "type": "shell",
+            "command": "ctest --preset 'CTest Clang-Debug Musichien' --output-on-failure",
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "Run musichien",
+            "type": "shell",
+            "command": "${workspaceFolder}/../Musichien-build/Clang-Debug/bin/musichien",
+            "problemMatcher": []
+        },
+        {
+            "label": "Format code",
+            "type": "shell",
+            "command": "scripts/format_code.sh",
+            "problemMatcher": []
+        },
+        {
+            "label": "Check code",
+            "type": "shell",
+            "command": "scripts/check_code.sh",
+            "problemMatcher": []
+        },
+        {
+            "label": "Superbuild dependencies",
+            "type": "shell",
+            "command": "cmake --preset 'Superbuild Musichien' && cmake --build --preset 'Build Superbuild Musichien'",
+            "problemMatcher": []
+        }
+    ]
+}

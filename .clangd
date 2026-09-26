@@ -1,0 +1,17 @@
+# =====================================================================================================================
+# clangd configuration - used by the language server of VS Code / Qt Creator / neovim
+# =====================================================================================================================
+
+Index:
+  # Background indexing is slow on large projects; the compile_commands.json database is enough.
+  Background: Skip
+
+Diagnostics:
+  UnusedIncludes: Strict    # Enables the Include Cleaner: reports unused #includes
+  MissingIncludes: Strict   # Reports headers that are used but not included
+
+InlayHints:
+  Enabled: No
+  Designators: Yes
+  ParameterNames: Yes
+  DeducedTypes: Yes

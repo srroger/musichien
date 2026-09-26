@@ -1,0 +1,15 @@
+<!--
+  ====================================================================================================================
+  Musichien - Qt resource file
+
+  Embeds the QML files into the executable, so that they are loaded through "qrc:/qml/...".
+
+  The prefix is "/" and the file keeps its "qml/" path on purpose: the resource path is then exactly
+  the same as the path on disk, which removes a whole class of "file not found at run time" bugs.
+  ====================================================================================================================
+-->
+<RCC>
+    <qresource prefix="/">
+        <file>qml/Main.qml</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,28 @@
+{
+    // =================================================================================================================
+    // Musichien - recommended extensions
+    //
+    // NOTE for code-oss users: code-oss installs extensions from the Open VSX registry, not from the
+    // Microsoft marketplace. All the extensions below are published on Open VSX.
+    // =================================================================================================================
+    "recommendations": [
+        // C++ language server, and the reference C++ formatter of the project.
+        // Uses the .clangd and .clang-format files of the repository.
+        "llvm-vs-code-extensions.vscode-clangd",
+
+        // Reads CMakePresets.json: configure, build and test without ever typing a command.
+        "ms-vscode.cmake-tools",
+        "twxs.cmake",
+
+        // Debugger required by .vscode/launch.json.
+        "vadimcn.vscode-lldb",
+
+        // EditorConfig support, so that the whitespace rules apply inside the editor as well.
+        "editorconfig.editorconfig"
+    ],
+    "unwantedRecommendations": [
+        // The Microsoft C++ extension conflicts with clangd: both would publish diagnostics for the
+        // same files, with different results.
+        "ms-vscode.cpptools"
+    ]
+}

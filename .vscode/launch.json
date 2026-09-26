@@ -1,0 +1,30 @@
+{
+    // =================================================================================================================
+    // Musichien - debug configuration (CodeLLDB)
+    //
+    // Requires the extension: vadimcn.vscode-lldb
+    //
+    // The program path points at the sibling build directory, exactly like the presets do.
+    // =================================================================================================================
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug musichien (Clang-Debug)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/../Musichien-build/Clang-Debug/bin/musichien",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "CMake: build (Clang-Debug)"
+        },
+        {
+            "name": "Debug test_domain (Clang-Debug)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/../Musichien-build/Clang-Debug/bin/test_domain",
+            "args": [],
+            "cwd": "${workspaceFolder}/../Musichien-build/Clang-Debug/bin",
+            "preLaunchTask": "CMake: build (Clang-Debug)"
+        }
+    ]
+}

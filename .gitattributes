@@ -1,0 +1,73 @@
+# =====================================================================================================================
+# Git attributes
+#
+# Guarantees that line endings never depend on the machine the developer uses.
+# Files are stored with LF in the repository and checked out with LF everywhere.
+# =====================================================================================================================
+
+# Default: let Git normalise line endings, store LF.
+* text=auto eol=lf
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Text sources
+# ---------------------------------------------------------------------------------------------------------------------
+*.cpp            text
+*.cxx            text
+*.h              text
+*.hpp            text
+*.qml            text
+*.js             text
+*.txt            text
+*.md             text
+*.cmake          text
+*.desktop        text
+CMakeLists.txt   text
+CMakePresets.json text
+.editorconfig    text
+.clang-format    text
+.clang-tidy      text
+.clangd          text
+
+# Shell scripts must keep LF even if checked out on Windows.
+*.sh             text eol=lf
+
+# Qt specific sources
+*.ts             text
+*.ui             text
+*.qrc            text
+*.pro            text
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Binary assets - never modified by Git
+# ---------------------------------------------------------------------------------------------------------------------
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.webp   binary
+*.ico    binary
+*.svg    text
+*.wav    binary
+*.ogg    binary
+*.mp3    binary
+*.flac   binary
+*.sf2    binary
+*.sf3    binary
+*.ttf    binary
+*.otf    binary
+*.apk    binary
+*.aab    binary
+*.keystore binary
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Language statistics on GitHub
+# ---------------------------------------------------------------------------------------------------------------------
+*.qml   linguist-language=QML
+*.qrc   linguist-language=XML
+*.cxx   linguist-language=C++
+*.hpp   linguist-language=C++
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Diff settings
+# ---------------------------------------------------------------------------------------------------------------------
+# Show a readable diff for the generated Qt translation files.
+*.ts    diff=text
