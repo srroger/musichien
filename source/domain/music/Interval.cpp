@@ -66,6 +66,24 @@ constexpr std::array<std::string_view, 15> NUMBER_NAMES{ "unison",         // 1
 
 constexpr std::array<Interval, SEMITONES_PER_OCTAVE> SIMPLE_INTERVALS{ buildSimpleIntervals() };
 
+// Builds the table of every interval the application supports, from the unison to the fifteenth.
+//
+// Same reasoning as above: constexpr, because this list is the source of the answer choices, and an
+// exercise must never wait for it to be computed.
+[[nodiscard]] constexpr std::array<Interval, SUPPORTED_INTERVAL_COUNT> buildSupportedIntervals() noexcept
+{
+    std::array<Interval, SUPPORTED_INTERVAL_COUNT> intervals{};
+
+    for( const std::int32_t semitones : std::views::iota( 0, MAXIMUM_INTERVAL_SEMITONES + 1 ) )
+    {
+        intervals.at( static_cast<std::size_t>( semitones ) ) = Interval{ semitones };
+    }
+
+    return intervals;
+}
+
+constexpr std::array<Interval, SUPPORTED_INTERVAL_COUNT> SUPPORTED_INTERVALS{ buildSupportedIntervals() };
+
 }    // namespace
 
 std::string Interval::name() const
@@ -144,9 +162,14 @@ std::vector<Interval> intervalsOf( std::span<const Note> p_notes )
     return intervals;
 }
 
-const std::array<Interval, 12> & allSimpleIntervals()
+const std::array<Interval, SEMITONES_PER_OCTAVE> & allSimpleIntervals()
 {
     return SIMPLE_INTERVALS;
+}
+
+const std::array<Interval, SUPPORTED_INTERVAL_COUNT> & allSupportedIntervals()
+{
+    return SUPPORTED_INTERVALS;
 }
 
 }    // namespace musichien::domain

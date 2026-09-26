@@ -37,6 +37,7 @@
 
 #include <array>
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -77,6 +78,13 @@ enum class IntervalQuality
 // deliberate: a wrapped distance would silently turn an unplayable request into a valid but WRONG
 // interval, which is far worse than a saturated one. No ear training exercise ever asks for more.
 inline constexpr std::int32_t MAXIMUM_INTERVAL_SEMITONES = 2 * SEMITONES_PER_OCTAVE;
+
+// How many intervals the application supports: one per distance, from the unison to the fifteenth.
+//
+// The answer choices of an exercise are drawn from a list this long, and a test checks that it is the
+// same list the naming tables cover. A screen that offered an interval outside of it would ask a
+// question the domain cannot answer.
+inline constexpr std::size_t SUPPORTED_INTERVAL_COUNT = static_cast<std::size_t>( MAXIMUM_INTERVAL_SEMITONES ) + 1;
 
 // Number of letter names inside an octave.
 //
@@ -249,12 +257,12 @@ concept NoteContainerLike = requires( const NoteContainer & p_container ) {
 // Everything the exercise generator needs from the domain. Kept free of any input and output.
 // ---------------------------------------------------------------------------------------------------------------------
 
-// Builds the interval between two notes. The direction of the movement does not change the result:
-// the constructor normalises the distance and the quality comes from the reference table.
+// Builds the interval between two notes. Only the magnitude of the movement matters: a falling fifth
+// and a rising fifth are the same interval, and the quality follows from the class.
 [[nodiscard]] Interval intervalBetween( const Note & p_firstNote, const Note & p_secondNote );
 
 // Identifies the interval of a distance in semitones. Always succeeds: the distance is reduced to
-// its simple form first, and every simple form has a name.
+// what the application supports, and every distance up to the fifteenth has a name.
 [[nodiscard]] Interval intervalFromSemitones( std::int32_t p_semitones );
 
 // Turns a sequence of notes into the sequence of the intervals it contains.
@@ -262,6 +270,13 @@ concept NoteContainerLike = requires( const NoteContainer & p_container ) {
 [[nodiscard]] std::vector<Interval> intervalsOf( std::span<const Note> p_notes );
 
 // Names of every simple interval, used to build the answer choices of an exercise.
-[[nodiscard]] const std::array<Interval, 12> & allSimpleIntervals();
+[[nodiscard]] const std::array<Interval, SEMITONES_PER_OCTAVE> & allSimpleIntervals();
+
+// Every interval the application supports, from the unison to the fifteenth, in order.
+//
+// This is the list the answer choices of an exercise are drawn from. A screen offers exactly these,
+// so that it can never propose an interval the domain would refuse to name, and never forget one the
+// domain knows how to name.
+[[nodiscard]] const std::array<Interval, SUPPORTED_INTERVAL_COUNT> & allSupportedIntervals();
 
 }    // namespace musichien::domain

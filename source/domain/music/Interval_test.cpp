@@ -203,4 +203,27 @@ TEST( IntervalTest, every_interval_up_to_the_fifteenth_is_named )
     }
 }
 
+TEST( IntervalTest, the_supported_list_is_the_whole_usable_range )
+{
+    const std::array<Interval, SUPPORTED_INTERVAL_COUNT> & intervals = allSupportedIntervals();
+
+    ASSERT_EQ( 25, intervals.size() );
+
+    // The list is the usable range itself, in order, with no hole and no duplicate. A screen builds
+    // its answer buttons from it, so a missing entry would silently remove an interval from the game,
+    // and a repeated one would offer the same answer twice.
+    for( std::size_t index = 0; index < intervals.size(); ++index )
+    {
+        const Interval & interval = intervals.at( index );
+
+        EXPECT_EQ( static_cast<std::int32_t>( index ), interval.semitones() );
+        EXPECT_FALSE( interval.name().empty() );
+        EXPECT_FALSE( interval.identifier().empty() );
+    }
+
+    // It starts at the unison and stops exactly where the naming stops.
+    EXPECT_EQ( "P1", intervals.front().identifier() );
+    EXPECT_EQ( "P15", intervals.back().identifier() );
+}
+
 }    // namespace musichien::domain
