@@ -140,6 +140,16 @@ if [ -z "${QT_VERSION}" ]; then
     exit 1
 fi
 
+# Qt 6.11 or newer is a hard requirement: earlier versions forward to the draft name
+# std::saturate_cast, which the final C++26 standard renamed to std::saturating_cast.
+# See docs/BUILD_AND_SETUP.md, section "Why Qt 6.11 is required".
+if [ "$(printf '%s\n' "6.11" "${QT_VERSION}" | sort -V | head -n 1)" != "6.11" ]; then
+    echo "  ERROR: Qt ${QT_VERSION} is too old: Qt 6.11 or newer is required to build in C++26."
+    echo "         Set MUSICHIEN_QT_VERSION to a newer version and re-run."
+    exit 1
+fi
+
+
 echo "  selected Qt version: ${QT_VERSION}"
 echo "  installing Qt for the desktop (linux_gcc_64)..."
 "${AQT}" install-qt linux desktop "${QT_VERSION}" linux_gcc_64 -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"

@@ -59,6 +59,30 @@ qt_standard_project_setup()
 message(STATUS "Musichien: Qt ${Qt6_VERSION} found at '${Qt6_DIR}'")
 
 # ---------------------------------------------------------------------------------------------------------------------
+# Minimum Qt version: 6.11
+#
+# A Qt older than 6.11 CANNOT be compiled in C++26 with a recent standard library.
+#
+# Reason: Qt 6.10 and earlier forward to 'std::saturate_cast', which was the name used while C++26 was
+# still a draft. The final standard renamed it 'std::saturating_cast', and GCC 16 / libstdc++ 16
+# implements that final name. The failure surfaces deep inside a Qt header, as a
+# "no member named 'saturate_cast' in namespace 'std'" error that says nothing about the real cause.
+#
+# Failing here, with an explanation, is far cheaper than debugging that message.
+# ---------------------------------------------------------------------------------------------------------------------
+if(Qt6_VERSION VERSION_LESS 6.11)
+    message(FATAL_ERROR
+        "Qt ${Qt6_VERSION} cannot be used with C++26: Qt 6.11 or newer is required. Qt 6.10 and "
+        "earlier forward to the draft name 'std::saturate_cast', which the final C++26 standard "
+        "renamed to 'std::saturating_cast'. The result would be a confusing 'no member named "
+        "saturate_cast' error raised from inside a Qt header. Fix it with "
+        "'scripts/install_dependencies.sh', then 'source scripts/setup_env.sh'. "
+        "See docs/BUILD_AND_SETUP.md.")
+endif()
+
+
+
+# ---------------------------------------------------------------------------------------------------------------------
 # GoogleTest / GoogleMock
 #
 # Built from source by the superbuild, so that the version never depends on the host.
