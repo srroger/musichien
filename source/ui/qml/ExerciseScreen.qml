@@ -220,9 +220,35 @@ Item {
                 Layout.fillWidth: true
 
                 Button {
+                    // Flat, and READABLE - which it was not.
+
+                    id: quitButton
+
+                    // A flat Material button takes its text colour from the style, and the style knows nothing
+                    // about the gradient painted behind it: the result was almost black on a night blue
+                    // background, and Roger reported it as such. The colour is therefore stated here, exactly
+                    // as the answer buttons state theirs, and a discreet outline gives the tap somewhere to
+                    // land.
                     flat: true
                     text: qsTr("Quitter")
                     onClicked: ExerciseController.stopSession()
+
+                    background: Rectangle {
+                        radius: 12
+                        color: "#2a1a46"
+                        border.width: 1
+                        border.color: quitButton.down ? "#a58ad0" : "#5c4a80"
+                    }
+
+                    contentItem: Text {
+                        text: quitButton.text
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        color: quitButton.down ? "#ffffff" : "#cbb8e8"
+                        font.pixelSize: 15
+                        font.bold: true
+                    }
+
                 }
 
                 Item {
