@@ -76,6 +76,15 @@ coverage/
 *~
 
 # ---------------------------------------------------------------------------------------------------------------------
+# AI collaboration rules
+#
+# AGENTS.md holds this project's working agreement with the assistant. It is deliberately kept OUT of Git:
+# it is a personal file, useful to one machine, and shipping it to a public repository would publish rules
+# that only make sense here. The file still belongs to the checkout, so the rule ignores it without deleting it.
+# ---------------------------------------------------------------------------------------------------------------------
+/AGENTS.md
+
+# ---------------------------------------------------------------------------------------------------------------------
 # Operating systems
 # ---------------------------------------------------------------------------------------------------------------------
 .DS_Store
