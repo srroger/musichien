@@ -25,20 +25,26 @@ function(musichienFunction_AddExternalProject p_projectName)
         endif()
 
         if(MUSICHIEN_SUPERBUILD_ONLY STREQUAL shortName)
-            set("COMPILE_${p_projectName}" ON)
+            set(compileThisProject ON)
         else()
-            set("COMPILE_${p_projectName}" OFF)
+            set(compileThisProject OFF)
         endif()
 
-        set("MUSICHIEN_SUPERBUILD_COMPILE_${p_projectName}" ${COMPILE_${p_projectName}} CACHE BOOL "Build ${p_projectName}")
+        # CACHE INTERNAL is what makes the decision survive the return of this function: a plain
+        # set() would be forgotten, and the superbuild would silently build nothing at all.
+        set("COMPILE_${p_projectName}" ${compileThisProject} CACHE INTERNAL "Build ${p_projectName}")
+        set("MUSICHIEN_SUPERBUILD_COMPILE_${p_projectName}" ${compileThisProject} CACHE BOOL "Build ${p_projectName}")
 
     else()
 
         # First configuration: every dependency is enabled, then the value is kept in the cache.
         set("MUSICHIEN_SUPERBUILD_COMPILE_${p_projectName}" ON CACHE BOOL "Build ${p_projectName}")
-        set("COMPILE_${p_projectName}" ${MUSICHIEN_SUPERBUILD_COMPILE_${p_projectName}})
+
+        # Same reasoning as above: CACHE INTERNAL, otherwise the loop below would skip everything.
+        set("COMPILE_${p_projectName}" "${MUSICHIEN_SUPERBUILD_COMPILE_${p_projectName}}" CACHE INTERNAL "Build ${p_projectName}")
 
     endif()
+
 
     message(STATUS "Musichien superbuild: dependency '${p_projectName}' registered")
 
