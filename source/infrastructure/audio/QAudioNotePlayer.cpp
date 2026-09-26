@@ -5,8 +5,10 @@
 #include <QAudioDevice>
 #include <QMediaDevices>
 
+#include <algorithm>
 #include <format>
 #include <iostream>
+#include <iterator>
 #include <utility>
 
 namespace musichien::infrastructure
@@ -18,15 +20,11 @@ namespace
 // Duration of a single note, as heard in an exercise.
 constexpr std::chrono::milliseconds DEFAULT_NOTE_DURATION{ 700 };
 
-// Sample rate asked from the audio device. 48000 Hz is the native rate of Android devices and is
-// supported almost everywhere.
-constexpr int REQUESTED_SAMPLE_RATE = 48000;
-
-// One channel is enough for a single tone, and halves the amount of data to push.
-constexpr int REQUESTED_CHANNEL_COUNT = 1;
-
 // Extra room given to the sink buffer, so that a single write always fits.
 constexpr int BUFFER_MARGIN_BYTES = 4096;
+
+// The synthesizer already normalises its own output, so the sink must not attenuate it further.
+constexpr double SINK_VOLUME = 1.0;
 
 }    // namespace
 
@@ -74,37 +72,55 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
         return;
     }
 
-    QAudioFormat requestedFormat;
-    requestedFormat.setSampleRate( REQUESTED_SAMPLE_RATE );
-    requestedFormat.setChannelCount( REQUESTED_CHANNEL_COUNT );
+    // Start from what the device prefers, INCLUDING its channel layout, and only force what the
+    // synthesizer really needs: 32 bit float samples.
+    //
+    // Asking for a mono stream was a mistake. On this machine the sound then came out of the left
+    // channel only, because the backend did not upmix it. Using the layout the device announces, and
+    // duplicating the mono signal over it, gives a properly centred sound.
+    QAudioFormat requestedFormat = outputDevice.preferredFormat();
     requestedFormat.setSampleFormat( QAudioFormat::Float );
 
-    // A device that cannot honour the request is asked what it would accept instead. Losing the
-    // sample rate is an inconvenience; playing nothing at all would be a bug.
     if( !outputDevice.isFormatSupported( requestedFormat ) )
     {
-        const QAudioFormat preferredFormat = outputDevice.preferredFormat();
-
-        requestedFormat = preferredFormat;
-        requestedFormat.setChannelCount( REQUESTED_CHANNEL_COUNT );
-        requestedFormat.setSampleFormat( QAudioFormat::Float );
-
-        std::cerr << "Musichien: the audio device does not support " << REQUESTED_SAMPLE_RATE
-                  << " Hz, falling back to " << requestedFormat.sampleRate() << " Hz\n";
+        // Fall back to the raw preferred format. It may not be Float, which is checked below.
+        requestedFormat = outputDevice.preferredFormat();
     }
 
-    m_audioFormat = requestedFormat;
+    m_audioSink = std::make_unique<QAudioSink>( outputDevice, requestedFormat );
 
-    // The synthesizer is created from the real sample rate of the device. This single line is what
-    // keeps every note in tune: generating at 44100 Hz and playing at 48000 Hz would shift the pitch.
+    // A sink only reveals the format it REALLY opened once its stream has been started. It is
+    // therefore opened once here and stopped immediately.
+    //
+    // This matters twice over: using the requested sample rate instead of the real one would make
+    // every note out of tune, and using the requested channel count would put the sound on the
+    // wrong channels.
+    m_audioSink->start();
+    m_audioFormat = m_audioSink->format();
+    m_audioSink->stop();
+
+    if( m_audioFormat.sampleFormat() != QAudioFormat::Float )
+    {
+        std::cerr << "Musichien: the audio device does not accept 32 bit float samples (it wants "
+                  << static_cast<int>( m_audioFormat.sampleFormat() ) << "). Playback stays silent.\n";
+
+        // Assigned rather than reset(): QAudioSink has a reset() method of its own, so a call to
+        // "m_audioSink.reset()" would read as if it acted on the sound stream.
+        m_audioSink = nullptr;
+        m_outputDescription = "unsupported sample format";
+
+        return;
+    }
+
+    // The synthesizer is created from the REAL sample rate of the device. This single line is what
+    // keeps every note in tune.
     m_synthesizer.emplace( m_audioFormat.sampleRate() );
 
-    m_audioSink = std::make_unique<QAudioSink>( outputDevice, m_audioFormat );
-
-    m_outputDescription = std::format( "{} ({} Hz, {} channel(s))",
+    m_outputDescription = std::format( "{} ({} Hz, {} channel(s), sample format {})",
                                        outputDevice.description().toStdString(),
                                        m_audioFormat.sampleRate(),
-                                       m_audioFormat.channelCount() );
+                                       m_audioFormat.channelCount(),
+                                       static_cast<int>( m_audioFormat.sampleFormat() ) );
 
     std::cerr << "Musichien: audio output opened on " << m_outputDescription << "\n";
 }
@@ -124,12 +140,28 @@ void QAudioNotePlayer::playSamples( std::vector<float> p_samples )
 
     m_currentSamples = std::move( p_samples );
 
-    const auto byteCount = static_cast<qint64>( m_currentSamples.size() )
+    // The synthesizer produces MONO samples, which is musically correct: a single tone is a single
+    // signal. Turning that into the channel layout of the device is the job of this adapter.
+    //
+    // The same sample is written to EVERY channel. Letting the audio backend upmix a mono stream is
+    // what produced a sound heard only from the left channel.
+    const auto channelCount = static_cast<std::size_t>( std::max( 1, m_audioFormat.channelCount() ) );
+
+    std::vector<float> channelSamples;
+    channelSamples.reserve( m_currentSamples.size() * channelCount );
+
+    for( const float monoSample : m_currentSamples )
+    {
+        std::fill_n( std::back_inserter( channelSamples ), channelCount, monoSample );
+    }
+
+    const auto byteCount = static_cast<qint64>( channelSamples.size() )
                            * static_cast<qint64>( sizeof( float ) );
 
     // The whole buffer is handed over in a single write, so the sink must be able to hold it. Without
     // this, a write longer than the internal buffer would be truncated and the note cut in the middle.
     m_audioSink->setBufferSize( static_cast<int>( byteCount ) + BUFFER_MARGIN_BYTES );
+    m_audioSink->setVolume( SINK_VOLUME );
 
     m_audioOutputDevice = m_audioSink->start();
 
@@ -143,7 +175,7 @@ void QAudioNotePlayer::playSamples( std::vector<float> p_samples )
     // idiom for pushing raw audio, and the only place in the project where a cast of this kind is
     // needed. It is therefore silenced locally rather than globally.
     const qint64 writtenByteCount = m_audioOutputDevice->write(
-      reinterpret_cast<const char *>( m_currentSamples.data() ),    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+      reinterpret_cast<const char *>( channelSamples.data() ),    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
       byteCount );
 
     if( writtenByteCount < byteCount )
