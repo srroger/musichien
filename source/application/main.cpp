@@ -8,6 +8,7 @@
 #include "infrastructure/audio/QAudioNotePlayer.h"
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
+#include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
 
@@ -77,7 +78,12 @@ int main( int p_argumentCount, char * p_arguments[] )
     // These members are static in Qt: calling them on the class makes that explicit, and avoids a
     // "static member accessed through instance" finding.
     QGuiApplication::setApplicationName( APPLICATION_NAME );
-    QGuiApplication::setApplicationVersion( MUSICHIEN_VERSION );
+
+    // The version says what the code is SUPPOSED to be; the build identifier says which commit was actually
+    // compiled. Both are displayed together, and until the first release that is deliberate: what runs on a
+    // phone can be weeks old, and "0.5.0" alone cannot tell two builds of it apart.
+    QGuiApplication::setApplicationVersion( QStringLiteral( MUSICHIEN_VERSION " · " MUSICHIEN_BUILD_ID ) );
+
     QGuiApplication::setOrganizationName( "Musichien" );
 
     // Material is the style Qt Quick Controls maps onto the Android look and feel. Using it from the
@@ -86,7 +92,7 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     // Diagnostics go to std::cerr on purpose: stderr is not buffered, so these lines always appear
     // immediately, even when the output is redirected to a file or to a pipe.
-    std::cerr << APPLICATION_NAME << " " << MUSICHIEN_VERSION << "\n";
+    std::cerr << APPLICATION_NAME << " " << MUSICHIEN_VERSION << " (" << MUSICHIEN_BUILD_ID << ")\n";
 
     // -------------------------------------------------------------------------------------------------------------
     // Wiring
