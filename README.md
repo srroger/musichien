@@ -142,5 +142,34 @@ Workflow détaillé : `docs/GIT_WORKFLOW.md`.
 
 ## ⚖️ Licence
 
-**GPL-3.0-or-later.** Ce projet doit rester libre : aucune version dérivée ne peut être fermée.
+**GNU General Public License, version 3 ou ultérieure** — texte complet dans [`LICENSE`](LICENSE).
+
+```
+Musichien — apprendre l'oreille musicale en jouant
+Copyright (C) 2026 Roger Srey (srroger)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+```
+
+Ce projet **doit rester libre** : aucune version dérivée ne peut être fermée.
+
+### Pourquoi GPL-3.0 et pas MIT ?
+
+Deux raisons, dans cet ordre :
+
+1. **C'est cohérent avec le projet.** Musichien est personnel, sans monétisation, et doit le rester.
+   Le GPL garantit la **réciprocité** : personne ne pourra jamais « fermer » ce logiciel.
+2. **C'est la seule licence propre avec Qt.** Qt est utilisé sous licence GPL. Sur Android, Qt est lié
+   d'une manière qui rend la conformité LGPLv3 **juridiquement contestée** (l'utilisateur ne peut pas
+   remplacer une bibliothèque à l'intérieur d'un APK signé). **GPL-3.0 lève toute ambiguïté**, et
+   débloque en plus les modules Qt réservés au GPL (Qt Quick 3D, Qt Virtual Keyboard, Qt Lottie…).
+
 
