@@ -38,6 +38,10 @@ ctest --preset "CTest Clang-Debug Musichien"
 
 # Ou, plus simplement, ouvrir l'éditeur avec l'environnement garanti :
 scripts/start_code_oss.sh
+
+# 4. Pour le téléphone : compile, VÉRIFIE l'absence de permission réseau, signe, puis installe
+scripts/install_dependencies.sh --with-android   # une seule fois
+scripts/build_android.sh
 ```
 
 Procédure complète, prérequis et dépannage : `docs/BUILD_AND_SETUP.md`.
@@ -65,6 +69,7 @@ Elles vivent dans `MUSICHIEN_EXTERNAL_DIR` (par défaut `../Roger-externals`) et
 | Dépendance | Version | Installée par | Rôle |
 |---|---|---|---|
 | **Qt** | **≥ 6.11 obligatoire** | `aqtinstall` (sans compte Qt) | Framework applicatif, interface QML |
+| **Android SDK + NDK** | API **36**, NDK **r27c** | `scripts/install_dependencies.sh --with-android` | Compilation pour le téléphone. Le NDK est **celui avec lequel Qt a été compilé** |
 
 | **GoogleTest / GoogleMock** | **1.18.0** | superbuild (depuis les sources) | Tests unitaires |
 | **nlohmann/json** | **3.12.0** | superbuild (en-têtes seuls) | Fichier de sauvegarde et fichiers de contenu |
@@ -90,6 +95,7 @@ Musichien/
 └── source/
     ├── domain/               # ♥ le cœur métier : aucune dépendance à Qt, testable seul
     ├── ui/                   # les fichiers QML et les ressources
+    ├── android/              # AndroidManifest.xml : ce qui garantit l'absence de permission réseau
     └── application/          # le point d'entrée : assemble, ne décide rien
 ```
 
@@ -135,9 +141,9 @@ Workflow détaillé : `docs/GIT_WORKFLOW.md`.
 - [x] Socle de build (CMake, superbuild, presets)
 - [x] Domaine : notes et intervalles, **testés**
 - [x] Première interface QML (écran de garde)
-- [ ] Moteur audio (SoundFonts, sortie basse latence)
+- [x] Moteur audio (synthèse pure, testée sans carte son)
 - [ ] Boucle de jeu, progression, gamification
-- [ ] Déploiement Android
+- [x] Déploiement Android (APK `arm64-v8a`, **vérifiée sans aucune permission système**)
 
 ---
 

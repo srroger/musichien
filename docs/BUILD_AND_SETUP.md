@@ -18,9 +18,14 @@ Machine de référence : **Manjaro Linux (Arch), x86_64**, testée avec 4 cœurs
 | `git` | Versionnage | — |
 | `jdk21-openjdk` | **JDK 21** | La chaîne Android de Qt exige **exactement** JDK 21 |
 | `python-pipx` | Installe `aqtinstall` de façon isolée | Évite de polluer le Python système |
+| `android-tools` | `adb`, `fastboot` *(Android seulement)* | Utile mais **non indispensable** : le SDK fournit son propre `adb`. Voir la découverte n°3 |
+| `android-udev` | `adb` voit le téléphone sans `sudo` *(Android seulement)* | — |
 
 ```bash
 sudo pacman -S clang clang-tools cmake ninja git jdk21-openjdk python-pipx
+
+# Pour Android, en plus
+sudo pacman -S android-tools android-udev
 ```
 
 > ⚠️ **JDK 26 est à éviter.** Il est installé par défaut sur la machine, mais il est **en avance** sur
@@ -49,7 +54,8 @@ scripts/install_dependencies.sh --with-android --with-superbuild
 | 2 | Installe **`aqtinstall`** via `pipx` |
 | 3 | **Découvre** la dernière version Qt disponible sur le miroir, puis l'installe **avec les modules du projet** dans `Roger-externals/Qt/` |
 
-| 4 | Construit **GoogleTest 1.18.0** et **nlohmann/json 3.12.0** via le superbuild |
+| 4 | *(avec `--with-android`)* Installe le **SDK Android** et le **NDK r27c** dans `Roger-externals/android-sdk` |
+| 5 | *(avec `--with-superbuild`)* Construit **GoogleTest 1.18.0** et **nlohmann/json 3.12.0** via le superbuild |
 
 ### Pourquoi `aqtinstall` et pas l'installeur officiel ?
 
@@ -210,9 +216,9 @@ avec CodeLLDB) et `extensions.json` (extensions recommandées).
 
 ---
 
-## 6. Android *(en préparation)*
+## 6. Android
 
-### ⚠️ Découverte : le dépôt Android de Qt a **déménagé**
+### ⚠️ Découverte n°1 : le dépôt Android de Qt a **déménagé**
 
 C'est le piège le plus coûteux rencontré jusqu'ici. Depuis **Qt 6.8**, les binaires Android de Qt ne
 sont **plus** dans `linux_x64/android` :
@@ -240,28 +246,125 @@ repassant à `linux`.
 > ```
 > `--dry-run` affiche ce qui serait téléchargé, sans rien écrire sur le disque.
 
-### Étapes restantes
+### Mise en place
+
+Tout est automatisé, **y compris le SDK et le NDK**, qui ne sont plus à installer à la main :
 
 ```bash
-# 1. Outillage hôte + Qt pour Android (android-tools, android-udev, jdk21-openjdk)
-scripts/install_dependencies.sh --with-android
-
-# 2. L'émulateur a besoin du groupe kvm, puis d'une reconnexion de session
-sudo gpasswd -a "$USER" kvm
-
-# 3. Android SDK (cmdline-tools) + le NDK exigé par Qt : la version exacte se lit DANS
-#    l'installation Qt pour Android, une fois l'étape 1 faite.
-
-# 4. Sur le téléphone : Paramètres → À propos → Numéro de build (7 tapes)
-#                      Options développeur → Débogage USB
-#    Puis accepter la fenêtre d'autorisation qui s'affiche.
-adb devices                                  # doit lister l'appareil
+scripts/install_dependencies.sh --with-android --with-superbuild
+source scripts/setup_env.sh
 ```
 
-> [!warning] À vérifier impérativement avant toute distribution
-> **L'APK ne doit contenir aucune permission `INTERNET`.** C'est la promesse centrale du projet
-> (voir la charte). Le manifeste généré par Qt doit donc être **relu** à ce moment-là, et non supposé
-> correct.
+Le SDK Android atterrit dans `Roger-externals/android-sdk`, **jamais** dans le système, avec exactement
+les versions exigées par Qt :
+
+| Composant | Version | Pourquoi précisément celle-là |
+|---|---|---|
+| **NDK** | **r27c** (`27.2.12479018`) | C'est **la révision avec laquelle Qt 6.12 a été compilé**. Elle se lit dans `android_arm64_v8a/lib/cmake/Qt6/qt.toolchain.cmake` ; elle ne se devine pas. |
+| **Plateforme** | `android-36` | Qt prend la plateforme installée la plus récente comme `compileSdk`. **API 37 n'existe pas** en canal stable : `sdkmanager` répond `Failed to find package`. |
+| **Build tools** | `36.0.0` | Minimum exigé par AGP 9.2.1, la version qu'embarque le template Gradle de Qt 6.12. |
+
+### Construire et installer
+
+```bash
+scripts/build_android.sh               # compile, vérifie, signe, puis installe sur le téléphone
+scripts/build_android.sh --no-install  # sans toucher au téléphone
+```
+
+Le script enchaîne configuration, compilation (cible `apk` fournie par Qt), récupération du paquet,
+**vérification des permissions**, signature, puis installation. La vérification est la raison d'être du
+script : voir la découverte n°2.
+
+### Sur le téléphone
+
+```bash
+# Paramètres → À propos → Numéro de build (7 tapes)
+# Options développeur → Débogage USB
+adb devices
+```
+
+### 🔴 Découverte n°2 : Qt réclame `INTERNET` à notre place
+
+C'est **le piège central du projet**, et il ne se voit qu'en relisant l'APK terminée.
+
+Le seul fait de lier `Qt6::Core` fait hériter de permissions :
+
+```cmake
+# android_arm64_v8a/lib/cmake/Qt6Core/Qt6CoreTargets.cmake
+INTERFACE_QT_ANDROID_PERMISSIONS "…WRITE_EXTERNAL_STORAGE;…INTERNET"
+```
+
+Et il existe **deux canaux indépendants**, ce qui rend le problème plus retors qu'il n'y paraît :
+
+| Canal | Mécanisme | Fermé par |
+|---|---|---|
+| **1** | La propriété CMake `QT_ANDROID_PERMISSIONS`, qui finit dans le JSON de déploiement | `cmake/musichienAndroid.cmake` la vide sur chaque module Qt |
+| **2** | Les fichiers `<module>-android-dependencies.xml` livrés avec Qt, que **`androiddeployqt` lit de lui-même**, sans rien demander à CMake | `source/android/AndroidManifest.xml`, **sans le marqueur `INSERT_PERMISSIONS`** |
+
+> [!important] Fermer le canal 1 ne suffit pas
+> Un premier build pourtant « propre » — JSON de déploiement contenant **zéro permission** — produisait
+> quand même un APK demandant `INTERNET`, `CAMERA`, `RECORD_AUDIO`, `BLUETOOTH` et
+> `ACCESS_NETWORK_STATE`. `androiddeployqt` les prélevait dans les XML des modules Qt (Qt6Core,
+> Qt6Network, Qt6Multimedia) et les insérait à son marqueur `INSERT_PERMISSIONS`. En retirant ce
+> marqueur du manifeste, il ne lui reste plus où les écrire.
+
+Résultat relu sur l'APK finale :
+
+```
+permissions declared by the package: none at all
+```
+
+> [!note] La seule permission restante est inoffensive
+> `io.github.srroger.musichien.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` est **déclarée par
+> l'application elle-même** (via `androidx.core`), avec un `protectionLevel` **signature**. Elle ne
+> peut être détenue que par une application signée de la même clé, n'accorde **aucune capacité
+> système** et n'apparaît pas dans les réglages. Elle est inévitable, et sans rapport avec le réseau.
+
+### Pourquoi c'est une garantie et non une promesse
+
+Sur Android, une application qui ne déclare pas `android.permission.INTERNET` n'est **pas placée dans le
+groupe `inet`** : ses appels `socket()` échouent. C'est le **noyau** qui applique la règle, pas
+Musichien. Retirer la permission, c'est retirer la capacité — et non cacher un bouton.
+
+### Signature
+
+Un APK **release est non signé**, donc **non installable**. `scripts/build_android.sh` le signe avec une
+**clé personnelle**, créée au premier lancement et conservée **hors du dépôt** :
+
+```
+~/.android/musichien-release.keystore
+~/.android/musichien-release.password     (chmod 600)
+```
+
+**Sauvegarder ces deux fichiers.** Android refuse d'installer une mise à jour dont la signature diffère
+de celle déjà en place : perdre la clé oblige à désinstaller l'application, donc à perdre la
+progression. Sous GPL, chacun reste libre de recompiler Musichien et de le signer de sa propre clé.
+
+### ⚠️ Découverte n°3 : `adb` du système peut être cassé sans rapport avec le projet
+
+`android-tools` (le paquet qui fournit `/usr/bin/adb`) était inutilisable :
+
+```
+adb: error while loading shared libraries: libprotobuf.so.36.0.0: cannot open shared object file
+```
+
+**Cause** : sur une distribution *rolling*, les dépendances se vérifient **par nom de paquet**, pas par
+version de bibliothèque. `protobuf` étant installé (en 35.1), `pacman` a jugé la dépendance satisfaite —
+alors que le binaire d'`adb` avait été compilé contre la **36**.
+
+**Deux conséquences pour le projet :**
+
+1. `scripts/setup_env.sh` place **le `platform-tools` du SDK en tête du `PATH`**. L'`adb` du SDK
+   n'a aucune dépendance système et fonctionne toujours, quel que soit l'état des paquets.
+2. `scripts/install_dependencies.sh` **avertit** désormais quand des dizaines de paquets attendent une
+   mise à jour : installer un paquet isolé sur un système en retard est exactement ce qui produit ce
+   genre de casse. Le remède est un upgrade complet (`sudo pacman -Syu`), jamais une réinstallation
+   ciblée.
+
+> [!warning] Aucune permission système ne doit jamais réapparaître
+> `scripts/build_android.sh` **refuse** de produire une APK qui en demande une, et il le vérifie
+> **deux fois** : sur le paquet compilé, puis sur le paquet **signé**. C'est la promesse centrale du
+> projet ; elle est donc contrôlée, pas espérée.
 
 
 ---
@@ -278,4 +381,12 @@ adb devices                                  # doit lister l'appareil
 | `adb devices` ne voit rien | `android-udev` manquant | `sudo pacman -S android-udev`, puis rebrancher |
 | Erreurs Gradle obscures | JDK 26 utilisé | Utiliser **JDK 21** |
 | `-Wlogical-op` inconnu | L'option est propre à GCC | Déjà conditionnée par compilateur dans le CMake |
+| `Failed to find package 'platforms;android-37'` | API 37 n'existe pas encore en canal stable | Utiliser `android-36` : c'est ce que fait le script |
+| `Expected '>', but got '-'` dans `AndroidManifest.xml` | Un commentaire **XML** contient `--`, ce qui est interdit en XML | Retirer toute séquence `--` des commentaires |
+| L'APK demande `INTERNET` | `androiddeployqt` a retrouvé son marqueur `INSERT_PERMISSIONS` | Vérifier `source/android/AndroidManifest.xml` — découverte n°2 |
+| `Failed to read Key … password … end of file reached` | `--key-pass file:` fait relire le fichier de mot de passe par `apksigner` | Ne pas passer `--key-pass` : sur un magasin PKCS12, le mot de passe de clé est celui du magasin |
+| `ninja: no work to do` sur la cible `apk` | `add_executable` au lieu de `qt_add_executable` | Utiliser `qt_add_executable`, sinon Qt ne crée pas les cibles de déploiement |
+| `no member named 'adjacent' in 'std::ranges::views'` | libc++ **18** (NDK r27c) est plus ancienne que libstdc++ 16 | Éviter les fonctionnalités de bibliothèque absentes de libc++ 18 : `views::adjacent`, `span::at`, `views::zip`… |
+| `no member named 'at' in 'std::span<float>'` | `std::span::at` est **C++26**, absent de libc++ 18 | Passer par un petit helper local vérifié, comme dans `ToneSynthesizer` |
+| `adb` introuvable ou cassé | `platform-tools` du SDK absent du `PATH` | `source scripts/setup_env.sh` : il le place en tête |
 
