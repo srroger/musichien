@@ -1,6 +1,7 @@
 #include "domain/music/Interval.h"
 
 #include <algorithm>
+#include <iterator>
 #include <ranges>
 
 namespace musichien::domain
@@ -103,12 +104,26 @@ std::vector<Interval> intervalsOf( std::span<const Note> p_notes )
     std::vector<Interval> intervals;
     intervals.reserve( p_notes.size() - 1 );
 
-    // A sliding window of two notes: no index, no manual increment, no off-by-one possible.
-    for( const auto & notePair : p_notes | std::views::adjacent<2> )
+    // A window of two consecutive notes, walked with iterators.
+    //
+    // std::views::adjacent<2> used to express this, with no index at all. It is a C++23 view that the
+    // libc++ shipped with the Android NDK (Clang 18) does not provide, and one single code path shared
+    // by every platform is worth more than the shorter syntax here: it is the path the unit tests
+    // exercise on the development machine, for the phone as well.
+    //
+    // Iterators rather than indices, because indexing a span is an unchecked access, which the
+    // clang-tidy configuration of this project refuses. 'std::next' never reaches past the end: the
+    // loop stops as soon as it would. See docs/BUILD_AND_SETUP.md.
+    for( auto firstNote = p_notes.begin(); firstNote != p_notes.end(); ++firstNote )
     {
-        const auto & [firstNote, secondNote] = notePair;
+        const auto secondNote = std::next( firstNote );
 
-        intervals.push_back( intervalBetween( firstNote, secondNote ) );
+        if( secondNote == p_notes.end() )
+        {
+            break;
+        }
+
+        intervals.push_back( intervalBetween( *firstNote, *secondNote ) );
     }
 
     return intervals;

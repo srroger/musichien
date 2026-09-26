@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <functional>
 #include <numbers>
 #include <ranges>
+#include <span>
 
 namespace musichien::domain
 {
@@ -140,22 +142,34 @@ void ToneSynthesizer::applyEnvelope( std::span<float> p_samples ) const
       std::min( sampleCountFor( RELEASE_DURATION ), maximumFadeSampleCount );
 
     // Fade in: the gain starts at 0, so the very first sample of the buffer is silence.
-    for( const std::size_t sampleIndex : std::views::iota( std::size_t{ 0 }, attackSampleCount ) )
-    {
-        const float gain = static_cast<float>( sampleIndex ) / static_cast<float>( attackSampleCount );
+    //
+    // The two loops below walk SUBVIEWS of the buffer rather than addressing samples by index, for two
+    // independent reasons:
+    //
+    //   * indexing a span is an unchecked access, which the clang-tidy configuration of this project
+    //     refuses (cppcoreguidelines-pro-bounds-avoid-unchecked-container-access);
+    //   * std::span::at(), the checked accessor used here before, is C++26 and is absent from the
+    //     libc++ shipped with the Android NDK's Clang 18.
+    //
+    // 'first' and 'last' cannot leave the buffer - the callers clamp both counts to half of it - and
+    // the gain is counted alongside the samples instead of being derived from an index.
+    std::size_t attackIndex = 0;
 
-        p_samples.at( sampleIndex ) *= gain;
+    for( float & sample : p_samples.first( attackSampleCount ) )
+    {
+        sample *= static_cast<float>( attackIndex ) / static_cast<float>( attackSampleCount );
+
+        ++attackIndex;
     }
 
     // Fade out: counted from the end, so the very last sample is exactly silence.
-    for( const std::size_t samplesFromTheEnd : std::views::iota( std::size_t{ 0 }, releaseSampleCount ) )
+    std::size_t samplesFromTheEnd = releaseSampleCount;
+
+    for( float & sample : p_samples.last( releaseSampleCount ) )
     {
-        const std::size_t sampleIndex = sampleCount - 1 - samplesFromTheEnd;
+        --samplesFromTheEnd;
 
-        const float gain =
-          static_cast<float>( samplesFromTheEnd ) / static_cast<float>( releaseSampleCount );
-
-        p_samples.at( sampleIndex ) *= gain;
+        sample *= static_cast<float>( samplesFromTheEnd ) / static_cast<float>( releaseSampleCount );
     }
 }
 

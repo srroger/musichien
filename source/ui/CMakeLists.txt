@@ -19,6 +19,16 @@ set(MUSICHIEN_QML_FILES
     PARENT_SCOPE
 )
 
+# The directory a QML IMPORT SCANNER must walk to discover the QML modules this application uses
+# (QtQuick, QtQuick.Controls, QtQuick.Controls.Material, QtQuick.Layouts...).
+#
+# It is exported from HERE, and not guessed in the application module, because this module is what
+# owns the QML files: if a QML file moves, only this line has to follow it.
+#
+# This value is only used by the Android build, where missing it costs a package that installs, starts
+# and dies immediately. See source/application/CMakeLists.txt.
+set(MUSICHIEN_QML_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR} PARENT_SCOPE)
+
 # ---------------------------------------------------------------------------------------------------------------------
 # The view models exposed to QML
 #
