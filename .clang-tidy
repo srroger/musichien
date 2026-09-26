@@ -1,0 +1,160 @@
+# =====================================================================================================================
+# Musichien - clang-tidy configuration
+#
+# Purpose: enforce the project's coding rules automatically, so that nobody (human or
+# assistant) has to remember them and so that no false diff is ever produced.
+#
+# The naming rules below implement the project conventions:
+#   - function parameters are prefixed with   p_
+#   - class data members are prefixed with    m_
+#   - everything is camelCase, types are CamelCase, constants are UPPER_CASE
+#   - identifiers must be long enough to be meaningful (no "int i", no "string str")
+#
+# Usage: scripts/check_code.sh
+# =====================================================================================================================
+---
+Checks: |
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-reserved-identifier,
+  -bugprone-unchecked-optional-access,
+  cert-*,
+  clang-analyzer-*,
+  -clang-analyzer-apiModeling.google.GTest,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  hicpp-*,
+  misc-*,
+  -misc-confusable-identifiers,
+  -misc-unused-parameters,
+  # misc-const-correctness is far too noisy on Qt code: adding const to a QObject based local
+  # frequently breaks its signal/slot usage, for no real benefit.
+  -misc-const-correctness,
+
+  # misc-include-cleaner demands a direct #include for every std symbol used, including those pulled
+  # in by our own headers. It produces thousands of findings on a healthy codebase.
+  -misc-include-cleaner,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -modernize-return-braced-init-list,
+  performance-*,
+  # performance-enum-size is a micro-optimisation that would force a base type on every enum of the
+  # domain, at the cost of readability. Not worth it at this stage.
+  -performance-enum-size,
+  readability-*,
+  -readability-magic-numbers
+
+
+WarningsAsErrors: ''
+HeaderFilterRegex: 'Musichien[\/\\]source'
+FormatStyle: file
+UseColor: true
+
+CheckOptions:
+
+  # ------------------------------------------------------------------------------------------------------------------
+  # Naming: functions and methods
+  # ------------------------------------------------------------------------------------------------------------------
+  - key:   readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key:   readability-identifier-naming.MethodCase
+    value: camelBack
+  - key:   readability-identifier-naming.IgnoreMainLikeFunctions
+    value: '1'
+
+  # ------------------------------------------------------------------------------------------------------------------
+  # Naming: types
+  # ------------------------------------------------------------------------------------------------------------------
+  - key:   readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key:   readability-identifier-naming.StructCase
+    value: CamelCase
+  - key:   readability-identifier-naming.UnionCase
+    value: CamelCase
+  - key:   readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key:   readability-identifier-naming.TypeAliasCase
+    value: CamelCase
+  - key:   readability-identifier-naming.TypedefCase
+    value: CamelCase
+  - key:   readability-identifier-naming.TemplateParameterCase
+    value: CamelCase
+
+  # ------------------------------------------------------------------------------------------------------------------
+  # Naming: enumerators and constants
+  # ------------------------------------------------------------------------------------------------------------------
+  - key:   readability-identifier-naming.EnumConstantCase
+    value: CamelCase
+  - key:   readability-identifier-naming.ScopedEnumConstantCase
+    value: CamelCase
+  - key:   readability-identifier-naming.ConstexprVariableCase
+    value: UPPER_CASE
+  - key:   readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key:   readability-identifier-naming.StaticConstantCase
+    value: UPPER_CASE
+  - key:   readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key:   readability-identifier-naming.NamespaceCase
+    value: lower_case
+
+  # ------------------------------------------------------------------------------------------------------------------
+  # Naming: the m_ prefix rule, applied to class data members
+  # ------------------------------------------------------------------------------------------------------------------
+  - key:   readability-identifier-naming.PrivateMemberCase
+    value: camelBack
+  - key:   readability-identifier-naming.PrivateMemberPrefix
+    value: 'm_'
+  - key:   readability-identifier-naming.ProtectedMemberCase
+    value: camelBack
+  - key:   readability-identifier-naming.ProtectedMemberPrefix
+    value: 'm_'
+
+  # Public members are deliberately NOT prefixed: plain data structs and QML exposed
+  # types read better without a prefix. See docs/CODE_CONVENTIONS.md.
+  - key:   readability-identifier-naming.PublicMemberCase
+    value: camelBack
+  - key:   readability-identifier-naming.PublicMemberPrefix
+    value: ''
+  - key:   readability-identifier-naming.StaticMemberCase
+    value: camelBack
+  - key:   readability-identifier-naming.StaticMemberPrefix
+    value: ''
+
+  # ------------------------------------------------------------------------------------------------------------------
+  # Naming: the p_ prefix rule, applied to function parameters
+  # ------------------------------------------------------------------------------------------------------------------
+  - key:   readability-identifier-naming.ParameterCase
+    value: camelBack
+  - key:   readability-identifier-naming.ParameterPrefix
+    value: 'p_'
+
+  # ------------------------------------------------------------------------------------------------------------------
+  # Naming: variables
+  # ------------------------------------------------------------------------------------------------------------------
+  - key:   readability-identifier-naming.VariableCase
+    value: camelBack
+  - key:   readability-identifier-naming.LocalVariableCase
+    value: camelBack
+  - key:   readability-identifier-naming.GlobalVariableCase
+    value: camelBack
+
+  # ------------------------------------------------------------------------------------------------------------------
+  # Meaningful names: refuses opaque identifiers such as "it", "str" or "tmp"
+  # ------------------------------------------------------------------------------------------------------------------
+  - key:   readability-identifier-length.MinimumVariableNameLength
+    value: '3'
+  - key:   readability-identifier-length.MinimumParameterNameLength
+    value: '3'
+  - key:   readability-identifier-length.MinimumLoopVariableNameLength
+    value: '3'
+
+  # ------------------------------------------------------------------------------------------------------------------
+  # Braces are always required, including for a single statement body
+  # ------------------------------------------------------------------------------------------------------------------
+  - key:   readability-braces-around-statements.ShortStatementLines
+    value: '0'
+...
+
