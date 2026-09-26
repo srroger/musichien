@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <numbers>
+#include <numeric>
 #include <random>
 #include <ranges>
 #include <span>
@@ -15,9 +16,6 @@ namespace musichien::domain
 
 namespace
 {
-
-// Full turn, in radians, used to convert a frequency into an angular step.
-constexpr double TWO_PI = 2.0 * std::numbers::pi;
 
 // Seed of the noise of the mistake cue.
 //
@@ -30,6 +28,57 @@ constexpr std::uint32_t MISTAKE_CUE_SEED = 20260926U;
 // Chosen so that the end of the burst is around a thousandth of its start: silence, to the ear, without
 // needing a separate fade. The envelope is applied on top of it all the same - see renderMistakeCue.
 constexpr double MISTAKE_CUE_DECAY = 6.0;
+
+// How much the hammer lets go over the length of the string it strikes.
+//
+// It hits at full strength and eases off, which is what makes a strike rather than a flat burst of noise.
+constexpr double HAMMER_RELEASE = 1.2;
+
+// Latency, in samples, of the averaging filter inside the loop.
+//
+// The filter delays the wave by HALF A SAMPLE, and that delay is part of the period the loop produces.
+// Forgetting it detunes every note, and detunes the HIGH ones more than the low ones - which makes an
+// octave slightly WIDER than an octave, a fifth slightly wider than a fifth. On an application whose
+// subject is the distance between two notes, that is not a rounding error, it is a wrong answer taught to
+// the player. Subtracting it is what keeps the tuning exact.
+constexpr double LOOP_FILTER_DELAY_SAMPLES = 0.5;
+
+// Ratio between two frequencies a given number of cents apart.
+[[nodiscard]] double centsToRatio( double p_cents )
+{
+    return std::pow( 2.0, p_cents / 1200.0 );
+}
+
+// How long a string of a given frequency takes to fall by 60 dB.
+//
+// Nearly the same everywhere in the range, and that is deliberate. A real string does decay faster in the
+// treble, but the loop filter below already takes care of that - it attenuates the high notes on every
+// round trip, and a high note makes many more round trips per second. Making the loss depend on the
+// frequency on TOP of that would leave the top of the range ringing for a tenth of a second.
+[[nodiscard]] double decayTimeFor( double p_frequency )
+{
+    constexpr double DECAY_AT_REFERENCE_SECONDS = 3.0;
+    constexpr double REFERENCE_FREQUENCY_HZ = 220.0;
+    constexpr double DECAY_EXPONENT = 0.15;
+
+    const double decaySeconds =
+      DECAY_AT_REFERENCE_SECONDS * std::pow( REFERENCE_FREQUENCY_HZ / p_frequency, DECAY_EXPONENT );
+
+    return std::clamp( decaySeconds, 1.5, 4.5 );
+}
+
+// Seed of the hammer of one string of one note.
+//
+// Spread across the whole range, so that two different notes never share a hammer. Two notes of an
+// interval that started on the SAME noise would add up on the attack and then cancel each other out -
+// exactly what this model exists to avoid. The stride is Knuth's constant: an odd number that spreads
+// consecutive MIDI numbers far apart in the seed space.
+[[nodiscard]] std::uint32_t stringSeedFor( const Note & p_note, std::size_t p_stringIndex )
+{
+    constexpr std::uint32_t SEED_STRIDE_PER_NOTE = 2654435761U;
+
+    return ( static_cast<std::uint32_t>( p_note.midiNumber() ) * SEED_STRIDE_PER_NOTE ) + static_cast<std::uint32_t>( p_stringIndex ) + 1U;
+}
 
 }    // namespace
 
@@ -65,23 +114,143 @@ std::vector<float> ToneSynthesizer::renderNote( const Note & p_note,
         return samples;
     }
 
-    const double angularIncrement =
-      TWO_PI * p_note.frequencyHz() / static_cast<double>( m_sampleRate );
+    const double frequency = p_note.frequencyHz();
 
-    for( const std::size_t sampleIndex : std::views::iota( std::size_t{ 0 }, sampleCount ) )
+    // The strings of the note, tuned a hair apart around the true frequency.
+    //
+    // The MIDDLE one is exactly right, and that detail matters more here than anywhere else: the player
+    // is asked to hear an INTERVAL, so a note that drifted would move the interval with it. The outer
+    // strings only add body, and their beat is far too slow to be heard as a wrong pitch.
+    for( std::size_t stringIndex = 0; stringIndex < STRING_COUNT; ++stringIndex )
     {
-        // The phase is computed from the sample index instead of being accumulated. An accumulated
-        // phase drifts over a long note, because floating point addition is not exact.
-        const double phase = angularIncrement * static_cast<double>( sampleIndex );
+        const double offsetInStrings = static_cast<double>( stringIndex ) - ( static_cast<double>( STRING_COUNT - 1 ) / 2.0 );
 
-        samples.at( sampleIndex ) = static_cast<float>( std::sin( phase ) );
+        mixStruckStringInto( samples,
+                             frequency * centsToRatio( offsetInStrings * STRING_DETUNE_CENTS ),
+                             stringSeedFor( p_note, stringIndex ) );
     }
 
-    applyEnvelope( samples );
+    // A strike, not a fade: see STRIKE_ATTACK_DURATION. The release, on the other hand, is the same as
+    // everywhere else, because the note is cut by the clock rather than by the string dying.
+    applyEnvelope( samples, STRIKE_ATTACK_DURATION, RELEASE_DURATION );
 
-    normalisePeak( samples );
+    normaliseOnsetEnergyTo( samples, TARGET_RMS_AMPLITUDE, NOTE_ONSET_DURATION );
 
     return samples;
+}
+
+void ToneSynthesizer::mixStruckStringInto( std::span<float> p_samples,
+                                           double p_frequency,
+                                           std::uint32_t p_seed ) const
+{
+    // Length of the delay line, in samples: one round trip of the wave is one period.
+    //
+    // ROUNDED UP, and this is the subtlety that costs a quarter tone if it is got wrong. Reading the line
+    // with linear interpolation at (1 - f) * line[i] + f * line[i + 1] does not ADD f samples of delay: the
+    // second tap is the YOUNGER sample, so the interpolated read is f samples EARLIER than the line. The
+    // delay a loop can produce is therefore in [N - 1, N], and the only way to land between two samples is
+    // to take N = ceil(L) and f = N - L. Done the other way round, every note is sharp - and the sharpness
+    // grows with the pitch, which quietly stretches every interval in the treble.
+    const double exactDelayLength =
+      ( static_cast<double>( m_sampleRate ) / p_frequency ) - LOOP_FILTER_DELAY_SAMPLES;
+
+    if( exactDelayLength < 4.0 )
+    {
+        return;
+    }
+
+    const auto delayLength = static_cast<std::size_t>( std::ceil( exactDelayLength ) );
+
+    const auto delayFraction =
+      static_cast<float>( static_cast<double>( delayLength ) - exactDelayLength );
+
+    std::vector<float> delayLine( delayLength, 0.0F );
+
+    // The hammer: a burst of noise, shaped so that it strikes and lets go.
+    std::mt19937 noiseEngine{ p_seed };
+
+    std::uniform_real_distribution<float> amplitudeDistribution{ -1.0F, 1.0F };
+
+    // The hammer strikes the WHOLE string, not one point of it: the excitation covers the delay line from
+    // end to end.
+    //
+    // Filling the line matters far more than it looks. Exciting only its very beginning - three
+    // milliseconds of noise followed by silence - produces a huge transient followed by a much quieter
+    // sustain, and the ceiling that prevents clipping then has to crush the whole note to keep that first
+    // moment inside the range. The note comes out several times too quiet.
+    //
+    // A long bass string genuinely does take several milliseconds to be struck and to let go, so covering
+    // the whole line is also the more honest model: about a millisecond for the top of the range, about
+    // ten for the bottom, which is exactly what a piano hammer does.
+    for( const std::size_t sampleIndex : std::views::iota( std::size_t{ 0 }, delayLength ) )
+    {
+        const double progress = static_cast<double>( sampleIndex ) / static_cast<double>( delayLength );
+
+        const auto shape = static_cast<float>( std::exp( -HAMMER_RELEASE * progress ) );
+
+        delayLine.at( sampleIndex ) = amplitudeDistribution( noiseEngine ) * shape;
+    }
+
+    // The excitation must carry NO continuous component.
+    //
+    // Noise drawn over a few hundred samples is not centred by chance, and the loop passes a continuous
+    // component almost without loss: a fraction of a per cent of offset would stay there for the whole
+    // note. It eats the headroom the ceiling needs - the note then comes out several times too quiet - and
+    // a phone speaker answers a continuous offset with a thump. One pass over the line removes it.
+    const auto meanExcitation =
+      std::accumulate( delayLine.begin(), delayLine.end(), 0.0 ) / static_cast<double>( delayLength );
+
+    std::ranges::for_each( delayLine, [meanExcitation]( float & p_sample ) {
+        p_sample -= static_cast<float>( meanExcitation );
+    } );
+
+    // And it is smoothed once, for two reasons that point the same way.
+    //
+    // It rounds off the hammer: a raw burst of noise has tall isolated peaks, and a real hammer does not
+    // click. And it lowers the crest factor, which is what limits how loud the note can be: the ceiling
+    // below is set by the tallest peak, so a spiky attack forces every note to be quieter than it needs to
+    // be - and forces different notes by different amounts, which is exactly the loudness difference this
+    // whole rewrite is trying to remove.
+    float previousExcitation = delayLine.back();
+
+    std::ranges::for_each( delayLine, [&previousExcitation]( float & p_sample ) {
+        const float smoothed = 0.5F * ( p_sample + previousExcitation );
+
+        previousExcitation = p_sample;
+        p_sample = smoothed;
+    } );
+
+    // The loss on every round trip, derived from the time the string takes to fall by 60 dB.
+    const auto loopLoss = static_cast<float>(
+      std::pow( 10.0, -3.0 / ( decayTimeFor( p_frequency ) * p_frequency ) ) );
+
+    std::size_t readIndex = 0;
+
+    float previousDelayedSample = 0.0F;
+
+    for( float & sample : p_samples )
+    {
+        const std::size_t nextIndex = ( readIndex + 1 == delayLength ) ? 0 : readIndex + 1;
+
+        const float currentSample = delayLine.at( readIndex );
+
+        // The fractional read: the delay is a real number, the buffer is an array.
+        const float delayedSample =
+          currentSample + ( delayFraction * ( delayLine.at( nextIndex ) - currentSample ) );
+
+        // The loop filter: the average of two consecutive samples, which is a low pass. It is what makes
+        // the HIGH harmonics die first, and therefore the whole reason the result sounds struck rather
+        // than held.
+        const float filteredSample = loopLoss * 0.5F * ( delayedSample + previousDelayedSample );
+
+        delayLine.at( readIndex ) = filteredSample;
+
+        previousDelayedSample = delayedSample;
+
+        sample += delayedSample;
+
+        readIndex = nextIndex;
+    }
 }
 
 std::vector<float> ToneSynthesizer::renderChord( std::span<const Note> p_notes,
@@ -105,9 +274,11 @@ std::vector<float> ToneSynthesizer::renderChord( std::span<const Note> p_notes,
         std::ranges::transform( noteSamples, mixedSamples, mixedSamples.begin(), std::plus<>{} );
     }
 
-    // Summing voices can exceed the maximum amplitude. Without this second normalisation a chord
-    // would clip, which sounds like distortion and would mislead the ear.
-    normalisePeak( mixedSamples );
+    // Summing voices can exceed the maximum amplitude, and normalising the SUM - not each voice - is what
+    // keeps an interval at the level of a single note. That is the whole point: the player compares two
+    // sounds, and a chord that sounded louder or quieter than a note would be a clue that has nothing to
+    // do with the interval.
+    normaliseOnsetEnergyTo( mixedSamples, TARGET_RMS_AMPLITUDE, NOTE_ONSET_DURATION );
 
     return mixedSamples;
 }
@@ -136,7 +307,9 @@ std::vector<float> ToneSynthesizer::renderMelody( std::span<const Note> p_notes,
     return melodySamples;
 }
 
-void ToneSynthesizer::applyEnvelope( std::span<float> p_samples ) const
+void ToneSynthesizer::applyEnvelope( std::span<float> p_samples,
+                                     std::chrono::milliseconds p_attack,
+                                     std::chrono::milliseconds p_release ) const
 {
     const std::size_t sampleCount = p_samples.size();
 
@@ -150,10 +323,15 @@ void ToneSynthesizer::applyEnvelope( std::span<float> p_samples ) const
     const std::size_t maximumFadeSampleCount = sampleCount / 2;
 
     const std::size_t attackSampleCount =
-      std::min( sampleCountFor( ATTACK_DURATION ), maximumFadeSampleCount );
+      std::min( sampleCountFor( p_attack ), maximumFadeSampleCount );
 
     const std::size_t releaseSampleCount =
-      std::min( sampleCountFor( RELEASE_DURATION ), maximumFadeSampleCount );
+      std::min( sampleCountFor( p_release ), maximumFadeSampleCount );
+
+    if( ( attackSampleCount == 0 ) || ( releaseSampleCount == 0 ) )
+    {
+        return;
+    }
 
     // Fade in: the gain starts at 0, so the very first sample of the buffer is silence.
     //
@@ -187,30 +365,66 @@ void ToneSynthesizer::applyEnvelope( std::span<float> p_samples ) const
     }
 }
 
-void ToneSynthesizer::normalisePeak( std::span<float> p_samples )
-{
-    normalisePeakTo( p_samples, TARGET_PEAK_AMPLITUDE );
-}
-
-void ToneSynthesizer::normalisePeakTo( std::span<float> p_samples, float p_targetPeak )
+float ToneSynthesizer::rootMeanSquare( std::span<const float> p_samples )
 {
     if( p_samples.empty() )
     {
-        return;
+        return 0.0F;
+    }
+
+    const double sumOfSquares = std::accumulate(
+      p_samples.begin(),
+      p_samples.end(),
+      0.0,
+      []( double p_sum, float p_sample ) {
+          const auto sample = static_cast<double>( p_sample );
+
+          return p_sum + ( sample * sample );
+      } );
+
+    return static_cast<float>( std::sqrt( sumOfSquares / static_cast<double>( p_samples.size() ) ) );
+}
+
+float ToneSynthesizer::peakAmplitude( std::span<const float> p_samples )
+{
+    if( p_samples.empty() )
+    {
+        return 0.0F;
     }
 
     const auto absoluteValues = p_samples | std::views::transform( []( float p_sample ) {
                                     return std::abs( p_sample );
                                 } );
 
-    const float peak = std::ranges::max( absoluteValues );
+    return std::ranges::max( absoluteValues );
+}
 
-    if( peak <= 0.0F )
+void ToneSynthesizer::normaliseOnsetEnergyTo( std::span<float> p_samples,
+                                              float p_targetRms,
+                                              std::chrono::milliseconds p_onsetDuration ) const
+{
+    // The onset, or the whole buffer when it is shorter than the onset: a very short sound has no beginning,
+    // it IS one.
+    const std::size_t onsetSampleCount = std::min( p_samples.size(), sampleCountFor( p_onsetDuration ) );
+
+    const float energy = rootMeanSquare( p_samples.first( onsetSampleCount ) );
+
+    if( energy <= 0.0F )
     {
         return;
     }
 
-    const float gain = p_targetPeak / peak;
+    float gain = p_targetRms / energy;
+
+    // The ceiling, and it is not a detail: a rich waveform reaches a given energy only by showing peaks
+    // well above it. Without this, the energy target would send the signal straight into clipping - and
+    // on a phone speaker, clipping is not a subtlety, it is distortion.
+    const float peak = peakAmplitude( p_samples );
+
+    if( ( peak > 0.0F ) && ( peak * gain > MAXIMUM_PEAK_AMPLITUDE ) )
+    {
+        gain = MAXIMUM_PEAK_AMPLITUDE / peak;
+    }
 
     std::ranges::for_each( p_samples, [gain]( float & p_sample ) { p_sample *= gain; } );
 }
@@ -248,10 +462,11 @@ std::vector<float> ToneSynthesizer::renderMistakeCue( std::chrono::milliseconds 
 
     // The same fade in and fade out as a note, and for the same reason: a burst that starts or stops
     // abruptly adds a CLICK of its own, which is the artefact the envelope exists to remove.
-    applyEnvelope( samples );
+    applyEnvelope( samples, CUE_ATTACK_DURATION, RELEASE_DURATION );
 
-    // And a LOWER target than a note, because noise at the same peak sounds louder than a tone.
-    normalisePeakTo( samples, MISTAKE_CUE_PEAK_AMPLITUDE );
+    // And a LOWER energy than a note, because noise at the same energy sounds much louder than a pitched
+    // sound: it spreads the same energy over every frequency at once.
+    normaliseOnsetEnergyTo( samples, MISTAKE_CUE_RMS_AMPLITUDE, MISTAKE_CUE_DURATION );
 
     return samples;
 }
