@@ -1,0 +1,81 @@
+<?xml version="1.0"?>
+<!--
+    Musichien, Android manifest.
+
+    This file is the reason the project can claim to be unable to use the network. The full story is
+    in the "Android" section of docs/BUILD_AND_SETUP.md. In short:
+
+      Qt's modules declare permissions. Qt6Core asks for INTERNET and WRITE_EXTERNAL_STORAGE,
+      Qt6Multimedia for CAMERA, BLUETOOTH, RECORD_AUDIO and MODIFY_AUDIO_SETTINGS, Qt6Network for
+      ACCESS_NETWORK_STATE. androiddeployqt reads them from the android-dependencies.xml files shipped
+      next to every Qt library and merges them into the manifest, independently of what CMake asked
+      for. The only place it can write them is its INSERT_PERMISSIONS marker, and this file
+      deliberately does not contain that marker.
+
+      Without android.permission.INTERNET declared, Android keeps the process out of the inet group
+      and its socket() calls fail. The kernel enforces this, not Musichien.
+
+    scripts/build_android.sh reads the permissions back out of the FINISHED package and fails the
+    build if any comes back. Prevention AND verification: a Qt upgrade could otherwise put them back
+    without a warning.
+
+    The INSERT markers below are replaced by androiddeployqt with the values declared in
+    cmake/musichienAndroid.cmake. There is no android:icon attribute on purpose: the project has no
+    icon yet, and an empty one would be rejected.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.srroger.musichien"
+    android:installLocation="auto"
+    android:versionCode="-- %%INSERT_VERSION_CODE%% --"
+    android:versionName="-- %%INSERT_VERSION_NAME%% --">
+
+    <!-- There is no INSERT_PERMISSIONS marker here, on purpose. See the header of this file. -->
+
+    <!-- %%INSERT_FEATURES -->
+
+    <supports-screens
+        android:anyDensity="true"
+        android:largeScreens="true"
+        android:normalScreens="true"
+        android:smallScreens="true" />
+
+    <application
+        android:name="org.qtproject.qt.android.bindings.QtApplication"
+        android:hardwareAccelerated="true"
+        android:label="-- %%INSERT_APP_NAME%% --"
+        android:enableOnBackInvokedCallback="true">
+
+        <activity
+            android:name="org.qtproject.qt.android.bindings.QtActivity"
+            android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|layoutDirection|locale|fontScale|keyboard|keyboardHidden|navigation|mcc|mnc|density"
+            android:label="-- %%INSERT_APP_NAME%% --"
+            android:launchMode="singleTop"
+            android:screenOrientation="unspecified"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="-- %%INSERT_APP_LIB_NAME%% --" />
+
+            <meta-data
+                android:name="android.app.arguments"
+                android:value="-- %%INSERT_APP_ARGUMENTS%% --" />
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.qtprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/qtprovider_paths" />
+        </provider>
+
+    </application>
+</manifest>
