@@ -361,6 +361,48 @@ alors que le binaire d'`adb` avait été compilé contre la **36**.
    genre de casse. Le remède est un upgrade complet (`sudo pacman -Syu`), jamais une réinstallation
    ciblée.
 
+### ⚠️ Découverte n°4 : le paquet s'installe, démarre, puis se ferme aussitôt
+
+C'est le symptôme le plus déroutant du projet : **l'installation réussit, l'icône apparaît, et l'écran se
+ferme immédiatement** — sans message sur le téléphone, et sans que rien n'ait été signalé à la
+compilation.
+
+La cause se lit dans le journal de l'application :
+
+```
+QQmlApplicationEngine failed to load component
+qrc:/qml/Main.qml:16:1: module "QtQuick.Controls" plugin
+"qml_QtQuick_Controls_qtquickcontrols2plugin" not found
+```
+
+Qt **embarque** dans le paquet les plugins QML que l'application importe réellement, et il décide
+lesquels en lançant `qmlimportscanner` sur les dossiers déclarés dans les settings de déploiement. Ces
+dossiers proviennent de la propriété **`QT_QML_ROOT_PATH`**. Quand elle n'est pas définie, Qt retombe sur
+le **dossier source de la cible** — ici `source/application`, qui **ne contient aucun QML** : les fichiers
+vivent dans le module `ui`. Le scanner ne trouve donc rien, n'embarque aucun plugin, et l'application
+meurt au démarrage.
+
+**Rien ne le signale à la compilation, et le desktop n'est pas touché**, puisque les plugins y viennent de
+l'installation Qt de la machine. Seul le téléphone révèle le problème.
+
+La correction tient en une ligne, dans `source/application/CMakeLists.txt` : pointer `QT_QML_ROOT_PATH`
+sur le module qui possède les QML.
+
+> [!tip] Lire le journal de l'application sur le téléphone
+> ```bash
+> adb logcat -c
+> adb shell am start -n io.github.srroger.musichien/org.qtproject.qt.android.bindings.QtActivity
+>
+> # Tout le journal est très bavard : se limiter à NOTRE application
+> adb logcat -d --pid=$(adb shell pidof io.github.srroger.musichien)
+>
+> # Ou chercher large
+> adb logcat -d | grep -iE "musichien|QML|default :"
+> ```
+> `--pid` avec `pidof` est de loin le plus lisible. C'est aussi ce qui a permis de constater que le son
+> sort bien : après un appui, le journal montre l'ouverture du flux `AAudio` (48 000 Hz, stéréo,
+> `format = 0x5` soit **Float 32 bits**).
+
 > [!warning] Aucune permission système ne doit jamais réapparaître
 > `scripts/build_android.sh` **refuse** de produire une APK qui en demande une, et il le vérifie
 > **deux fois** : sur le paquet compilé, puis sur le paquet **signé**. C'est la promesse centrale du
@@ -386,6 +428,7 @@ alors que le binaire d'`adb` avait été compilé contre la **36**.
 | L'APK demande `INTERNET` | `androiddeployqt` a retrouvé son marqueur `INSERT_PERMISSIONS` | Vérifier `source/android/AndroidManifest.xml` — découverte n°2 |
 | `Failed to read Key … password … end of file reached` | `--key-pass file:` fait relire le fichier de mot de passe par `apksigner` | Ne pas passer `--key-pass` : sur un magasin PKCS12, le mot de passe de clé est celui du magasin |
 | `ninja: no work to do` sur la cible `apk` | `add_executable` au lieu de `qt_add_executable` | Utiliser `qt_add_executable`, sinon Qt ne crée pas les cibles de déploiement |
+| **L'app s'installe, démarre, puis se ferme aussitôt** | Les plugins QML ne sont pas embarqués : `qmlimportscanner` n'a trouvé aucun QML | `QT_QML_ROOT_PATH` doit pointer sur le module `ui` — découverte n°4. Symptôme exact dans le journal : `module "QtQuick.Controls" plugin … not found` |
 | `no member named 'adjacent' in 'std::ranges::views'` | libc++ **18** (NDK r27c) est plus ancienne que libstdc++ 16 | Éviter les fonctionnalités de bibliothèque absentes de libc++ 18 : `views::adjacent`, `span::at`, `views::zip`… |
 | `no member named 'at' in 'std::span<float>'` | `std::span::at` est **C++26**, absent de libc++ 18 | Passer par un petit helper local vérifié, comme dans `ToneSynthesizer` |
 | `adb` introuvable ou cassé | `platform-tools` du SDK absent du `PATH` | `source scripts/setup_env.sh` : il le place en tête |
