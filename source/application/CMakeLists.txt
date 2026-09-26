@@ -23,6 +23,8 @@ target_compile_definitions(musichien_app PRIVATE MUSICHIEN_VERSION="${PROJECT_VE
 
 target_link_libraries(musichien_app PRIVATE
     musichien_domain
+    musichien_ui
+    musichien_infrastructure
 
     Qt6::Core
     Qt6::Gui
@@ -31,6 +33,7 @@ target_link_libraries(musichien_app PRIVATE
     Qt6::QuickControls2
     Qt6::Multimedia
 )
+
 
 # The file is named "musichien" while the target keeps the explicit "musichien_app" name: the binary
 # and the target do not have to share a name.

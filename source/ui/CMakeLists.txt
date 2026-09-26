@@ -18,3 +18,22 @@ set(MUSICHIEN_QML_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/Main.qml
     PARENT_SCOPE
 )
+
+# ---------------------------------------------------------------------------------------------------------------------
+# The view models exposed to QML
+#
+# They are the ONLY bridge between the interface and the domain. The QML displays and calls them; the
+# rules of the game stay in the domain, where they are testable without a graphical interface.
+# ---------------------------------------------------------------------------------------------------------------------
+musichienFunction_AddLibrary(ui
+    IntervalPlaybackController.h
+    IntervalPlaybackController.cpp
+)
+
+target_link_libraries(musichien_ui PUBLIC
+    musichien_domain
+
+    Qt6::Core
+    Qt6::Qml
+)
+
