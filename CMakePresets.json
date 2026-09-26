@@ -1,0 +1,134 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 26,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "description": "Base preset: Ninja generator, build tree as a sibling of the project",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/../Musichien-build/${presetName}",
+            "environment": {
+                "NINJA_STATUS": "[%f/%t] (%e) "
+            }
+        },
+        {
+            "name": "baseMusichien",
+            "hidden": true,
+            "description": "Base preset for the application itself",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "MUSICHIEN_EXTERNAL_DIR": "$env{MUSICHIEN_EXTERNAL_DIR}",
+                "MUSICHIEN_QT_DIR": "$env{MUSICHIEN_QT_DIR}"
+            }
+        },
+        {
+            "name": "Clang-Debug Musichien",
+            "displayName": "Musichien - Debug (Clang)",
+            "description": "Debug build with clang, warnings and clang-tidy enabled",
+            "inherits": "baseMusichien",
+            "binaryDir": "${sourceDir}/../Musichien-build/Clang-Debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "$env{CLANG_DIR}/clang",
+                "CMAKE_CXX_COMPILER": "$env{CLANG_DIR}/clang++"
+            }
+        },
+        {
+            "name": "Clang-RelWithDebInfo Musichien",
+            "displayName": "Musichien - RelWithDebInfo (Clang)",
+            "description": "Optimised build with debug information: the development default",
+            "inherits": "baseMusichien",
+            "binaryDir": "${sourceDir}/../Musichien-build/Clang-RelWithDebInfo",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_C_COMPILER": "$env{CLANG_DIR}/clang",
+                "CMAKE_CXX_COMPILER": "$env{CLANG_DIR}/clang++"
+            }
+        },
+        {
+            "name": "Clang-Release Musichien",
+            "displayName": "Musichien - Release (Clang)",
+            "description": "Fully optimised build, used to measure the real performance",
+            "inherits": "baseMusichien",
+            "binaryDir": "${sourceDir}/../Musichien-build/Clang-Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_C_COMPILER": "$env{CLANG_DIR}/clang",
+                "CMAKE_CXX_COMPILER": "$env{CLANG_DIR}/clang++"
+            }
+        },
+        {
+            "name": "Superbuild Musichien",
+            "displayName": "Musichien - Superbuild (dependencies)",
+            "description": "Builds only the external dependencies compiled from source, into MUSICHIEN_EXTERNAL_DIR",
+            "inherits": "base",
+            "binaryDir": "${sourceDir}/../Musichien-build/Superbuild",
+            "cacheVariables": {
+                "MUSICHIEN_SUPERBUILD": "ON",
+                "MUSICHIEN_EXTERNAL_DIR": "$env{MUSICHIEN_EXTERNAL_DIR}",
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_C_COMPILER": "$env{CLANG_DIR}/clang",
+                "CMAKE_CXX_COMPILER": "$env{CLANG_DIR}/clang++"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "Build Clang-Debug Musichien",
+            "configurePreset": "Clang-Debug Musichien"
+        },
+        {
+            "name": "Build Clang-RelWithDebInfo Musichien",
+            "configurePreset": "Clang-RelWithDebInfo Musichien"
+        },
+        {
+            "name": "Build Clang-Release Musichien",
+            "configurePreset": "Clang-Release Musichien"
+        },
+        {
+            "name": "Build Superbuild Musichien",
+            "configurePreset": "Superbuild Musichien"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "CTest Clang-Debug Musichien",
+            "configurePreset": "Clang-Debug Musichien",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        },
+        {
+            "name": "CTest Clang-RelWithDebInfo Musichien",
+            "configurePreset": "Clang-RelWithDebInfo Musichien",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        },
+        {
+            "name": "CTest Clang-Release Musichien",
+            "configurePreset": "Clang-Release Musichien",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        }
+    ]
+}
