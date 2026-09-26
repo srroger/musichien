@@ -47,3 +47,19 @@ target_link_libraries(musichien_ui PUBLIC
     Qt6::Qml
 )
 
+# ---------------------------------------------------------------------------------------------------------------------
+# Unit tests
+#
+# The view model is tested with the fake note player of the domain, so these tests need neither a
+# sound card nor a phone. They check the two things a view model can get wrong: what would be heard,
+# and what would be displayed.
+# ---------------------------------------------------------------------------------------------------------------------
+if(MUSICHIEN_BUILD_TESTING)
+
+    musichienFunction_AddTest(ui
+        musichien_ui
+        IntervalPlaybackController_test.cpp
+    )
+
+endif()
+

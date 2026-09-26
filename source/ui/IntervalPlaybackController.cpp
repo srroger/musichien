@@ -1,6 +1,8 @@
 #include "ui/IntervalPlaybackController.h"
 
-#include "domain/music/Note.h"
+#include "domain/music/Interval.h"
+
+#include <QString>
 
 #include <array>
 #include <chrono>
@@ -24,6 +26,27 @@ constexpr std::int32_t PERFECT_FIFTH_SEMITONES = 7;
 // is a musical decision, not a technical one: it will be tuned by ear.
 constexpr std::chrono::milliseconds MELODIC_GAP{ 280 };
 
+// Describes an interval for the interface.
+//
+// Every key is filled every time, and the interface reads them without checking: an empty map is what
+// says "nothing to name", and it is what a single note produces.
+//
+// 'identifier' is the stable name a save file would keep, 'name' is the one a human reads. The rest
+// describes the MODEL rather than the interval, and exists so that the model can be seen while it is
+// being tested: the exercise screens will simply ignore the keys they do not need.
+[[nodiscard]] QVariantMap describeInterval( const domain::Interval & p_interval )
+{
+    return QVariantMap{
+      { QStringLiteral( "identifier" ), QString::fromStdString( p_interval.identifier() ) },
+      { QStringLiteral( "name" ), QString::fromStdString( p_interval.name() ) },
+      { QStringLiteral( "semitones" ), p_interval.semitones() },
+      { QStringLiteral( "intervalClass" ), p_interval.intervalClass() },
+      { QStringLiteral( "octaveSpan" ), p_interval.octaveSpan() },
+      { QStringLiteral( "number" ), p_interval.number() },
+      { QStringLiteral( "isCompound" ), p_interval.isCompound() },
+    };
+}
+
 }    // namespace
 
 IntervalPlaybackController::IntervalPlaybackController( domain::NotePlayer & p_notePlayer,
@@ -31,60 +54,90 @@ IntervalPlaybackController::IntervalPlaybackController( domain::NotePlayer & p_n
   : QObject{ p_parent }
   , m_notePlayer{ p_notePlayer }
 {
+    // The choices are built once, from the domain's own list, and never again: the screen asks for
+    // them, it never composes them.
+    for( const domain::Interval & interval : domain::allSupportedIntervals() )
+    {
+        m_supportedIntervals.append( describeInterval( interval ) );
+    }
 }
 
-QString IntervalPlaybackController::lastPlayedIntervalName() const
+QVariantList IntervalPlaybackController::supportedIntervals() const
 {
-    return m_lastPlayedIntervalName;
+    return m_supportedIntervals;
 }
 
-void IntervalPlaybackController::setLastPlayedIntervalName( QString p_intervalName )
+QVariantMap IntervalPlaybackController::lastPlayedInterval() const
 {
-    if( m_lastPlayedIntervalName == p_intervalName )
+    return m_lastPlayedInterval;
+}
+
+bool IntervalPlaybackController::harmonicPlayback() const
+{
+    return m_harmonicPlayback;
+}
+
+void IntervalPlaybackController::setHarmonicPlayback( bool p_harmonicPlayback )
+{
+    if( m_harmonicPlayback == p_harmonicPlayback )
     {
         return;
     }
 
-    m_lastPlayedIntervalName = std::move( p_intervalName );
+    m_harmonicPlayback = p_harmonicPlayback;
+
+    emit harmonicPlaybackChanged();
+}
+
+void IntervalPlaybackController::setLastPlayedInterval( QVariantMap p_description )
+{
+    // Only notify when something actually changed: replaying the same interval must not make the
+    // screen blink.
+    if( m_lastPlayedInterval == p_description )
+    {
+        return;
+    }
+
+    m_lastPlayedInterval = std::move( p_description );
 
     emit lastPlayedIntervalChanged();
+}
+
+void IntervalPlaybackController::playAndDescribe( const domain::Note & p_rootNote,
+                                                  const domain::Note & p_upperNote )
+{
+    const std::array<domain::Note, 2> notes{ p_rootNote, p_upperNote };
+
+    if( m_harmonicPlayback )
+    {
+        m_notePlayer.playChord( notes );
+    }
+    else
+    {
+        m_notePlayer.playMelody( notes, MELODIC_GAP );
+    }
+
+    // The interval is identified by the DOMAIN, and from the two notes that were ACTUALLY played
+    // rather than from the distance that was asked for. Should the playable range ever clamp a note,
+    // the name displayed would then follow what was really heard instead of quietly lying.
+    setLastPlayedInterval( describeInterval( domain::intervalBetween( p_rootNote, p_upperNote ) ) );
+}
+
+void IntervalPlaybackController::playInterval( int p_semitones )
+{
+    const domain::Note rootNote{ ROOT_MIDI_NUMBER };
+    const domain::Note upperNote = rootNote.transposedBy( p_semitones );
+
+    playAndDescribe( rootNote, upperNote );
 }
 
 void IntervalPlaybackController::playSingleNote()
 {
     m_notePlayer.playNote( domain::Note{ ROOT_MIDI_NUMBER } );
 
-    setLastPlayedIntervalName( QString{} );
-}
-
-void IntervalPlaybackController::playPerfectFifth()
-{
-    const domain::Note rootNote{ ROOT_MIDI_NUMBER };
-    const domain::Note upperNote = rootNote.transposedBy( PERFECT_FIFTH_SEMITONES );
-
-    const std::array<domain::Note, 2> fifthNotes{ rootNote, upperNote };
-
-    m_notePlayer.playChord( fifthNotes );
-
-    // The interval is identified by the DOMAIN. This class only displays the result: if the naming
-    // rule changed one day, it would change in the domain and in its tests, not here.
-    const domain::Interval interval = domain::intervalBetween( rootNote, upperNote );
-
-    setLastPlayedIntervalName( QString::fromStdString( interval.name() ) );
-}
-
-void IntervalPlaybackController::playMelodicFifth()
-{
-    const domain::Note rootNote{ ROOT_MIDI_NUMBER };
-    const domain::Note upperNote = rootNote.transposedBy( PERFECT_FIFTH_SEMITONES );
-
-    const std::array<domain::Note, 2> fifthNotes{ rootNote, upperNote };
-
-    m_notePlayer.playMelody( fifthNotes, MELODIC_GAP );
-
-    const domain::Interval interval = domain::intervalBetween( rootNote, upperNote );
-
-    setLastPlayedIntervalName( QString::fromStdString( interval.name() ) );
+    // A single note is not an interval: there is nothing to name. The empty description is what tells
+    // the screen to fall back to its generic prompt.
+    setLastPlayedInterval( QVariantMap{} );
 }
 
 void IntervalPlaybackController::stopPlayback()
