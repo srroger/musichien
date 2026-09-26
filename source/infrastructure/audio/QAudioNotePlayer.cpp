@@ -236,4 +236,18 @@ void QAudioNotePlayer::playChord( std::span<const domain::Note> p_notes )
     playSamples( m_synthesizer->renderChord( p_notes, noteDuration() ) );
 }
 
+void QAudioNotePlayer::playMistakeCue()
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // A short burst that replaces whatever was playing: a cue is a punctuation mark, and hearing it over
+    // the interval it is commenting on would be confusing.
+    playSamples( m_synthesizer->renderMistakeCue( domain::ToneSynthesizer::MISTAKE_CUE_DURATION ) );
+}
+
 }    // namespace musichien::infrastructure

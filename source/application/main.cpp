@@ -6,9 +6,12 @@
 // =====================================================================================================================
 
 #include "infrastructure/audio/QAudioNotePlayer.h"
+#include "infrastructure/content/JsonHintBook.h"
+#include "infrastructure/haptics/DeviceHaptics.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
 
+#include <QFile>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
@@ -16,6 +19,7 @@
 #include <QtQml>
 
 #include <iostream>
+#include <string_view>
 
 namespace
 {
@@ -31,6 +35,38 @@ constexpr const char * APPLICATION_NAME = "Musichien";
 constexpr const char * QML_MODULE_NAME = "Musichien";
 constexpr int QML_MODULE_MAJOR_VERSION = 1;
 constexpr int QML_MODULE_MINOR_VERSION = 0;
+
+// Where the content files live once embedded. The path is the one they have on disk, thanks to the alias
+// declared in resources.qrc: one path to remember, identical on the desktop and on the phone.
+constexpr const char * INTERVAL_HINTS_RESOURCE = ":/assets/content/interval-hints.json";
+
+// Reads the memory hints from the resources.
+//
+// The file is opened HERE and not inside the reader: understanding JSON is the infrastructure's job,
+// reading a Qt resource is an application concern, and this is the layer allowed to know both.
+//
+// Missing or broken content is deliberately not fatal. A game that refuses to start because a hint is
+// malformed would trade a small loss for a total one.
+[[nodiscard]] musichien::domain::HintBook loadHintBook()
+{
+    QFile contentFile{ QString::fromUtf8( INTERVAL_HINTS_RESOURCE ) };
+
+    if( !contentFile.open( QIODevice::ReadOnly ) )
+    {
+        std::cerr << "Musichien: the interval hints are missing from the resources.\n";
+
+        return {};
+    }
+
+    const QByteArray content = contentFile.readAll();
+
+    musichien::domain::HintBook hintBook = musichien::infrastructure::readHintBook(
+      std::string_view{ content.constData(), static_cast<std::size_t>( content.size() ) } );
+
+    std::cerr << "Musichien: " << hintBook.hintCount() << " interval hints read\n";
+
+    return hintBook;
+}
 
 }    // namespace
 
@@ -79,7 +115,14 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     // The exercise screen has its own view model. It receives the SAME port, and neither controller
     // knows the other exists: the bench and the loop are two independent uses of the same domain.
-    musichien::ui::ExerciseSessionController exerciseController{ notePlayer };
+    //
+    // The vibration is injected as a function rather than called from the view model, and the hint book
+    // is handed over to be owned: one keeps Android out of the interface, the other keeps a reference to
+    // somebody else's object out of it.
+    musichien::ui::ExerciseSessionController exerciseController{ notePlayer,
+                                                                 {},
+                                                                 loadHintBook(),
+                                                                 musichien::infrastructure::vibrateForMistake };
 
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,

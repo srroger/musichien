@@ -169,6 +169,10 @@ Item {
             // The verdict
             // -------------------------------------------------------------------------------------------------
             // The choices
+            // The memory hint, once the player has made a mistake: a snatch of music they already know.
+            // Its place is RESERVED whether or not there is a hint, and that is not cosmetic: a screen that
+            // grows and shrinks moves the buttons under the finger of the player, which in a game played by
+            // tapping is unforgivable.
 
             anchors.fill: parent
             anchors.margins: 16
@@ -264,6 +268,27 @@ Item {
                     text: qsTr("Écoute bien…")
                     color: "#cbb8e8"
                     font.pixelSize: 17
+                }
+
+            }
+
+            // Note where it sits: BELOW the prompt, not in the verdict. A hint is useful while the player is
+            // still choosing; arriving with the answer, it would only be a second answer.
+            // -------------------------------------------------------------------------------------------------
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 36
+
+                Text {
+                    anchors.centerIn: parent
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#e8dcff"
+                    font.pixelSize: 16
+                    // Empty text is what "nothing to show" means, whichever of its reasons applies.
+                    text: ExerciseController.hintText
+                    visible: ExerciseController.hintText !== ""
                 }
 
             }

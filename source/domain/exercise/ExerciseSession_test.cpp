@@ -448,4 +448,53 @@ TEST( ExerciseSessionTest, the_three_directions_all_come_up_in_a_session )
     EXPECT_GT( harmonicCount, 0 );
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// The memory hint
+//
+// The hint is a NUDGE where the "Réponse" button is a rescue, and the whole design is in the timing: too
+// early it is the answer in disguise, too late it arrives after the player has given up. The two
+// thresholds are therefore asserted against each other, not one at a time.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionTest, the_hint_waits_for_a_mistake_and_leaves_with_the_question )
+{
+    ExerciseSession session{ TEST_SEED, unlimitedLivesSettings() };
+
+    // Nothing before the player has tried.
+    EXPECT_FALSE( session.isHintAvailable() );
+
+    answerWrongly( session );
+
+    EXPECT_TRUE( session.isHintAvailable() );
+
+    // The next question starts clean: a hint belongs to a question, not to a session.
+    answerCorrectly( session );
+    session.advance();
+
+    EXPECT_FALSE( session.isHintAvailable() );
+}
+
+TEST( ExerciseSessionTest, the_hint_is_offered_before_the_answer_is )
+{
+    SessionSettings settings = unlimitedLivesSettings();
+
+    // Enough intervals on the grid that three wrong answers in a row are possible at all: the grid closes
+    // in on every mistake, which is the subject of its own test.
+    settings.startingPaletteSize = 5;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    answerWrongly( session );
+
+    // At the first mistake: the nudge.
+    EXPECT_TRUE( session.isHintAvailable() );
+    EXPECT_FALSE( session.isHelpAvailable() );
+
+    answerWrongly( session );
+    answerWrongly( session );
+
+    // At the third: the rescue.
+    EXPECT_TRUE( session.isHelpAvailable() );
+}
+
 }    // namespace musichien::domain

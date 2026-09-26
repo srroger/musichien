@@ -31,6 +31,21 @@
 
     <!-- There is no INSERT_PERMISSIONS marker here, on purpose. See the header of this file. -->
 
+    <!--
+      The permissions Musichien DECLARES ITSELF, one by one, and never more than the game can justify.
+
+      A permission written here is a decision, and scripts/build_android.sh refuses the build if one
+      appears that is not also written down in its allowlist, justified in the same breath. Declaring
+      nothing would be simpler and would be a lie: the application does vibrate.
+
+        VIBRATE   a short buzz when an answer is wrong, doubling the shake of the screen so that a
+                  mistake is FELT and not only seen. It is a NORMAL permission: no dialog is ever shown,
+                  it grants access to nothing - no network, no file, no camera, no microphone, no
+                  location - and the only hardware it reaches is the vibrating motor. Stopping the
+                  vibration changes nothing but the vibration.
+    -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <!-- %%INSERT_FEATURES -->
 
     <supports-screens

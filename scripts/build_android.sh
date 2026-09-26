@@ -188,11 +188,18 @@ read_declared_permissions()
 #                       not learn to read without learning to write - which is why this one is
 #                       accepted even though it opens a real hardware input.
 #
+#   VIBRATE             a short buzz when an answer is wrong, doubling the shake of the screen so that
+#                       a mistake is felt and not only seen. It is a NORMAL permission: Android shows
+#                       no dialog for it, it grants access to NOTHING - no network, no file, no
+#                       camera, no microphone, no location - and the only hardware it reaches is the
+#                       vibrating motor.
+#
 # INTERNET is absent from this list, and can never be added to it: see the first rule below.
 # ---------------------------------------------------------------------------------------------------------------------
 ALLOWED_SYSTEM_PERMISSIONS=(
     "android.permission.POST_NOTIFICATIONS"
     "android.permission.RECORD_AUDIO"
+    "android.permission.VIBRATE"
 )
 
 # Refuses to go on when a package asks for a system permission it has no business asking for.

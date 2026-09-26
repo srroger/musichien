@@ -22,16 +22,26 @@
 
 #include "domain/audio/NotePlayer.h"
 #include "domain/exercise/ExerciseSession.h"
+#include "domain/exercise/HintBook.h"
 
 #include <QObject>
+#include <QString>
 #include <QVariantList>
 #include <QVariantMap>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 namespace musichien::ui
 {
+
+// Called when a wrong answer should be FELT, not only seen.
+//
+// An empty function means "this device cannot vibrate", which is the honest description of a development
+// machine. Injecting it rather than calling a platform API from here is what keeps this view model
+// testable, and what keeps the knowledge of Android out of the interface layer.
+using VibrationCallback = std::function<void()>;
 
 class ExerciseSessionController final : public QObject
 {
@@ -58,6 +68,12 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( QVariantMap heardInterval READ heardInterval NOTIFY sessionChanged )
     Q_PROPERTY( QVariantMap answeredInterval READ answeredInterval NOTIFY sessionChanged )
 
+    // A snatch of music to remember the interval by, once the player has made a mistake.
+    //
+    // EMPTY means "nothing to show", for any of three reasons that the screen does not need to tell
+    // apart: no mistake yet, the answer already known, or a gap in the content file.
+    Q_PROPERTY( QString hintText READ hintText NOTIFY sessionChanged )
+
     Q_PROPERTY( int experience READ experience NOTIFY scoreChanged )
     Q_PROPERTY( int streak READ streak NOTIFY scoreChanged )
     Q_PROPERTY( int lives READ lives NOTIFY scoreChanged )
@@ -70,8 +86,14 @@ public:
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
+    //
+    // The hint book arrives the same way, from the content file the application read at start up, and is
+    // held BY VALUE: a reference would be a reference to an object whose lifetime this class does not
+    // control, which is the shortest path to a crash nobody can reproduce.
     explicit ExerciseSessionController( domain::NotePlayer & p_notePlayer,
                                         domain::SessionSettings p_settings = {},
+                                        domain::HintBook p_hintBook = {},
+                                        VibrationCallback p_vibrate = {},
                                         QObject * p_parent = nullptr );
 
     [[nodiscard]] bool running() const noexcept;
@@ -85,6 +107,7 @@ public:
     [[nodiscard]] bool isHelpAvailable() const noexcept;
     [[nodiscard]] QVariantMap heardInterval() const;
     [[nodiscard]] QVariantMap answeredInterval() const;
+    [[nodiscard]] QString hintText() const;
     [[nodiscard]] int experience() const noexcept;
     [[nodiscard]] int streak() const noexcept;
     [[nodiscard]] int lives() const noexcept;
@@ -142,6 +165,12 @@ private:
 
     // Kept so that every session this controller starts uses the same rules.
     domain::SessionSettings m_settings;
+
+    // The memory hooks, owned here rather than referenced: see the constructor.
+    domain::HintBook m_hintBook;
+
+    // Empty when the device cannot vibrate.
+    VibrationCallback m_vibrate;
 
     // Empty until a session starts: the bench is what the application shows before that.
     std::unique_ptr<domain::ExerciseSession> m_session;

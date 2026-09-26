@@ -32,6 +32,10 @@ musichienFunction_AddLibrary(domain
     exercise/SessionScore.cpp
     exercise/ExerciseSession.h
     exercise/ExerciseSession.cpp
+
+    # The memory hooks, as content the domain holds and the infrastructure fills
+    exercise/HintBook.h
+    exercise/HintBook.cpp
 )
 
 # Expose the module to the rest of the project under a stable name.
@@ -51,6 +55,7 @@ if(MUSICHIEN_BUILD_TESTING)
         audio/ToneSynthesizer_test.cpp
         exercise/AnswerGrid_test.cpp
         exercise/ExerciseSession_test.cpp
+        exercise/HintBook_test.cpp
         exercise/LearningOrder_test.cpp
         exercise/SessionScore_test.cpp
     )

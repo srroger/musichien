@@ -243,6 +243,70 @@ TEST( NotePlayerFakeTest, records_what_it_is_asked_to_play )
     ASSERT_EQ( 1, player.playedChords().size() );
 
     EXPECT_EQ( 1, player.stopCount() );
+
+    // The cue is not an interval: it is counted on its own, precisely so that a test can tell "the player
+    // heard the answer again" from "the player heard that they were wrong".
+    player.playMistakeCue();
+
+    EXPECT_EQ( 1, player.mistakeCueCount() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The cue that marks a mistake
+//
+// What it SOUNDS like is the adapter's business. What the domain has to guarantee is that it carries no
+// pitch - the whole reason a mistake is signalled by noise rather than by a note - and that it stays out
+// of the way of the sounds being taught.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ToneSynthesizerTest, the_mistake_cue_is_noise_and_not_a_note )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const std::vector<float> cue = synthesizer.renderMistakeCue( ToneSynthesizer::MISTAKE_CUE_DURATION );
+
+    ASSERT_FALSE( cue.empty() );
+
+    // A tone crosses zero twice per period. The comparison uses the HIGHEST note the game ever plays, C6
+    // at 1046 Hz, so that the margin does not quietly depend on a pitch being low: over the length of
+    // this cue that tone would cross zero around 190 times, while noise crosses it on about half of its
+    // samples. Three times the worst case leaves no doubt about what this is.
+    constexpr double HIGHEST_PLAYED_FREQUENCY = 1046.5;
+
+    const double durationInSeconds =
+      std::chrono::duration<double>( ToneSynthesizer::MISTAKE_CUE_DURATION ).count();
+
+    const double highestToneCrossings = 2.0 * HIGHEST_PLAYED_FREQUENCY * durationInSeconds;
+
+    EXPECT_GT( static_cast<double>( countZeroCrossings( cue ) ), 3.0 * highestToneCrossings );
+}
+
+TEST( ToneSynthesizerTest, the_mistake_cue_is_quieter_than_a_note_and_dies_out )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const std::vector<float> cue = synthesizer.renderMistakeCue( ToneSynthesizer::MISTAKE_CUE_DURATION );
+
+    // Deliberately below the level of a note: noise at the same peak sounds much louder, and a cue is
+    // there to be noticed, not to make the player jump.
+    EXPECT_NEAR( ToneSynthesizer::MISTAKE_CUE_PEAK_AMPLITUDE, peakAmplitudeOf( cue ), 0.001F );
+    EXPECT_LT( peakAmplitudeOf( cue ), ToneSynthesizer::TARGET_PEAK_AMPLITUDE );
+
+    // And it ends in silence, which is what keeps the end of the burst from being a click of its own.
+    ASSERT_GE( cue.size(), 2 );
+
+    EXPECT_LT( std::abs( cue.back() ), 0.001F );
+}
+
+TEST( ToneSynthesizerTest, the_mistake_cue_is_the_same_every_time )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    // The seed is fixed. A cue that changed at every mistake would be impossible to recognise, and
+    // recognition is the only thing a cue is for - besides which, an unpredictable buffer cannot be
+    // asserted.
+    EXPECT_EQ( synthesizer.renderMistakeCue( ToneSynthesizer::MISTAKE_CUE_DURATION ),
+               synthesizer.renderMistakeCue( ToneSynthesizer::MISTAKE_CUE_DURATION ) );
 }
 
 }    // namespace musichien::domain

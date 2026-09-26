@@ -54,6 +54,11 @@ public:
                                                std::chrono::milliseconds{ 0 } } );
     }
 
+    void playMistakeCue() override
+    {
+        ++m_mistakeCueCount;
+    }
+
     void stopAll() override
     {
         ++m_stopCount;
@@ -67,6 +72,7 @@ public:
     [[nodiscard]] const std::vector<Note> & playedNotes() const noexcept { return m_playedNotes; }
     [[nodiscard]] const std::vector<PlayedGroup> & playedMelodies() const noexcept { return m_playedMelodies; }
     [[nodiscard]] const std::vector<PlayedGroup> & playedChords() const noexcept { return m_playedChords; }
+    [[nodiscard]] int mistakeCueCount() const noexcept { return m_mistakeCueCount; }
     [[nodiscard]] int stopCount() const noexcept { return m_stopCount; }
 
     void clear()
@@ -74,6 +80,7 @@ public:
         m_playedNotes.clear();
         m_playedMelodies.clear();
         m_playedChords.clear();
+        m_mistakeCueCount = 0;
         m_stopCount = 0;
     }
 
@@ -82,6 +89,7 @@ private:
     std::vector<Note> m_playedNotes;
     std::vector<PlayedGroup> m_playedMelodies;
     std::vector<PlayedGroup> m_playedChords;
+    int m_mistakeCueCount{ 0 };
     int m_stopCount{ 0 };
 };
 

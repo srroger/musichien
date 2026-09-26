@@ -59,6 +59,13 @@ struct SessionSettings
     // Wrong answers on the same question before the answer can be revealed.
     std::int32_t wrongAttemptsBeforeHelp{ 3 };
 
+    // Wrong answers on the same question before the MEMORY HINT appears.
+    //
+    // ONE, and that is the point: a hint is not a last resort, it is what turns a mistake into a
+    // connection. Waiting for three mistakes before helping would mean waiting for a player to be
+    // discouraged, and the hint is a nudge where the "Réponse" button is a rescue.
+    std::int32_t wrongAttemptsBeforeHint{ 1 };
+
     // Lives of the session. Empty means no limit: it is what the training mode of the first version
     // will use. The first playable loop keeps it finite, because a rule nobody can feel is a rule
     // nobody can judge.
@@ -160,6 +167,13 @@ public:
 
     // True once the answer may be revealed: the player has tried enough.
     [[nodiscard]] bool isHelpAvailable() const noexcept;
+
+    // True once the memory hint may be shown: the player has tried, and a snatch of music might unblock
+    // them.
+    //
+    // Distinct from isHelpAvailable, and the difference is the whole design: a hint NUDGES ("remember
+    // Star Wars?"), help GIVES UP ("it was a fifth"). The first should arrive early, the second late.
+    [[nodiscard]] bool isHintAvailable() const noexcept;
 
     // True while the player is still allowed to hear the interval again.
     [[nodiscard]] bool canReplay() const noexcept { return m_state == SessionState::Asking; }

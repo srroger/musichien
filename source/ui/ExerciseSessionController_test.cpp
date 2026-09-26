@@ -51,6 +51,24 @@ constexpr std::size_t SESSION_QUESTION_COUNT = 10;
     return p_controller.heardInterval().value( "semitones" ).toInt();
 }
 
+// A book that has a hint for EVERY interval going up.
+//
+// The session draws its interval at random, so a test cannot know which one will be asked. Covering them
+// all is what keeps the assertion precise, instead of sorting through special cases.
+[[nodiscard]] domain::HintBook hintBookForEveryAscendingInterval()
+{
+    domain::HintBook hintBook;
+
+    for( std::int32_t semitones = 0; semitones <= domain::MAXIMUM_INTERVAL_SEMITONES; ++semitones )
+    {
+        hintBook.add( domain::Interval{ semitones },
+                      domain::IntervalDirection::Ascending,
+                      domain::IntervalHint{ "indice " + std::to_string( semitones ), {} } );
+    }
+
+    return hintBook;
+}
+
 void answerCorrectly( ExerciseSessionController & p_controller )
 {
     p_controller.answer( heardDistance( p_controller ) );
@@ -252,6 +270,129 @@ TEST( ExerciseSessionControllerTest, leaving_the_loop_releases_the_sound_and_the
     // And the bench is back: nothing of the session is left behind.
     EXPECT_FALSE( controller.isFinished() );
     EXPECT_EQ( 0, controller.experience() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// A mistake, as a sound and as a feeling
+//
+// Two channels that are not the interval being taught: one is heard, one is felt. Both are asserted
+// separately from the melody that is played again, because telling them apart is the whole point of
+// having a cue that is not a note.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionControllerTest, a_wrong_answer_is_heard_as_a_cue_and_felt )
+{
+    domain::NotePlayerFake notePlayer;
+
+    int vibrationCount = 0;
+
+    ExerciseSessionController controller{ notePlayer,
+                                          ascendingOnlySettings(),
+                                          {},
+                                          [&vibrationCount] { ++vibrationCount; } };
+
+    controller.startSession();
+    controller.answer( heardDistance( controller ) + 1 );
+
+    EXPECT_EQ( 1, notePlayer.mistakeCueCount() );
+    EXPECT_EQ( 1, vibrationCount );
+}
+
+TEST( ExerciseSessionControllerTest, a_correct_answer_neither_sounds_the_cue_nor_vibrates )
+{
+    domain::NotePlayerFake notePlayer;
+
+    int vibrationCount = 0;
+
+    ExerciseSessionController controller{ notePlayer,
+                                          ascendingOnlySettings(),
+                                          {},
+                                          [&vibrationCount] { ++vibrationCount; } };
+
+    controller.startSession();
+    answerCorrectly( controller );
+
+    EXPECT_EQ( 0, notePlayer.mistakeCueCount() );
+    EXPECT_EQ( 0, vibrationCount );
+}
+
+TEST( ExerciseSessionControllerTest, a_device_that_cannot_vibrate_still_hears_the_cue )
+{
+    // No callback at all, which is what a development machine honestly is. Nothing must depend on it.
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    controller.startSession();
+    controller.answer( heardDistance( controller ) + 1 );
+
+    EXPECT_EQ( 1, notePlayer.mistakeCueCount() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The memory hint
+//
+// A hint is a nudge, and its timing is the whole design: too early it is the answer in disguise, too late
+// it arrives after the player has given up.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionControllerTest, the_hint_waits_for_a_mistake )
+{
+    domain::NotePlayerFake notePlayer;
+
+    ExerciseSessionController controller{ notePlayer,
+                                          ascendingOnlySettings(),
+                                          hintBookForEveryAscendingInterval() };
+
+    controller.startSession();
+
+    // Nothing yet: an interval offered before the player has tried would just be a second question.
+    EXPECT_TRUE( controller.hintText().isEmpty() );
+
+    const std::int32_t askedDistance = heardDistance( controller );
+
+    controller.answer( askedDistance + 1 );
+
+    // And the hint is the one of the interval that was ASKED, never of the one that was answered.
+    EXPECT_EQ( QString::fromStdString( "indice " + std::to_string( askedDistance ) ),
+               controller.hintText() );
+}
+
+TEST( ExerciseSessionControllerTest, the_hint_stays_for_the_verdict_and_leaves_with_the_question )
+{
+    domain::NotePlayerFake notePlayer;
+
+    ExerciseSessionController controller{ notePlayer,
+                                          ascendingOnlySettings(),
+                                          hintBookForEveryAscendingInterval() };
+
+    controller.startSession();
+    controller.answer( heardDistance( controller ) + 1 );
+
+    ASSERT_FALSE( controller.hintText().isEmpty() );
+
+    answerCorrectly( controller );
+
+    // The verdict is being read, so the hint is still worth reading: that is where it turns "you were
+    // wrong" into "that is how you could have remembered it".
+    EXPECT_FALSE( controller.hintText().isEmpty() );
+
+    controller.continueToNextQuestion();
+
+    // And the next question starts clean: a hint belongs to a question, not to a session.
+    EXPECT_TRUE( controller.hintText().isEmpty() );
+}
+
+TEST( ExerciseSessionControllerTest, an_interval_without_a_hint_shows_nothing )
+{
+    // An empty book is what a gap in the content file looks like. Nothing is displayed, and nothing else
+    // changes.
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    controller.startSession();
+    controller.answer( heardDistance( controller ) + 1 );
+
+    EXPECT_TRUE( controller.hintText().isEmpty() );
 }
 
 }    // namespace musichien::ui

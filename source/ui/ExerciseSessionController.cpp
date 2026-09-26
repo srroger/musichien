@@ -26,10 +26,14 @@ constexpr int NO_LIFE_LIMIT = -1;
 
 ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_notePlayer,
                                                       domain::SessionSettings p_settings,
+                                                      domain::HintBook p_hintBook,
+                                                      VibrationCallback p_vibrate,
                                                       QObject * p_parent )
   : QObject{ p_parent }
   , m_notePlayer{ p_notePlayer }
   , m_settings{ p_settings }
+  , m_hintBook{ std::move( p_hintBook ) }
+  , m_vibrate{ std::move( p_vibrate ) }
 {
 }
 
@@ -100,6 +104,30 @@ QVariantMap ExerciseSessionController::answeredInterval() const
     // operator* rather than value(): an empty optional is what "nothing to show" means here, and it is
     // already handled.
     return answer.has_value() ? describeInterval( *answer ) : QVariantMap{};
+}
+
+QString ExerciseSessionController::hintText() const
+{
+    if( ( m_session == nullptr ) || !m_session->isHintAvailable() )
+    {
+        return QString{};
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    // Looked up for the interval that was ASKED, in the direction it was played: a hint is a fact about
+    // the question, never about the answer, and never about the button the player pressed.
+    const std::optional<domain::IntervalHint> hint = m_hintBook.hintFor( question.target,
+                                                                         question.direction );
+
+    if( !hint.has_value() )
+    {
+        // A gap in the content file - the seventh descending has no hint yet. Nothing is reported to
+        // the player: a missing hint is simply absent, not broken.
+        return QString{};
+    }
+
+    return QString::fromStdString( hint->label );
 }
 
 int ExerciseSessionController::experience() const noexcept
@@ -217,9 +245,20 @@ void ExerciseSessionController::answer( int p_semitones )
         // catch up on, and the melody is what gives the second note its meaning.
         playCurrentQuestion();
 
-        // And it is announced, so that the screen can answer with its BODY - a shake today, a
-        // vibration tomorrow. The controller knows what happened; how it should feel is not its job.
+        // And it is announced, so that the screen can answer with its BODY - the shake, and the
+        // vibration on a device that has a motor. The controller knows what happened; how it should feel
+        // is not its job.
         emit wrongAnswerGiven();
+
+        // The cue, then the buzz: both are mistakes being made audible and tangible, and neither is the
+        // interval the player is being asked to name. See NotePlayer::playMistakeCue for why that
+        // distinction matters.
+        m_notePlayer.playMistakeCue();
+
+        if( m_vibrate )
+        {
+            m_vibrate();
+        }
     }
 
     emit scoreChanged();

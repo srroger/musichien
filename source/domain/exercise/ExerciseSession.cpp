@@ -240,6 +240,15 @@ void ExerciseSession::advance()
     m_state = SessionState::Asking;
 }
 
+bool ExerciseSession::isHintAvailable() const noexcept
+{
+    // No condition on the state, on purpose: the hint is worth showing while the player is still
+    // choosing AND after the answer is known, where it becomes "that is how you could have remembered
+    // it". It appears on the first mistake and stays for the rest of the question, because a new
+    // question brings a new Question with a count back at zero.
+    return m_currentQuestion.wrongAttemptCount >= m_settings.wrongAttemptsBeforeHint;
+}
+
 bool ExerciseSession::isHelpAvailable() const noexcept
 {
     return ( m_state == SessionState::Asking )
