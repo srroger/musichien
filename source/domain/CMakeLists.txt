@@ -22,6 +22,16 @@ musichienFunction_AddLibrary(domain
     audio/NotePlayerFake.h
     audio/ToneSynthesizer.h
     audio/ToneSynthesizer.cpp
+
+    # The exercise loop, as pure rules: no sound, no clock, no screen
+    exercise/AnswerGrid.h
+    exercise/AnswerGrid.cpp
+    exercise/LearningOrder.h
+    exercise/LearningOrder.cpp
+    exercise/SessionScore.h
+    exercise/SessionScore.cpp
+    exercise/ExerciseSession.h
+    exercise/ExerciseSession.cpp
 )
 
 # Expose the module to the rest of the project under a stable name.
@@ -39,6 +49,10 @@ if(MUSICHIEN_BUILD_TESTING)
         musichien_domain
         music/Interval_test.cpp
         audio/ToneSynthesizer_test.cpp
+        exercise/AnswerGrid_test.cpp
+        exercise/ExerciseSession_test.cpp
+        exercise/LearningOrder_test.cpp
+        exercise/SessionScore_test.cpp
     )
 
 endif()
