@@ -36,8 +36,8 @@ cmake --build --preset "Build Clang-Debug Musichien"
 ctest --preset "CTest Clang-Debug Musichien"
 ../Musichien-build/Clang-Debug/bin/musichien
 
-# Ou, plus simplement, ouvrir l'IDE avec l'environnement garanti :
-scripts/start_qtcreator.sh
+# Ou, plus simplement, ouvrir l'éditeur avec l'environnement garanti :
+scripts/start_code_oss.sh
 ```
 
 Procédure complète, prérequis et dépannage : `docs/BUILD_AND_SETUP.md`.

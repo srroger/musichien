@@ -1,0 +1,54 @@
+{
+    // =================================================================================================================
+    // Musichien - code-oss / VS Code settings
+    //
+    // These settings are shared on purpose: they are part of the conventions of the project.
+    // =================================================================================================================
+
+    // --- CMake: drive everything through the presets, never through a hand written configuration ---
+    "cmake.useCMakePresets": "always",
+    "cmake.configurePreset": "Clang-Debug Musichien",
+    "cmake.buildPreset": "Build Clang-Debug Musichien",
+    "cmake.testPreset": "CTest Clang-Debug Musichien",
+    "cmake.buildBeforeRun": true,
+    "cmake.configureOnOpen": false,
+
+    // --- clangd: the language server, which is also the C++ formatter -------------------------------
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/../Musichien-build/Clang-Debug",
+        "--header-insertion=never",
+        "--background-index=false"
+    ],
+    "[cpp]": {
+        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
+    },
+
+    // --- Formatting: automatic, identical to scripts/format_code.sh ---------------------------------
+    //
+    // QML is deliberately excluded from format-on-save: qmlformat is the reference formatter and is
+    // run by scripts/format_code.sh, so that QML and C++ are always formatted by the same tools.
+    "editor.formatOnSave": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "[qml]": {
+        "editor.formatOnSave": false
+    },
+
+    // --- Whitespace: mirrors .editorconfig, so that no false diff is ever produced -------------------
+    "files.encoding": "utf8",
+    "files.eol": "\n",
+    "files.insertFinalNewline": true,
+    "files.trimTrailingWhitespace": true,
+    "files.trimTrailingWhitespaceInRegexAndStrings": false,
+
+    // --- Keep the editor focused on the sources ------------------------------------------------------
+    "search.exclude": {
+        "**/Musichien-build": true,
+        "**/Roger-externals": true,
+        "**/compile_commands.json": true
+    },
+    "files.watcherExclude": {
+        "**/Musichien-build/**": true,
+        "**/Roger-externals/**": true
+    }
+}
