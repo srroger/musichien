@@ -53,45 +53,95 @@ echo "  source built deps     : ${WITH_SUPERBUILD}"
 echo "====================================================================================================="
 
 # ---------------------------------------------------------------------------------------------------------------------
-# 1. System packages
+# 1. Required tools
 #
-# Only the generic tooling is taken from the host. Qt, GoogleTest and the JSON library are pinned in
-# the external directory, never taken from pacman.
+# The check is done on the COMMANDS, not on package names.
+#
+# Reason: a command can be provided by several packages, and hard coding a package name that does not
+# exist makes the whole script fail for a reason that has nothing to do with the project. That is
+# exactly what happened with 'clang-tools', which is not a package on Arch: clang-format, clang-tidy
+# and clangd all come from the 'clang' package.
+#
+# Format: <command>:<package that provides it>
 # ---------------------------------------------------------------------------------------------------------------------
-echo
-echo "--- Step 1/4: system packages ------------------------------------------------------------"
-
-SYSTEM_PACKAGES=(
-    clang                # the compiler used by every preset
-    clang-tools          # clang-format, clang-tidy and clangd
-    cmake
-    ninja
-    git
-    jdk21-openjdk        # required by the Android toolchain of Qt (JDK 21, not 26)
-    coreutils            # provides the find and sort used to detect the pinned Qt
+REQUIRED_TOOLS=(
+    "clang:clang"                # the compiler used by every preset
+    "clang-format:clang"         # formatting, driven by .clang-format
+    "clang-tidy:clang"           # naming rules and static analysis
+    "cmake:cmake"
+    "ninja:ninja"
+    "git:git"
 )
 
+echo
+echo "--- Step 1/4: required tools -----------------------------------------------------------"
+
 MISSING_PACKAGES=()
-for package in "${SYSTEM_PACKAGES[@]}"; do
-    if ! pacman -Q "${package}" >/dev/null 2>&1; then
-        MISSING_PACKAGES+=("${package}")
+
+for toolEntry in "${REQUIRED_TOOLS[@]}"; do
+
+    toolCommand="${toolEntry%%:*}"
+    toolPackage="${toolEntry##*:}"
+
+    if command -v "${toolCommand}" >/dev/null 2>&1; then
+        printf '  %-14s OK\n' "${toolCommand}"
+    else
+        printf '  %-14s MISSING (package: %s)\n' "${toolCommand}" "${toolPackage}"
+
+        # The same package may provide several missing commands: it is added only once.
+        if [[ ! " ${MISSING_PACKAGES[*]:-} " =~ " ${toolPackage} " ]]; then
+            MISSING_PACKAGES+=("${toolPackage}")
+        fi
     fi
 done
 
 if [ ${#MISSING_PACKAGES[@]} -eq 0 ]; then
-    echo "  every system package is already installed"
+    echo "  every required tool is already available"
 else
-    echo "  missing: ${MISSING_PACKAGES[*]}"
-    echo "  installing (sudo required)..."
-    sudo pacman -S --needed --noconfirm "${MISSING_PACKAGES[@]}"
+    echo
+    echo "  Packages to install: ${MISSING_PACKAGES[*]}"
+    echo "  The next command asks for your administrator password (sudo)."
+    echo
+
+    if ! sudo pacman -S --needed --noconfirm "${MISSING_PACKAGES[@]}"; then
+        echo
+        echo "  ERROR: the installation failed. Run it by hand to see the details:"
+        echo "         sudo pacman -S --needed ${MISSING_PACKAGES[*]}"
+        exit 1
+    fi
 fi
 
+
 if [ "${WITH_ANDROID}" = "ON" ]; then
-    echo "  Android host tooling..."
-    sudo pacman -S --needed --noconfirm android-tools android-udev
-    echo "  NOTE: add your user to the kvm group to be able to use the emulator:"
-    echo "        sudo gpasswd -a ${USER} kvm"
+
+    echo
+    echo "  Android host tooling (only needed to build for Android)..."
+
+    # jdk21-openjdk belongs here and not in the general list: a desktop only build needs no JDK at all.
+    ANDROID_PACKAGES=(
+        android-tools        # adb, fastboot
+        android-udev         # so that adb sees the phone without sudo
+        jdk21-openjdk        # required by the Android toolchain of Qt: JDK 21, never the JDK 26 of the system
+    )
+
+    echo "  Packages to install: ${ANDROID_PACKAGES[*]}"
+    echo "  The next command asks for your administrator password (sudo)."
+    echo
+
+    if ! sudo pacman -S --needed --noconfirm "${ANDROID_PACKAGES[@]}"; then
+        echo
+        echo "  ERROR: the installation failed. Run it by hand to see the details:"
+        echo "         sudo pacman -S --needed ${ANDROID_PACKAGES[*]}"
+        exit 1
+    fi
+
+    echo
+    echo "  NOTE: JDK 21 is required by the Android toolchain of Qt. The JDK 26 of the system is too"
+    echo "        recent for Gradle and AGP, and produces obscure build failures."
+    echo "  NOTE: add your user to the kvm group to be able to use the emulator, then log out:"
+    echo "          sudo gpasswd -a ${USER} kvm"
 fi
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 # 2. aqtinstall
