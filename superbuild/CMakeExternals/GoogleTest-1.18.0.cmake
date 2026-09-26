@@ -7,14 +7,14 @@
 # Installed into: ${MUSICHIEN_EXTERNAL_DIR}/GoogleTest-<version>
 # =====================================================================================================================
 
-ExternalProject_Add(${proj}
+ExternalProject_Add(${p_externalProjectName}
 
     GIT_REPOSITORY  https://github.com/google/googletest.git
     GIT_TAG         ${MUSICHIEN_GOOGLETEST_GIT_TAG}
     GIT_SHALLOW     TRUE
 
     CMAKE_ARGS
-        -DCMAKE_INSTALL_PREFIX:PATH=${SUPERBUILD_DEPENDENCIES_INSTALL_PATH}/${proj}
+        -DCMAKE_INSTALL_PREFIX:PATH=${SUPERBUILD_DEPENDENCIES_INSTALL_PATH}/${p_externalProjectName}
         -DCMAKE_BUILD_TYPE=Release
         -DCMAKE_C_COMPILER:STRING=${CMAKE_C_COMPILER}
         -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}
@@ -41,4 +41,4 @@ ExternalProject_Add(${proj}
 
 # Keep the installation directory in a clean state: the previous one is renamed now and deleted once
 # the new installation has succeeded.
-musichienFunction_DeleteDirectoryOnSuccess(${proj})
+musichienFunction_DeleteDirectoryOnSuccess(${p_externalProjectName})

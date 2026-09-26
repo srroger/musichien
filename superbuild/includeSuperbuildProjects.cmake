@@ -25,7 +25,15 @@ foreach(dependency IN LISTS MUSICHIEN_EXTERNAL_PROJECTS)
     if(COMPILE_${dependency})
 
         message(STATUS "Musichien superbuild: building '${dependency}'")
+
+        # The build rules of superbuild/CMakeExternals use p_externalProjectName as the name of the
+        # dependency currently being built. Passing it explicitly avoids relying on a shared loop
+        # variable name, which is exactly the kind of implicit coupling that breaks silently.
+        set(p_externalProjectName "${dependency}")
+
         include(${CMAKE_SOURCE_DIR}/superbuild/CMakeExternals/${dependency}.cmake)
+
+        unset(p_externalProjectName)
 
     else()
 
@@ -34,3 +42,4 @@ foreach(dependency IN LISTS MUSICHIEN_EXTERNAL_PROJECTS)
     endif()
 
 endforeach()
+

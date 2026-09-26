@@ -11,7 +11,7 @@
 # Installed into: ${MUSICHIEN_EXTERNAL_DIR}/NlohmannJson-<version>
 # =====================================================================================================================
 
-ExternalProject_Add(${proj}
+ExternalProject_Add(${p_externalProjectName}
 
     GIT_REPOSITORY  https://github.com/nlohmann/json.git
     GIT_TAG         ${MUSICHIEN_NLOHMANN_JSON_GIT_TAG}
@@ -20,13 +20,13 @@ ExternalProject_Add(${proj}
     BUILD_COMMAND     ""
 
     INSTALL_COMMAND
-        ${CMAKE_COMMAND} -E make_directory ${SUPERBUILD_DEPENDENCIES_INSTALL_PATH}/${proj}
+        ${CMAKE_COMMAND} -E make_directory ${SUPERBUILD_DEPENDENCIES_INSTALL_PATH}/${p_externalProjectName}
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 <SOURCE_DIR>/include
-                ${SUPERBUILD_DEPENDENCIES_INSTALL_PATH}/${proj}/include
+                ${SUPERBUILD_DEPENDENCIES_INSTALL_PATH}/${p_externalProjectName}/include
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 <SOURCE_DIR>/LICENSE.MIT
-                ${SUPERBUILD_DEPENDENCIES_INSTALL_PATH}/${proj}/LICENSE.MIT
+                ${SUPERBUILD_DEPENDENCIES_INSTALL_PATH}/${p_externalProjectName}/LICENSE.MIT
 
     LOG_DOWNLOAD  1
     LOG_INSTALL   1
@@ -34,4 +34,4 @@ ExternalProject_Add(${proj}
 
 # Keep the installation directory in a clean state: the previous one is renamed now and deleted once
 # the new installation has succeeded.
-musichienFunction_DeleteDirectoryOnSuccess(${proj})
+musichienFunction_DeleteDirectoryOnSuccess(${p_externalProjectName})
