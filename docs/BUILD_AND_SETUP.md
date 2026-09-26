@@ -403,10 +403,19 @@ sur le module qui possède les QML.
 > sort bien : après un appui, le journal montre l'ouverture du flux `AAudio` (48 000 Hz, stéréo,
 > `format = 0x5` soit **Float 32 bits**).
 
-> [!warning] Aucune permission système ne doit jamais réapparaître
-> `scripts/build_android.sh` **refuse** de produire une APK qui en demande une, et il le vérifie
-> **deux fois** : sur le paquet compilé, puis sur le paquet **signé**. C'est la promesse centrale du
-> projet ; elle est donc contrôlée, pas espérée.
+> [!warning] Les permissions sont une **décision**, pas un détail
+> Seules **deux** permissions sont acceptées, et chacune doit se justifier par écrit dans
+> `ALLOWED_SYSTEM_PERMISSIONS` (`scripts/build_android.sh`) :
+>
+> | Permission | Pourquoi elle est acceptée |
+> |---|---|
+> | `POST_NOTIFICATIONS` | Afficher le rappel quotidien. N'accorde **rien** : ni réseau, ni fichier, ni micro, ni position. Se refuse sans casser l'application |
+> | `RECORD_AUDIO` | Le **pilier chant**. Chanter un intervalle est la moitié de l'entraînement de l'oreille |
+>
+> **Toute autre permission fait échouer le build.** Et `android.permission.INTERNET` est refusée
+> **en dur**, séparément de la liste : même en l'y ajoutant par erreur, elle serait rejetée. C'est la
+> promesse centrale du projet, et elle est **contrôlée**, pas espérée — deux fois, sur le paquet
+> compilé puis sur le paquet **signé**, celui qui sera réellement installé.
 
 
 ---

@@ -123,6 +123,8 @@ perdre. Exportable et importable : l'utilisateur n'est jamais prisonnier de l'ap
 | **Android** | ✅ **Fonctionne de bout en bout.** APK `arm64-v8a` construite, **relue sans aucune permission système**, signée puis installée par `scripts/build_android.sh`. NDK **r27c (27.2.12479018)**, imposé par Qt 6.12 ; **JDK 21** (jamais le JDK 26 du système) ; plateforme **android-36**. |
 | **Portabilité de la bibliothèque standard** | ⚠️ **Contrainte de conception, pas un détail.** Le NDK r27c embarque **libc++ 18**, plus ancienne que le **libstdc++ 16** du poste de développement. Le domaine doit donc se limiter aux fonctionnalités présentes dans **les deux** : pas de `std::views::adjacent`, pas de `std::span::at`. C'est le prix à payer pour que **le code testé sur la machine soit exactement celui qui tourne sur le téléphone** — un seul chemin, testé une fois. |
 | **`INTERNET` : promesse ou garantie ?** | ✅ **Garantie, et vérifiée deux fois.** Qt réclame `INTERNET` via **deux canaux** distincts (`QT_ANDROID_PERMISSIONS` et les `<module>-android-dependencies.xml` lus par `androiddeployqt`). Les deux sont fermés, et `scripts/build_android.sh` relit les permissions dans l'APK **compilée puis signée**. Sans `android.permission.INTERNET`, Android exclut le processus du groupe `inet` : c'est le noyau qui refuse, pas le code. |
+| **Les autres permissions** | 🟡 **Liste blanche, et elle doit rester courte.** Le build accepte exactement deux permissions, chacune justifiée par écrit dans le code : `POST_NOTIFICATIONS` (afficher le rappel) et `RECORD_AUDIO` (pilier chant). **Toute autre fait échouer le build**, et `INTERNET` reste refusée **en dur**, séparément de la liste. Une permission non réfléchie est la façon dont une application privée cesse de l'être. |
+| **Intervalle : distance et classe** | ✅ **Deux notions, comme en théorie musicale.** L'intervalle garde ses **octaves** (14 demi-tons = une 9ᵉ majeure, plus une 2nde) et expose en plus sa **classe** (0-11, la couleur dans l'octave). Sans cela, la 9ᵉ était **indiscernable** de la 2nde, et les accords de jazz hors de portée. Le nommage va jusqu'à la **15ᵉ** (deux octaves) ; la **13ᵉ** est la dernière extension **utile**, car à ce stade les sept degrés de la gamme sont présents. |
 
 
 ---
@@ -134,6 +136,6 @@ perdre. Exportable et importable : l'utilisateur n'est jamais prisonnier de l'ap
 | Dépendance à Qt / au système de fichiers dans `domain` | Détruit la testabilité, qui est la raison d'être de cette architecture |
 | Logique métier dans un fichier `.qml` | Non testable, et impossible à réutiliser |
 | Chaîne de caractères française en dur dans le code | Les textes passent par `qsTr()` |
-| Accès réseau, SDK de traçage, publicité, achat intégré | Aucune permission `INTERNET` déclarée, et `scripts/build_android.sh` **refuse** de produire une APK qui en demanderait une |
+| Accès réseau, SDK de traçage, publicité, achat intégré | Aucune permission `INTERNET` déclarée, et `scripts/build_android.sh` **refuse** de produire un paquet qui en demanderait une. Toute autre permission doit figurer dans la liste blanche, justifiée |
 | Version codée en dur ailleurs que dans `cmake/musichienVersions.cmake` | Une seule source de vérité |
 | Formatage et logique dans le même commit | Rend le `git blame` inutilisable |
