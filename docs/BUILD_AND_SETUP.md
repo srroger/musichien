@@ -210,22 +210,59 @@ avec CodeLLDB) et `extensions.json` (extensions recommandées).
 
 ---
 
-## 6. Dépendances Android *(à venir)*
+## 6. Android *(en préparation)*
 
+### ⚠️ Découverte : le dépôt Android de Qt a **déménagé**
 
-Préparé mais pas encore actif. Étapes prévues :
+C'est le piège le plus coûteux rencontré jusqu'ici. Depuis **Qt 6.8**, les binaires Android de Qt ne
+sont **plus** dans `linux_x64/android` :
+
+| Dépôt | Dernière mise à jour | Dernière version Qt |
+|---|---|---|
+| `linux_x64/android/` (l'ancien) | **24 sept. 2024** — **gelé** | **6.7.3** |
+| **`all_os/android/`** (le nouveau) | **24 sept. 2026** — vivant | **6.12.0** |
+
+**Conséquence si on se trompe** : `aqt list-qt linux android` ne montre **rien au-delà de 6.7.3**, et
+on peut légitimement — mais faussement — conclure que **Qt a abandonné le support d'Android**.
+La commande correcte utilise donc `all_os` :
 
 ```bash
-sudo pacman -S android-tools android-udev
-sudo gpasswd -a "$USER" kvm          # pour l'émulateur, puis se reconnecter
+scripts/install_dependencies.sh --with-android
+```
 
-# Qt pour Android (réclame EXACTEMENT le NDK r27c = 27.2.12479018)
+Le script porte le commentaire explicatif, pour que personne ne « corrige » un jour cette ligne en
+repassant à `linux`.
+
+> [!tip] Comment le vérifier sans rien télécharger
+> ```bash
+> aqt list-qt all_os android --arch 6.12.0     # -> android_armv7 android_x86 android_x86_64 android_arm64_v8a
+> aqt install-qt all_os android 6.12.0 android_arm64_v8a -m qtmultimedia --dry-run -O /tmp/test
+> ```
+> `--dry-run` affiche ce qui serait téléchargé, sans rien écrire sur le disque.
+
+### Étapes restantes
+
+```bash
+# 1. Outillage hôte + Qt pour Android (android-tools, android-udev, jdk21-openjdk)
 scripts/install_dependencies.sh --with-android
 
-# Sur le téléphone : Paramètres → À propos → Numéro de build (7 tapes)
-#                   Options développeur → Débogage USB
-adb devices                          # doit lister l'appareil
+# 2. L'émulateur a besoin du groupe kvm, puis d'une reconnexion de session
+sudo gpasswd -a "$USER" kvm
+
+# 3. Android SDK (cmdline-tools) + le NDK exigé par Qt : la version exacte se lit DANS
+#    l'installation Qt pour Android, une fois l'étape 1 faite.
+
+# 4. Sur le téléphone : Paramètres → À propos → Numéro de build (7 tapes)
+#                      Options développeur → Débogage USB
+#    Puis accepter la fenêtre d'autorisation qui s'affiche.
+adb devices                                  # doit lister l'appareil
 ```
+
+> [!warning] À vérifier impérativement avant toute distribution
+> **L'APK ne doit contenir aucune permission `INTERNET`.** C'est la promesse centrale du projet
+> (voir la charte). Le manifeste généré par Qt doit donc être **relu** à ce moment-là, et non supposé
+> correct.
+
 
 ---
 
