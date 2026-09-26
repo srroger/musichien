@@ -83,15 +83,34 @@ source scripts/setup_env.sh
 |---|---|
 | `MUSICHIEN_PROJECT_DIR` | Racine du projet |
 | `MUSICHIEN_EXTERNAL_DIR` | Dossier des dépendances épinglées |
-| `MUSICHIEN_QT_DIR` | **La** version de Qt utilisée (détectée automatiquement) |
+| `MUSICHIEN_QT_VERSION` | La version de Qt effectivement utilisée |
+| `MUSICHIEN_QT_DIR` | **Le** Qt utilisé (détecté automatiquement) |
 | `CLANG_DIR` | Dossier du compilateur, lu par `CMakePresets.json` |
+| `PATH` | **CMake et Ninja épinglés**, s'ils existent dans `MUSICHIEN_EXTERNAL_DIR` |
 
-> Si `MUSICHIEN_QT_DIR` retombe sur `/usr`, le script le signale : **le build dépend alors du Qt de la
-> machine**, et la reproductibilité n'est plus garantie.
+### Comment Qt est détecté
+
+**Deux dispositions sont supportées**, car les deux sont légitimes :
+
+| Disposition | Origine | Chemin |
+|---|---|---|
+| **aqt** | `scripts/install_dependencies.sh` | `<externals>/Qt/<version>/gcc_64` |
+| **à plat** | les autres projets personnels | `<externals>/Qt-<version>` |
+
+Le script retient **la version la plus récente** qui contient réellement un
+`lib/cmake/Qt6/Qt6Config.cmake`.
+
+> [!warning] Le repli `/usr` est signalé, et il n'est pas collant
+> Si aucun Qt épinglé n'est trouvé, le script affiche un **avertissement** et retombe sur le Qt de la
+> machine. Ce repli est **volontairement bruyant** : c'est le signal que la reproductibilité n'est
+> plus garantie.
+> Il est aussi **non collant** : un nouveau `source scripts/setup_env.sh` **redétecte** le Qt épinglé
+> dès qu'il est installé, même si la session précédente avait exporté `/usr`.
 
 ---
 
 ## 4. Compiler
+
 
 ```bash
 source scripts/setup_env.sh
@@ -122,17 +141,28 @@ cmake --preset "Clang-Debug Musichien" -DMUSICHIEN_ENABLE_CLANG_TIDY=OFF
 ## 5. Ouvrir l'IDE
 
 ```bash
+scripts/start_code_oss.sh      # code-oss (VS Code libre), environnement garanti
 scripts/start_qtcreator.sh     # Qt Creator, environnement garanti
-scripts/start_vscode.sh        # VS Code, environnement garanti
 ```
 
 > ⚠️ **Ne jamais ouvrir le projet depuis le menu applications.** L'IDE n'aurait pas les variables
-> d'environnement : les presets seraient illisibles et le build prendrait silencieusement le Qt de la
+> d'environnement : les presets seraient illisibles, et le build prendrait silencieusement le Qt de la
 > machine — exactement ce que ce projet cherche à éviter.
+
+`.vscode/` contient la configuration partagée de code-oss : `settings.json` (presets CMake, formatage
+automatique, clangd), `tasks.json` (build, test, formatage, vérification), `launch.json` (débogage
+avec CodeLLDB) et `extensions.json` (extensions recommandées).
+
+> [!note] code-oss et les extensions
+> code-oss installe ses extensions depuis le registre **Open VSX**, pas depuis le marketplace
+> Microsoft. Les extensions recommandées sont toutes publiées sur Open VSX. L'extension C++ de
+> Microsoft (`ms-vscode.cpptools`) est explicitement **déconseillée** : elle entrerait en conflit avec
+> `clangd`, qui est la référence du projet.
 
 ---
 
 ## 6. Dépendances Android *(à venir)*
+
 
 Préparé mais pas encore actif. Étapes prévues :
 
