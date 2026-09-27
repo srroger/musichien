@@ -2,12 +2,14 @@
 
 #include "domain/music/Interval.h"
 #include "domain/music/Temperament.h"
+#include "domain/rhythm/RhythmPattern.h"
 #include "ui/IntervalDescription.h"
 #include "ui/MicrophoneController.h"
 
 #include <QString>
 
 #include <array>
+#include <cmath>
 #include <limits>
 #include <optional>
 #include <random>
@@ -26,6 +28,67 @@ namespace
 // A sentinel rather than zero, because zero lives IS a state - it means the session is over - and the
 // screen has to be able to tell the two apart.
 constexpr int NO_LIFE_LIMIT = -1;
+
+// La qualite d'une frappe, dans la convention de l'ecran : 0 = Miss, 1 = Good, 2 = Perfect.
+//
+// La page Rythme parle deja cette langue, et la question de rythme doit parler la MEME : deux ecrans qui
+// nommeraient differemment la meme chose obligeraient le QML a connaitre deux traductions pour un seul verdict.
+[[nodiscard]] int screenQualityOf( domain::HitQuality p_quality ) noexcept
+{
+    switch( p_quality )
+    {
+        case domain::HitQuality::Perfect:
+            return 2;
+
+        case domain::HitQuality::Good:
+            return 1;
+
+        case domain::HitQuality::Miss:
+            return 0;
+    }
+
+    return 0;
+}
+
+// La cellule d'une question, avec le meme garde-fou que le domaine : un index venu du domaine est valide, et une
+// liste qui changerait un jour ne doit pas transformer une question en exception.
+[[nodiscard]] const domain::RhythmPattern & patternOf( const domain::Question & p_question ) noexcept
+{
+    const std::vector<domain::RhythmPattern> & patterns = domain::allRhythmPatterns();
+
+    const std::size_t index = std::min( p_question.patternIndex, patterns.size() - 1 );
+
+    return patterns.at( index );
+}
+
+// Un accord, decrit pour l'ecran : sa couleur, son nom, son symbole ("Cm") et le nom de sa tonique.
+//
+// L'ecran AFFICHE, il n'assemble rien : un symbole compose dans le QML serait compose autrement le jour ou un deuxieme
+// ecran le montrerait, et les deux divergeraient en silence.
+[[nodiscard]] QVariantMap describeChord( const domain::Chord & p_chord )
+{
+    const domain::Note root{ p_chord.rootMidiNumber };
+
+    const std::string rootName = root.pitchClassName();
+
+    const std::string_view suffix = domain::chordQualitySymbolSuffix( p_chord.quality );
+
+    QVariantMap described;
+
+    described.insert( QStringLiteral( "quality" ), static_cast<int>( p_chord.quality ) );
+
+    described.insert( QStringLiteral( "name" ),
+                      QString::fromStdString( std::string{ domain::chordQualityName( p_chord.quality ) } ) );
+
+    described.insert( QStringLiteral( "rootName" ), QString::fromStdString( rootName ) );
+
+    // La tonique et son suffixe, colles : "C" et "m" font "Cm", et "C" tout seul est deja un do majeur.
+    described.insert( QStringLiteral( "symbol" ), QString::fromStdString( rootName + std::string{ suffix } ) );
+
+    described.insert( QStringLiteral( "noteCount" ), static_cast<int>( domain::chordNoteCount( p_chord.quality ) ) );
+
+    return described;
+}
 
 }    // namespace
 
@@ -53,15 +116,12 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
 
     if( m_playerLevel.has_value() )
     {
-        m_settings = domain::sessionSettingsFor( *m_playerLevel );
+        m_settings = sessionSettingsForLevel( *m_playerLevel );
     }
 
-    // The share of sung questions, remembered from the last time the player set it: it overrides the level's default,
-    // exactly like the level itself overrode the settings the caller passed.
-    if( m_levelStore != nullptr )
-    {
-        m_settings.singQuestionShare = m_levelStore->storedSingQuestionShare();
-    }
+    // Les parts de question, telles que le profil s'en souvient : elles priment sur les reglages passes au
+    // constructeur, exactement comme le niveau a prime sur eux juste avant.
+    applyStoredQuestionShares( m_settings );
 
     // The instruments the player asked for. An empty list is a first run: everything is offered, which is what a
     // fresh installation should sound like.
@@ -71,6 +131,12 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
     }
 
     m_enabledInstruments.resize( domain::INSTRUMENT_COUNT, true );
+
+    // La boucle de rythme. Le timer le plus precis que Qt offre, comme la page Rythme : le clic doit tomber ou
+    // l'oreille l'attend, et un timer grossier fait tituber toute une mesure.
+    m_rhythmTimer.setTimerType( Qt::PreciseTimer );
+
+    QObject::connect( &m_rhythmTimer, &QTimer::timeout, this, &ExerciseSessionController::onRhythmBeat );
 }
 
 bool ExerciseSessionController::running() const noexcept
@@ -191,7 +257,10 @@ bool ExerciseSessionController::isHelpAvailable() const noexcept
 
 QVariantMap ExerciseSessionController::heardInterval() const
 {
-    if( m_session == nullptr )
+    // Sur une question de rythme ou d'accord, il n'y a pas d'intervalle a decrire : la question porte bien un intervalle
+    // tire au hasard - c'est l'ordre des tirages qui veut ca - mais il n'a jamais ete joue, et le montrer serait un
+    // mensonge.
+    if( ( m_session == nullptr ) || isRhythmQuestion() || isChordQuestion() )
     {
         return QVariantMap{};
     }
@@ -215,7 +284,9 @@ QVariantMap ExerciseSessionController::answeredInterval() const
 
 QString ExerciseSessionController::hintText() const
 {
-    if( ( m_session == nullptr ) || !m_session->isHintAvailable() )
+    // Pas d'indice sur une question de rythme ni sur une question d'accord : les indices sont des souvenirs
+    // d'INTERVALLES ("pense a Star Wars"), et le contenu n'en a ni pour une cellule ni pour une couleur d'accord.
+    if( ( m_session == nullptr ) || !m_session->isHintAvailable() || isRhythmQuestion() || isChordQuestion() )
     {
         return QString{};
     }
@@ -258,16 +329,46 @@ void ExerciseSessionController::choosePlayerLevel( int p_level )
 
     // The rules of the session to COME. A session already running is deliberately left alone: changing the
     // difficulty under the feet of a player in the middle of ten questions is not a kindness.
-    m_settings = domain::sessionSettingsFor( level );
+    m_settings = sessionSettingsForLevel( level );
+
+    applyStoredQuestionShares( m_settings );
 
     if( m_levelStore != nullptr )
     {
-        m_settings.singQuestionShare = m_levelStore->storedSingQuestionShare();
-
         m_levelStore->storeLevel( level );
     }
 
     emit playerLevelChanged();
+}
+
+domain::SessionSettings ExerciseSessionController::sessionSettingsForLevel( domain::PlayerLevel p_level ) const
+{
+    domain::SessionSettings settings = domain::sessionSettingsFor( p_level );
+
+    // Les parts de question sont des reglages du JOUEUR, pas des consequences de sa difficulte : elles survivent au
+    // changement de niveau. C'est une correction plutot qu'un detail - sans elle, quelqu'un qui avait demande des
+    // questions de rythme sur mesure les perdait en changeant de niveau, et la session recommencait a en poser a sa
+    // place.
+    //
+    // Ce que le PROFIL en dit, lui, est applique juste apres, par applyStoredQuestionShares : c'est la que ces
+    // reglages sont ranges, et le profil fait foi.
+    settings.singQuestionShare = m_settings.singQuestionShare;
+    settings.rhythmQuestionShare = m_settings.rhythmQuestionShare;
+    settings.chordQuestionShare = m_settings.chordQuestionShare;
+
+    return settings;
+}
+
+void ExerciseSessionController::applyStoredQuestionShares( domain::SessionSettings & p_settings ) const
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    p_settings.singQuestionShare = m_levelStore->storedSingQuestionShare();
+    p_settings.rhythmQuestionShare = m_levelStore->storedRhythmQuestionShare();
+    p_settings.chordQuestionShare = m_levelStore->storedChordQuestionShare();
 }
 
 QVariantList ExerciseSessionController::playerLevels()
@@ -465,6 +566,8 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
 
 void ExerciseSessionController::stopSession()
 {
+    stopRhythmLoop();
+
     stopPlayback();
 
     m_session.reset();
@@ -538,35 +641,224 @@ int ExerciseSessionController::questionKind() const noexcept
     return ( m_session != nullptr ) ? static_cast<int>( m_session->currentQuestion().kind ) : 0;
 }
 
+bool ExerciseSessionController::isRhythmQuestion() const noexcept
+{
+    return ( m_session != nullptr ) && ( m_session->currentQuestion().kind == domain::QuestionKind::Rhythm );
+}
+
+QString ExerciseSessionController::rhythmPatternName() const
+{
+    if( !isRhythmQuestion() )
+    {
+        return QString{};
+    }
+
+    // Le nom vient du domaine, et l'ecran le montre tel quel : "Binaire", "Valse" sont des noms de MUSIQUE, pas des
+    // identifiants techniques, et les renommer est une decision de contenu.
+    const std::string_view name = patternOf( m_session->currentQuestion() ).name();
+
+    return QString::fromUtf8( name.data(), static_cast<int>( name.size() ) );
+}
+
+int ExerciseSessionController::rhythmBpm() const noexcept
+{
+    return isRhythmQuestion() ? m_session->currentQuestion().bpm : 0;
+}
+
+int ExerciseSessionController::rhythmBeatsPerBar() const noexcept
+{
+    return isRhythmQuestion() ? patternOf( m_session->currentQuestion() ).beatsPerBar() : 0;
+}
+
+QVariantList ExerciseSessionController::rhythmHits() const
+{
+    QVariantList hits;
+
+    if( !isRhythmQuestion() )
+    {
+        // Aucune frappe a dessiner, plutot que les frappes d'une autre question : une liste vide ne dessine rien, et
+        // rien est exactement ce qu'il faut montrer sur une question d'intervalle.
+        return hits;
+    }
+
+    for( const domain::RhythmHit & hit : patternOf( m_session->currentQuestion() ).hits() )
+    {
+        QVariantMap described;
+
+        // Ou la frappe tombe, en TEMPS depuis le debut de la boucle : c'est le domaine qui le dit, et l'ecran se
+        // contente de placer le trait sur la mesure.
+        described.insert( QStringLiteral( "beat" ), hit.beat );
+        described.insert( QStringLiteral( "accented" ), hit.accented );
+        described.insert( QStringLiteral( "drum" ), static_cast<int>( hit.drum ) );
+
+        hits.append( described );
+    }
+
+    return hits;
+}
+
+int ExerciseSessionController::rhythmBeatInBar() const noexcept
+{
+    return m_rhythmBeatInBar;
+}
+
+bool ExerciseSessionController::isRhythmPlaying() const noexcept
+{
+    return m_rhythmIsPlaying;
+}
+
+int ExerciseSessionController::rhythmLastQuality() const noexcept
+{
+    return m_rhythmLastQuality;
+}
+
+int ExerciseSessionController::rhythmCoveredOnsets() const noexcept
+{
+    return m_rhythmCoveredOnsets;
+}
+
+int ExerciseSessionController::rhythmOnsetCount() const noexcept
+{
+    return isRhythmQuestion() ? static_cast<int>( m_session->currentQuestion().coveredOnsets.size() ) : 0;
+}
+
+int ExerciseSessionController::rhythmCellDurationMs() const noexcept
+{
+    if( !isRhythmQuestion() )
+    {
+        return 0;
+    }
+
+    // Une mesure : c'est ce que dure l'ecoute, la reproduction, et la confirmation. L'ecran s'en sert pour laisser au
+    // feedback le temps de s'entendre - une pause plus courte couperait la cellule en plein milieu.
+    const double beatMs = domain::beatDurationMs( static_cast<double>( m_session->currentQuestion().bpm ) );
+
+    return static_cast<int>( std::lround( beatMs * static_cast<double>( rhythmBeatsPerBar() ) ) );
+}
+
+bool ExerciseSessionController::isChordQuestion() const noexcept
+{
+    return ( m_session != nullptr ) && ( m_session->currentQuestion().kind == domain::QuestionKind::Chord );
+}
+
+QVariantMap ExerciseSessionController::heardChord() const
+{
+    if( !isChordQuestion() )
+    {
+        return QVariantMap{};
+    }
+
+    return describeChord( m_session->currentQuestion().chord );
+}
+
+QVariantMap ExerciseSessionController::answeredChord() const
+{
+    if( ( m_session == nullptr ) || !isChordQuestion() )
+    {
+        return QVariantMap{};
+    }
+
+    const std::optional<domain::ChordQuality> answer = m_session->lastChordAnswer();
+
+    // operator* plutot que value() : un optional vide est ce que "rien a montrer" veut dire ici, et c'est deja gere.
+    if( !answer.has_value() )
+    {
+        return QVariantMap{};
+    }
+
+    // Le symbole se construit sur la tonique de la QUESTION : le joueur a repondu une couleur, pas une tonique, et le
+    // verdict doit opposer deux couleurs sur la meme note.
+    return describeChord( domain::Chord{ .quality = *answer,
+                                         .rootMidiNumber = m_session->currentQuestion().chord.rootMidiNumber } );
+}
+
+QVariantList ExerciseSessionController::chordChoices() const
+{
+    QVariantList choices;
+
+    if( ( m_session == nullptr ) || !isChordQuestion() )
+    {
+        return choices;
+    }
+
+    for( const domain::ChordQuality quality : m_session->currentQuestion().chordChoices )
+    {
+        QVariantMap described;
+        described.insert( QStringLiteral( "quality" ), static_cast<int>( quality ) );
+        described.insert( QStringLiteral( "name" ), QString::fromUtf8( domain::chordQualityName( quality ).data(), static_cast<int>( domain::chordQualityName( quality ).size() ) ) );
+        described.insert( QStringLiteral( "noteCount" ), static_cast<int>( domain::chordNoteCount( quality ) ) );
+
+        choices.append( described );
+    }
+
+    return choices;
+}
+
+void ExerciseSessionController::answerChord( int p_quality )
+{
+    if( ( m_session == nullptr ) || !isAsking() )
+    {
+        // Une reponse arrivant deux fois, ou apres la question, ne change rien : la session le dit elle-meme, et
+        // s'arreter ici evite d'emettre des signaux pour rien.
+        return;
+    }
+
+    if( p_quality < 0 || std::cmp_greater_equal( p_quality, domain::CHORD_QUALITY_COUNT ) )
+    {
+        // Un index hors liste vient d'un ecran qui invente. Il est refuse plutot que converti en une couleur qui
+        // n'existe pas.
+        return;
+    }
+
+    processAnswer( m_session->answerChord( static_cast<domain::ChordQuality>( p_quality ) ) );
+}
+
 void ExerciseSessionController::processAnswer( bool p_isCorrect )
 {
     // Always, and not only when the question is over: a wrong answer closes the grid in, and the
     // screen must show the grid that exists rather than the one it had a moment ago.
     refreshChoices();
 
+    // Le rythme a deja repondu tout seul : sa cellule est en train de sonner - l'ecoute qui reprend apres un rate, ou
+    // la confirmation apres une reussite. Le chemin commun des notes doit donc se taire, sinon deux sons se marcheraient
+    // dessus, et c'est la cellule qu'on n'entendrait plus.
+    const bool isRhythm = isRhythmQuestion();
+
     if( p_isCorrect )
     {
-        // A correct answer is heard again as a CHORD: the two notes together, one block instead of two,
-        // which is twice as short - and a genuinely different listen of the same interval, the colour
-        // without the melody. Roger asked for it to stop the success from dragging, and the reason to
-        // keep it is musical: hearing the interval both ways is what seals it.
-        playCurrentQuestionAsChord();
+        if( !isRhythm )
+        {
+            // A correct answer is heard again as a CHORD: the two notes together, one block instead of two,
+            // which is twice as short - and a genuinely different listen of the same interval, the colour
+            // without the melody. Roger asked for it to stop the success from dragging, and the reason to
+            // keep it is musical: hearing the interval both ways is what seals it.
+            playCurrentQuestionAsChord();
+        }
     }
     else
     {
-        // A wrong answer is heard again IMMEDIATELY, and in its original form: there is something to
-        // catch up on, and the melody is what gives the second note its meaning.
-        playCurrentQuestion();
+        if( !isRhythm )
+        {
+            // A wrong answer is heard again IMMEDIATELY, and in its original form: there is something to
+            // catch up on, and the melody is what gives the second note its meaning.
+            playCurrentQuestion();
+        }
 
         // And it is announced, so that the screen can answer with its BODY - the shake, and the
         // vibration on a device that has a motor. The controller knows what happened; how it should feel
         // is not its job.
         emit wrongAnswerGiven();
 
-        // The cue, then the buzz: both are mistakes being made audible and tangible, and neither is the
-        // interval the player is being asked to name. See NotePlayer::playMistakeCue for why that
-        // distinction matters.
-        m_notePlayer.playMistakeCue();
+        if( !isRhythm )
+        {
+            // The cue, then the buzz: both are mistakes being made audible and tangible, and neither is the
+            // interval the player is being asked to name. See NotePlayer::playMistakeCue for why that
+            // distinction matters.
+            //
+            // Sur une question de rythme, le cue est TU : il couvrirait la cellule, qui est justement ce qu'il faut
+            // reentendre. La secousse et la vibration, elles, ne sonnent pas, et restent.
+            m_notePlayer.playMistakeCue();
+        }
 
         if( m_vibrate )
         {
@@ -591,7 +883,20 @@ void ExerciseSessionController::revealAnswer()
 
     refreshChoices();
 
-    playCurrentQuestion();
+    if( isRhythmQuestion() )
+    {
+        // Passer une question de rythme : la cellule est rejouee UNE fois, pour que le joueur entende ce qu'il aurait
+        // du reproduire, et la boucle s'arrete - c'est le meme son que la confirmation, et la meme raison.
+        m_rhythmCoveredOnsets = coveredOnsetCount();
+
+        stopRhythmLoop();
+
+        playRhythmModelOnce();
+    }
+    else
+    {
+        playCurrentQuestion();
+    }
 
     emit scoreChanged();
     emit sessionChanged();
@@ -614,6 +919,9 @@ void ExerciseSessionController::continueToNextQuestion()
     }
     else
     {
+        // La session s'arrete : rien ne doit continuer a battre derriere l'ecran de fin.
+        stopRhythmLoop();
+
         persistSessionOutcome();
     }
 
@@ -684,6 +992,10 @@ void ExerciseSessionController::announceSessionEndIfNeeded()
 
 void ExerciseSessionController::stopPlayback()
 {
+    // La boucle de rythme est un son comme un autre : quitter l'ecran doit la faire taire, sinon elle continue de
+    // battre derriere le banc d'essai.
+    stopRhythmLoop();
+
     m_notePlayer.stopAll();
 }
 
@@ -880,6 +1192,56 @@ void ExerciseSessionController::setSingQuestionShare( int p_share )
     emit singQuestionShareChanged();
 }
 
+int ExerciseSessionController::rhythmQuestionShare() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedRhythmQuestionShare() : 20;
+}
+
+void ExerciseSessionController::setRhythmQuestionShare( int p_share )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    if( p_share < 0 || p_share > 100 )
+    {
+        return;
+    }
+
+    m_levelStore->storeRhythmQuestionShare( p_share );
+
+    // La session SUIVANTE prend la nouvelle part ; une session en cours garde ses regles. Meme contrat que le chant,
+    // et c'est ce qui rend le reglage sur : rien ne change sous les pieds du joueur au milieu d'une partie.
+    m_settings.rhythmQuestionShare = p_share;
+
+    emit rhythmQuestionShareChanged();
+}
+
+int ExerciseSessionController::chordQuestionShare() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedChordQuestionShare() : 20;
+}
+
+void ExerciseSessionController::setChordQuestionShare( int p_share )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    if( p_share < 0 || p_share > 100 )
+    {
+        return;
+    }
+
+    m_levelStore->storeChordQuestionShare( p_share );
+
+    m_settings.chordQuestionShare = p_share;
+
+    emit chordQuestionShareChanged();
+}
+
 void ExerciseSessionController::listenToTarget()
 {
     if( m_session == nullptr )
@@ -963,6 +1325,294 @@ void ExerciseSessionController::refreshChoices()
     emit questionChanged();
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// La boucle de rythme
+//
+// Deux mesures, et elles ne font pas la meme chose : la premiere fait ECOUTER la cellule, la seconde la fait
+// REPRODUIRE. Puis on recommence, jusqu'a ce que la cellule soit juste - c'est tout l'exercice, et il ne demande au
+// joueur aucun geste en dehors de ses frappes.
+// ---------------------------------------------------------------------------------------------------------------------
+
+void ExerciseSessionController::startRhythmQuestion()
+{
+    if( !isRhythmQuestion() )
+    {
+        return;
+    }
+
+    // Rien n'a encore ete frappe sur cette question : -1, et non 0, qui est deja un Miss.
+    m_rhythmLastQuality = NO_RHYTHM_TAP;
+    m_rhythmCoveredOnsets = 0;
+
+    beginRhythmListening();
+
+    const double beatMs = domain::beatDurationMs( static_cast<double>( m_session->currentQuestion().bpm ) );
+
+    if( beatMs <= 0.0 )
+    {
+        // Un tempo nul est un reglage fautif, pas une question a jouer : la question reste posee, la boucle ne bat
+        // simplement pas. Le domaine refuse les frappes pour la meme raison, donc les deux disent la meme chose.
+        emit rhythmStateChanged();
+
+        return;
+    }
+
+    m_rhythmTimer.start( static_cast<int>( std::lround( beatMs ) ) );
+
+    emit rhythmStateChanged();
+}
+
+void ExerciseSessionController::beginRhythmListening()
+{
+    m_rhythmIsPlaying = false;
+    m_rhythmBeatInBar = 0;
+
+    // L'horloge repart ici : c'est le premier temps de la mesure d'ecoute. La reproduction repartira la sienne, parce
+    // que la position d'une frappe se compte depuis le premier temps de la CELLULE, pas depuis le debut de la question.
+    m_rhythmClock.restart();
+
+    // Le premier temps sonne tout de suite : une mesure qui attendrait un battement de timer pour commencer decalerait
+    // tout ce qui suit.
+    playRhythmHitsForBeat( 0 );
+}
+
+void ExerciseSessionController::beginRhythmPlaying()
+{
+    m_rhythmIsPlaying = true;
+    m_rhythmBeatInBar = 0;
+    m_rhythmClock.restart();
+
+    // La tentative commence : l'ardoise affichee repart de zero, et la derniere frappe avec elle.
+    //
+    // ICI plutot qu'a l'ecoute, et c'est ce qui laisse au joueur le temps de lire son "trois sur quatre" pendant que
+    // la cellule se rejoue apres un rate - le temps de comprendre ce qui a manque.
+    m_rhythmCoveredOnsets = 0;
+    m_rhythmLastQuality = NO_RHYTHM_TAP;
+
+    // Le clic du premier temps, tout de suite : c'est le repere que le joueur attend, et le retarder d'un battement
+    // decalerait toute la mesure.
+    m_notePlayer.playMetronomeClick( true );
+}
+
+void ExerciseSessionController::finishRhythmLoop()
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    // Le detail de la tentative est lu AVANT le verdict : le domaine remet son ardoise a zero en jugeant, et l'ecran a
+    // besoin de savoir combien de frappes sur combien ont ete touchees pour pouvoir le dire.
+    m_rhythmCoveredOnsets = coveredOnsetCount();
+
+    const bool isCorrect = m_session->endRhythmLoop();
+
+    if( isCorrect )
+    {
+        // La question est close : la cellule est rejouee UNE fois en confirmation, et la boucle s'arrete. La suite
+        // appartient a la pause de l'ecran, qui a la duree de la cellule pour laisser le son se finir.
+        stopRhythmLoop();
+
+        playRhythmModelOnce();
+    }
+    else
+    {
+        // La question reste posee, et l'ecoute qui recommence EST le feedback : le joueur reentend ce qu'il n'a pas su
+        // reproduire, puis il retente. Aucun bouton a presser entre deux tentatives - c'est ce qui fait qu'un exercice
+        // de rythme se JOUE au lieu de se lire.
+        beginRhythmListening();
+    }
+
+    // Le score, les vies et le verdict passent par le chemin commun a toutes les questions.
+    processAnswer( isCorrect );
+
+    emit rhythmStateChanged();
+}
+
+void ExerciseSessionController::stopRhythmLoop()
+{
+    m_rhythmTimer.stop();
+
+    m_rhythmIsPlaying = false;
+    m_rhythmBeatInBar = 0;
+}
+
+void ExerciseSessionController::onRhythmBeat()
+{
+    if( !isRhythmQuestion() || ( m_session->state() != domain::SessionState::Asking ) )
+    {
+        // La question a change, ou elle a sa reponse : la boucle s'arrete d'elle-meme plutot que de continuer a battre
+        // sous une autre question. C'est le filet de securite de toute la mecanique.
+        stopRhythmLoop();
+
+        emit rhythmStateChanged();
+
+        return;
+    }
+
+    const int beatsPerBar = rhythmBeatsPerBar();
+
+    if( beatsPerBar <= 0 )
+    {
+        stopRhythmLoop();
+
+        emit rhythmStateChanged();
+
+        return;
+    }
+
+    // Ce qui sonne sur ce temps : la cellule pendant l'ecoute, la pulsation pendant la reproduction.
+    //
+    // Le clic est MUET pendant l'ecoute, et c'est un choix : le modele doit s'entendre seul, sinon une syncope se noie
+    // sous le metronome. Pendant la reproduction, au contraire, le clic est la seule reference - la cellule ne s'y
+    // rejoue pas, sinon le joueur ne ferait que la suivre et il n'y aurait plus rien a reproduire.
+    if( m_rhythmIsPlaying )
+    {
+        m_notePlayer.playMetronomeClick( m_rhythmBeatInBar == 0 );
+    }
+    else
+    {
+        playRhythmHitsForBeat( m_rhythmBeatInBar );
+    }
+
+    ++m_rhythmBeatInBar;
+
+    if( m_rhythmBeatInBar < beatsPerBar )
+    {
+        emit rhythmStateChanged();
+
+        return;
+    }
+
+    // La mesure est finie.
+    m_rhythmBeatInBar = 0;
+
+    if( !m_rhythmIsPlaying )
+    {
+        // L'ecoute est finie : a toi.
+        beginRhythmPlaying();
+
+        emit rhythmStateChanged();
+
+        return;
+    }
+
+    finishRhythmLoop();
+}
+
+void ExerciseSessionController::playRhythmHitsForBeat( int p_beatInBar )
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    const double beatMs = domain::beatDurationMs( static_cast<double>( question.bpm ) );
+
+    if( beatMs <= 0.0 )
+    {
+        return;
+    }
+
+    const auto barBeat = static_cast<double>( p_beatInBar );
+
+    for( const domain::RhythmHit & hit : patternOf( question ).hits() )
+    {
+        if( ( hit.beat < barBeat ) || ( hit.beat >= barBeat + 1.0 ) )
+        {
+            continue;
+        }
+
+        const int delayMs = static_cast<int>( std::lround( ( hit.beat - barBeat ) * beatMs ) );
+
+        if( delayMs <= 0 )
+        {
+            m_notePlayer.playDrum( hit.drum );
+
+            continue;
+        }
+
+        // Une frappe decalee part en differe : c'est ce qu'est une syncope - une frappe ENTRE deux temps. Le
+        // controleur est le contexte du tir, donc il vit assez longtemps pour l'entendre.
+        QTimer::singleShot( delayMs, this, [this, drum = hit.drum]() { m_notePlayer.playDrum( drum ); } );
+    }
+}
+
+void ExerciseSessionController::playRhythmModelOnce()
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    // Toute la cellule d'un coup : les frappes du premier temps partent maintenant, les autres en differe. C'est
+    // exactement le chemin de la mesure d'ecoute, sans le timer de la boucle.
+    for( int beat = 0; beat < rhythmBeatsPerBar(); ++beat )
+    {
+        playRhythmHitsForBeat( beat );
+    }
+}
+
+double ExerciseSessionController::rhythmPositionInBeats() const noexcept
+{
+    if( m_session == nullptr )
+    {
+        return 0.0;
+    }
+
+    const double beatMs = domain::beatDurationMs( static_cast<double>( m_session->currentQuestion().bpm ) );
+
+    if( beatMs <= 0.0 )
+    {
+        return 0.0;
+    }
+
+    return static_cast<double>( m_rhythmClock.elapsed() ) / beatMs;
+}
+
+int ExerciseSessionController::coveredOnsetCount() const noexcept
+{
+    if( m_session == nullptr )
+    {
+        return 0;
+    }
+
+    const std::vector<bool> & covered = m_session->currentQuestion().coveredOnsets;
+
+    return static_cast<int>( std::ranges::count( covered, true ) );
+}
+
+void ExerciseSessionController::tapRhythm()
+{
+    if( ( m_session == nullptr ) || !isRhythmQuestion() )
+    {
+        return;
+    }
+
+    // Le doigt s'entend TOUJOURS, meme quand la frappe ne vaut rien : sans ce son, taper donnerait l'impression que
+    // l'ecran n'a pas recu le geste, et le joueur recommencerait a taper pour rien.
+    m_notePlayer.playDrum( domain::Drum::Snare );
+
+    if( !m_rhythmIsPlaying )
+    {
+        // Pendant l'ecoute, une frappe sonne et n'est pas jugee : celui qui accompagne la cellule ne perd pas une vie
+        // pour l'avoir suivie.
+        return;
+    }
+
+    // La mesure est prise ICI, et le jugement appartient au domaine : c'est la seule repartition possible entre une
+    // horloge et des regles pures.
+    m_rhythmLastQuality = screenQualityOf( m_session->registerRhythmTap( rhythmPositionInBeats() ) );
+
+    // Et l'ardoise se relit tout de suite, pour que l'ecran montre la tentative se construire frappe apres frappe
+    // plutot que d'attendre le verdict pour en dire un mot.
+    m_rhythmCoveredOnsets = coveredOnsetCount();
+
+    emit rhythmStateChanged();
+}
+
 void ExerciseSessionController::playCurrentQuestion()
 {
     if( m_session == nullptr )
@@ -971,6 +1621,28 @@ void ExerciseSessionController::playCurrentQuestion()
     }
 
     const domain::Question & question = m_session->currentQuestion();
+
+    // Une question de rythme ne se joue pas, elle se BOUCLE : sa cellule s'ecoute puis se reproduit. Le domaine n'a
+    // donc rien a faire entendre ici, et c'est la boucle qui s'en charge.
+    if( question.kind == domain::QuestionKind::Rhythm )
+    {
+        startRhythmQuestion();
+
+        return;
+    }
+
+    // Un accord ne se joue pas comme un intervalle : ses notes sont PLAQUEES, et la question est de reconnaitre leur
+    // couleur, pas de suivre une melodie.
+    if( question.kind == domain::QuestionKind::Chord )
+    {
+        playChordNotes( question.chord );
+
+        return;
+    }
+
+    // Toute autre question met fin a la boucle de rythme, et c'est ce qui garantit qu'une cellule ne continue pas a
+    // battre sous une question d'intervalle.
+    stopRhythmLoop();
 
     // Une question chantee n'est pas jouee d'office, sauf pour un debutant : les autres ont le bouton "Ecouter",
     // et s'en servir coute de l'experience (voir listenToTarget).
@@ -1008,6 +1680,15 @@ void ExerciseSessionController::playCurrentQuestion()
     m_notePlayer.playMelody( ascendingNotes, m_session->settings().melodicGap );
 }
 
+void ExerciseSessionController::playChordNotes( const domain::Chord & p_chord )
+{
+    // Les notes viennent du domaine, l'accord entier d'un coup : c'est la COULEUR qu'on fait entendre, pas une suite
+    // de notes. Un span se construit sur le vecteur, donc rien n'est copie de plus.
+    const std::vector<domain::Note> notes = p_chord.notes();
+
+    m_notePlayer.playChord( notes );
+}
+
 void ExerciseSessionController::playCurrentQuestionAsChord()
 {
     if( m_session == nullptr )
@@ -1016,6 +1697,15 @@ void ExerciseSessionController::playCurrentQuestionAsChord()
     }
 
     const domain::Question & question = m_session->currentQuestion();
+
+    // Sur une question d'accord, la confirmation est l'accord lui-meme : il etait deja plaque, et le rejouer est
+    // exactement ce que le joueur doit garder en tete.
+    if( question.kind == domain::QuestionKind::Chord )
+    {
+        playChordNotes( question.chord );
+
+        return;
+    }
 
     const domain::Note rootNote{ question.rootMidiNumber };
     const domain::Note upperNote = rootNote.transposedBy( question.target.semitones() );

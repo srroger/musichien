@@ -40,6 +40,33 @@ const std::vector<RhythmPattern> & allRhythmPatterns()
     return patterns;
 }
 
+namespace
+{
+
+// The position folded back into one loop: the pattern repeats for ever, so a tap at 4.2 beats is a tap at 0.2.
+[[nodiscard]] double foldIntoLoop( double p_positionInBeats, double p_loopLength ) noexcept
+{
+    double position = std::fmod( p_positionInBeats, p_loopLength );
+
+    if( position < 0.0 )
+    {
+        position += p_loopLength;
+    }
+
+    return position;
+}
+
+// How far a folded position lies from one onset, the SHORT way round: the loop has no beginning, so a tap just
+// before the downbeat is close to it, not almost a whole bar away from it.
+[[nodiscard]] double loopDistance( double p_position, double p_onset, double p_loopLength ) noexcept
+{
+    const double direct = std::abs( p_position - p_onset );
+
+    return std::min( direct, p_loopLength - direct );
+}
+
+}    // namespace
+
 double distanceToNearestOnsetInBeats( const RhythmPattern & p_pattern, double p_positionInBeats ) noexcept
 {
     const auto hits = p_pattern.hits();
@@ -51,27 +78,48 @@ double distanceToNearestOnsetInBeats( const RhythmPattern & p_pattern, double p_
 
     const double loopLength = static_cast<double>( p_pattern.beatsPerBar() );
 
-    // The position folded back into one loop: the pattern repeats for ever, so a tap at 4.2 beats is a tap at 0.2.
-    double position = std::fmod( p_positionInBeats, loopLength );
-
-    if( position < 0.0 )
-    {
-        position += loopLength;
-    }
+    const double position = foldIntoLoop( p_positionInBeats, loopLength );
 
     double bestDistance = loopLength;
 
     for( const RhythmHit & hit : hits )
     {
-        // The distance is measured the SHORT way round, because the loop has no beginning: a tap just before the
-        // downbeat is close to it, not almost a whole bar away from it.
-        const double direct = std::abs( position - hit.beat );
-        const double wrapped = loopLength - direct;
-
-        bestDistance = std::min( bestDistance, std::min( direct, wrapped ) );
+        bestDistance = std::min( bestDistance, loopDistance( position, hit.beat, loopLength ) );
     }
 
     return bestDistance;
+}
+
+std::size_t nearestOnsetIndex( const RhythmPattern & p_pattern, double p_positionInBeats ) noexcept
+{
+    const auto hits = p_pattern.hits();
+
+    if( hits.empty() )
+    {
+        return 0;
+    }
+
+    const double loopLength = static_cast<double>( p_pattern.beatsPerBar() );
+
+    const double position = foldIntoLoop( p_positionInBeats, loopLength );
+
+    std::size_t bestIndex = 0;
+    double bestDistance = loopLength;
+
+    for( std::size_t index = 0; index < hits.size(); ++index )
+    {
+        const double distance = loopDistance( position, hits[index].beat, loopLength );
+
+        // STRICTLY closer, so that a tie keeps the EARLIER onset: two onsets equidistant from a tap - a courtesy
+        // that only an exactly symmetrical cell can produce - must not depend on the order of the comparison.
+        if( distance < bestDistance )
+        {
+            bestDistance = distance;
+            bestIndex = index;
+        }
+    }
+
+    return bestIndex;
 }
 
 }    // namespace musichien::domain

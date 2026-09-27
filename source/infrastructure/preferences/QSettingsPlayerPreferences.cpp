@@ -45,6 +45,11 @@ constexpr const char * REFERENCE_PITCH_KEY = "player/reference-pitch";
 // How many questions in a hundred ask the player to SING, the rest asking him to name the interval.
 constexpr const char * SING_QUESTION_SHARE_KEY = "player/sing-question-share";
 
+// Les deux autres parts de question, gardees avec les memes bornes et la meme valeur de repli que celle du chant :
+// trois reglages du meme genre se lisent de la meme facon, sinon l'un des trois finira par mentir.
+constexpr const char * RHYTHM_QUESTION_SHARE_KEY = "player/rhythm-question-share";
+constexpr const char * CHORD_QUESTION_SHARE_KEY = "player/chord-question-share";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -241,6 +246,44 @@ void QSettingsPlayerPreferences::storeSingQuestionShare( std::int32_t p_share )
     QSettings settings;
 
     settings.setValue( SING_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedRhythmQuestionShare() const
+{
+    const std::int32_t stored = QSettings{}.value( RHYTHM_QUESTION_SHARE_KEY, 20 ).toInt();
+
+    if( stored < 0 || stored > 100 )
+    {
+        return 20;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeRhythmQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( RHYTHM_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedChordQuestionShare() const
+{
+    const std::int32_t stored = QSettings{}.value( CHORD_QUESTION_SHARE_KEY, 20 ).toInt();
+
+    if( stored < 0 || stored > 100 )
+    {
+        return 20;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeChordQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( CHORD_QUESTION_SHARE_KEY, p_share );
 }
 
 }    // namespace musichien::infrastructure

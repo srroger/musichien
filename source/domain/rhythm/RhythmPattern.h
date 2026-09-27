@@ -71,4 +71,14 @@ private:
 // the domain owns no clock.
 [[nodiscard]] double distanceToNearestOnsetInBeats( const RhythmPattern & p_pattern, double p_positionInBeats ) noexcept;
 
+// WHICH onset is the nearest one, as an index into p_pattern.hits().
+//
+// The distance alone is not enough to judge an exercise: knowing that a tap landed on a hit says the tap was right,
+// but only knowing WHICH hit lets one say that the other ones were never touched. The two questions are asked
+// together, on the same wrap-around loop, and they live here so that they cannot drift apart.
+//
+// An empty pattern has no onset and answers 0: the caller that cares about the difference counts the hits itself,
+// and a cell without a hit is a cell to refuse rather than a cell to judge.
+[[nodiscard]] std::size_t nearestOnsetIndex( const RhythmPattern & p_pattern, double p_positionInBeats ) noexcept;
+
 }    // namespace musichien::domain

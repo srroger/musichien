@@ -69,6 +69,14 @@ public:
     [[nodiscard]] std::int32_t storedSingQuestionShare() const override;
 
     void storeSingQuestionShare( std::int32_t p_share ) override;
+
+    [[nodiscard]] std::int32_t storedRhythmQuestionShare() const override;
+
+    void storeRhythmQuestionShare( std::int32_t p_share ) override;
+
+    [[nodiscard]] std::int32_t storedChordQuestionShare() const override;
+
+    void storeChordQuestionShare( std::int32_t p_share ) override;
 };
 
 }    // namespace musichien::infrastructure

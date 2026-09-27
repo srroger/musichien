@@ -31,6 +31,7 @@ Item {
     // ("c'était…, tu as répondu…"). Roger found the single 1,9 s pause too long, and he was right: it
     // was tuned for the slowest case and applied to the fastest.
     // Everything that moves is gathered here, because the whole screen shifts sideways during the shake.
+    // La pause d'une question de rythme : la duree de la cellule, plus une respiration.
 
     id: exerciseScreen
 
@@ -38,6 +39,9 @@ Item {
     // than it is. A tap anywhere skips the pause instead - free, and always available.
     readonly property int successPause: 1200
     readonly property int mistakePause: 1800
+    // Elle vient du CONTROLEUR, donc du domaine et de son tempo : une mesure a 90 bpm dure deux secondes et demie, et
+    // aucune constante ecrite ici ne saurait le dire sans mentir le jour ou le tempo change.
+    readonly property int rhythmPause: ExerciseController.rhythmCellDurationMs + 600
     // Horizontal offset of the whole screen during the shake. Zero is the resting state, and it is both
     // where the animation starts and where it ends.
     property real shakeOffset: 0
@@ -46,6 +50,9 @@ Item {
     // Both checks, and not just the second one: reading a property of something that does not exist yet
     // is an error in QML, and a screen must never be one binding away from throwing.
     readonly property bool hasAnswered: answeredInterval !== undefined && answeredInterval.identifier !== undefined
+    // La meme chose pour un accord : ce que le joueur vient de repondre, et s'il y a quelque chose a montrer.
+    readonly property var answeredChordData: ExerciseController.answeredChord
+    readonly property bool hasAnsweredChord: answeredChordData !== undefined && answeredChordData.name !== undefined
 
     // Deliberately NOT an indication of the answer: a colour says "this button is a fifth", never "this
     // button is the one you are looking for".
@@ -59,6 +66,27 @@ Item {
     // What the verdict says. The NAME comes from the domain, the sentence is built here: the domain
     // names intervals, it does not speak French.
     function verdictText() {
+        // Une question de rythme ne se raconte pas avec des noms d'intervalles : elle se compte en frappes. Et c'est
+        // le NOMBRE qui parle, jamais un jugement - "tu as manque la deuxieme" serait un conseil que rien ne prouve.
+        if (ExerciseController.questionKind === 3) {
+            if (ExerciseController.wasLastAnswerCorrect)
+                return qsTr("%1 — reproduite !").arg(ExerciseController.rhythmPatternName);
+
+            return qsTr("%1 : %2 frappes sur %3").arg(ExerciseController.rhythmPatternName).arg(ExerciseController.rhythmCoveredOnsets).arg(ExerciseController.rhythmOnsetCount);
+        }
+        // Un accord se nomme par sa couleur, et se montre par son SYMBOLE : "Minor", et "Cm" - la tonique vient du
+        // domaine, et le symbole est deja assemble la-bas.
+        if (ExerciseController.questionKind === 4) {
+            var chord = ExerciseController.heardChord;
+            if (chord.name === undefined)
+                return "";
+
+            var chordVerdict = qsTr("%1 (%2)").arg(chord.name).arg(chord.symbol);
+            if (exerciseScreen.hasAnsweredChord && !ExerciseController.wasLastAnswerCorrect)
+                chordVerdict += qsTr(" — tu as répondu %1").arg(ExerciseController.answeredChord.name);
+
+            return chordVerdict;
+        }
         var heard = ExerciseController.heardInterval;
         if (heard.identifier === undefined)
             return "";
@@ -71,11 +99,14 @@ Item {
     }
 
     Timer {
-        id: nextQuestionTimer
-
         // Read when the timer is RESTARTED, which happens the moment the verdict appears: the pause
         // therefore matches the verdict it is giving time to.
-        interval: ExerciseController.wasLastAnswerCorrect ? exerciseScreen.successPause : exerciseScreen.mistakePause
+
+        id: nextQuestionTimer
+
+        // Une question de rythme a la sienne, et elle est plus longue : le feedback y est la CELLULE elle-meme, qui
+        // dure une mesure entiere. Couper avant la fin couperait le son qui vient d'etre donne en reponse.
+        interval: ExerciseController.questionKind === 3 ? exerciseScreen.rhythmPause : (ExerciseController.wasLastAnswerCorrect ? exerciseScreen.successPause : exerciseScreen.mistakePause)
         onTriggered: ExerciseController.continueToNextQuestion()
     }
 
@@ -181,6 +212,10 @@ Item {
             // Ce n'est pas une question de joliesse : c'est la CONDITION pour qu'un jour les notes d'un accord
             // puissent se relier par des traits. Un accord se lira alors comme une FIGURE - un triangle pour un
             // majeur, une autre pour un septieme - et la forme dira quelque chose de la musique, sans un mot.
+            // -------------------------------------------------------------------------------------------------
+            // La question de rythme
+            // -------------------------------------------------------------------------------------------------
+            // La question d'accord
 
             anchors.fill: parent
             anchors.margins: 16
@@ -309,7 +344,9 @@ Item {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
-                    visible: !ExerciseController.isFeedbackVisible
+                    // Le "Écoute bien…" est le prompt des questions d'OREILLE. Sur une question de rythme, c'est la
+                    // zone rythmique qui dit ou en est la boucle, et le meme mot y serait faux la moitie du temps.
+                    visible: !ExerciseController.isFeedbackVisible && ExerciseController.questionKind !== 3 && ExerciseController.questionKind !== 4
                     text: qsTr("Écoute bien…")
                     color: "#cbb8e8"
                     font.pixelSize: 17
@@ -563,6 +600,191 @@ Item {
 
             }
 
+            // La cellule se dessine, s'ecoute, puis se reproduit au doigt. C'est la "petite partition" du design, et
+            // elle sert deux fois : elle annonce ce qu'il faut jouer, et elle dit ou en est la boucle.
+            // -------------------------------------------------------------------------------------------------
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: ExerciseController.questionKind === 3
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#ffffff"
+                    font.pixelSize: 20
+                    font.bold: true
+                    text: qsTr("Reproduis : %1").arg(ExerciseController.rhythmPatternName)
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    text: qsTr("%1 bpm · %2 temps").arg(ExerciseController.rhythmBpm).arg(ExerciseController.rhythmBeatsPerBar)
+                }
+
+                // La mesure : un repere par temps, un trait par frappe de la cellule, et un curseur sur le temps qui
+                // sonne. Le trait est plus haut et plus clair quand la frappe est accentuee - c'est ce relief que
+                // l'oreille doit retrouver.
+                Item {
+                    id: rhythmBar
+
+                    readonly property int beatsPerBar: Math.max(1, ExerciseController.rhythmBeatsPerBar)
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 96
+                    Layout.topMargin: 4
+
+                    Repeater {
+                        model: rhythmBar.beatsPerBar
+
+                        delegate: Rectangle {
+                            required property int index
+
+                            x: (index / rhythmBar.beatsPerBar) * rhythmBar.width
+                            y: 0
+                            width: 1
+                            height: rhythmBar.height
+                            color: index === 0 ? "#5c4a80" : "#3f2d63"
+                        }
+
+                    }
+
+                    Repeater {
+                        model: ExerciseController.rhythmHits
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            // La place de la frappe dans la mesure vient du DOMAINE : ce fichier ne compte rien, il
+                            // place ce qu'on lui donne.
+                            readonly property real hitX: (modelData.beat / rhythmBar.beatsPerBar) * rhythmBar.width
+
+                            x: hitX - width / 2
+                            y: modelData.accented ? 10 : 26
+                            width: modelData.accented ? 12 : 8
+                            height: rhythmBar.height - (modelData.accented ? 20 : 40)
+                            radius: width / 2
+                            color: modelData.accented ? "#ffd479" : "#a58ad0"
+                        }
+
+                    }
+
+                    Rectangle {
+                        x: (ExerciseController.rhythmBeatInBar / rhythmBar.beatsPerBar) * rhythmBar.width
+                        y: 0
+                        width: 3
+                        height: rhythmBar.height
+                        color: ExerciseController.isRhythmPlaying ? "#8ef2b0" : "#6f5c96"
+                    }
+
+                }
+
+                // Ou en est la boucle, et ce que la tentative a donne jusqu'ici. Rien n'est invente ici : le tour vient
+                // de l'horloge du controleur, le compte du domaine.
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: ExerciseController.isRhythmPlaying ? "#8ef2b0" : "#cbb8e8"
+                    font.pixelSize: 15
+                    text: ExerciseController.isRhythmPlaying ? qsTr("À toi !") : qsTr("Écoute…")
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: 18
+                    font.bold: true
+                    // Vide tant que rien n'a ete frappe : un "Miss" affiche avant la premiere frappe serait un reproche
+                    // que le joueur n'a pas merite.
+                    text: ExerciseController.rhythmLastQuality === 2 ? qsTr("Perfect") : (ExerciseController.rhythmLastQuality === 1 ? qsTr("Good") : (ExerciseController.rhythmLastQuality === 0 ? qsTr("Miss") : ""))
+                    color: ExerciseController.rhythmLastQuality === 2 ? "#8ef2b0" : (ExerciseController.rhythmLastQuality === 1 ? "#ffd479" : "#ff8fa3")
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#8a77ad"
+                    font.pixelSize: 13
+                    text: qsTr("%1 / %2 frappes").arg(ExerciseController.rhythmCoveredOnsets).arg(ExerciseController.rhythmOnsetCount)
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.minimumHeight: 90
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 22
+                        color: tapArea.pressed ? "#8ef2b0" : (ExerciseController.isRhythmPlaying ? "#2a1a46" : "#1c1230")
+                        border.width: 2
+                        border.color: ExerciseController.isRhythmPlaying ? "#8ef2b0" : "#3f2d63"
+
+                        Text {
+                            anchors.centerIn: parent
+                            color: ExerciseController.isRhythmPlaying ? "#ffffff" : "#6f5c96"
+                            font.pixelSize: 26
+                            font.bold: true
+                            text: ExerciseController.isRhythmPlaying ? qsTr("TAPE") : qsTr("Écoute la cellule…")
+                        }
+
+                    }
+
+                    // onPressed, et NON onClicked : "clicked" part au relachement du doigt, donc une centaine de
+                    // millisecondes plus tard - un dixieme de temps a 90 bpm, et de quoi transformer un Perfect en
+                    // Good. Une frappe part au CONTACT, comme une corde.
+                    MouseArea {
+                        id: tapArea
+
+                        anchors.fill: parent
+                        enabled: ExerciseController.isRhythmPlaying
+                        onPressed: ExerciseController.tapRhythm()
+                    }
+
+                }
+
+            }
+
+            // Un accord se reconnait a sa COULEUR : les notes sont plaquees, et l'ecran n'offre qu'une poignee de noms.
+            // Pas de cercle des quintes ici - une qualite d'accord n'a pas d'angle sur un cercle - et l'ordre des
+            // boutons suit l'ordre d'apprentissage, donc il ne bouge jamais d'une question a l'autre.
+            // -------------------------------------------------------------------------------------------------
+            GridLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: ExerciseController.isChordQuestion
+                columns: 2
+                rowSpacing: 10
+                columnSpacing: 10
+
+                Repeater {
+                    model: ExerciseController.chordChoices
+
+                    delegate: Button {
+                        required property var modelData
+                        // La bonne reponse est mise en avant QUAND ELLE EST CONNUE, jamais avant : un bouton qui se
+                        // signalerait tout seul donnerait la reponse.
+                        readonly property bool isTheAnswer: ExerciseController.heardChord.quality === modelData.quality
+
+                        Layout.fillWidth: true
+                        height: 64
+                        highlighted: isTheAnswer && ExerciseController.isFeedbackVisible
+                        enabled: ExerciseController.isAsking
+                        // Le nombre de notes est affiche : c'est ce qui separe une triade d'une septieme, et c'est la
+                        // premiere chose que l'oreille attrape.
+                        text: modelData.noteCount === 4 ? qsTr("%1 — 4 notes").arg(modelData.name) : qsTr("%1 — 3 notes").arg(modelData.name)
+                        // L'index de la qualite voyage tel quel : l'ecran affiche un nom, et renvoie l'index de ce
+                        // qu'il a affiche. Il ne nomme rien lui-meme.
+                        onClicked: ExerciseController.answerChord(modelData.quality)
+                    }
+
+                }
+
+            }
+
             // -------------------------------------------------------------------------------------------------
             // Listening again, and giving up
             // -------------------------------------------------------------------------------------------------
@@ -585,7 +807,9 @@ Item {
                     // it is not offered before it is useful either.
                     visible: ExerciseController.isHelpAvailable
                     highlighted: true
-                    text: qsTr("Réponse")
+                    // Sur une question de rythme, la question ne se "revele" pas : elle se PASSE. Le meme bouton, le
+                    // meme domaine (revealAnswer), et un mot qui dit ce que le joueur fait vraiment.
+                    text: ExerciseController.questionKind === 3 ? qsTr("Passer") : qsTr("Réponse")
                     onClicked: ExerciseController.revealAnswer()
                 }
 

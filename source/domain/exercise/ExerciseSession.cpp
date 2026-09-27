@@ -2,6 +2,7 @@
 
 #include "domain/exercise/AnswerGrid.h"
 #include "domain/exercise/LearningOrder.h"
+#include "domain/rhythm/RhythmPattern.h"
 
 #include <algorithm>
 #include <span>
@@ -9,10 +10,29 @@
 namespace musichien::domain
 {
 
+namespace
+{
+
+// La cellule d'une question rythmique.
+//
+// L'index vient du domaine lui-meme, donc il est valide. Le garde-fou est la pour qu'une liste de cellules qui
+// changerait un jour ne transforme pas une question en exception : une cellule plutot qu'aucune, le jeu continue.
+[[nodiscard]] const RhythmPattern & patternOf( const Question & p_question ) noexcept
+{
+    const std::vector<RhythmPattern> & patterns = allRhythmPatterns();
+
+    const std::size_t index = std::min( p_question.patternIndex, patterns.size() - 1 );
+
+    return patterns.at( index );
+}
+
+}    // namespace
+
 ExerciseSession::ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings )
   : m_randomEngine{ p_seed }
   , m_settings{ p_settings }
   , m_palette{ beginnerPalette( m_settings.startingPaletteSize ) }
+  , m_chordPalette{ beginnerChordPalette( m_settings.startingChordQualityCount ) }
   , m_score{ m_settings.lives }
   , m_currentQuestion{ buildQuestion() }
 {
@@ -25,9 +45,30 @@ Question ExerciseSession::buildQuestion()
 {
     Question question;
 
+    // L'intervalle est tire EN PREMIER, meme quand la question sera rythmique : c'est l'ordre des tirages que les
+    // tests existants ont appris a suivre, et une question de rythme qui ne s'en sert pas ne doit pas deplacer les
+    // autres questions pour autant.
     question.target = drawTarget();
 
     question.kind = drawKind();
+
+    if( question.kind == QuestionKind::Rhythm )
+    {
+        // Une question de rythme n'a ni tonique, ni sens, ni grille : une cellule, un tempo, et des frappes a couvrir.
+        // Le retour est anticipe parce que tout ce qui suit ne parle QUE d'intervalles.
+        buildRhythmicCell( question );
+
+        return question;
+    }
+
+    if( question.kind == QuestionKind::Chord )
+    {
+        // Un accord a une tonique et une couleur, mais ni direction ni grille de choix tires au hasard : il a sa
+        // propre palette, et sa propre facon de se repondre.
+        buildChordQuestion( question );
+
+        return question;
+    }
 
     if( question.kind == QuestionKind::Sing )
     {
@@ -191,6 +232,88 @@ bool ExerciseSession::answerSung( bool p_isCorrect )
     return resolveAnswer( p_isCorrect, std::nullopt );
 }
 
+HitQuality ExerciseSession::registerRhythmTap( double p_positionInBeats )
+{
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::Rhythm ) )
+    {
+        // Une frappe hors d'une question de rythme ne juge rien. C'est le meme refus que answerDirection oppose a une
+        // question qui demandait un nom : deux langues differentes ne se repondent pas l'une l'autre.
+        return HitQuality::Miss;
+    }
+
+    const RhythmPattern & pattern = patternOf( m_currentQuestion );
+
+    const double beatMs = beatDurationMs( static_cast<double>( m_currentQuestion.bpm ) );
+
+    if( pattern.hits().empty() || ( beatMs <= 0.0 ) )
+    {
+        // Une cellule sans frappe rendrait toute frappe parfaite - la distance a un ensemble vide vaut zero - et un
+        // tempo nul rendrait toute frappe infiniment loin. Les deux sont des reglages fautifs, pas des questions a
+        // juger : ils refusent la frappe plutot que de mentir sur ce qu'elle vaut.
+        return HitQuality::Miss;
+    }
+
+    const HitQuality quality =
+      judgeDistance( distanceToNearestOnsetInBeats( pattern, p_positionInBeats ) * beatMs );
+
+    if( quality == HitQuality::Miss )
+    {
+        ++m_currentQuestion.offBeatTapCount;
+
+        return quality;
+    }
+
+    // L'onset le plus proche est marque COUVERT. Le toucher deux fois - le doigt qui rebondit sur l'ecran - ne coute
+    // rien : ce qui est juge, c'est la PLACE des frappes, et une frappe de la cellule est touchee ou elle ne l'est pas.
+    const std::size_t onsetIndex = nearestOnsetIndex( pattern, p_positionInBeats );
+
+    if( onsetIndex < m_currentQuestion.coveredOnsets.size() )
+    {
+        m_currentQuestion.coveredOnsets.at( onsetIndex ) = true;
+    }
+
+    return quality;
+}
+
+bool ExerciseSession::endRhythmLoop()
+{
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::Rhythm ) )
+    {
+        return false;
+    }
+
+    // Les deux conditions, et pas seulement la premiere : couvrir chaque frappe de la cellule ET ne rien taper a cote.
+    // Sans la seconde, la question serait juste des qu'on a touche les bons onsets, quel que soit le nombre de frappes
+    // ajoutees entre eux - et "reproduire une cellule" deviendrait "taper en continu".
+    const bool everyOnsetWasCovered =
+      !m_currentQuestion.coveredOnsets.empty()
+      && std::ranges::all_of( m_currentQuestion.coveredOnsets, []( bool p_isCovered ) { return p_isCovered; } );
+
+    const bool noTapWasOffBeat = ( m_currentQuestion.offBeatTapCount == 0 );
+
+    // L'ardoise est remise a zero AVANT de rendre le verdict, et pas apres : un rate laisse la question posee, et la
+    // boucle suivante doit repartir vierge - sinon une frappe oubliee une fois le resterait pour toujours.
+    m_currentQuestion.coveredOnsets.assign( m_currentQuestion.coveredOnsets.size(), false );
+    m_currentQuestion.offBeatTapCount = 0;
+
+    return resolveAnswer( everyOnsetWasCovered && noTapWasOffBeat, std::nullopt );
+}
+
+bool ExerciseSession::answerChord( ChordQuality p_quality )
+{
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::Chord ) )
+    {
+        // Nommer une couleur la ou aucune n'a ete jouee ne repond a rien. C'est le meme refus que la direction oppose a
+        // une question qui demandait un nom, et la frappe a une question d'intervalle : trois langues, trois questions.
+        return false;
+    }
+
+    // Rien a enregistrer comme "repondu" : il n'y a pas de distance a montrer dans le verdict, seulement une couleur.
+    m_lastChordAnswer = p_quality;
+
+    return resolveAnswer( p_quality == m_currentQuestion.chord.quality, std::nullopt );
+}
+
 QuestionKind ExerciseSession::drawKind()
 {
     std::uniform_int_distribution<std::int32_t> distribution{ 0, 99 };
@@ -208,7 +331,99 @@ QuestionKind ExerciseSession::drawKind()
         return QuestionKind::Direction;
     }
 
+    // Le rythme vient APRES les deux autres, et les parts se lisent comme des BORNES CUMULEES : chacune prend la
+    // tranche qui suit la precedente. L'ordre n'est pas une preference, c'est ce qui rend le tirage lisible d'un coup
+    // d'oeil - et ce qui fait qu'augmenter une part ne deplace que les questions qui la suivent.
+    if( ( m_settings.rhythmQuestionShare > 0 )
+        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare
+                      + m_settings.rhythmQuestionShare ) )
+    {
+        return QuestionKind::Rhythm;
+    }
+
+    // Et les accords en dernier : c'est la question la plus exigeante des quatre, donc celle qui ferme la marche.
+    if( ( m_settings.chordQuestionShare > 0 )
+        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare
+                      + m_settings.rhythmQuestionShare + m_settings.chordQuestionShare ) )
+    {
+        return QuestionKind::Chord;
+    }
+
     return QuestionKind::NamedInterval;
+}
+
+void ExerciseSession::buildChordQuestion( Question & p_question )
+{
+    p_question.chord.quality = drawChordQuality();
+
+    p_question.chord.rootMidiNumber = drawChordRootMidiNumber( p_question.chord.quality );
+
+    // Ce que le joueur peut repondre : SA palette, dans l'ordre d'apprentissage, et rien d'autre. Une couleur qu'il
+    // n'a jamais rencontree ne lui serait d'aucun secours - elle ne serait pas un choix, seulement un piege.
+    p_question.chordChoices.assign( m_chordPalette.begin(), m_chordPalette.end() );
+}
+
+ChordQuality ExerciseSession::drawChordQuality()
+{
+    // Chaque couleur de la palette a la meme chance, y compris la derniere arrivee. Meme regle que les intervalles, et
+    // pour la meme raison : ponderer vers ce que le joueur rate ferait un meilleur exercice et un pire jeu.
+    std::uniform_int_distribution<std::size_t> distribution{ 0, m_chordPalette.size() - 1 };
+
+    return m_chordPalette.at( distribution( m_randomEngine ) );
+}
+
+std::int32_t ExerciseSession::drawChordRootMidiNumber( ChordQuality p_quality )
+{
+    // La tonique est la note la PLUS GRAVE de l'accord : ce qui doit tenir dans la fenetre confortable, c'est la note
+    // du haut, donc la tonique plus l'intervalle le plus grand de l'accord.
+    //
+    // Se tromper ici est silencieux : l'accord serait simplement joue hors de la plage d'un haut-parleur de telephone,
+    // ce qui s'entend comme un accord un peu etrange plutot que comme un bug.
+    const std::span<const std::int32_t> intervals = chordIntervals( p_quality );
+
+    const std::int32_t chordSpan = intervals.back();
+
+    const std::int32_t lowestRoot = m_settings.lowestRootMidiNumber;
+
+    const std::int32_t highestRoot =
+      std::min( m_settings.highestRootMidiNumber, m_settings.highestPlayableMidiNumber - chordSpan );
+
+    if( highestRoot < lowestRoot )
+    {
+        // Les reglages ont ete pousses dans un coin ou cet accord ne tient pas. Rendre le milieu de la fenetre garde la
+        // question jouable, ce qui vaut mieux qu'un accord hors plage et une question que personne ne peut expliquer.
+        return std::clamp( m_settings.lowestRootMidiNumber,
+                           m_settings.lowestPlayableMidiNumber,
+                           m_settings.highestPlayableMidiNumber );
+    }
+
+    std::uniform_int_distribution<std::int32_t> distribution{ lowestRoot, highestRoot };
+
+    return distribution( m_randomEngine );
+}
+
+void ExerciseSession::buildRhythmicCell( Question & p_question )
+{
+    const std::vector<RhythmPattern> & patterns = allRhythmPatterns();
+
+    // Une cellule au hasard, tous les coups.
+    //
+    // Pas de progression ici, et c'est une difference de fond avec les intervalles : le rythme ne s'apprend pas du
+    // simple vers le compose, les cinq cellules sont accessibles des la premiere session, et retomber sur la meme est
+    // une repetition - exactement ce qu'un exercice de rythme demande.
+    std::uniform_int_distribution<std::size_t> distribution{ 0, patterns.size() - 1 };
+
+    p_question.patternIndex = distribution( m_randomEngine );
+
+    p_question.bpm = m_settings.rhythmBpm;
+
+    // L'ardoise de la tentative : une case par frappe de la cellule, toutes a couvrir. Le rythme est le seul endroit
+    // du jeu ou le joueur peut ne PAS repondre la ou on l'attend - c'est donc le seul endroit qui a besoin de compter
+    // des frappes plutot qu'une reponse.
+    const RhythmPattern & pattern = patterns.at( p_question.patternIndex );
+
+    p_question.coveredOnsets.assign( pattern.hits().size(), false );
+    p_question.offBeatTapCount = 0;
 }
 
 bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p_answer )
@@ -229,6 +444,10 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
         if( ( wideningPeriod > 0 ) && ( m_score.streak() % wideningPeriod == 0 ) )
         {
             widenPalette();
+
+            // Les accords s'elargissent sur les MEMES reussites : une seule progression a tenir, plutot que deux
+            // compteurs dont l'un finirait par mentir. Une couleur de plus tous les trois succes, comme un intervalle.
+            widenChordPalette();
         }
 
         m_state = SessionState::Feedback;
@@ -240,11 +459,16 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
 
     ++m_consecutiveErrors;
 
-    if( ( m_consecutiveErrors >= 2 ) && ( m_currentQuestion.direction != IntervalDirection::Harmonic ) )
+    if( ( m_consecutiveErrors >= 2 ) && ( m_currentQuestion.kind == QuestionKind::NamedInterval )
+        && ( m_currentQuestion.direction != IntervalDirection::Harmonic ) )
     {
         // Deux erreurs de suite : la question EN COURS bascule en mode guide, comme un indice. Le joueur n'a plus
         // qu'a dire si ca monte ou ca descend - une question plus petite, a laquelle il sait encore repondre. Un
         // intervalle harmonique n'a ni monte ni descend, donc il reste tel quel.
+        //
+        // Et SEULE une question d'intervalle a nommer bascule. Une cellule rythmique n'a ni montee ni descente, un
+        // accord ne se repond pas en disant dans quel sens il va, et une question chantee tient toute sa valeur de la
+        // voix du joueur : la transformer en "monte ou descend ?" remplacerait une question par une autre.
         m_currentQuestion.kind = QuestionKind::Direction;
     }
 
@@ -285,7 +509,16 @@ void ExerciseSession::revealAnswer()
     // The player asked to be told: they were not ready. The newest interval leaves the palette, so
     // that the questions that follow are asked on ground they can stand on. Help costs nothing, but it
     // does say something, and this is the only place where saying it does not feel like a punishment.
-    narrowPalette();
+    //
+    // Seulement sur une question qui PARLE d'intervalles, et c'est une precision qui compte : passer une cellule
+    // rythmique ou un accord n'apprend rien sur la palette d'intervalles, et la faire reculer serait une consequence
+    // que le joueur ne pourrait relier a rien de ce qu'il vient de faire.
+    if( ( m_currentQuestion.kind == QuestionKind::NamedInterval )
+        || ( m_currentQuestion.kind == QuestionKind::Direction )
+        || ( m_currentQuestion.kind == QuestionKind::Sing ) )
+    {
+        narrowPalette();
+    }
 
     m_state = SessionState::Feedback;
 }
@@ -315,6 +548,7 @@ void ExerciseSession::advance()
     m_consecutiveErrors = 0;
 
     m_lastAnswer.reset();
+    m_lastChordAnswer.reset();
     m_lastAnswerWasCorrect = false;
 
     m_state = SessionState::Asking;
@@ -335,8 +569,15 @@ bool ExerciseSession::isHintAvailable() const noexcept
 
 bool ExerciseSession::isHelpAvailable() const noexcept
 {
+    // Une question de rythme s'aide PLUS TOT qu'une question d'intervalle, et la difference est une regle du domaine
+    // plutot qu'un caprice de l'ecran : voir wrongAttemptsBeforeRhythmHelp. Un intervalle se reecoute autant de fois
+    // qu'on veut ; une cellule ne s'entend que pendant sa boucle d'ecoute.
+    const std::int32_t attemptsBeforeHelp = ( m_currentQuestion.kind == QuestionKind::Rhythm )
+                                              ? m_settings.wrongAttemptsBeforeRhythmHelp
+                                              : m_settings.wrongAttemptsBeforeHelp;
+
     return m_settings.aidsAllowed && ( m_state == SessionState::Asking )
-           && ( m_currentQuestion.wrongAttemptCount >= m_settings.wrongAttemptsBeforeHelp );
+           && ( m_currentQuestion.wrongAttemptCount >= attemptsBeforeHelp );
 }
 
 bool ExerciseSession::hasEarnedStar() const noexcept
@@ -372,6 +613,20 @@ void ExerciseSession::narrowPalette()
     }
 
     m_palette = beginnerPalette( m_palette.size() - 1 );
+}
+
+void ExerciseSession::widenChordPalette()
+{
+    if( m_chordPalette.size() >= chordLearningOrder().size() )
+    {
+        // Toutes les couleurs du jeu sont deja en place : il n'y a plus rien a elargir.
+        return;
+    }
+
+    // Toujours la couleur SUIVANTE de l'ordre, jamais une tiree au hasard : c'est ce qui rend la progression
+    // previsible, et une couleur choisie au hasard ferait sauter le joueur du majeur a la septieme majeure sans
+    // aucune raison qu'il puisse sentir.
+    m_chordPalette = beginnerChordPalette( m_chordPalette.size() + 1 );
 }
 
 }    // namespace musichien::domain

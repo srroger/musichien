@@ -35,6 +35,7 @@ ApplicationWindow {
     // Pourquoi un composant : le style Material peint la CASE sur fond clair ET la LISTE ouverte sur fond blanc.
     // Regler seulement `background` ne suffit donc pas - un texte clair sur une liste blanche reste illisible. Il
     // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
+    // Une part de question : un titre, une phrase qui dit ce que le reglage fait, et le nombre.
 
     id: mainWindow
 
@@ -604,6 +605,9 @@ ApplicationWindow {
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
+                // Les trois parts de question : combien de questions de chaque genre sur cent. Un reglage par genre,
+                // la meme mise en page pour les trois, et une seule definition - voir QuestionShareSetting.
+
                 id: settingsColumn
 
                 width: settingsScroll.availableWidth
@@ -774,60 +778,39 @@ ApplicationWindow {
 
                 }
 
-                // Le chant : combien de questions demandent de chanter l'intervalle au lieu de le nommer. Une regle de
-                // session que le joueur regle une fois, et les sessions suivantes s'y tiennent.
-                ColumnLayout {
+                // Le rythme et les accords sont arrives apres le chant, et ils se sont fait brancher sans une ligne
+                // de mise en page nouvelle : c'est exactement ce que le composant promettait.
+                QuestionShareSetting {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
-                    spacing: 6
-
-                    Text {
-                        Layout.fillWidth: true
-                        color: "#e8dcff"
-                        font.pixelSize: 14
-                        font.bold: true
-                        text: qsTr("Chant")
+                    title: qsTr("Chant")
+                    hint: qsTr("Part des questions chantées, en pour cent. 0 = jamais, 100 = tout chanter.")
+                    share: ExerciseController.singQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setSingQuestionShare(p_share);
                     }
+                }
 
-                    Text {
-                        Layout.fillWidth: true
-                        color: "#8a77ad"
-                        font.pixelSize: 12
-                        wrapMode: Text.WordWrap
-                        text: qsTr("Part des questions chantées, en pour cent. 0 = jamais, 100 = tout chanter.")
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Rythme")
+                    hint: qsTr("Part des questions de rythme, en pour cent. 0 = jamais, 100 = que du rythme.")
+                    share: ExerciseController.rhythmQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setRhythmQuestionShare(p_share);
                     }
+                }
 
-                    SpinBox {
-                        Layout.preferredWidth: 150
-                        Layout.preferredHeight: 32
-                        Layout.alignment: Qt.AlignLeft
-                        from: 0
-                        to: 100
-                        stepSize: 5
-                        editable: true
-                        value: ExerciseController.singQuestionShare
-                        onValueModified: ExerciseController.setSingQuestionShare(value)
-
-                        contentItem: TextInput {
-                            text: parent.textFromValue(parent.value, parent.locale)
-                            color: "#ffffff"
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            font.pixelSize: 15
-                            validator: parent.validator
-                            inputMethodHints: Qt.ImhFormattedNumbersOnly
-                            readOnly: !parent.editable
-                        }
-
-                        background: Rectangle {
-                            color: "#1b1035"
-                            radius: 4
-                            border.width: 1
-                            border.color: "#5c4a80"
-                        }
-
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Accords")
+                    hint: qsTr("Part des questions d'accords, en pour cent. 0 = jamais, 100 = que des accords.")
+                    share: ExerciseController.chordQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setChordQuestionShare(p_share);
                     }
-
                 }
 
                 // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
@@ -1383,6 +1366,68 @@ ApplicationWindow {
 
                 }
 
+            }
+
+        }
+
+    }
+
+    // UNE seule definition pour les trois reglages - chant, rythme, accords - parce que trois copies identiques
+    // finissent toujours par diverger, et parce que le prochain genre de question en aura une quatrieme a brancher.
+    component QuestionShareSetting: ColumnLayout {
+        id: questionShareSetting
+
+        property string title: ""
+        property string hint: ""
+        property int share: 0
+
+        signal shareEdited(real p_share)
+
+        spacing: 6
+
+        Text {
+            Layout.fillWidth: true
+            color: "#e8dcff"
+            font.pixelSize: 14
+            font.bold: true
+            text: questionShareSetting.title
+        }
+
+        Text {
+            Layout.fillWidth: true
+            color: "#8a77ad"
+            font.pixelSize: 12
+            wrapMode: Text.WordWrap
+            text: questionShareSetting.hint
+        }
+
+        SpinBox {
+            Layout.preferredWidth: 150
+            Layout.preferredHeight: 32
+            Layout.alignment: Qt.AlignLeft
+            from: 0
+            to: 100
+            stepSize: 5
+            editable: true
+            value: questionShareSetting.share
+            onValueModified: questionShareSetting.shareEdited(value)
+
+            contentItem: TextInput {
+                text: parent.textFromValue(parent.value, parent.locale)
+                color: "#ffffff"
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: 15
+                validator: parent.validator
+                inputMethodHints: Qt.ImhFormattedNumbersOnly
+                readOnly: !parent.editable
+            }
+
+            background: Rectangle {
+                color: "#1b1035"
+                radius: 4
+                border.width: 1
+                border.color: "#5c4a80"
             }
 
         }

@@ -1,6 +1,8 @@
 #include "domain/exercise/ExerciseSession.h"
 
 #include "domain/exercise/LearningOrder.h"
+#include "domain/music/Chord.h"
+#include "domain/rhythm/RhythmPattern.h"
 
 #include <gtest/gtest.h>
 
@@ -26,14 +28,27 @@ namespace
 
 constexpr std::uint32_t TEST_SEED = 20260926;
 
-// The settings of most tests: no limit on mistakes, so that a test about the GRID is not disturbed by
-// a test about the lives - and no sung question, which has its own tests, and which would otherwise make a
-// test about intervals fail at random, one draw in five.
-[[nodiscard]] SessionSettings unlimitedLivesSettings()
+// Des questions d'INTERVALLE, et rien d'autre.
+//
+// Une session reelle melange les genres - chant, rythme, accords - et c'est ce qu'on veut en jouant. Un test qui parle
+// d'une GRILLE, d'une PALETTE ou des VIES doit donc savoir de quoi il parle : sans cet epeinglage, il tombe une fois
+// sur cinq sur une question qui n'offre aucune grille, et il echoue au hasard. Un test qui echoue au hasard n'apprend
+// rien a personne, sinon a etre ignore.
+[[nodiscard]] SessionSettings intervalOnlySettings()
 {
     SessionSettings settings;
-    settings.lives = std::nullopt;
     settings.singQuestionShare = 0;
+    settings.rhythmQuestionShare = 0;
+    settings.chordQuestionShare = 0;
+    return settings;
+}
+
+// The settings of most tests: no limit on mistakes, so that a test about the GRID is not disturbed by
+// a test about the lives - et aucune question d'un autre genre que l'intervalle, pour la meme raison.
+[[nodiscard]] SessionSettings unlimitedLivesSettings()
+{
+    SessionSettings settings = intervalOnlySettings();
+    settings.lives = std::nullopt;
     return settings;
 }
 
@@ -71,6 +86,106 @@ void playCorrectly( ExerciseSession & p_session, std::size_t p_questionCount )
     }
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// Le rythme
+// ---------------------------------------------------------------------------------------------------------------------
+
+// Une session qui ne pose QUE des questions de rythme.
+//
+// Le rythme a sa part de tirage, comme le chant : un test qui parle d'une cellule epingle donc les DEUX autres parts,
+// sinon la session lui poserait un intervalle une fois sur cinq.
+[[nodiscard]] SessionSettings rhythmOnlySettings()
+{
+    SessionSettings settings;
+    settings.singQuestionShare = 0;
+    settings.directionQuestionShare = 0;
+    settings.rhythmQuestionShare = 100;
+    return settings;
+}
+
+// La cellule de la question en cours, telle que le joueur l'entend.
+[[nodiscard]] const RhythmPattern & patternOf( const ExerciseSession & p_session )
+{
+    return allRhythmPatterns().at( p_session.currentQuestion().patternIndex );
+}
+
+// Reproduit la cellule : une frappe sur chacune de ses frappes, pile dessus.
+void playTheCellCorrectly( ExerciseSession & p_session )
+{
+    for( const RhythmHit & hit : patternOf( p_session ).hits() )
+    {
+        p_session.registerRhythmTap( hit.beat );
+    }
+}
+
+// La place la plus loin possible de TOUTE frappe de la cellule.
+//
+// Sert a taper a cote, et de facon sure : la cellule est tiree au hasard, donc une position choisie a la main tomberait
+// a cote sur une cellule et pile sur une autre. Le balayage est court, et parfaitement deterministe.
+[[nodiscard]] double furthestPositionFromAnyHitInBeats( const RhythmPattern & p_pattern )
+{
+    const double loopLength = static_cast<double>( p_pattern.beatsPerBar() );
+
+    constexpr int STEP_COUNT = 1000;
+
+    double bestPosition = 0.0;
+    double bestDistance = -1.0;
+
+    for( int step = 0; step < STEP_COUNT; ++step )
+    {
+        const double position = ( static_cast<double>( step ) / static_cast<double>( STEP_COUNT ) ) * loopLength;
+
+        const double distance = distanceToNearestOnsetInBeats( p_pattern, position );
+
+        if( distance > bestDistance )
+        {
+            bestDistance = distance;
+            bestPosition = position;
+        }
+    }
+
+    return bestPosition;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Les accords
+// ---------------------------------------------------------------------------------------------------------------------
+
+// Une session qui ne pose QUE des questions d'accords.
+[[nodiscard]] SessionSettings chordOnlySettings()
+{
+    SessionSettings settings;
+    settings.singQuestionShare = 0;
+    settings.directionQuestionShare = 0;
+    settings.rhythmQuestionShare = 0;
+    settings.chordQuestionShare = 100;
+    return settings;
+}
+
+// La couleur de l'accord demande.
+[[nodiscard]] ChordQuality askedChordQuality( const ExerciseSession & p_session )
+{
+    return p_session.currentQuestion().chord.quality;
+}
+
+// Une reponse fausse : une AUTRE couleur de ce que le joueur a le droit de repondre.
+[[nodiscard]] ChordQuality wrongChordAnswer( const ExerciseSession & p_session )
+{
+    const std::vector<ChordQuality> & choices = p_session.currentQuestion().chordChoices;
+
+    const auto wrong = std::ranges::find_if( choices, [&p_session]( ChordQuality p_quality ) {
+        return p_quality != p_session.currentQuestion().chord.quality;
+    } );
+
+    return ( wrong != choices.end() ) ? *wrong : p_session.currentQuestion().chord.quality;
+}
+
+// Repond juste, sur une question d'accord.
+void answerChordCorrectly( ExerciseSession & p_session )
+{
+    p_session.answerChord( askedChordQuality( p_session ) );
+}
+
 }    // namespace
 
 TEST( ExerciseSessionTest, a_session_asks_its_first_question_immediately )
@@ -85,7 +200,8 @@ TEST( ExerciseSessionTest, a_session_asks_its_first_question_immediately )
 
 TEST( ExerciseSessionTest, the_right_answer_is_always_offered )
 {
-    ExerciseSession session{ TEST_SEED };
+    // Des questions d'intervalle uniquement : ce test parle de la GRILLE.
+    ExerciseSession session{ TEST_SEED, intervalOnlySettings() };
 
     for( std::size_t index = 0; index < 10; ++index )
     {
@@ -103,7 +219,8 @@ TEST( ExerciseSessionTest, the_right_answer_is_always_offered )
 
 TEST( ExerciseSessionTest, a_wrong_answer_asks_the_same_question_again )
 {
-    ExerciseSession session{ TEST_SEED };
+    // Une question d'intervalle : ce test repond a cote d'une cible, donc il lui faut une cible d'intervalle.
+    ExerciseSession session{ TEST_SEED, intervalOnlySettings() };
 
     const std::int32_t firstTarget = targetOf( session );
     const std::size_t firstQuestionNumber = session.questionNumber();
@@ -262,7 +379,9 @@ TEST( ExerciseSessionTest, ten_questions_end_the_session )
 
 TEST( ExerciseSessionTest, five_wrong_answers_end_a_session_that_has_five_lives )
 {
-    ExerciseSession session{ TEST_SEED };
+    // Des questions d'intervalle : ce test cherche une MAUVAISE reponse dans la grille, donc il lui faut une grille -
+    // et les cinq vies par defaut, qui sont le sujet du test.
+    ExerciseSession session{ TEST_SEED, intervalOnlySettings() };
 
     ASSERT_EQ( 5, session.settings().lives.value() );
 
@@ -597,6 +716,382 @@ TEST( ExerciseSessionTest, a_session_can_ask_to_sing_instead_of_naming )
     // Une question chantee n'offre rien a choisir : la voix est la reponse, et elle peut etre juste...
     EXPECT_TRUE( session.answerSung( true ) );
     EXPECT_EQ( 1, session.score().streak() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Le rythme, comme question
+//
+// Le rythme est entre dans la session comme un GENRE de question, au meme titre que le chant : la meme boucle, le meme
+// score, les memes vies. Tout ce qui suit se joue donc sans une seule seconde d'attente - consequence directe du fait
+// que le domaine ne mesure pas le temps : il RECOIT la position des frappes, et il les juge.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionTest, a_rhythm_question_asks_for_a_cell_and_a_tempo )
+{
+    const ExerciseSession session{ TEST_SEED, rhythmOnlySettings() };
+
+    const Question & question = session.currentQuestion();
+
+    EXPECT_EQ( QuestionKind::Rhythm, question.kind );
+
+    // La cellule vient du domaine, et l'ardoise de la tentative a une case par frappe a couvrir.
+    ASSERT_LT( question.patternIndex, allRhythmPatterns().size() );
+    EXPECT_EQ( allRhythmPatterns().at( question.patternIndex ).hits().size(), question.coveredOnsets.size() );
+    EXPECT_EQ( 90, question.bpm );
+
+    // Rien a choisir : la reponse n'est pas un bouton, c'est le geste.
+    EXPECT_TRUE( question.choices.empty() );
+}
+
+TEST( ExerciseSessionTest, reproducing_every_hit_of_the_cell_wins_the_question )
+{
+    ExerciseSession session{ TEST_SEED, rhythmOnlySettings() };
+
+    playTheCellCorrectly( session );
+
+    EXPECT_TRUE( session.endRhythmLoop() );
+    EXPECT_EQ( SessionState::Feedback, session.state() );
+
+    // Une question juste est une question juste, quel que soit son genre : elle compte dans le score et allonge la
+    // serie. C'est ce que "le rythme est une question comme une autre" veut dire, et c'est tout l'interet du travail.
+    EXPECT_EQ( 1, session.score().streak() );
+    EXPECT_EQ( 1U, session.score().completedQuestionCount() );
+}
+
+TEST( ExerciseSessionTest, forgetting_a_hit_loses_the_attempt_and_keeps_the_question )
+{
+    SessionSettings settings = rhythmOnlySettings();
+    settings.lives = std::nullopt;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    const RhythmPattern & pattern = patternOf( session );
+
+    // Toutes les frappes SAUF la derniere : l'oubli typique, celui du joueur qui suit la cellule et s'arrete une
+    // frappe trop tot.
+    ASSERT_GT( pattern.hits().size(), 1U );
+
+    for( std::size_t index = 0; index + 1 < pattern.hits().size(); ++index )
+    {
+        session.registerRhythmTap( pattern.hits().at( index ).beat );
+    }
+
+    EXPECT_FALSE( session.endRhythmLoop() );
+    EXPECT_EQ( SessionState::Asking, session.state() );
+
+    // Et l'ardoise est VIERGE pour la boucle suivante : la frappe oubliee une fois ne le reste pas pour toujours.
+    playTheCellCorrectly( session );
+
+    EXPECT_TRUE( session.endRhythmLoop() );
+}
+
+TEST( ExerciseSessionTest, a_tap_between_the_hits_costs_the_whole_attempt )
+{
+    SessionSettings settings = rhythmOnlySettings();
+    settings.lives = std::nullopt;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    const RhythmPattern & pattern = patternOf( session );
+
+    const double offBeat = furthestPositionFromAnyHitInBeats( pattern );
+
+    // Le prealable du test, verifie plutot que suppose : cette position est bien un rate, au tempo de la question.
+    ASSERT_GT( distanceToNearestOnsetInBeats( pattern, offBeat ) * beatDurationMs( 90.0 ), GOOD_WINDOW_MS );
+
+    playTheCellCorrectly( session );
+
+    // La frappe de trop : toutes les frappes sont la, mais une est tombee entre deux. Sans cette regle, "reproduire
+    // une cellule" deviendrait "taper en continu jusqu'a avoir touche les bons endroits".
+    session.registerRhythmTap( offBeat );
+
+    EXPECT_FALSE( session.endRhythmLoop() );
+}
+
+TEST( ExerciseSessionTest, tapping_twice_on_the_same_hit_is_not_a_mistake )
+{
+    ExerciseSession session{ TEST_SEED, rhythmOnlySettings() };
+
+    playTheCellCorrectly( session );
+
+    // Le doigt qui rebondit sur l'ecran, ou le doute d'un joueur qui reaffirme : ce qui est juge, c'est la PLACE des
+    // frappes, et une frappe de la cellule est touchee ou elle ne l'est pas.
+    session.registerRhythmTap( patternOf( session ).hits().front().beat );
+
+    EXPECT_TRUE( session.endRhythmLoop() );
+}
+
+TEST( ExerciseSessionTest, a_rhythm_question_is_never_turned_into_a_guided_one )
+{
+    SessionSettings settings = rhythmOnlySettings();
+    settings.lives = std::nullopt;
+
+    // Un intervalle qui monte, pour que le basculement guide soit possible s'il devait arriver.
+    settings.ascendingShare = 100;
+    settings.descendingShare = 0;
+    settings.harmonicShare = 0;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    for( int attempt = 0; attempt < 3; ++attempt )
+    {
+        // Rien tape : la boucle se termine sans une seule frappe.
+        EXPECT_FALSE( session.endRhythmLoop() );
+    }
+
+    // Une cellule n'a ni montee ni descente : la question reste une question de rythme, et le joueur qui vient d'en
+    // rater une attend de la REPOSER.
+    EXPECT_EQ( QuestionKind::Rhythm, session.currentQuestion().kind );
+}
+
+TEST( ExerciseSessionTest, a_rhythm_question_can_be_passed_after_one_lost_attempt )
+{
+    SessionSettings settings = rhythmOnlySettings();
+    settings.lives = std::nullopt;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    EXPECT_FALSE( session.isHelpAvailable() );
+
+    session.endRhythmLoop();    // rien tape : une tentative perdue
+
+    // Un intervalle se reecoute autant de fois qu'on veut ; une cellule ne s'entend que pendant sa boucle d'ecoute.
+    // Un seul essai perdu, et le joueur peut passer - sinon une question incomprehensible couterait toutes ses vies.
+    EXPECT_TRUE( session.isHelpAvailable() );
+}
+
+TEST( ExerciseSessionTest, tapping_on_a_question_that_is_not_rhythmic_judges_nothing )
+{
+    ExerciseSession session{ TEST_SEED, unlimitedLivesSettings() };
+
+    EXPECT_EQ( QuestionKind::NamedInterval, session.currentQuestion().kind );
+
+    // Deux langues ne se repondent pas l'une l'autre : une frappe sur une question d'intervalle ne juge rien, et ne
+    // ferme pas la question.
+    EXPECT_EQ( HitQuality::Miss, session.registerRhythmTap( 0.0 ) );
+    EXPECT_FALSE( session.endRhythmLoop() );
+    EXPECT_EQ( SessionState::Asking, session.state() );
+}
+
+TEST( ExerciseSessionTest, the_rhythm_share_decides_whether_a_cell_is_asked )
+{
+    // Zero : jamais de rythme, meme sur trente questions.
+    SessionSettings withoutRhythm = unlimitedLivesSettings();
+    withoutRhythm.questionCount = 30;
+
+    ExerciseSession intervalSession{ TEST_SEED, withoutRhythm };
+
+    for( std::size_t index = 0; index < 30; ++index )
+    {
+        EXPECT_NE( QuestionKind::Rhythm, intervalSession.currentQuestion().kind );
+
+        answerCorrectly( intervalSession );
+        intervalSession.advance();
+    }
+
+    // Cent : toutes les questions en sont, et c'est ce qui rend le reste de ces tests possible.
+    SessionSettings onlyRhythm = rhythmOnlySettings();
+    onlyRhythm.questionCount = 30;
+
+    ExerciseSession rhythmSession{ TEST_SEED, onlyRhythm };
+
+    for( std::size_t index = 0; index < 30; ++index )
+    {
+        EXPECT_EQ( QuestionKind::Rhythm, rhythmSession.currentQuestion().kind );
+
+        playTheCellCorrectly( rhythmSession );
+
+        EXPECT_TRUE( rhythmSession.endRhythmLoop() );
+
+        rhythmSession.advance();
+    }
+
+    // La session va jusqu'au bout sans rater une question : la fin est la meme que pour des intervalles.
+    EXPECT_TRUE( rhythmSession.isFinished() );
+    EXPECT_TRUE( rhythmSession.hasEarnedStar() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Les accords, comme question
+//
+// Meme boucle, meme score, memes vies : un accord est un troisieme genre de question, et il se juge aussi vite qu'un
+// intervalle - parce qu'un accord est une liste de distances, et que cette liste vit dans le domaine.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionTest, a_chord_question_offers_only_the_colours_the_player_knows )
+{
+    const ExerciseSession session{ TEST_SEED, chordOnlySettings() };
+
+    const Question & question = session.currentQuestion();
+
+    EXPECT_EQ( QuestionKind::Chord, question.kind );
+
+    // Deux couleurs au depart, et ce sont majeur et mineur : c'est ce que Roger a demande, et c'est ce que la palette
+    // d'un debutant contient.
+    ASSERT_EQ( 2U, question.chordChoices.size() );
+    EXPECT_EQ( ChordQuality::Major, question.chordChoices.at( 0 ) );
+    EXPECT_EQ( ChordQuality::Minor, question.chordChoices.at( 1 ) );
+
+    // La bonne reponse est TOUJOURS l'un des choix : une question dont la reponse n'est pas proposee n'est pas une
+    // question, c'est un piege.
+    EXPECT_NE( question.chordChoices.end(), std::ranges::find( question.chordChoices, question.chord.quality ) );
+
+    // Et l'accord a des notes : la tonique en bas, le reste au-dessus.
+    EXPECT_GE( question.chord.notes().size(), 3U );
+
+    // Un accord n'offre pas de grille d'intervalles : deux listes de choix, deux questions differentes.
+    EXPECT_TRUE( question.choices.empty() );
+}
+
+TEST( ExerciseSessionTest, naming_the_right_colour_wins_the_question )
+{
+    ExerciseSession session{ TEST_SEED, chordOnlySettings() };
+
+    answerChordCorrectly( session );
+
+    EXPECT_EQ( SessionState::Feedback, session.state() );
+    EXPECT_EQ( 1, session.score().streak() );
+
+    // Et la couleur nommee est retenue, pour que le verdict puisse la montrer.
+    ASSERT_TRUE( session.lastChordAnswer().has_value() );
+    EXPECT_TRUE( session.lastChordAnswer() == session.currentQuestion().chord.quality );
+}
+
+TEST( ExerciseSessionTest, naming_another_colour_keeps_the_question_and_loses_a_life )
+{
+    SessionSettings settings = chordOnlySettings();
+
+    // DEUX vies, et pas une : avec une seule, perdre la vie termine la session, et le test ne pourrait plus rien dire
+    // de la question qui reste posee - ce qui est justement ce qu'il verifie.
+    settings.lives = 2;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    const ChordQuality wrong = wrongChordAnswer( session );
+
+    // Le prealable du test : il y a bien une autre couleur a repondre.
+    ASSERT_NE( askedChordQuality( session ), wrong );
+
+    EXPECT_FALSE( session.answerChord( wrong ) );
+
+    // La question reste posee : un accord rate se retente, et il est rejoue.
+    EXPECT_EQ( SessionState::Asking, session.state() );
+
+    // La mauvaise reponse est retenue, elle aussi : c'est elle que le verdict oppose a la bonne.
+    ASSERT_TRUE( session.lastChordAnswer().has_value() );
+    EXPECT_TRUE( *session.lastChordAnswer() == wrong );
+
+    answerChordCorrectly( session );
+
+    EXPECT_EQ( SessionState::Feedback, session.state() );
+}
+
+TEST( ExerciseSessionTest, naming_a_colour_on_a_question_that_is_not_an_accord_judges_nothing )
+{
+    ExerciseSession session{ TEST_SEED, unlimitedLivesSettings() };
+
+    EXPECT_EQ( QuestionKind::NamedInterval, session.currentQuestion().kind );
+
+    // Trois langues, trois questions : nommer une couleur d'accord la ou un intervalle a ete joue ne repond a rien.
+    EXPECT_FALSE( session.answerChord( ChordQuality::Minor ) );
+    EXPECT_EQ( SessionState::Asking, session.state() );
+}
+
+TEST( ExerciseSessionTest, a_chord_never_turns_into_a_direction_question )
+{
+    SessionSettings settings = chordOnlySettings();
+    settings.lives = std::nullopt;
+    settings.ascendingShare = 100;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    for( int attempt = 0; attempt < 3; ++attempt )
+    {
+        // Une autre couleur que la bonne, trois fois de suite.
+        EXPECT_FALSE( session.answerChord( wrongChordAnswer( session ) ) );
+    }
+
+    // "Ca monte ou ca descend ?" ne veut rien dire d'un accord : la question reste une question d'accord, et elle
+    // attend une couleur.
+    EXPECT_EQ( QuestionKind::Chord, session.currentQuestion().kind );
+}
+
+TEST( ExerciseSessionTest, the_chord_palette_widens_with_successes )
+{
+    ExerciseSession session{ TEST_SEED, chordOnlySettings() };
+
+    // Un debutant commence par deux couleurs, et c'est la MEME progression que les intervalles : trois succes, et une
+    // couleur de plus.
+    ASSERT_EQ( 2U, session.chordPalette().size() );
+
+    for( int question = 0; question < 3; ++question )
+    {
+        answerChordCorrectly( session );
+        session.advance();
+    }
+
+    ASSERT_EQ( 3U, session.chordPalette().size() );
+
+    // Et la couleur arrivee est la SUIVANTE de l'ordre d'apprentissage, jamais une tiree au hasard : c'est ce qui rend
+    // la progression previsible pour le joueur.
+    EXPECT_EQ( ChordQuality::Sus4, session.chordPalette().at( 2 ) );
+
+    // Elle est desormais proposee, et elle peut tomber : le tirage peut la demander.
+    EXPECT_EQ( 3U, session.currentQuestion().chordChoices.size() );
+}
+
+TEST( ExerciseSessionTest, passing_a_chord_question_does_not_take_an_interval_away )
+{
+    SessionSettings settings = chordOnlySettings();
+    settings.lives = std::nullopt;
+    settings.startingPaletteSize = 6;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    const std::size_t intervalPaletteBefore = session.palette().size();
+
+    session.revealAnswer();
+
+    // Passer un accord n'apprend rien sur les intervalles : la palette d'intervalles ne recule pas. C'est une
+    // consequence que le joueur ne pourrait relier a rien, et elle est donc refusee.
+    EXPECT_EQ( intervalPaletteBefore, session.palette().size() );
+    EXPECT_EQ( SessionState::Feedback, session.state() );
+}
+
+TEST( ExerciseSessionTest, the_chord_share_decides_whether_an_accord_is_asked )
+{
+    // Zero : jamais d'accord, meme sur trente questions.
+    SessionSettings withoutChords = unlimitedLivesSettings();
+    withoutChords.questionCount = 30;
+
+    ExerciseSession intervalSession{ TEST_SEED, withoutChords };
+
+    for( std::size_t index = 0; index < 30; ++index )
+    {
+        EXPECT_NE( QuestionKind::Chord, intervalSession.currentQuestion().kind );
+
+        answerCorrectly( intervalSession );
+        intervalSession.advance();
+    }
+
+    // Cent : toutes les questions en sont.
+    SessionSettings onlyChords = chordOnlySettings();
+    onlyChords.questionCount = 30;
+
+    ExerciseSession chordSession{ TEST_SEED, onlyChords };
+
+    for( std::size_t index = 0; index < 30; ++index )
+    {
+        EXPECT_EQ( QuestionKind::Chord, chordSession.currentQuestion().kind );
+
+        answerChordCorrectly( chordSession );
+
+        EXPECT_TRUE( chordSession.wasLastAnswerCorrect() );
+
+        chordSession.advance();
+    }
+
+    EXPECT_TRUE( chordSession.isFinished() );
 }
 
 }    // namespace musichien::domain

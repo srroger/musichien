@@ -2,6 +2,7 @@
 #include "ui/ExerciseSessionController.h"
 
 #include <QCoreApplication>
+#include <QEventLoop>
 #include <QGuiApplication>
 #include <QJSValue>
 #include <QMap>
@@ -101,6 +102,12 @@ namespace
     settings.startingPaletteSize = domain::SUPPORTED_INTERVAL_COUNT;
     settings.choiceCount = domain::SUPPORTED_INTERVAL_COUNT;
 
+    // Et RIEN d'autre : ni chant, ni rythme, ni mode guide. L'ecran charge ici est celui de la grille, et une question
+    // d'un autre genre - tiree une fois sur cinq - n'aurait aucun bouton de cercle a chercher.
+    settings.singQuestionShare = 0;
+    settings.directionQuestionShare = 0;
+    settings.rhythmQuestionShare = 0;
+
     return settings;
 }
 
@@ -159,13 +166,39 @@ namespace
 }
 
 // Le cercle des quintes : le parent du Repeater, et rien d'autre.
+// Y a-t-il, sous cet item, un bouton qui porte un texte ? Le cercle des quintes en est plein, les autres zones non.
+[[nodiscard]] bool hasLabelledButton( QQuickItem & p_item )
+{
+    for( QQuickItem * child : everyItem( p_item ) )
+    {
+        if( child->property( "down" ).isValid() && !child->property( "text" ).toString().isEmpty() )
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Le board du cercle : le parent d'un Repeater qui a produit des BOUTONS.
+//
+// "Le premier Repeater de l'arbre" ne suffit pas, et l'experience l'a montre : la page en contient d'autres - les
+// couches de la portee du chant, les reperes de la mesure rythmique - et l'ordre de parcours change des qu'une zone
+// apparait dans la page. Ce qu'on cherche, c'est le board qui PORTE des boutons, donc on regarde ce qu'il contient.
 [[nodiscard]] QQuickItem * circleBoardOf( QQuickItem & p_screen )
 {
     for( QQuickItem * item : everyItem( p_screen ) )
     {
-        if( QString::fromLatin1( item->metaObject()->className() ).contains( QStringLiteral( "Repeater" ) ) )
+        if( !QString::fromLatin1( item->metaObject()->className() ).contains( QStringLiteral( "Repeater" ) ) )
         {
-            return item->parentItem();
+            continue;
+        }
+
+        QQuickItem * parent = item->parentItem();
+
+        if( ( parent != nullptr ) && hasLabelledButton( *parent ) )
+        {
+            return parent;
         }
     }
 
@@ -526,6 +559,56 @@ TEST( ExerciseScreenTest, the_circle_draws_each_octave_on_its_own_ring )
               << "sur le meme rayon, deux boutons partagent la meme couche";
         }
     }
+}
+
+TEST( ExerciseScreenTest, the_cell_is_listened_to_before_it_is_reproduced )
+{
+    // Le seul test de TEMPS du projet, et il est a sa place ici : c'est le seul binaire de test qui a une application
+    // Qt - donc des QTimer qui battent et une boucle d'evenements qui les fait avancer. Le meme test, ecrit dans les
+    // tests du view model, attendait un evenement qui ne venait jamais : une suite de tests sans application ne fait
+    // pas tourner une horloge, elle reste bloquee.
+    //
+    // Ce qu'il verifie n'est couvert nulle part ailleurs : les DEUX phases de la boucle de rythme - l'ecoute, puis la
+    // reproduction - et l'ardoise remise a zero au moment ou le doigt devient juge. Le jugement lui-meme appartient au
+    // domaine, ou il est teste sans horloge du tout.
+    //
+    // Le tempo est pousse tres haut pour que la mesure dure deux dixiemes de seconde.
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings;
+    settings.singQuestionShare = 0;
+    settings.directionQuestionShare = 0;
+    settings.rhythmQuestionShare = 100;
+    settings.rhythmBpm = 1200;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    QEventLoop settling;
+
+    // On sort des que la reproduction commence. Le delai de securite, lui, est la pour qu'un echec DISE quelque chose
+    // plutot que d'attendre pour toujours.
+    QObject::connect( &controller, &ExerciseSessionController::rhythmStateChanged, [&controller, &settling]() {
+        if( controller.isRhythmPlaying() )
+        {
+            settling.quit();
+        }
+    } );
+
+    QTimer::singleShot( 2000, &settling, &QEventLoop::quit );
+
+    controller.startSession();
+
+    // Une question de rythme commence toujours par l'ECOUTE : le doigt n'est pas juge tant que la cellule n'a pas ete
+    // entendue en entier.
+    EXPECT_FALSE( controller.isRhythmPlaying() );
+
+    settling.exec();
+
+    EXPECT_TRUE( controller.isRhythmPlaying() ) << "la cellule n'a jamais laisse la place a la reproduction";
+
+    // La tentative commence : l'ardoise repart de zero, et la derniere frappe avec elle.
+    EXPECT_EQ( 0, controller.rhythmCoveredOnsets() );
+    EXPECT_EQ( -1, controller.rhythmLastQuality() );
 }
 
 }    // namespace musichien::ui
