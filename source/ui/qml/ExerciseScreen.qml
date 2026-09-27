@@ -341,27 +341,17 @@ Item {
 
                 Repeater {
                     // UN SEUL Repeater, et PLAT : une entree par bouton, chacune sachant sa place, son rang dans
-                    // la case, et le nombre de ses voisines.
-                    // Combien d'octaves l'intervalle est au-dessus du simple : zero pour une seconde, un pour
-                    // une neuvieme, deux pour une quinzieme. C'est CE nombre, et non le rang dans la case, qui
-                    // decide de la TAILLE - parce que c'est lui qui dit la distance.
-                    // ...et de combien le composes s'en ecarte : juste assez pour TOUCHER son simple, en allant
-                    // vers le centre du cercle.
-                    // ...et la somme des poids de la case entiere.
-                    // C'est elle qui garantit qu'il n'y a JAMAIS de chevauchement : les ronds se partagent la
-                    // hauteur de la case dans cette proportion, donc la somme de leurs hauteurs vaut la case.
-                    // LA TAILLE. Le simple prend toute la place ; chaque octave au-dessus est un rond plus petit,
-                    // pose DEDANS - Roger : "un cercle plus petit et les deuxiemes boutons dedans".
-                    // OU SE POSENT LES COMPOSES : colles au BORD du simple, et jamais au centre.
-                    // Au centre, ils cacheraient le simple - qui est ce qu'on cherche le plus souvent. Colles au
-                    // bord, ils laissent au simple presque toute sa surface a toucher, et ils sont eux-memes
-                    // entierement cliquables : le petit est dessine apres, donc au-dessus.
+                    // Un seul Repeater, PLAT : une entree par bouton. Chaque bouton porte sa place (l'angle), son octave (la
+                    // couche), et son identifiant. Le cercle des quintes se dessine comme des couches d'electrons - voir
+                    // la geometrie du delegue juste en dessous.
+                    // COUCHES CONCENTRIQUES, comme les electrons d'un atome - l'image de Roger, enfin comprise.
+                    // Chaque CLASSE d'intervalle a son ANGLE sur le cercle, et chaque OCTAVE a sa COUCHE : un
+                    // rayon plus petit. Le simple vit sur la couche externe, la neuvieme sur la couche interne,
+                    // au MEME angle que la seconde, juste plus proche du centre ; la quinzieme sur une troisieme
+                    // couche, plus proche encore.
 
-                    // C'est la reponse a deux choses a la fois. D'abord une demande de Roger : les composes
-                    // restent COLLES a leur simple, parce qu'une seconde majeure et une neuvieme majeure sont la
-                    // MEME couleur - elles partagent leur place sur le cercle, et il faut pouvoir designer chacune.
-                    // Ensuite une lecon apprise a la dure : un Repeater DANS un Repeater ne produit rien, en
-                    // silence. La page se charge, aucun avertissement, et pas un bouton a l'ecran.
+                    // Un Repeater DANS un Repeater ne produit rien, en silence : la page se charge, aucun
+                    // avertissement, et pas un bouton a l'ecran. C'est une lecon apprise a la dure.
                     model: ExerciseController.gridPositions
 
                     delegate: Item {
@@ -369,23 +359,24 @@ Item {
 
                         required property var modelData
                         required property int index
-                        // Combien d'octaves l'intervalle est au-dessus du simple : zero pour une seconde, un pour
-                        // une neuvieme, deux pour une quinzieme. C'est CE nombre qui decide de la taille, parce que
-                        // c'est lui qui dit la distance - Roger : "un peu plus petits a chaque octave de distance".
+                        // Ainsi deux intervalles d'une meme classe ne peuvent jamais se chevaucher : ils sont l'un
+                        // derriere l'autre, sur le meme rayon. La distance se lit radialement - c'est exactement ce
+                        // que les cercles imbriques et les piles de pastilles ne savaient pas faire.
                         readonly property real octaveSpan: (gridButton.modelData.octaveSpan > 0) ? gridButton.modelData.octaveSpan : 0
-                        // Un cran par octave, et le rond reste rond. Une case de 62 pixels donne ainsi 62, 36 puis 21
-                        // pixels. Le simple ne retrecit JAMAIS pour faire de la place : c'etait precisement le defaut
-                        // de la version precedente, ou le partage de la hauteur rapetissait tout le monde.
-                        readonly property real buttonSize: (octaveSpan <= 0) ? circleBoard.slotHeight : (circleBoard.slotHeight * Math.pow(0.48, octaveSpan))
-                        // Ils s'alternent, en bas puis en haut : deux composes de la meme case ne se genent pas.
-                        readonly property real satelliteOffset: (octaveSpan <= 0) ? 0 : (((circleBoard.slotHeight - buttonSize) / 2) * (((octaveSpan % 2) === 1) ? 1 : -1))
+                        // Le facteur de la couche : le simple est a 1, chaque octave au-dessus est 0,6 fois plus
+                        // proche du centre. La TAILLE suit le meme facteur, pour que les cases d'une couche interne
+                        // ne se touchent pas entre elles - la largeur d'arc disponible diminue avec le rayon.
+                        readonly property real layerFactor: Math.pow(0.55, octaveSpan)
+                        readonly property real buttonSize: circleBoard.slotWidth * layerFactor
                         // Moins quatre-vingt-dix degres, c'est midi : la place zero du cercle est le do, et le do se
                         // met en haut. Le sens des aiguilles d'une montre donne ensuite sol, re, la, mi, si -
-                        // l'ordre du cercle, tel qu'il s'enseigne.
+                        // l'ordre du cercle, tel qu'il s'enseigne. Le MEME angle pour toutes les couches.
                         readonly property real slotAngleRadians: (-90 + (30 * gridButton.modelData.slot)) * Math.PI / 180
+                        // Le rayon de la couche ou vit cet intervalle.
+                        readonly property real layerRadius: circleBoard.ringRadius * layerFactor
 
-                        x: (circleBoard.width / 2) + (circleBoard.ringRadius * Math.cos(slotAngleRadians)) - (width / 2)
-                        y: (circleBoard.height / 2) + (circleBoard.ringRadius * Math.sin(slotAngleRadians)) - (height / 2) + satelliteOffset
+                        x: (circleBoard.width / 2) + (layerRadius * Math.cos(slotAngleRadians)) - (width / 2)
+                        y: (circleBoard.height / 2) + (layerRadius * Math.sin(slotAngleRadians)) - (height / 2)
                         width: buttonSize
                         height: buttonSize
 

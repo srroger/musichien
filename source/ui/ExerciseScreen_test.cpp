@@ -21,6 +21,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <map>
 #include <string>
@@ -409,22 +410,17 @@ TEST( ExerciseScreenTest, the_three_octaves_of_a_note_are_all_on_the_screen )
     EXPECT_EQ( unisonSlot, domain::circleOfFifthsSlot( domain::Interval{ 24 } ) );
 }
 
-TEST( ExerciseScreenTest, no_two_intervals_of_the_same_place_ever_overlap )
+TEST( ExerciseScreenTest, the_circle_draws_each_octave_on_its_own_ring )
 {
-    // Le defaut exact que Roger a trouve : deux intervalles d'une meme case se posaient l'un sur l'autre, et le
-    // bouton du dessous devenait impossible a toucher.
+    // COUCHES CONCENTRIQUES, comme les electrons d'un atome : l'image de Roger, et ce que ce test verifie.
     //
-    // Un chevauchement ne se voit pas dans un modele, ni dans un log, ni dans un test qui compte des items : il se
-    // voit dans des RECTANGLES. C'est donc cela qu'on compare, pour les boutons d'une meme place.
-    //
-    // Deux places VOISINES se touchent presque par construction - douze cases reparties sur un cercle - et ce n'est
-    // pas le sujet : ce sont deux boutons differents, a deux endroits differents, et l'oeil les distingue.
+    //   * aucun chevauchement, quelle que soit la couche ;
+    //   * un intervalle compose est sur le MEME RAYON que son simple - meme angle, couche plus proche ;
+    //   * tout tient dans le cercle.
     const LoadedScreen screen = loadExerciseScreen();
 
     ASSERT_NE( nullptr, screen.item );
 
-    // Le cercle est dimensionne comme sur un telephone : sans taille, tous les boutons mesurent zero, et le test ne
-    // dirait rien du tout.
     QQuickItem * board = circleBoardOf( *screen.item );
 
     ASSERT_NE( nullptr, board ) << "le cercle des quintes est introuvable. " << screenReport( *screen.item );
@@ -442,71 +438,92 @@ TEST( ExerciseScreenTest, no_two_intervals_of_the_same_place_ever_overlap )
 
     ASSERT_FALSE( buttons.empty() ) << "aucun bouton sur le cercle. " << screenReport( *screen.item );
 
-    // Les boutons rassembles par place.
-    std::map<int, std::vector<QQuickItem *>> buttonsPerSlot;
+    // Tout se mesure dans le repere de la SCENE, parce que rectangleOf() y ramene chaque bouton : le centre du
+    // cercle et son cadre doivent donc y etre exprimes aussi, sinon on mesure une distance depuis un centre qui
+    // n'est pas le bon.
+    const QRectF boardRect{ board->mapToItem( nullptr, QPointF{ 0, 0 } ), QSizeF{ board->width(), board->height() } };
+
+    // La distance d'un bouton au centre du cercle : c'est sa couche.
+    const QPointF centre = boardRect.center();
+
+    const auto distanceFromCentre = [&centre]( QQuickItem & p_button ) {
+        const QPointF buttonCentre = rectangleOf( p_button ).center();
+
+        return std::hypot( buttonCentre.x() - centre.x(), buttonCentre.y() - centre.y() );
+    };
+
+    // 1. Aucun chevauchement ENTRE COUCHES DIFFERENTES, et tout tient dans le cercle.
+    //
+    // Les voisins d'une MEME couche se touchent presque par construction - douze cases reparties sur un cercle,
+    // comme au tout premier dessin - et c'est voulu : ce sont des boutons differents, a des endroits differents.
+    // Ce que le dessin interdit, c'est qu'un intervalle d'une couche en couvre un d'une autre.
+    for( std::size_t left = 0; left < buttons.size(); ++left )
+    {
+        const QRectF first = rectangleOf( *buttons.at( left ) );
+        const int leftLayer = qRound( distanceFromCentre( *buttons.at( left ) ) * 10.0 );
+
+        EXPECT_TRUE( boardRect.contains( first ) )
+          << "le bouton " << buttons.at( left )->property( "text" ).toString().toStdString() << " sort du cercle";
+
+        for( std::size_t right = left + 1; right < buttons.size(); ++right )
+        {
+            const int rightLayer = qRound( distanceFromCentre( *buttons.at( right ) ) * 10.0 );
+
+            if( leftLayer == rightLayer )
+            {
+                continue;
+            }
+
+            // On compare des DISQUES, pas des rectangles. Un rectangle est axe sur l'ecran, alors qu'un bouton est
+            // pose en diagonale sur le cercle : deux disques bien separes peuvent avoir des rectangles qui se
+            // touchent, et c'est un faux positif qui enverrait chasser un bug inexistant.
+            const QPointF leftCentre = first.center();
+            const QPointF rightCentre = rectangleOf( *buttons.at( right ) ).center();
+            const double gap = std::hypot( leftCentre.x() - rightCentre.x(), leftCentre.y() - rightCentre.y() );
+            const double minimumGap = ( buttons.at( left )->width() + buttons.at( right )->width() ) / 2.0;
+
+            EXPECT_GE( gap, minimumGap )
+              << "deux boutons de couches differentes se touchent : '"
+              << buttons.at( left )->property( "text" ).toString().toStdString() << "' et '"
+              << buttons.at( right )->property( "text" ).toString().toStdString() << "' - ecart " << gap
+              << " pour un minimum de " << minimumGap;
+        }
+    }
+
+    // 2. A angle egal, les couches sont distinctes et ordonnees : le simple est le plus loin du centre, la
+    // quinzieme le plus pres.
+    std::map<int, std::vector<QQuickItem *>> byAngle;
 
     for( QQuickItem * button : buttons )
     {
-        // Un bouton de taille nulle n'est pas un bouton : c'est le signe d'un calcul parti en NaN.
-        EXPECT_GT( button->width(), 0.0 ) << "le bouton " << button->property( "text" ).toString().toStdString() << " est de taille nulle";
+        const QPointF buttonCentre = rectangleOf( *button ).center();
 
-        // Le rassemblement se fait par la PLACE, lue sur le DELEGUE du bouton : un bouton ne connait pas son
-        // modelData, c'est son delegue qui le porte.
-        //
-        // Et surtout PAS par la position du centre, ce qui etait une erreur : les composes sont decales a
-        // l'interieur du simple, donc leurs centres diffèrent tous, et chaque bouton se retrouvait seul dans son
-        // groupe. Le test passait alors en ne comparant rien du tout - le pire genre de test vert.
-        const QVariant raw = button->parentItem()->property( "modelData" );
+        const int angle = qRound( std::atan2( buttonCentre.y() - centre.y(), buttonCentre.x() - centre.x() ) * 1000.0 );
 
-        const int place = ( raw.canConvert<QVariantMap>() && !raw.toMap().isEmpty() )
-                            ? raw.toMap().value( QStringLiteral( "slot" ) ).toInt()
-                            : raw.value<QJSValue>().property( QStringLiteral( "slot" ) ).toInt();
-
-        buttonsPerSlot[place].push_back( button );
+        byAngle[angle].push_back( button );
     }
 
-    EXPECT_GE( buttonsPerSlot.size(), 2U ) << "une seule place porte des intervalles : le test ne prouverait rien";
+    EXPECT_GE( byAngle.size(), 2U ) << "tous les boutons sont sur le meme rayon : le test ne prouverait rien";
 
-    for( auto & [place, stacked] : buttonsPerSlot )
+    for( const auto & entry : byAngle )
     {
-        // Du plus grand au plus petit : le simple en tete, ses composes a sa suite. C'est l'ordre dans lequel ils
-        // sont dessines - donc celui dans lequel ils s'empilent a l'ecran.
-        std::ranges::sort( stacked, []( QQuickItem * p_left, QQuickItem * p_right ) { return p_left->width() > p_right->width(); } );
+        std::vector<QQuickItem *> ring = entry.second;
 
-        QQuickItem * simple = stacked.front();
-
-        // 1. Un composes se pose DEDANS, colle au bord du simple : c'est le dessin voulu, donc leur chevauchement
-        // n'est pas un defaut. Ce qui en serait un, c'est que le CENTRE du simple soit couvert - le simple est ce
-        // qu'on cherche le plus souvent, et c'est la qu'un doigt se pose.
-        const QPointF centre = rectangleOf( *simple ).center();
-
-        for( QQuickItem * button : stacked )
+        if( ring.size() < 2 )
         {
-            if( button != simple )
-            {
-                EXPECT_FALSE( rectangleOf( *button ).contains( centre ) )
-                  << "place " << place << " : '" << button->property( "text" ).toString().toStdString()
-                  << "' couvre le centre du simple '" << simple->property( "text" ).toString().toStdString() << "'";
-            }
+            continue;
         }
 
-        // 2. Deux composes ne se genent pas : eux ne doivent JAMAIS se recouvrir entre eux.
-        for( std::size_t left = 1; left < stacked.size(); ++left )
-        {
-            for( std::size_t right = left + 1; right < stacked.size(); ++right )
-            {
-                EXPECT_FALSE( rectangleOf( *stacked.at( left ) ).intersects( rectangleOf( *stacked.at( right ) ) ) )
-                  << "place " << place << " : '" << stacked.at( left )->property( "text" ).toString().toStdString()
-                  << "' et '" << stacked.at( right )->property( "text" ).toString().toStdString() << "' se recouvrent";
-            }
-        }
+        // Du plus loin au plus proche du centre : c'est l'ordre des couches, et il ne depend pas de l'ordre dans
+        // lequel QML a cree les boutons.
+        std::ranges::sort( ring, [&distanceFromCentre]( QQuickItem * p_left, QQuickItem * p_right ) {
+            return distanceFromCentre( *p_left ) > distanceFromCentre( *p_right );
+        } );
 
-        // 3. Et les tailles DECROISSENT avec la distance : le simple est le plus grand, la quinzieme la plus petite.
-        // C'est la demande de Roger, et c'est ce qui rend la case lisible d'un coup d'oeil.
-        for( std::size_t rank = 1; rank < stacked.size(); ++rank )
+        for( std::size_t rank = 1; rank < ring.size(); ++rank )
         {
-            EXPECT_LT( stacked.at( rank )->width(), stacked.at( rank - 1 )->width() )
-              << "place " << place << " : le rang " << rank << " n'est pas plus petit que le precedent";
+            EXPECT_GT( distanceFromCentre( *ring.at( rank - 1 ) ), distanceFromCentre( *ring.at( rank ) ) )
+              << "sur le meme rayon, deux boutons partagent la meme couche";
         }
     }
 }
