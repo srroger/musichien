@@ -50,6 +50,13 @@ public:
     // AUDIBLE is the domain's.
     virtual void playMistakeCue() = 0;
 
+    // Un clic de menu : un son très court, très doux, qui ne dit rien d'autre que "ta main a été entendue".
+    //
+    // Il a un CORPS PAR DÉFAUT, et c'est délibéré : un appareil sans retour sonore n'a rien à implémenter, et un
+    // test qui ne s'intéresse pas au clic n'a rien à écrire non plus. Le feedback d'un bouton ne mérite pas
+    // d'obliger tous les adaptateurs du projet à répondre.
+    virtual void playTapCue() {}
+
     // Stops everything immediately. Called when the screen is left or the application goes to the
     // background: an audio stream left open on a phone is a battery drain and a bug.
     virtual void stopAll() = 0;

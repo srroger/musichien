@@ -164,6 +164,9 @@ int ExerciseSessionController::playerLevel() const noexcept
 
 void ExerciseSessionController::choosePlayerLevel( int p_level )
 {
+    // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
+    m_notePlayer.playTapCue();
+
     const domain::PlayerLevel level = domain::playerLevelFromIndex( static_cast<std::size_t>( p_level ) );
 
     m_playerLevel = level;
@@ -237,6 +240,9 @@ QVariantList ExerciseSessionController::instruments() const
 
 void ExerciseSessionController::setInstrumentEnabled( int p_index, bool p_isEnabled )
 {
+    // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
+    m_notePlayer.playTapCue();
+
     // Two tests rather than one: comparing a signed index with an unsigned count in the same
     // expression is exactly the kind of comparison that lets a negative index through.
     if( p_index < 0 )
@@ -311,6 +317,9 @@ bool ExerciseSessionController::starEarned() const noexcept
 
 void ExerciseSessionController::startSession()
 {
+    // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
+    m_notePlayer.playTapCue();
+
     // The seed is drawn HERE, in the interface layer, and never inside the domain.
     //
     // That is what keeps a session reproducible from its seed in a test, and it is also why the rules
