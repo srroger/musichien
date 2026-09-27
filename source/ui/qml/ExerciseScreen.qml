@@ -363,8 +363,8 @@ Item {
 
             }
 
-            // Le chant : quand la question le demande, la grille s'efface et il ne reste qu'a chanter. Le micro sert
-            // de retour, et la session juge. La barre de stabilite et la boule vivent dans le controleur du micro.
+            // Le chant : quand la question le demande, la grille s'efface et il ne reste qu'a chanter. La portee, la
+            // boule et la barre de stabilite sont le composant partage avec l'accordeur ; seule la cible change.
             ColumnLayout {
                 Layout.fillWidth: true
                 visible: ExerciseController.questionKind === 2
@@ -380,21 +380,52 @@ Item {
                     text: qsTr("Chante : %1").arg(MicrophoneController.singingTargetLabel)
                 }
 
+                StaffBall {
+                    Layout.preferredHeight: 120
+                }
+
+                // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 8
+                    radius: 4
+                    color: "#1b1035"
+
+                    Rectangle {
+                        height: 8
+                        radius: 4
+                        color: "#8ef2b0"
+                        width: parent.width * MicrophoneController.sungStability
+                    }
+
+                }
+
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
                     color: "#cbb8e8"
-                    font.pixelSize: 14
+                    font.pixelSize: 13
                     visible: !MicrophoneController.hasSungInterval
                     text: MicrophoneController.hasFirstNote ? qsTr("Première note tenue — maintenant la deuxième") : qsTr("Tiens la première note…")
                 }
 
-                Button {
+                RowLayout {
                     Layout.fillWidth: true
-                    height: 58
-                    highlighted: MicrophoneController.isSingingCaptureActive
-                    text: MicrophoneController.isSingingCaptureActive ? qsTr("J'écoute…") : qsTr("Je chante")
-                    onClicked: MicrophoneController.isSingingCaptureActive ? MicrophoneController.stopSingingCapture() : MicrophoneController.startSingingCapture()
+                    spacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Écouter")
+                        onClicked: MicrophoneController.playSingingTarget()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        highlighted: MicrophoneController.isSingingCaptureActive
+                        text: MicrophoneController.isSingingCaptureActive ? qsTr("J'écoute…") : qsTr("Je chante")
+                        onClicked: MicrophoneController.isSingingCaptureActive ? MicrophoneController.stopSingingCapture() : MicrophoneController.startSingingCapture()
+                    }
+
                 }
 
                 Connections {

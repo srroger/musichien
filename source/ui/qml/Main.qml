@@ -145,13 +145,6 @@ ApplicationWindow {
     // and a bug. The view model was given a method for exactly this call.
     onClosing: IntervalController.stopPlayback()
 
-    // La police musicale, embarquee dans les ressources : les polices Android par defaut n'ont pas la clef de Sol.
-    FontLoader {
-        id: musicFont
-
-        source: "qrc:/assets/fonts/NotoMusic-Regular.ttf"
-    }
-
     Rectangle {
         // The loop itself, and the only thing the player ever sees of it: the bench below is a tool for
         // building the project, this is the game.
@@ -1128,59 +1121,6 @@ ApplicationWindow {
                 radius: 8
                 border.width: 1
                 border.color: "#5c4a80"
-            }
-
-        }
-
-    }
-
-    // La portee miniature et sa boule : la clef de Sol, cinq lignes, et la boule qui suit la hauteur chantee. Un
-    // composant parce qu'elle sert a DEUX endroits - l'accordeur et l'exercice de chant - et un seul style evite
-    // qu'ils divergent.
-    component StaffBall: Item {
-        Layout.fillWidth: true
-        Layout.preferredHeight: 100
-
-        Text {
-            x: 2
-            y: -2
-            text: "\uD834\uDD1E"
-            color: "#cbb8e8"
-            font.pixelSize: 40
-            font.family: musicFont.name
-        }
-
-        Repeater {
-            model: 5
-
-            delegate: Rectangle {
-                required property int index
-
-                x: 0
-                y: parent.height * (0.15 + index * 0.175)
-                width: parent.width
-                height: 1
-                color: "#5c4a80"
-            }
-
-        }
-
-        Rectangle {
-            width: 18
-            height: 18
-            radius: 9
-            visible: MicrophoneController.detectedFrequencyHz > 0
-            color: mainWindow.tuningColor()
-            x: parent.width / 2 - width / 2
-            y: parent.height * (1 - MicrophoneController.detectedStaffFraction) - height / 2
-
-            // L'inertie : la boule ne saute pas de note en note, elle GLISSE vers la bonne place.
-            Behavior on y {
-                NumberAnimation {
-                    duration: 250
-                    easing.type: Easing.OutQuad
-                }
-
             }
 
         }
