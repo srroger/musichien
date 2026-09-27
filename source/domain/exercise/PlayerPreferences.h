@@ -82,6 +82,15 @@ public:
     [[nodiscard]] virtual std::int64_t starCount() const = 0;
 
     virtual void storeStarCount( std::int64_t p_count ) = 0;
+
+    // Whether the daily reminder is on.
+    //
+    // A REMINDER is a setting, and it is justified because two reasonable people want different things: the player
+    // who comes back on his own, and the player who needs the nudge. Same drawer as the instruments for the same
+    // reason - what the player wants, remembered.
+    [[nodiscard]] virtual bool dailyReminderEnabled() const = 0;
+
+    virtual void storeDailyReminderEnabled( bool p_enabled ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -118,6 +127,10 @@ public:
 
     void storeStarCount( std::int64_t p_count ) override { m_starCount = p_count; }
 
+    [[nodiscard]] bool dailyReminderEnabled() const override { return m_dailyReminderEnabled; }
+
+    void storeDailyReminderEnabled( bool p_enabled ) override { m_dailyReminderEnabled = p_enabled; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -130,6 +143,8 @@ private:
     std::int64_t m_sessionCount{ 0 };
 
     std::int64_t m_starCount{ 0 };
+
+    bool m_dailyReminderEnabled{ false };
 };
 
 }    // namespace musichien::domain

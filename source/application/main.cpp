@@ -8,6 +8,7 @@
 #include "infrastructure/audio/QAudioNotePlayer.h"
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
+#include "infrastructure/notifications/NullNotificationScheduler.h"
 #include "infrastructure/preferences/QSettingsPlayerPreferences.h"
 #include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
@@ -229,6 +230,28 @@ int main( int p_argumentCount, char * p_arguments[] )
                       playWantedInstruments );
 
     playWantedInstruments();
+
+    // Le rappel quotidien. Le port cache la plateforme : sur le bureau, rien ne se planifie ; sur Android, une
+    // vraie notification sera posee. Ce que l'application sait, c'est qu'une case a ete cochee, et elle demande au
+    // port de s'en occuper.
+    musichien::infrastructure::NullNotificationScheduler notificationScheduler;
+
+    const auto applyReminder = [&exerciseController, &notificationScheduler]() {
+        if( exerciseController.dailyReminderEnabled() )
+        {
+            notificationScheduler.scheduleDailyReminder( 19, 0 );
+        }
+        else
+        {
+            notificationScheduler.cancelReminder();
+        }
+    };
+
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::dailyReminderChanged,
+                      applyReminder );
+
+    applyReminder();
 
     // Bonjour. Un arpège montant de do, sol, do : une quinte et une octave, aucune tierce, donc rien
     // à comprendre - seulement quelque chose qui monte et qui flotte. Au piano, et très discret : c'est

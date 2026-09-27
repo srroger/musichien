@@ -30,6 +30,9 @@ constexpr const char * SESSIONS_KEY = "player/sessions";
 
 constexpr const char * STARS_KEY = "player/stars";
 
+// The daily reminder.
+constexpr const char * REMINDER_KEY = "player/reminder";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -134,6 +137,18 @@ void QSettingsPlayerPreferences::storeStarCount( std::int64_t p_count )
     QSettings settings;
 
     settings.setValue( STARS_KEY, static_cast<qlonglong>( p_count ) );
+}
+
+bool QSettingsPlayerPreferences::dailyReminderEnabled() const
+{
+    return QSettings{}.value( REMINDER_KEY, false ).toBool();
+}
+
+void QSettingsPlayerPreferences::storeDailyReminderEnabled( bool p_enabled )
+{
+    QSettings settings;
+
+    settings.setValue( REMINDER_KEY, p_enabled );
 }
 
 }    // namespace musichien::infrastructure

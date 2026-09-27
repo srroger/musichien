@@ -49,6 +49,10 @@ public:
     [[nodiscard]] std::int64_t starCount() const override;
 
     void storeStarCount( std::int64_t p_count ) override;
+
+    [[nodiscard]] bool dailyReminderEnabled() const override;
+
+    void storeDailyReminderEnabled( bool p_enabled ) override;
 };
 
 }    // namespace musichien::infrastructure

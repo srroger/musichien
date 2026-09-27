@@ -604,6 +604,23 @@ int ExerciseSessionController::starCount() const
     return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->starCount() ) : 0;
 }
 
+bool ExerciseSessionController::dailyReminderEnabled() const
+{
+    return ( m_levelStore != nullptr ) && m_levelStore->dailyReminderEnabled();
+}
+
+void ExerciseSessionController::setDailyReminderEnabled( bool p_enabled )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    m_levelStore->storeDailyReminderEnabled( p_enabled );
+
+    emit dailyReminderChanged();
+}
+
 void ExerciseSessionController::refreshChoices()
 {
     if( m_session == nullptr )

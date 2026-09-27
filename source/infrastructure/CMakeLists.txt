@@ -17,6 +17,8 @@ musichienFunction_AddLibrary(infrastructure
     content/JsonHintBook.cpp
     haptics/DeviceHaptics.h
     haptics/DeviceHaptics.cpp
+    notifications/NotificationScheduler.h
+    notifications/NullNotificationScheduler.h
     preferences/QSettingsPlayerPreferences.h
     preferences/QSettingsPlayerPreferences.cpp
 )
