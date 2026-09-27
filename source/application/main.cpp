@@ -293,7 +293,8 @@ int main( int p_argumentCount, char * p_arguments[] )
           }
 
           return std::make_unique<musichien::infrastructure::QAudioPitchDetector>( inputDevices.at( p_deviceIndex ) );
-      } };
+      },
+      &playerLevelStore };
 
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,

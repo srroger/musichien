@@ -1,6 +1,7 @@
 #include "ui/MicrophoneController.h"
 
 #include "domain/audio/PitchDetector.h"
+#include "domain/exercise/PlayerPreferences.h"
 #include "domain/music/Note.h"
 #include "domain/music/Temperament.h"
 
@@ -109,10 +110,14 @@ constexpr double OFF_CENTS = 20.0;
 
 }    // namespace
 
-MicrophoneController::MicrophoneController( QStringList p_deviceNames, DetectorFactory p_factory, QObject * p_parent )
+MicrophoneController::MicrophoneController( QStringList p_deviceNames,
+                                            DetectorFactory p_factory,
+                                            musichien::domain::PlayerPreferences * p_preferences,
+                                            QObject * p_parent )
   : QObject{ p_parent }
   , m_deviceNames{ std::move( p_deviceNames ) }
   , m_factory{ std::move( p_factory ) }
+  , m_preferences{ p_preferences }
 {
     // An empty list would leave the ComboBox with nothing to show. The message says what to LOOK AT: on a desktop
     // this is almost always a sound card whose active profile has no input - the microphone exists, ALSA sees it, and
@@ -200,18 +205,43 @@ void MicrophoneController::onPitch( float p_frequencyHz )
     m_detectedPitchRatio = pitchRatioFor( m_detectedFrequencyHz );
     m_detectedNoteLabel = noteLabelFor( m_detectedFrequencyHz );
 
+    // The continuous MIDI position of the voice: 69 is A4, 69.5 is halfway to the next note. The staff draws the
+    // ball from this, so that a note sung perfectly in tune lands exactly on its line or space.
+    m_detectedMidi = m_detectedFrequencyHz > 0.0
+                       ? static_cast<double>( domain::REFERENCE_MIDI_NUMBER )
+                           + ( static_cast<double>( domain::SEMITONES_PER_OCTAVE )
+                               * std::log2( m_detectedFrequencyHz / domain::REFERENCE_FREQUENCY_HZ ) )
+                       : 0.0;
+
     // The tuner part: how far the voice is from the note it is closest to. This is what makes the page useful
     // outside the game - checking a guitar string, or hearing how flat yesterday's cold left the voice.
     const std::optional<domain::Note> nearest = nearestNoteFor( m_detectedFrequencyHz );
 
-    m_detectedCents = nearest.has_value()
-                        ? domain::centsBetween( m_detectedFrequencyHz, nearest->frequencyHz() )
-                        : 0.0;
+    if( nearest.has_value() )
+    {
+        // The tuner honours the chosen tuning. In equal temperament the reference is the note itself; in the others
+        // it depends on the root - and this is the SAME calculation the audio layer will use to play intervals, so
+        // the tuner and the game will never disagree.
+        const domain::Temperament temperament = ( m_preferences != nullptr )
+                                                  ? m_preferences->storedTemperament()
+                                                  : domain::Temperament::Equal;
+
+        const domain::Note root = ( m_preferences != nullptr ) ? m_preferences->storedTuningRoot()
+                                                               : domain::Note{ 60 };
+
+        m_detectedCents = domain::centsBetween( m_detectedFrequencyHz,
+                                                domain::frequencyFor( *nearest, root, temperament ) );
+    }
+    else
+    {
+        m_detectedCents = 0.0;
+    }
 
     m_detectedTuningState = tuningStateFor( nearest.has_value(), m_detectedCents );
 
     emit detectedFrequencyHzChanged();
     emit detectedPitchRatioChanged();
+    emit detectedMidiChanged();
     emit detectedNoteLabelChanged();
     emit detectedCentsChanged();
     emit detectedTuningStateChanged();

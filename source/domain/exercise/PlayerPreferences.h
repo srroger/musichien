@@ -103,6 +103,14 @@ public:
     [[nodiscard]] virtual Temperament storedTemperament() const = 0;
 
     virtual void storeTemperament( Temperament p_temperament ) = 0;
+
+    // The ROOT note the tuning is heard from. In equal temperament it is irrelevant - that is the whole point of it.
+    // In the others it is what gives every interval its meaning: a fifth above C is not built on the same reference
+    // as a fifth above F#. Stored as a note, but only its PITCH CLASS matters for tuning; the octave does not change
+    // an interval.
+    [[nodiscard]] virtual Note storedTuningRoot() const = 0;
+
+    virtual void storeTuningRoot( Note p_root ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -147,6 +155,10 @@ public:
 
     void storeTemperament( Temperament p_temperament ) override { m_temperament = p_temperament; }
 
+    [[nodiscard]] Note storedTuningRoot() const override { return m_tuningRoot; }
+
+    void storeTuningRoot( Note p_root ) override { m_tuningRoot = p_root; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -163,6 +175,8 @@ private:
     bool m_dailyReminderEnabled{ false };
 
     Temperament m_temperament{ Temperament::Equal };
+
+    Note m_tuningRoot{ 60 };
 };
 
 }    // namespace musichien::domain

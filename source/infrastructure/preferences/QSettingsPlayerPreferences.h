@@ -57,6 +57,10 @@ public:
     [[nodiscard]] domain::Temperament storedTemperament() const override;
 
     void storeTemperament( domain::Temperament p_temperament ) override;
+
+    [[nodiscard]] domain::Note storedTuningRoot() const override;
+
+    void storeTuningRoot( domain::Note p_root ) override;
 };
 
 }    // namespace musichien::infrastructure

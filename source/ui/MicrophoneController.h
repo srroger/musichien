@@ -21,7 +21,8 @@
 namespace musichien::domain
 {
 class PitchDetector;
-}
+class PlayerPreferences;
+}    // namespace musichien::domain
 
 namespace musichien::ui
 {
@@ -35,6 +36,7 @@ class MicrophoneController final : public QObject
     Q_PROPERTY( bool isListening READ isListening NOTIFY isListeningChanged )
     Q_PROPERTY( double detectedFrequencyHz READ detectedFrequencyHz NOTIFY detectedFrequencyHzChanged )
     Q_PROPERTY( double detectedPitchRatio READ detectedPitchRatio NOTIFY detectedPitchRatioChanged )
+    Q_PROPERTY( double detectedMidi READ detectedMidi NOTIFY detectedMidiChanged )
     Q_PROPERTY( QString detectedNoteLabel READ detectedNoteLabel NOTIFY detectedNoteLabelChanged )
 
     // How far the voice is from the nearest note, in cents, and how good that is. This is what turns the microphone
@@ -47,7 +49,10 @@ public:
     // application's way of handing over a QAudioPitchDetector without this view model ever seeing Qt Multimedia.
     using DetectorFactory = std::function<std::unique_ptr<musichien::domain::PitchDetector>( int p_deviceIndex )>;
 
-    MicrophoneController( QStringList p_deviceNames, DetectorFactory p_factory, QObject * p_parent = nullptr );
+    MicrophoneController( QStringList p_deviceNames,
+                          DetectorFactory p_factory,
+                          musichien::domain::PlayerPreferences * p_preferences = nullptr,
+                          QObject * p_parent = nullptr );
 
     // Out-of-line, because the detector is only forward-declared here: the unique_ptr cannot destroy it in the
     // header where the type is still incomplete.
@@ -63,6 +68,7 @@ public:
     [[nodiscard]] bool isListening() const { return m_isListening; }
     [[nodiscard]] double detectedFrequencyHz() const { return m_detectedFrequencyHz; }
     [[nodiscard]] double detectedPitchRatio() const { return m_detectedPitchRatio; }
+    [[nodiscard]] double detectedMidi() const { return m_detectedMidi; }
     [[nodiscard]] QString detectedNoteLabel() const { return m_detectedNoteLabel; }
     [[nodiscard]] double detectedCents() const { return m_detectedCents; }
     [[nodiscard]] int detectedTuningState() const { return m_detectedTuningState; }
@@ -76,6 +82,7 @@ signals:
     void isListeningChanged();
     void detectedFrequencyHzChanged();
     void detectedPitchRatioChanged();
+    void detectedMidiChanged();
     void detectedNoteLabelChanged();
     void detectedCentsChanged();
     void detectedTuningStateChanged();
@@ -86,10 +93,12 @@ private:
 
     QStringList m_deviceNames;
     DetectorFactory m_factory;
+    musichien::domain::PlayerPreferences * m_preferences{ nullptr };
     int m_currentDeviceIndex{ 0 };
     bool m_isListening{ false };
     double m_detectedFrequencyHz{ 0.0 };
     double m_detectedPitchRatio{ 0.0 };
+    double m_detectedMidi{ 0.0 };
     double m_detectedCents{ 0.0 };
     int m_detectedTuningState{ 0 };
     QString m_detectedNoteLabel;

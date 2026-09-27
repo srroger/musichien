@@ -36,6 +36,9 @@ constexpr const char * REMINDER_KEY = "player/reminder";
 // The tuning. Stored as the enum's own number, and read back through a range check.
 constexpr const char * TEMPERAMENT_KEY = "player/temperament";
 
+// The root note of the tuning, as a MIDI number.
+constexpr const char * TUNING_ROOT_KEY = "player/tuning-root";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -173,6 +176,25 @@ void QSettingsPlayerPreferences::storeTemperament( domain::Temperament p_tempera
     QSettings settings;
 
     settings.setValue( TEMPERAMENT_KEY, static_cast<int>( p_temperament ) );
+}
+
+domain::Note QSettingsPlayerPreferences::storedTuningRoot() const
+{
+    const int stored = QSettings{}.value( TUNING_ROOT_KEY, 60 ).toInt();
+
+    if( stored < domain::Note::MINIMUM_MIDI_NUMBER || stored > domain::Note::MAXIMUM_MIDI_NUMBER )
+    {
+        return domain::Note{ 60 };
+    }
+
+    return domain::Note{ stored };
+}
+
+void QSettingsPlayerPreferences::storeTuningRoot( domain::Note p_root )
+{
+    QSettings settings;
+
+    settings.setValue( TUNING_ROOT_KEY, p_root.midiNumber() );
 }
 
 }    // namespace musichien::infrastructure

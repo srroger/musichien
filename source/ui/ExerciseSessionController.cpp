@@ -771,6 +771,41 @@ QVariantList ExerciseSessionController::temperaments() const    // NOLINT(readab
     return names;
 }
 
+int ExerciseSessionController::tuningRoot() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedTuningRoot().pitchClassIndex() : 0;
+}
+
+void ExerciseSessionController::setTuningRoot( int p_index )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    if( p_index < 0 || p_index >= domain::SEMITONES_PER_OCTAVE )
+    {
+        return;
+    }
+
+    // A root is a PITCH CLASS: which octave it sits in does not change an interval, so it is stored in octave 4.
+    m_levelStore->storeTuningRoot( domain::Note{ 60 + p_index } );
+
+    emit tuningRootChanged();
+}
+
+QVariantList ExerciseSessionController::tuningRoots() const    // NOLINT(readability-convert-member-functions-to-static)
+{
+    QVariantList names;
+
+    for( std::int32_t index = 0; index < domain::SEMITONES_PER_OCTAVE; ++index )
+    {
+        names.append( QString::fromStdString( domain::Note{ 60 + index }.name() ) );
+    }
+
+    return names;
+}
+
 int ExerciseSessionController::reminderHour() const noexcept    // NOLINT(readability-convert-member-functions-to-static)
 {
     return 19;

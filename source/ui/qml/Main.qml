@@ -82,6 +82,17 @@ ApplicationWindow {
         return "#f2848e";
     }
 
+    // Position verticale d'une note sur la portee, en clef de Sol : 64 (E4) sur la ligne du bas, 77 (F5) sur la
+    // ligne du haut. Un demi-ton fait la moitie d'un pas de gamme, donc la boule glisse exactement sur les lignes et
+    // les interlignes - un Do juste tombe pile sur son interligne.
+    function staffY(p_midi) {
+        if (p_midi <= 0)
+            return 0.5;
+
+        var t = (p_midi - 64) / 13;
+        return Math.max(0, Math.min(1, t));
+    }
+
     // Plays the interval at a given distance, then reveals the feedback.
     // The distance is all this screen knows how to say about an interval: it never names one, never
     // decides whether one is simple or compound, and never builds one. It asks, then it displays what
@@ -113,6 +124,9 @@ ApplicationWindow {
         return qsTr("%1 octaves plus haut").arg(p_octaveSpan);
     }
 
+    // The colour of the window itself, not of any item inside it. On Android this is what shows through a system bar
+    // while the first frame paints, and it must match the top of the gradient rather than flash white.
+    color: "#1b1035"
     // Une anecdote par ouverture, comme les ecrans de chargement d'autrefois : un petit texte qui change et qui
     // donne a lire. Tiree au hasard dans le fichier de contenu, jamais ecrite en dur ici.
     Component.onCompleted: ExerciseController.refreshAnecdote()
@@ -261,33 +275,6 @@ ApplicationWindow {
                     Layout.preferredHeight: 6
                 }
 
-                // Options et Profil sur UNE ligne, a parts egales : deux portes de la meme rangee, plutot que deux
-                // boutons poses l'un sous l'autre.
-                RowLayout {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: mainWindow.buttonWidth
-                    spacing: 8
-
-                    Button {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 46
-                        text: qsTr("Options")
-                        onClicked: settingsDialog.open()
-                    }
-
-                    Button {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 46
-                        text: qsTr("Profil")
-                        onClicked: profileDialog.open()
-                    }
-
-                }
-
-                Item {
-                    Layout.preferredHeight: 6
-                }
-
                 // The way into the loop. It sits above the bench on purpose: the bench is a tool for
                 // building the project, and playing is what the application is FOR.
                 Button {
@@ -316,6 +303,29 @@ ApplicationWindow {
                         Layout.preferredHeight: 46
                         text: qsTr("Survie")
                         onClicked: ExerciseController.startSurvivalSession()
+                    }
+
+                }
+
+                // Options et Profil sous les modes de jeu : ce sont des portes vers des PAGES, pas des actions de
+                // jeu, donc elles se rangent apres, a parts egales.
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    spacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Options")
+                        onClicked: settingsDialog.open()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Profil")
+                        onClicked: profileDialog.open()
                     }
 
                 }
@@ -668,6 +678,56 @@ ApplicationWindow {
                         text: qsTr("Le tempéré est la référence. Les autres sonnent plus juste par endroits, et faux ailleurs.")
                     }
 
+                    // La note de reference : sans elle, un accordage non egal ne veut rien dire. Elle n'apparait
+                    // donc que quand l'accordage en a besoin.
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.topMargin: 4
+                        spacing: 6
+                        visible: ExerciseController.temperament !== 0
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#e8dcff"
+                            font.pixelSize: 13
+                            text: qsTr("Note de référence")
+                        }
+
+                        ComboBox {
+                            Layout.fillWidth: true
+                            model: ExerciseController.tuningRoots
+                            currentIndex: ExerciseController.tuningRoot
+                            onActivated: ExerciseController.setTuningRoot(index)
+
+                            contentItem: Text {
+                                text: parent.displayText
+                                color: "#ffffff"
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 10
+                            }
+
+                            delegate: ItemDelegate {
+                                width: parent.width
+
+                                contentItem: Text {
+                                    text: modelData
+                                    color: "#e8dcff"
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                            }
+
+                            background: Rectangle {
+                                color: "#1b1035"
+                                radius: 8
+                                border.width: 1
+                                border.color: "#5c4a80"
+                            }
+
+                        }
+
+                    }
+
                 }
 
                 // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
@@ -741,6 +801,16 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 90
 
+                            // La clef de Sol. Un simple glyphe : c'est le point de repere, et il sera
+                            // probablement configurable plus tard pour les exercices de solfege.
+                            Text {
+                                x: 2
+                                y: -2
+                                text: "\uD834\uDD1E"
+                                color: "#cbb8e8"
+                                font.pixelSize: 40
+                            }
+
                             Repeater {
                                 model: 5
 
@@ -762,9 +832,10 @@ ApplicationWindow {
                                 width: 18
                                 height: 18
                                 radius: 9
+                                visible: MicrophoneController.detectedFrequencyHz > 0
                                 color: mainWindow.tuningColor()
                                 x: parent.width / 2 - width / 2
-                                y: parent.height * (1 - MicrophoneController.detectedPitchRatio) - height / 2
+                                y: parent.height * (1 - mainWindow.staffY(MicrophoneController.detectedMidi)) - height / 2
 
                                 Behavior on y {
                                     NumberAnimation {

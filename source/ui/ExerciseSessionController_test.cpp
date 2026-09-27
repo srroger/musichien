@@ -711,6 +711,16 @@ TEST( ExerciseSessionControllerTest, the_tuning_is_remembered_and_stays_in_range
 
     // And the names a screen shows come from the domain, one per temperament.
     EXPECT_EQ( static_cast<int>( domain::TEMPERAMENT_NAMES.size() ), controller.temperaments().size() );
+
+    // The root the tuning is heard from is remembered too, and it is a pitch class - C is 0, G is 7.
+    controller.setTuningRoot( 7 );
+
+    EXPECT_EQ( 7, controller.tuningRoot() );
+    EXPECT_EQ( 7, levelStore.storedTuningRoot().pitchClassIndex() );
+
+    controller.setTuningRoot( 99 );
+
+    EXPECT_EQ( 7, controller.tuningRoot() );
 }
 
 }    // namespace musichien::ui

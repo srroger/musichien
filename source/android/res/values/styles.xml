@@ -32,6 +32,13 @@
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
 
         <!--
+            Refuse the edge-to-edge ENFORCEMENT that Android 15 (API 35) imposes on apps targeting 35+. With it, the
+            system ignores statusBarColor and draws the bar transparent; opting out makes the two colour items above
+            work again. It is deprecated and will disappear one day, but until then it is the simplest honest fix.
+        -->
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+
+        <!--
             And the ICONS themselves, which the XML can no longer decide on its own from Android 15 onwards. They are
             forced at run time, from the Kotlin free side: see source/android/src/.../SystemBars.java, called by
             infrastructure/android/AndroidSystemBars.cpp as soon as the window exists.
