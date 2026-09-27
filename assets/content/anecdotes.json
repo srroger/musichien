@@ -1,0 +1,17 @@
+{
+  "jeu": "Musichien",
+  "role": "anecdotes",
+  "regle": "Un petit texte affiche pendant les temps calmes, facon ecran de chargement. Le champ 'type' vaut lore, astuce, acoustique, histoire ou theorie.",
+  "anecdotes": [
+    { "type": "acoustique", "texte": "Une octave, c'est une frequence doublee : 440 Hz pour le la, 880 Hz pour le la d'au-dessus. L'oreille les entend comme la MEME note, un etage plus haut." },
+    { "type": "theorie", "texte": "La quinte juste (do-sol) est le premier intervalle que le corps reconnait : c'est le rapport le plus simple apres l'octave, 3 sur 2." },
+    { "type": "astuce", "texte": "Pour retenir la quarte ascendante, pense aux premieres notes de la Marseillaise : elles montent d'une quarte." },
+    { "type": "lore", "texte": "Le chien Musichien n'entend pas mieux que toi : il s'entraine juste un peu tous les jours." },
+    { "type": "histoire", "texte": "Bach n'a jamais entendu un piano moderne : l'instrument de son temps, le clavecin, ne pouvait pas faire de nuances." },
+    { "type": "acoustique", "texte": "Le timbre d'un instrument, ce sont ses harmoniques : un saxophone et une flute jouent la meme note, mais pas le meme melange d'ondes." },
+    { "type": "theorie", "texte": "Le triton, la quarte augmentee, a longtemps ete appele diabolus in musica : sa tension sonnait si mal qu'on l'evitait." },
+    { "type": "astuce", "texte": "Chante l'intervalle avant de le nommer : la voix aide l'oreille a tenir la note." },
+    { "type": "histoire", "texte": "Le diapason a varie pendant des siecles : le la etait plus grave au temps de Mozart qu'aujourd'hui." },
+    { "type": "lore", "texte": "Une oreille ne se developpe pas en une nuit, mais chaque seance laisse une trace : c'est pour ca qu'on revient." }
+  ]
+}

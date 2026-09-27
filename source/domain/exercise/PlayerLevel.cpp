@@ -12,6 +12,9 @@ namespace
 // has the same length, the same lives and the same scoring whoever is playing.
 [[nodiscard]] SessionSettings defaultSessionSettings()
 {
+    // Le mode guide n'est PAS active par defaut : il arrive la ou il compte, apres deux erreurs de suite. Voir
+    // ExerciseSession::drawKind - la question suivante devient alors "ca monte ou ca descend ?", et c'est une aide,
+    // pas un reglage. Le champ reste la pour le jour ou un joueur voudra plus de questions guidees.
     return SessionSettings{};
 }
 
@@ -45,6 +48,36 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             // A wider grid, so that a player who knows every interval is not handed the answer by a grid of
             // six. Clamped by the palette, which holds twelve.
             settings.choiceCount = 8;
+            break;
+
+        case PlayerLevel::BeyondTheOctave:
+            // Les douze intervalles simples, PUIS les premiers composes : c'est ce que demande un joueur qui
+            // entend deja l'octave et veut savoir ce qu'il y a au-dessus.
+            //
+            // Les composes ne prennent pas de place nouvelle sur le cercle : ils se posent SUR la place de leur
+            // classe, en petit, ce qui est exactement ce qui rend les traits interessants.
+            settings.startingPaletteSize = 18;
+            settings.successesBeforeWidening = 2;
+            settings.choiceCount = 8;
+            break;
+
+        case PlayerLevel::Master:
+            // TOUTE la carte des le premier coup : les vingt-cinq intervalles que l'application connait, du
+            // simple a la quinzieme - deux octaves pleines.
+            //
+            // La palette n'a plus rien a elargir, et c'est le domaine lui-meme qui s'en charge : widenPalette
+            // s'arrete quand tout est en jeu. Elle n'a surtout rien a RETRECIR, ce qui est le vrai piege de ce
+            // niveau : narrowPalette ne descend jamais sous la taille de depart, et une grille qui se vide sur
+            // une erreur ne serait plus la carte entiere que ce mode promet.
+            settings.startingPaletteSize = SUPPORTED_INTERVAL_COUNT;
+
+            // Les vingt-cinq, donc : plus de leurres choisis dans le voisinage, plus rien a eliminer. Le joueur
+            // entend un intervalle et il le NOMME, sur une carte complete. C'est tout l'interet, et c'est aussi
+            // ce qui rend le mode mesurable : aucune question ne peut etre reussie par deducation.
+            settings.choiceCount = SUPPORTED_INTERVAL_COUNT;
+
+            // Aucune aide : ni l'indice qui souffle, ni le bouton qui donne la reponse.
+            settings.aidsAllowed = false;
             break;
     }
 

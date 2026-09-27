@@ -66,6 +66,17 @@ struct SessionSettings
     // discouraged, and the hint is a nudge where the "Réponse" button is a rescue.
     std::int32_t wrongAttemptsBeforeHint{ 1 };
 
+    // Whether the two aids are offered at all: the hint that nudges on the first mistake, and the button
+    // that gives the answer away after three.
+    //
+    // ONE flag for both, because "no aid" is one decision and not two: a mode where the player measures
+    // himself against the whole palette cannot afford either. Cutting only one of them would leave the
+    // other to give away the same answer.
+    //
+    // It is a RULE and not a setting of the screen, which is why it lives here with the others: the day
+    // the rules move to a data file, "Master offers no help" is a line of that file, not a line of QML.
+    bool aidsAllowed{ true };
+
     // Lives of the session. Empty means no limit: it is what the training mode of the first version
     // will use. The first playable loop keeps it finite, because a rule nobody can feel is a rule
     // nobody can judge.
@@ -103,6 +114,13 @@ struct SessionSettings
     std::int32_t descendingShare{ 30 };
     std::int32_t harmonicShare{ 20 };
 
+    // Share of questions, in percent, that ask the DIRECTION instead of the interval: "does it go up or down?".
+    //
+    // ZERO by default, so that the original game is untouched unless it is asked for. This is the guided mode of
+    // the next step, and it is a RULE like the rest - a share the settings can set to fifty, never a flag the
+    // screen flips.
+    std::int32_t directionQuestionShare{ 0 };
+
     // Silence left between the two notes of a question, as heard.
     //
     // A musical value rather than a technical one: too short and the two notes sound like one glide,
@@ -111,9 +129,23 @@ struct SessionSettings
     std::chrono::milliseconds melodicGap{ 300 };
 };
 
+// What a question asks the player.
+//
+// The original game asks for the NAME of an interval. The guided mode asks for the DIRECTION: the interval is
+// played, and the player only has to say whether it went up or down - a smaller question, but the one a beginner
+// answers first.
+enum class QuestionKind
+{
+    NamedInterval,
+    Direction
+};
+
 // A question, as the screen needs it.
 struct Question
 {
+    // What the question asks. The screen reads it to know whether to show the circle or the two directions.
+    QuestionKind kind{ QuestionKind::NamedInterval };
+
     // The note the interval is played from.
     std::int32_t rootMidiNumber{ 60 };
 
@@ -191,6 +223,12 @@ public:
     // A wrong answer does not end the question: it is asked again, which is how one gets to try.
     bool answer( std::int32_t p_semitones );
 
+    // The player says which way the interval went, on a guided question. Returns whether it was right.
+    //
+    // Refused on a question that asked for a name: the two answers are different languages, and accepting a
+    // direction where an interval was expected would let a lucky tap score by accident.
+    bool answerDirection( IntervalDirection p_direction );
+
     // The player gave up on this question and asked to see the answer. Worth nothing, and it costs
     // nothing: help is not a mistake.
     void revealAnswer();
@@ -206,6 +244,13 @@ public:
 private:
     // Builds the next question from the palette, the settings and the engine.
     [[nodiscard]] Question buildQuestion();
+
+    // Whether the next question asks for a name or a direction, drawn from the settings.
+    [[nodiscard]] QuestionKind drawKind();
+
+    // What a right or a wrong answer produces, whatever its form: the score moves, the palette widens or the grid
+    // closes in, and the question passes to feedback or the session ends.
+    bool resolveAnswer( bool p_isCorrect, std::optional<Interval> p_answer );
 
     // An interval of the palette, drawn evenly.
     [[nodiscard]] Interval drawTarget();
@@ -225,6 +270,13 @@ private:
     SessionSettings m_settings;
     std::vector<Interval> m_palette;
     SessionScore m_score;
+
+    // Wrong answers in a row. Two of them, and the next question becomes a guided one - a smaller question the
+    // player can still answer, which is help that does not announce itself.
+    //
+    // Declared BEFORE m_currentQuestion, and that order is not decorative: buildQuestion() reads it while it
+    // initialises m_currentQuestion, so it must already exist.
+    std::size_t m_consecutiveErrors{ 0 };
 
     Question m_currentQuestion;
     SessionState m_state{ SessionState::Asking };

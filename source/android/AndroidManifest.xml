@@ -46,6 +46,22 @@
     -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!--
+      The daily reminder is a notification, and on Android 13 and later a notification can only be shown if the
+      application has asked. POST_NOTIFICATIONS is that permission: a dialog, once, that the player can refuse -
+      and refusing it simply means "no reminder", never anything else. It reaches no file, no camera, no
+      microphone, no location, no network.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      The singing exercise reads the microphone through Qt Multimedia. RECORD_AUDIO is a RUNTIME permission on
+      Android: the declaration below only makes the dialog possible, and the application asks for it with
+      QCoreApplication::requestPermission at the exact moment the player starts the microphone test - never at
+      launch, never for nothing. Refusing it simply means "no singing exercise", nothing else.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- %%INSERT_FEATURES -->
 
     <supports-screens
@@ -82,6 +98,10 @@
                 android:name="android.app.arguments"
                 android:value="-- %%INSERT_APP_ARGUMENTS%% --" />
         </activity>
+
+        <receiver
+            android:name=".ReminderReceiver"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

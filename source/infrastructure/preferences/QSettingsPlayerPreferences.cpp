@@ -20,6 +20,19 @@ constexpr const char * LEVEL_KEY = "player/level";
 // adding an instrument to the end cannot silently shift the others.
 constexpr const char * INSTRUMENTS_KEY = "player/instruments";
 
+// The profile: a name and an experience total. Both stored as readable text, like every other preference.
+constexpr const char * NAME_KEY = "player/name";
+
+constexpr const char * EXPERIENCE_KEY = "player/experience";
+
+// The statistics page, in two numbers: how many sessions were played, and how many earned their star.
+constexpr const char * SESSIONS_KEY = "player/sessions";
+
+constexpr const char * STARS_KEY = "player/stars";
+
+// The daily reminder.
+constexpr const char * REMINDER_KEY = "player/reminder";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -76,6 +89,66 @@ void QSettingsPlayerPreferences::storeEnabledInstruments( std::vector<bool> p_en
     QSettings settings;
 
     settings.setValue( INSTRUMENTS_KEY, storedFlags );
+}
+
+std::string QSettingsPlayerPreferences::playerName() const
+{
+    return QSettings{}.value( NAME_KEY ).toString().toStdString();
+}
+
+void QSettingsPlayerPreferences::storePlayerName( std::string p_name )
+{
+    QSettings settings;
+
+    settings.setValue( NAME_KEY, QString::fromStdString( p_name ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::totalExperience() const
+{
+    return static_cast<std::int64_t>( QSettings{}.value( EXPERIENCE_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeTotalExperience( std::int64_t p_total )
+{
+    QSettings settings;
+
+    settings.setValue( EXPERIENCE_KEY, static_cast<qlonglong>( p_total ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::sessionCount() const
+{
+    return static_cast<std::int64_t>( QSettings{}.value( SESSIONS_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeSessionCount( std::int64_t p_count )
+{
+    QSettings settings;
+
+    settings.setValue( SESSIONS_KEY, static_cast<qlonglong>( p_count ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::starCount() const
+{
+    return static_cast<std::int64_t>( QSettings{}.value( STARS_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeStarCount( std::int64_t p_count )
+{
+    QSettings settings;
+
+    settings.setValue( STARS_KEY, static_cast<qlonglong>( p_count ) );
+}
+
+bool QSettingsPlayerPreferences::dailyReminderEnabled() const
+{
+    return QSettings{}.value( REMINDER_KEY, false ).toBool();
+}
+
+void QSettingsPlayerPreferences::storeDailyReminderEnabled( bool p_enabled )
+{
+    QSettings settings;
+
+    settings.setValue( REMINDER_KEY, p_enabled );
 }
 
 }    // namespace musichien::infrastructure

@@ -13,10 +13,17 @@
 musichienFunction_AddLibrary(infrastructure
     audio/QAudioNotePlayer.h
     audio/QAudioNotePlayer.cpp
+    audio/NullPitchDetector.h
+    audio/QAudioPitchDetector.h
+    audio/QAudioPitchDetector.cpp
     content/JsonHintBook.h
     content/JsonHintBook.cpp
+    content/JsonAnecdoteBook.h
+    content/JsonAnecdoteBook.cpp
     haptics/DeviceHaptics.h
     haptics/DeviceHaptics.cpp
+    notifications/NotificationScheduler.h
+    notifications/NullNotificationScheduler.h
     preferences/QSettingsPlayerPreferences.h
     preferences/QSettingsPlayerPreferences.cpp
 )
@@ -33,6 +40,14 @@ target_link_libraries(musichien_infrastructure PUBLIC
 )
 
 set_target_properties(musichien_infrastructure PROPERTIES FOLDER "infrastructure")
+
+# ---------------------------------------------------------------------------------------------------------------------
+# La vraie planification des rappels, compilee seulement sur Android : elle parle a AlarmManager par JNI, et elle
+# n'a rien a faire - ni a compiler - sur le bureau, ou le port "rien" est celui qui compte.
+# ---------------------------------------------------------------------------------------------------------------------
+if(ANDROID)
+    target_sources(musichien_infrastructure PRIVATE notifications/AndroidNotificationScheduler.cpp)
+endif()
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Unit tests

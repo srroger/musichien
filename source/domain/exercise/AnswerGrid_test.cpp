@@ -210,4 +210,98 @@ TEST( AnswerGridTest, a_grid_asking_for_one_choice_still_offers_two )
     EXPECT_EQ( AnswerGrid::MINIMUM_CHOICE_COUNT, choices.size() );
 }
 
+TEST( AnswerGridTest, the_grid_is_laid_out_in_circle_of_fifths_order )
+{
+    // Roger : "les intervalles places au bon endroit du cercle". La position d'un bouton doit vouloir dire
+    // quelque chose, et elle ne le peut que si elle ne change jamais : c'est ce que ce test protege.
+    //
+    // Une quinte fait sept demi-tons, donc l'ordre attendu est do, sol, re, la, mi, si, fa diese...
+    const std::vector<Interval> palette{ Interval{ 0 }, Interval{ 1 }, Interval{ 2 }, Interval{ 3 }, Interval{ 4 }, Interval{ 5 }, Interval{ 6 }, Interval{ 7 }, Interval{ 8 }, Interval{ 9 }, Interval{ 10 }, Interval{ 11 }, Interval{ 12 } };
+
+    // Plusieurs tirages : un ordre qui ne tient qu'avec une graine serait un ordre qui ne tient pas.
+    for( std::uint32_t seed = 1; seed <= 20; ++seed )
+    {
+        std::mt19937 randomEngine{ seed };
+
+        const std::vector<Interval> choices = AnswerGrid::build( palette, Interval{ 7 }, 6, randomEngine );
+
+        std::vector<std::int32_t> positions;
+
+        std::ranges::transform( choices, std::back_inserter( positions ), []( const Interval & p_choice ) {
+            return ( 7 * p_choice.intervalClass() ) % 12;
+        } );
+
+        EXPECT_TRUE( std::ranges::is_sorted( positions ) ) << "graine " << seed;
+    }
+}
+
+TEST( AnswerGridTest, a_choice_that_disappears_leaves_a_hole_and_moves_nothing )
+{
+    // La grille se resserre a chaque erreur : un leurre disparait. La place des AUTRES ne doit pas bouger d'un
+    // pouce - c'est toute la difference entre une carte et une liste, et c'est ce qui casse en silence si on
+    // range les boutons par position dans la liste plutot que par classe d'intervalle.
+    const std::vector<Interval> full{ Interval{ 7 }, Interval{ 4 } };
+    const std::vector<Interval> narrowed{ Interval{ 7 } };
+
+    const auto fullLayout = layoutOnCircle( full );
+    const auto narrowedLayout = layoutOnCircle( narrowed );
+
+    const std::size_t fifthSlot = circleOfFifthsSlot( Interval{ 7 } );
+    const std::size_t thirdSlot = circleOfFifthsSlot( Interval{ 4 } );
+
+    // Deux intervalles differents ne tombent jamais sur la meme case.
+    EXPECT_NE( fifthSlot, thirdSlot );
+
+    // La quinte est a la meme place dans les deux cas...
+    ASSERT_FALSE( fullLayout.at( fifthSlot ).empty() );
+    ASSERT_FALSE( narrowedLayout.at( fifthSlot ).empty() );
+    EXPECT_EQ( 7, narrowedLayout.at( fifthSlot ).front().semitones() );
+
+    // ...et la tierce laisse simplement sa case VIDE.
+    EXPECT_FALSE( fullLayout.at( thirdSlot ).empty() );
+    EXPECT_TRUE( narrowedLayout.at( thirdSlot ).empty() );
+}
+
+TEST( AnswerGridTest, a_compound_stays_glued_to_its_simple_on_the_same_place )
+{
+    // Une seconde majeure et une neuvieme majeure sont la MEME couleur : leur classe est la meme, donc leur
+    // place sur le cercle est la meme. Et toutes les deux doivent y etre posees.
+    //
+    // C'est la difference entre une carte et une carte TRONQUEE : n'en montrer qu'une - en ecrasant l'autre -
+    // reviendrait a demander au joueur de designer la neuvieme la ou elle n'est pas affichee.
+    const Interval majorSecond{ 2 };
+    const Interval majorNinth{ 14 };
+
+    ASSERT_EQ( majorSecond.intervalClass(), majorNinth.intervalClass() );
+
+    const std::vector<Interval> choices{ majorNinth, majorSecond };
+
+    const auto layout = layoutOnCircle( choices );
+
+    const std::size_t slot = circleOfFifthsSlot( majorSecond );
+
+    ASSERT_EQ( 2U, layout.at( slot ).size() );
+
+    // Le simple d'abord, son compose colle juste derriere : la case a donc un sens de lecture constant, et le
+    // bouton du simple reste toujours de la meme extremite quelle que soit la question.
+    EXPECT_EQ( majorSecond.semitones(), layout.at( slot ).front().semitones() );
+    EXPECT_EQ( majorNinth.semitones(), layout.at( slot ).back().semitones() );
+}
+
+TEST( AnswerGridTest, a_class_holds_every_octave_of_it_in_one_place )
+{
+    // La classe zero est le cas extreme : l'unisson, l'octave et la quinzieme sont la MEME note a une ou deux
+    // octaves pres, et trois intervalles distincts. Une seule place, et les trois dessus.
+    const std::vector<Interval> choices{ Interval{ 24 }, Interval{ 0 }, Interval{ 12 } };
+
+    const auto layout = layoutOnCircle( choices );
+
+    const auto & slot = layout.at( circleOfFifthsSlot( Interval{ 0 } ) );
+
+    ASSERT_EQ( 3U, slot.size() );
+    EXPECT_EQ( 0, slot.at( 0 ).semitones() );
+    EXPECT_EQ( 12, slot.at( 1 ).semitones() );
+    EXPECT_EQ( 24, slot.at( 2 ).semitones() );
+}
+
 }    // namespace musichien::domain

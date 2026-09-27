@@ -27,9 +27,22 @@ Question ExerciseSession::buildQuestion()
 
     question.target = drawTarget();
 
-    // The direction is drawn BEFORE the root, because the root depends on it: the room an interval
-    // needs is on one side or the other.
-    question.direction = drawDirection();
+    question.kind = drawKind();
+
+    if( question.kind == QuestionKind::Direction )
+    {
+        // Le mode guide demande "ca monte ou ca descend ?" : un intervalle harmonique n'a pas de sens a ce
+        // moment-la, donc il est sorti du tirage.
+        question.direction = ( std::uniform_int_distribution<std::int32_t>{ 0, 1 }( m_randomEngine ) == 0 )
+                               ? IntervalDirection::Ascending
+                               : IntervalDirection::Descending;
+    }
+    else
+    {
+        // The direction is drawn BEFORE the root, because the root depends on it: the room an interval
+        // needs is on one side or the other.
+        question.direction = drawDirection();
+    }
 
     question.rootMidiNumber = drawRootMidiNumber( question.target, question.direction );
 
@@ -145,12 +158,41 @@ bool ExerciseSession::answer( std::int32_t p_semitones )
         return false;
     }
 
-    const bool isCorrect = ( p_semitones == m_currentQuestion.target.semitones() );
+    return resolveAnswer( p_semitones == m_currentQuestion.target.semitones(),
+                          intervalFromSemitones( p_semitones ) );
+}
 
-    m_lastAnswer = intervalFromSemitones( p_semitones );
-    m_lastAnswerWasCorrect = isCorrect;
+bool ExerciseSession::answerDirection( IntervalDirection p_direction )
+{
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::Direction ) )
+    {
+        // A direction where a name was expected is a different language: it changes nothing.
+        return false;
+    }
 
-    if( isCorrect )
+    return resolveAnswer( p_direction == m_currentQuestion.direction, std::nullopt );
+}
+
+QuestionKind ExerciseSession::drawKind()
+{
+    if( m_settings.directionQuestionShare <= 0 )
+    {
+        // The guided mode is OFF by default: the original game is what a fresh session asks.
+        return QuestionKind::NamedInterval;
+    }
+
+    std::uniform_int_distribution<std::int32_t> distribution{ 0, 99 };
+
+    return ( distribution( m_randomEngine ) < m_settings.directionQuestionShare ) ? QuestionKind::Direction
+                                                                                  : QuestionKind::NamedInterval;
+}
+
+bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p_answer )
+{
+    m_lastAnswer = p_answer;
+    m_lastAnswerWasCorrect = p_isCorrect;
+
+    if( p_isCorrect )
     {
         m_score.registerSuccess( m_currentQuestion.replayCount, m_currentQuestion.wrongAttemptCount );
 
@@ -171,6 +213,16 @@ bool ExerciseSession::answer( std::int32_t p_semitones )
     }
 
     ++m_currentQuestion.wrongAttemptCount;
+
+    ++m_consecutiveErrors;
+
+    if( ( m_consecutiveErrors >= 2 ) && ( m_currentQuestion.direction != IntervalDirection::Harmonic ) )
+    {
+        // Deux erreurs de suite : la question EN COURS bascule en mode guide, comme un indice. Le joueur n'a plus
+        // qu'a dire si ca monte ou ca descend - une question plus petite, a laquelle il sait encore repondre. Un
+        // intervalle harmonique n'a ni monte ni descend, donc il reste tel quel.
+        m_currentQuestion.kind = QuestionKind::Direction;
+    }
 
     m_score.registerError();
 
@@ -234,6 +286,10 @@ void ExerciseSession::advance()
 
     m_currentQuestion = buildQuestion();
 
+    // Le compteur d'erreurs vaut pour la question qui VENAIT d'etre posee : deux erreurs dessus, et la suivante -
+    // celle qui vient d'etre construite - a ete tiree guidee. On repart de zero pour celle-ci.
+    m_consecutiveErrors = 0;
+
     m_lastAnswer.reset();
     m_lastAnswerWasCorrect = false;
 
@@ -246,12 +302,16 @@ bool ExerciseSession::isHintAvailable() const noexcept
     // choosing AND after the answer is known, where it becomes "that is how you could have remembered
     // it". It appears on the first mistake and stays for the rest of the question, because a new
     // question brings a new Question with a count back at zero.
-    return m_currentQuestion.wrongAttemptCount >= m_settings.wrongAttemptsBeforeHint;
+    //
+    // A mode that offers no aid at all cuts it here, at the source: nothing on the screen has to know
+    // that such a mode exists, and no screen can forget to check.
+    return m_settings.aidsAllowed
+           && ( m_currentQuestion.wrongAttemptCount >= m_settings.wrongAttemptsBeforeHint );
 }
 
 bool ExerciseSession::isHelpAvailable() const noexcept
 {
-    return ( m_state == SessionState::Asking )
+    return m_settings.aidsAllowed && ( m_state == SessionState::Asking )
            && ( m_currentQuestion.wrongAttemptCount >= m_settings.wrongAttemptsBeforeHelp );
 }
 

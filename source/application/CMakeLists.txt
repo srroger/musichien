@@ -21,11 +21,33 @@ qt_add_executable(musichien_app
     ${MUSICHIEN_QML_RESOURCE_FILE}
 )
 
+# Les QML eux-memes, par qt_add_resources : AUTORCC ne suit que le .qrc et laisserait un QML modifie hors du build.
+# Voir le long commentaire de source/ui/CMakeLists.txt, et celui du test qui charge cet ecran.
+set_source_files_properties(${MUSICHIEN_QML_ABSOLUTE_FILES}
+    PROPERTIES QT_RESOURCE_ALIAS "${MUSICHIEN_QML_ALIASES}")
+
+qt_add_resources(musichien_app "qml-resources"
+    PREFIX "/"
+    FILES ${MUSICHIEN_QML_ABSOLUTE_FILES}
+)
+
 musichienFunction_ConfigureTarget(musichien_app)
 
 # The union of the QML file list and the resource file makes CMake and the IDE aware of every
-# displayed file, so that a change in a .qml file triggers a rebuild of the resources.
+# displayed file.
 target_sources(musichien_app PRIVATE ${MUSICHIEN_QML_FILES})
+
+# ---------------------------------------------------------------------------------------------------------------------
+# A changed QML file must rebuild the RESOURCE, and not only the target
+#
+# Listing the QML files as sources of the executable - the line above - looks like it should be enough. It is not:
+# the resource is a C++ file carrying the CONTENT of the QML, generated once, and CMake has no reason to regenerate
+# it because the .qml changed. The build succeeds, the application starts, and the screen is the one from before
+# the change.
+#
+# What fixes it lives in source/ui/CMakeLists.txt, next to the resource itself: a build target that touches the
+# .qrc whenever a QML changes, which is the only event AUTORCC reacts to.
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 # QML import scanning - what makes the Android package able to start

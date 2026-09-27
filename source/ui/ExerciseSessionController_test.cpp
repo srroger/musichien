@@ -2,6 +2,7 @@
 
 #include "domain/audio/NotePlayerFake.h"
 
+#include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -289,6 +290,7 @@ TEST( ExerciseSessionControllerTest, a_wrong_answer_is_heard_as_a_cue_and_felt )
     ExerciseSessionController controller{ notePlayer,
                                           ascendingOnlySettings(),
                                           {},
+                                          {},
                                           [&vibrationCount] { ++vibrationCount; } };
 
     controller.startSession();
@@ -306,6 +308,7 @@ TEST( ExerciseSessionControllerTest, a_correct_answer_neither_sounds_the_cue_nor
 
     ExerciseSessionController controller{ notePlayer,
                                           ascendingOnlySettings(),
+                                          {},
                                           {},
                                           [&vibrationCount] { ++vibrationCount; } };
 
@@ -407,7 +410,7 @@ TEST( ExerciseSessionControllerTest, a_level_decides_where_the_sessions_start )
     domain::NotePlayerFake notePlayer;
     domain::PlayerPreferencesFake levelStore;
 
-    ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
     // Nothing chosen yet, and that is a question to ask - not a default to assume.
     EXPECT_FALSE( controller.hasChosenLevel() );
@@ -435,7 +438,7 @@ TEST( ExerciseSessionControllerTest, a_remembered_level_is_there_at_start_up )
     levelStore.storeLevel( domain::PlayerLevel::Advanced );
 
     // No choosePlayerLevel call at all: the application opens on what it remembers.
-    ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
     EXPECT_TRUE( controller.hasChosenLevel() );
     EXPECT_EQ( static_cast<int>( domain::PlayerLevel::Advanced ), controller.playerLevel() );
@@ -446,7 +449,7 @@ TEST( ExerciseSessionControllerTest, a_level_changes_the_palette_and_nothing_els
     domain::NotePlayerFake notePlayer;
     domain::PlayerPreferencesFake levelStore;
 
-    ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
     controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Beginner ) );
     controller.startSession();
@@ -492,6 +495,189 @@ TEST( ExerciseSessionControllerTest, the_levels_to_offer_are_ready_to_display )
         EXPECT_EQ( index, level.value( "index" ).toInt() );
         EXPECT_FALSE( level.value( "name" ).toString().isEmpty() );
     }
+}
+
+TEST( ExerciseSessionControllerTest, every_choice_is_on_the_circle_at_the_place_of_its_class )
+{
+    // Le bug que ce test surveille a coute une soiree de test a Roger : la carte ignorait silencieusement un
+    // intervalle quand un AUTRE de la meme classe occupait deja sa place. La question devenait alors impossible
+    // a repondre - le bouton affichait l'octave quand l'unisson etait demande - et rien n'echouait.
+    //
+    // La regle est donc verifiee pour CHAQUE intervalle offert, sur chaque question d'une session entiere, et
+    // non seulement pour la cible : tout ce que la session propose doit se retrouver sur la carte.
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    controller.startSession();
+
+    for( int question = 0; question < static_cast<int>( SESSION_QUESTION_COUNT ); ++question )
+    {
+        const QVariantList positions = controller.gridPositions();
+
+        ASSERT_EQ( domain::CIRCLE_OF_FIFTHS_SLOT_COUNT, static_cast<std::size_t>( positions.size() ) );
+
+        // Une place pleine porte un identifiant a montrer, et une place vide n'en porte pas. C'est la seule chose
+        // que l'ecran lira pour ecrire dans le bouton : si elle manque, l'ecran affiche des boutons vides - et
+        // rien ne le dit.
+        for( const QVariant & position : positions )
+        {
+            const QVariantMap map = position.toMap();
+
+            if( map.value( "isEmpty" ).toBool() )
+            {
+                continue;
+            }
+
+            EXPECT_FALSE( map.value( "identifier" ).toString().isEmpty() )
+              << "la place " << map.value( "slot" ).toInt() << " n'a pas d'identifiant a montrer. Cles : "
+              << QStringList{ map.keys() }.join( ", " ).toStdString();
+        }
+
+        // Est-ce que cet intervalle se trouve bien sur la place de sa classe ?
+        const auto isPlaced = [&positions]( std::int32_t p_semitones ) {
+            const auto slot = static_cast<int>( domain::circleOfFifthsSlot( domain::Interval{ p_semitones } ) );
+
+            for( const QVariant & position : positions )
+            {
+                const QVariantMap map = position.toMap();
+
+                if( ( map.value( "slot" ).toInt() == slot )
+                    && ( map.value( "semitones" ).toInt() == p_semitones ) )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        for( const QVariant & choice : controller.choices() )
+        {
+            const std::int32_t semitones = choice.toMap().value( "semitones" ).toInt();
+
+            EXPECT_TRUE( isPlaced( semitones ) ) << "l'intervalle de " << semitones << " demi-tons manque a sa place";
+        }
+
+        // La question est jouee jusqu'au verdict, pour que la suivante soit tiree a son tour.
+        answerCorrectly( controller );
+        controller.continueToNextQuestion();
+    }
+}
+
+TEST( ExerciseSessionControllerTest, a_place_holds_every_octave_of_its_class )
+{
+    // Le cas precis rapporte par Roger, et il est traitre parce qu'il n'arrive qu'avec les intervalles composes :
+    // quand l'unisson ET l'octave sont sur la table, ils visent la MEME place du cercle. La carte les ecrasait
+    // l'un par l'autre, et le joueur n'avait plus rien de juste a cliquer.
+    //
+    // Ce test CONSTRUIT la situation au lieu de l'attendre au hasard : la carte entiere, donc les trois octaves
+    // de la meme note sur la meme place.
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings = ascendingOnlySettings();
+
+    settings.startingPaletteSize = domain::SUPPORTED_INTERVAL_COUNT;
+    settings.choiceCount = domain::SUPPORTED_INTERVAL_COUNT;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+
+    // L'unisson, l'octave et la quinzieme sont la meme note a une ou deux octaves pres : une seule place.
+    const std::size_t unisonSlot = domain::circleOfFifthsSlot( domain::Interval{ 0 } );
+
+    ASSERT_EQ( unisonSlot, domain::circleOfFifthsSlot( domain::Interval{ 12 } ) );
+    ASSERT_EQ( unisonSlot, domain::circleOfFifthsSlot( domain::Interval{ 24 } ) );
+
+    // Les trois boutons de cette place, dans l'ordre ou l'ecran les empile.
+    std::vector<std::int32_t> stacked;
+
+    for( const QVariant & position : controller.gridPositions() )
+    {
+        const QVariantMap map = position.toMap();
+
+        if( map.value( "slot" ).toInt() == static_cast<int>( unisonSlot ) )
+        {
+            stacked.push_back( map.value( "semitones" ).toInt() );
+
+            // Et chacun sait combien ils sont et ou il se place : c'est ce qui permet a l'ecran de les repartir
+            // sans rien savoir de la musique.
+            EXPECT_EQ( 3, map.value( "stackSize" ).toInt() );
+        }
+    }
+
+    ASSERT_EQ( 3U, stacked.size() );
+    EXPECT_EQ( 0, stacked.at( 0 ) );
+    EXPECT_EQ( 12, stacked.at( 1 ) );
+    EXPECT_EQ( 24, stacked.at( 2 ) );
+}
+
+TEST( ExerciseSessionControllerTest, a_guided_question_reports_its_kind_and_takes_a_direction )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings = ascendingOnlySettings();
+    settings.directionQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+
+    // Le mode guide est annonce a l'ecran...
+    EXPECT_EQ( 1, controller.questionKind() );
+
+    // ...et une reponse par direction est acceptee sans erreur, quelle qu'en soit la justesse.
+    controller.answerDirection( 0 );
+}
+
+TEST( ExerciseSessionControllerTest, the_session_experience_joins_the_profile_total_at_the_end )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake store;
+
+    domain::SessionSettings settings = ascendingOnlySettings();
+
+    settings.questionCount = 2;
+
+    ExerciseSessionController controller{ notePlayer, settings, {}, {}, {}, &store };
+
+    controller.startSession();
+
+    // Deux questions jouees jusqu'au bout, toutes les deux justes.
+    while( !controller.isFinished() )
+    {
+        answerCorrectly( controller );
+        controller.continueToNextQuestion();
+    }
+
+    // Le total du profil a recu l'experience de la session, une fois et pas deux.
+    EXPECT_GT( store.totalExperience(), 0 );
+
+    // Et la session a ete comptee, une fois.
+    EXPECT_EQ( 1, store.sessionCount() );
+}
+
+TEST( ExerciseSessionControllerTest, the_infinite_mode_has_no_lives )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    controller.startInfiniteSession();
+
+    // Le mode infini, c'est exactement cela : aucune vie, donc aucune fin - juste enchainer.
+    EXPECT_TRUE( controller.hasUnlimitedLives() );
+}
+
+TEST( ExerciseSessionControllerTest, the_survival_mode_keeps_its_lives )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    controller.startSurvivalSession();
+
+    // Le survival, c'est l'arcade avec des vies : on garde celles du niveau, et la partie finit quand elles
+    // tombent a zero.
+    EXPECT_FALSE( controller.hasUnlimitedLives() );
 }
 
 }    // namespace musichien::ui

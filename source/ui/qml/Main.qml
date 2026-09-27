@@ -52,6 +52,20 @@ ApplicationWindow {
         feedbackTimer.restart();
     }
 
+    // Combien de temps avant la prochaine notification, en "X h MM". Lu par la page de profil ; l'heure vient du
+    // controleur, pas du QML - une heure qui existe deux fois est une heure qui derive.
+    function reminderCountdown() {
+        var now = new Date();
+        var next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), ExerciseController.reminderHour, ExerciseController.reminderMinute, 0);
+        if (next <= now)
+            next.setDate(next.getDate() + 1);
+
+        var minutes = Math.round((next - now) / 60000);
+        var hours = Math.floor(minutes / 60);
+        var rest = minutes % 60;
+        return hours + " h " + (rest < 10 ? "0" : "") + rest;
+    }
+
     // Plays the interval at a given distance, then reveals the feedback.
     // The distance is all this screen knows how to say about an interval: it never names one, never
     // decides whether one is simple or compound, and never builds one. It asks, then it displays what
@@ -83,6 +97,9 @@ ApplicationWindow {
         return qsTr("%1 octaves plus haut").arg(p_octaveSpan);
     }
 
+    // Une anecdote par ouverture, comme les ecrans de chargement d'autrefois : un petit texte qui change et qui
+    // donne a lire. Tiree au hasard dans le fichier de contenu, jamais ecrite en dur ici.
+    Component.onCompleted: ExerciseController.refreshAnecdote()
     width: 420
     height: 820
     minimumWidth: 320
@@ -160,6 +177,22 @@ ApplicationWindow {
                     wrapMode: Text.WordWrap
                 }
 
+                // L'anecdote du chargement, sous le sous-titre : c'est la qu'elle se lit, et fillWidth + WordWrap
+                // borne sa largeur a celle de la page - sans cela un texte long pousse les boutons vers la droite.
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    text: ExerciseController.anecdoteText
+                    color: "#8a77ad"
+                    font.pixelSize: 13
+                    font.italic: true
+                    wrapMode: Text.WordWrap
+                    visible: ExerciseController.anecdoteText !== ""
+                }
+
                 Item {
                     Layout.preferredHeight: 8
                 }
@@ -175,9 +208,11 @@ ApplicationWindow {
                     text: ExerciseController.hasChosenLevel ? qsTr("Ton niveau") : qsTr("Pour commencer : tu en es où ?")
                 }
 
+                // Sur DEUX lignes : quatre niveaux ne tiennent plus sur une seule, et un bouton qu on ne peut pas
+                // atteindre est un bouton qui n existe pas.
                 Flow {
-                    Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
+                    Layout.alignment: Qt.AlignHCenter
                     spacing: 8
 
                     Repeater {
@@ -187,6 +222,7 @@ ApplicationWindow {
                             required property var modelData
 
                             text: modelData.name
+                            font.pixelSize: 13
                             // The chosen one stays marked, so that the screen never leaves any doubt about the
                             // level the next session will use.
                             highlighted: ExerciseController.playerLevel === modelData.index
@@ -210,6 +246,14 @@ ApplicationWindow {
                     onClicked: settingsDialog.open()
                 }
 
+                // La page du joueur : le nom, le total, les etoiles. Assis a cote des instruments, parce que c'est
+                // la que l'on trouve ce qui est a soi.
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: qsTr("Profil…")
+                    onClicked: profileDialog.open()
+                }
+
                 Button {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
@@ -217,6 +261,22 @@ ApplicationWindow {
                     highlighted: true
                     text: qsTr("Jouer")
                     onClicked: ExerciseController.startSession()
+                }
+
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 48
+                    text: qsTr("Mode infini")
+                    onClicked: ExerciseController.startInfiniteSession()
+                }
+
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 48
+                    text: qsTr("Survie")
+                    onClicked: ExerciseController.startSurvivalSession()
                 }
 
                 Item {
@@ -446,38 +506,309 @@ ApplicationWindow {
 
         anchors.centerIn: parent
         width: Math.min(mainWindow.width * 0.9, 420)
-        title: qsTr("Instruments joues")
+        // La popup s'adapte a son contenu, et se borne seulement quand il ne tient pas : plus d'espace vide en bas,
+        // et le defilement prend le relais quand il y a trop a montrer.
+        height: Math.min(mainWindow.height * 0.9, settingsColumn.implicitHeight + 32)
         modal: true
+        padding: 16
+
+        // Un fond sombre, et pas la feuille blanche du systeme : cette page fait partie du jeu, et le
+        // blanc de l’application systeme jurait au milieu du bleu nuit.
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        contentItem: ScrollView {
+            id: settingsScroll
+
+            clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+            ColumnLayout {
+                id: settingsColumn
+
+                width: settingsScroll.availableWidth
+                spacing: 8
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Le tirage se fait au hasard parmi les instruments coches.")
+                }
+
+                Repeater {
+                    model: ExerciseController.instruments
+
+                    delegate: CheckBox {
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        text: modelData.name
+                        checked: modelData.enabled
+                        onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+
+                        // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre. Le leftPadding
+                        // remet le texte a droite de la case, sinon il se pose par-dessus l'indicateur.
+                        contentItem: Text {
+                            text: parent.text
+                            color: "#e8dcff"
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: parent.indicator.width + parent.spacing
+                            font.pixelSize: 15
+                        }
+
+                    }
+
+                }
+
+                CheckBox {
+                    Layout.fillWidth: true
+                    text: qsTr("Un rappel chaque jour")
+                    checked: ExerciseController.dailyReminderEnabled
+                    onClicked: ExerciseController.setDailyReminderEnabled(checked)
+
+                    contentItem: Text {
+                        text: parent.text
+                        color: "#e8dcff"
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: parent.indicator.width + parent.spacing
+                        font.pixelSize: 15
+                    }
+
+                }
+
+                // Le compte a rebours, juste sous la case qui l'active : impossible de le manquer, et c'est la que le
+                // joueur le cherche.
+                Text {
+                    Layout.fillWidth: true
+                    color: "#8ef2b0"
+                    font.pixelSize: 13
+                    visible: ExerciseController.dailyReminderEnabled
+                    text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
+                }
+
+                // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
+                // miniature au rythme de la voix - c'est l'affichage qu'aura la question chantee, expose ici d'abord.
+                Rectangle {
+                    id: microphonePanel
+
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    // Un Rectangle qui ne contient qu'un layout ancre n'a AUCUNE hauteur propre : ses enfants se
+                    // posaient les uns sur les autres. La hauteur vient donc du contenu, explicitement.
+                    Layout.preferredHeight: microphoneColumn.implicitHeight + 24
+                    color: "#2a1a46"
+                    radius: 8
+                    border.width: 1
+                    border.color: "#5c4a80"
+
+                    ColumnLayout {
+                        id: microphoneColumn
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 12
+                        spacing: 10
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#e8dcff"
+                            font.pixelSize: 14
+                            font.bold: true
+                            text: qsTr("Le micro")
+                        }
+
+                        ComboBox {
+                            Layout.fillWidth: true
+                            model: MicrophoneController.inputDeviceNames
+                            currentIndex: MicrophoneController.currentDeviceIndex
+                            onActivated: MicrophoneController.selectDevice(index)
+
+                            contentItem: Text {
+                                text: parent.displayText
+                                color: "#ffffff"
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 10
+                            }
+
+                            delegate: ItemDelegate {
+                                width: parent.width
+
+                                contentItem: Text {
+                                    text: modelData
+                                    color: "#e8dcff"
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                            }
+
+                            background: Rectangle {
+                                color: "#1b1035"
+                                radius: 8
+                                border.width: 1
+                                border.color: "#5c4a80"
+                            }
+
+                        }
+
+                        // La portee miniature : cinq lignes, une boule qui suit la hauteur. Le ratio est logarithmique,
+                        // donc la boule monte d'une octave pour un doublement de frequence, comme une vraie note.
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 90
+
+                            Repeater {
+                                model: 5
+
+                                delegate: Rectangle {
+                                    required property int index
+
+                                    x: 0
+                                    y: parent.height * (0.15 + index * 0.175)
+                                    width: parent.width
+                                    height: 1
+                                    color: "#5c4a80"
+                                }
+
+                            }
+
+                            Rectangle {
+                                id: pitchBall
+
+                                width: 18
+                                height: 18
+                                radius: 9
+                                color: MicrophoneController.isListening ? "#8ef2b0" : "#5c4a80"
+                                x: parent.width / 2 - width / 2
+                                y: parent.height * (1 - MicrophoneController.detectedPitchRatio) - height / 2
+
+                                Behavior on y {
+                                    NumberAnimation {
+                                        duration: 60
+                                        easing.type: Easing.OutQuad
+                                    }
+
+                                }
+
+                            }
+
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#8ef2b0"
+                            font.pixelSize: 15
+                            font.bold: true
+                            text: MicrophoneController.detectedNoteLabel
+                        }
+
+                        Button {
+                            Layout.alignment: Qt.AlignRight
+                            text: MicrophoneController.isListening ? qsTr("Arrêter") : qsTr("Tester le micro")
+                            onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
+                        }
+
+                    }
+
+                }
+
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    text: qsTr("Fermer")
+                    onClicked: settingsDialog.close()
+                }
+
+            }
+
+        }
+
+    }
+
+    // La page du joueur. Le personnage et les statistiques sont UNE SEULE page : un profil n'est pas un reglage, et
+    // des statistiques ne sont pas une personne - c'est la meme chose, regardee sous le nom qu'on lui a donne.
+    Dialog {
+        id: profileDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 420)
+        modal: true
+        padding: 16
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
 
         contentItem: ColumnLayout {
-            spacing: 8
+            spacing: 10
+
+            Text {
+                Layout.fillWidth: true
+                color: "#cbb8e8"
+                font.pixelSize: 16
+                text: qsTr("Ton profil")
+            }
+
+            TextField {
+                Layout.fillWidth: true
+                placeholderText: qsTr("Ton nom…")
+                text: ExerciseController.playerName
+                onEditingFinished: ExerciseController.setPlayerName(text)
+                // Le style Material ne connait pas le bleu nuit derriere lui : le texte restait noir sur sombre.
+                // La couleur est donc dite ici, comme pour les autres boutons de l'application.
+                color: "#ffffff"
+                placeholderTextColor: "#7a6a9e"
+
+                background: Rectangle {
+                    color: "#2a1a46"
+                    radius: 8
+                    border.width: 1
+                    border.color: "#5c4a80"
+                }
+
+            }
+
+            Text {
+                Layout.fillWidth: true
+                color: "#ffffff"
+                font.pixelSize: 16
+                font.bold: true
+                text: qsTr("%1 XP").arg(ExerciseController.totalExperience)
+            }
 
             Text {
                 Layout.fillWidth: true
                 color: "#cbb8e8"
                 font.pixelSize: 14
-                wrapMode: Text.WordWrap
-                text: qsTr("Le tirage se fait au hasard parmi les instruments coches.")
+                text: qsTr("%1 sessions · %2 étoiles").arg(ExerciseController.sessionCount).arg(ExerciseController.starCount)
             }
 
-            Repeater {
-                model: ExerciseController.instruments
+            Text {
+                Layout.fillWidth: true
+                color: "#8ef2b0"
+                font.pixelSize: 13
+                visible: ExerciseController.dailyReminderEnabled
+                text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
+            }
 
-                delegate: CheckBox {
-                    required property var modelData
-
-                    Layout.fillWidth: true
-                    text: modelData.name
-                    checked: modelData.enabled
-                    onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
-                }
-
+            Button {
+                Layout.alignment: Qt.AlignRight
+                text: qsTr("Tester la notification")
+                onClicked: ExerciseController.testReminder()
             }
 
             Button {
                 Layout.alignment: Qt.AlignRight
                 text: qsTr("Fermer")
-                onClicked: settingsDialog.close()
+                onClicked: profileDialog.close()
             }
 
         }

@@ -33,6 +33,26 @@ public:
     [[nodiscard]] std::vector<bool> storedEnabledInstruments() const override;
 
     void storeEnabledInstruments( std::vector<bool> p_enabledInstruments ) override;
+
+    [[nodiscard]] std::string playerName() const override;
+
+    void storePlayerName( std::string p_name ) override;
+
+    [[nodiscard]] std::int64_t totalExperience() const override;
+
+    void storeTotalExperience( std::int64_t p_total ) override;
+
+    [[nodiscard]] std::int64_t sessionCount() const override;
+
+    void storeSessionCount( std::int64_t p_count ) override;
+
+    [[nodiscard]] std::int64_t starCount() const override;
+
+    void storeStarCount( std::int64_t p_count ) override;
+
+    [[nodiscard]] bool dailyReminderEnabled() const override;
+
+    void storeDailyReminderEnabled( bool p_enabled ) override;
 };
 
 }    // namespace musichien::infrastructure

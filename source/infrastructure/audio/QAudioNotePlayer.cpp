@@ -6,6 +6,7 @@
 #include <QMediaDevices>
 
 #include <algorithm>
+#include <array>
 #include <format>
 #include <iostream>
 #include <iterator>
@@ -277,7 +278,12 @@ void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_
 
 const domain::SampledInstrument & QAudioNotePlayer::instrumentFor( std::span<const domain::Note> p_notes )
 {
-    const bool sameQuestion = ( p_notes.size() == m_lastPlayedNotes.size() ) && std::equal( p_notes.begin(), p_notes.end(), m_lastPlayedNotes.begin() );
+    // The same question is the same NOTES, whatever order the melody played them in: a falling fifth and its
+    // feedback chord share the same two notes. Comparing them as an ORDERED sequence would re-draw the instrument
+    // between the melody and the chord - the guitar turning into a saxophone in front of the player, which is
+    // exactly the bug Roger saw.
+    const bool sameQuestion = ( p_notes.size() == m_lastPlayedNotes.size() )
+                              && std::is_permutation( p_notes.begin(), p_notes.end(), m_lastPlayedNotes.begin() );
 
     if( !sameQuestion )
     {
@@ -303,6 +309,82 @@ void QAudioNotePlayer::playMistakeCue()
     // A short burst that replaces whatever was playing: a cue is a punctuation mark, and hearing it over
     // the interval it is commenting on would be confusing.
     playSamples( m_synthesizer->renderMistakeCue( domain::ToneSynthesizer::MISTAKE_CUE_DURATION ) );
+}
+
+void QAudioNotePlayer::playTapCue()
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // Une note aiguë TRÈS courte, rendue par la synthèse et non par un échantillon : 60 ms, là où une note
+    // échantillonnée dure 700 ms et porterait tout un timbre. Un clic de menu n'est pas un événement musical.
+    std::vector<float> samples =
+      m_synthesizer->renderNote( domain::Note{ 88 }, std::chrono::milliseconds{ 60 } );
+
+    // Et discret : c'est le volume d'un accusé de réception, pas celui d'une réponse. Assez pour être entendu,
+    // pas assez pour occuper l'oreille.
+    constexpr float TAP_GAIN = 0.22F;
+
+    for( float & sample : samples )
+    {
+        sample *= TAP_GAIN;
+    }
+
+    playSamples( std::move( samples ) );
+}
+
+void QAudioNotePlayer::playGreeting()
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // L'arpège, tel que Roger l'a décrit : "à la Zelda, montant, sur des degrés un peu éthérés".
+    //
+    // Do, sol, do : une quinte et une octave, aucune tierce. C'est exactement ce qui rend un accord ouvert - il
+    // n'y a pas de tierce pour dire majeur ou mineur, donc rien à comprendre, seulement quelque chose qui monte
+    // et qui flotte. Une tierce aurait été un accord ; ceci est un appel.
+    const std::array<domain::Note, 3> greetingNotes{ domain::Note{ 72 }, domain::Note{ 79 }, domain::Note{ 84 } };
+
+    // Un souffle entre les notes : sans lui, trois notes jouées bout à bout sonnent comme une seule note qui
+    // change de hauteur.
+    constexpr std::chrono::milliseconds GREETING_GAP{ 40 };
+
+    std::vector<float> samples;
+
+    const bool hasPiano = !m_instruments.empty();
+
+    if( hasPiano )
+    {
+        // Le PIANO et non le tirage au hasard : l'accueil doit être reconnaissable d'un lancement à l'autre, et
+        // c'est le premier instrument chargé.
+        samples = m_instruments.front().renderMelody( greetingNotes,
+                                                      noteDuration(),
+                                                      GREETING_GAP,
+                                                      m_audioFormat.sampleRate() );
+    }
+    else
+    {
+        samples = m_synthesizer->renderMelody( greetingNotes, noteDuration(), GREETING_GAP );
+    }
+
+    // Et surtout, DISCRET. C'est le volume qui répond au vrai reproche : au niveau des exercices, une
+    // introduction n'est plus une introduction, c'est une fanfare.
+    constexpr float GREETING_GAIN = 0.35F;
+
+    for( float & sample : samples )
+    {
+        sample *= GREETING_GAIN;
+    }
+
+    playSamples( std::move( samples ) );
 }
 
 }    // namespace musichien::infrastructure

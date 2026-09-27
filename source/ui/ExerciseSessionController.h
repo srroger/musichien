@@ -22,9 +22,12 @@
 
 #include "domain/audio/NotePlayer.h"
 #include "domain/audio/SampledInstrument.h"
+#include "domain/exercise/AnecdoteBook.h"
+#include "domain/exercise/AnswerGrid.h"
 #include "domain/exercise/ExerciseSession.h"
 #include "domain/exercise/HintBook.h"
 #include "domain/exercise/PlayerPreferences.h"
+#include "domain/exercise/Rank.h"
 
 #include <QObject>
 #include <QString>
@@ -59,11 +62,19 @@ class ExerciseSessionController final : public QObject
     // and only then: a grid that moved during the feedback would be unreadable.
     Q_PROPERTY( QVariantList choices READ choices NOTIFY questionChanged )
 
+    // Les memes choix, mais PLACES sur le cercle des quintes : douze cases fixes, dont les vides. C'est ce que
+    // l'ecran affiche, et c'est ce qui donne une geographie stable a la grille - une carte, pas une liste.
+    Q_PROPERTY( QVariantList gridPositions READ gridPositions NOTIFY questionChanged )
+
     Q_PROPERTY( bool isAsking READ isAsking NOTIFY sessionChanged )
     Q_PROPERTY( bool isFinished READ isFinished NOTIFY sessionChanged )
     Q_PROPERTY( bool isFeedbackVisible READ isFeedbackVisible NOTIFY sessionChanged )
     Q_PROPERTY( bool wasLastAnswerCorrect READ wasLastAnswerCorrect NOTIFY sessionChanged )
     Q_PROPERTY( bool isHelpAvailable READ isHelpAvailable NOTIFY sessionChanged )
+
+    // Ce que la question en cours demande : 0 pour nommer un intervalle, 1 pour dire dans quel sens il a ete joue.
+    // C'est ce que l'ecran lit pour savoir s'il montre le cercle ou les deux boutons monte/descend.
+    Q_PROPERTY( int questionKind READ questionKind NOTIFY questionChanged )
 
     // What the domain says about the interval that was asked, and about the one the player chose. The
     // screen reads names and identifiers, it composes neither.
@@ -100,13 +111,73 @@ class ExerciseSessionController final : public QObject
 
     Q_PROPERTY( int experience READ experience NOTIFY scoreChanged )
     Q_PROPERTY( int streak READ streak NOTIFY scoreChanged )
+
+    // The rank of the streak, from D up to SSS - a game feel of its own, displayed and never decided by the screen.
+    Q_PROPERTY( int rank READ rank NOTIFY scoreChanged )
+    Q_PROPERTY( QString rankLabel READ rankLabel NOTIFY scoreChanged )
+
+    // A loading-screen anecdote, refreshed on demand. Empty when the content file has nothing to say.
+    Q_PROPERTY( QString anecdoteText READ anecdoteText NOTIFY anecdoteChanged )
     Q_PROPERTY( int lives READ lives NOTIFY scoreChanged )
     Q_PROPERTY( bool hasUnlimitedLives READ hasUnlimitedLives NOTIFY scoreChanged )
+
+    // The profile: a name and an experience total, remembered between launches. Read from the store on demand - a
+    // profile is asked once, not read from disk on every frame.
+    Q_PROPERTY( QString playerName READ playerName WRITE setPlayerName NOTIFY playerNameChanged )
+    Q_PROPERTY( int totalExperience READ totalExperience NOTIFY totalExperienceChanged )
+    Q_PROPERTY( int sessionCount READ sessionCount NOTIFY sessionChanged )
+    Q_PROPERTY( int starCount READ starCount NOTIFY sessionChanged )
+
+    // The daily reminder: a setting the player turns on, so that the application nudges him back. The scheduling
+    // itself is not this object's job - the application wires the signal to the platform scheduler.
+    Q_PROPERTY( bool dailyReminderEnabled READ dailyReminderEnabled WRITE setDailyReminderEnabled NOTIFY dailyReminderChanged )
+
+    // L'heure du rappel : une constante pour l'instant, lue par le compte a rebours de l'ecran.
+    Q_PROPERTY( int reminderHour READ reminderHour CONSTANT )
+    Q_PROPERTY( int reminderMinute READ reminderMinute CONSTANT )
 
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
 
 public:
+    // Ce que la question en cours demande : nommer un intervalle, ou dire dans quel sens il a ete joue. La valeur
+    // est celle du domaine, transposee en entier pour le QML.
+    [[nodiscard]] int questionKind() const noexcept;
+
+    // The name the player gave himself, empty before the first time he writes one.
+    [[nodiscard]] QString playerName() const;
+
+    Q_INVOKABLE void setPlayerName( const QString & p_name );
+
+    // Experience earned across every session, remembered between launches.
+    [[nodiscard]] int totalExperience() const;
+
+    // How many sessions were played to the end, and how many earned their star.
+    [[nodiscard]] int sessionCount() const;
+
+    [[nodiscard]] int starCount() const;
+
+    // Whether the daily reminder is on, remembered between launches.
+    [[nodiscard]] bool dailyReminderEnabled() const;
+
+    Q_INVOKABLE void setDailyReminderEnabled( bool p_enabled );
+
+    [[nodiscard]] int reminderHour() const noexcept;
+
+    [[nodiscard]] int reminderMinute() const noexcept;
+
+    // The developer button that fires a reminder right now, to check the plumbing.
+    Q_INVOKABLE void testReminder();
+
+    // The rank of the current streak, as an index and as its display label.
+    [[nodiscard]] int rank() const noexcept;
+
+    [[nodiscard]] QString rankLabel() const;
+
+    // The anecdote currently shown, and a way to draw a new one.
+    [[nodiscard]] QString anecdoteText() const;
+
+    Q_INVOKABLE void refreshAnecdote();
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
@@ -117,6 +188,7 @@ public:
     explicit ExerciseSessionController( domain::NotePlayer & p_notePlayer,
                                         domain::SessionSettings p_settings = {},
                                         domain::HintBook p_hintBook = {},
+                                        domain::AnecdoteBook p_anecdoteBook = {},
                                         VibrationCallback p_vibrate = {},
                                         domain::PlayerPreferences * p_levelStore = nullptr,
                                         QObject * p_parent = nullptr );
@@ -125,6 +197,7 @@ public:
     [[nodiscard]] int questionNumber() const noexcept;
     [[nodiscard]] int questionCount() const noexcept;
     [[nodiscard]] QVariantList choices() const;
+    [[nodiscard]] QVariantList gridPositions() const;
     [[nodiscard]] bool isAsking() const noexcept;
     [[nodiscard]] bool isFinished() const noexcept;
     [[nodiscard]] bool isFeedbackVisible() const noexcept;
@@ -161,11 +234,21 @@ public:
     // is a battery drain.
     Q_INVOKABLE void stopSession();
 
+    // Starts the endless arcade mode: no lives, no end, just one question after another. A mistake costs rhythm,
+    // not the game.
+    Q_INVOKABLE void startInfiniteSession();
+
+    // Starts the survival mode: endless, but with lives - the game ends when they run out.
+    Q_INVOKABLE void startSurvivalSession();
+
     // The player asks to hear the interval again. Counted by the session, played here.
     Q_INVOKABLE void replay();
 
     // The player picks an interval, given as a distance in semitones: the screen never sends a name.
     Q_INVOKABLE void answer( int p_semitones );
+
+    // The player says which way the interval went, on a guided question: 0 up, 1 down.
+    Q_INVOKABLE void answerDirection( int p_direction );
 
     // The player asks for the answer, after the session said it may be revealed.
     Q_INVOKABLE void revealAnswer();
@@ -196,10 +279,39 @@ signals:
     // The player has just turned an instrument on or off.
     void instrumentsChanged();
 
+    // The player has just written or changed his name.
+    void playerNameChanged();
+
+    // The experience total has just grown, after a session ended.
+    void totalExperienceChanged();
+
+    // The player has just turned the daily reminder on or off.
+    void dailyReminderChanged();
+
+    // The player has just pressed the "test the notification" button.
+    void testReminderRequested();
+
+    // A new anecdote was drawn.
+    void anecdoteChanged();
+
 private:
     // Rebuilds the list of choices from the question being asked, and only then notifies. Called
     // whenever the question changes AND whenever the grid closes in after a mistake.
     void refreshChoices();
+
+    // What follows a right or a wrong answer, whatever its form: replay the question one way or the other, shake
+    // on a mistake, and tell the screen. Both answer() and answerDirection() end here.
+    void processAnswer( bool p_isCorrect );
+
+    // Draws a fresh anecdote the FIRST time the session is seen finished, so that a session opens and closes on
+    // something to learn. Guarded, because the last question and the last life can both be the end.
+    void announceSessionEndIfNeeded();
+
+    // Starts a session with these settings, drawing the seed in the interface layer where entropy belongs.
+    void beginSession( domain::SessionSettings p_settings );
+
+    // Adds the session's outcome - its experience, its count, its star - to the profile, once, when it ends.
+    void persistSessionOutcome();
 
     // Plays the interval of the question being asked, from its own root note.
     void playCurrentQuestion();
@@ -214,6 +326,13 @@ private:
 
     // The memory hooks, owned here rather than referenced: see the constructor.
     domain::HintBook m_hintBook;
+
+    // The loading-screen anecdotes, content of the same kind, and the engine that draws them.
+    domain::AnecdoteBook m_anecdoteBook;
+
+    std::mt19937 m_anecdoteRandomEngine{ std::random_device{}() };
+
+    QString m_anecdoteText;
 
     // Empty when the device cannot vibrate.
     VibrationCallback m_vibrate;
@@ -231,6 +350,9 @@ private:
 
     // Empty until a session starts: the bench is what the application shows before that.
     std::unique_ptr<domain::ExerciseSession> m_session;
+
+    // False until the end of the running session has been announced once. Reset when a session begins.
+    bool m_sessionEndAnnounced{ false };
 
     QVariantList m_choices;
 };

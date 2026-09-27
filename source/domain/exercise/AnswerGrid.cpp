@@ -18,6 +18,19 @@ namespace
     return ( p_left >= p_right ) ? ( p_left - p_right ) : ( p_right - p_left );
 }
 
+// Position d'un intervalle dans le cercle des quintes.
+//
+// Une quinte fait SEPT demi-tons, donc l'index d'un intervalle dans le cercle s'obtient en multipliant sa classe
+// par sept, modulo douze : do, sol, ré, la, mi, si, fa dièse... Sept et douze sont premiers entre eux, ce qui
+// garantit que chaque classe a sa place et une seule - la table n'a donc pas besoin d'être écrite.
+[[nodiscard]] constexpr std::int32_t circleOfFifthsPosition( const Interval & p_interval ) noexcept
+{
+    constexpr std::int32_t SEMITONES_IN_A_FIFTH = 7;
+    constexpr std::int32_t SEMITONES_IN_AN_OCTAVE = 12;
+
+    return ( SEMITONES_IN_A_FIFTH * p_interval.intervalClass() ) % SEMITONES_IN_AN_OCTAVE;
+}
+
 }    // namespace
 
 std::int32_t AnswerGrid::plausibilityDistance( const Interval & p_target, const Interval & p_other )
@@ -92,10 +105,62 @@ std::vector<Interval> AnswerGrid::build( std::span<const Interval> p_palette,
     std::ranges::copy( candidates | std::views::take( wantedDistractorCount ),
                        std::back_inserter( choices ) );
 
-    // And shuffled once more, as a whole: the right answer must not sit in the same place either.
-    std::ranges::shuffle( choices, p_randomEngine );
+    // Et rangés SELON LE CERCLE DES QUINTES - ce qui est le contraire d'un mélange.
+    //
+    // Roger : "les intervalles placés au bon endroit du cercle". Il a mis le doigt sur quelque chose que la
+    // grille ne faisait pas : elle était mélangée à chaque question, y compris l'emplacement du bon bouton, pour
+    // que le joueur ne puisse pas reconnaître une question à la forme des boutons. C'était prudent, et c'était
+    // une occasion perdue - un bouton qui change de place ne peut pas devenir un REPÈRE.
+    //
+    // Ici, la position porte une information : deux intervalles voisins dans la grille sont voisins en musique,
+    // et le joueur l'apprend sans qu'on le lui dise jamais. C'est exactement le genre de savoir qui se passe de
+    // mots.
+    //
+    // L'aléatoire reste là où il a du sens : dans QUELS leurres sont proposés, et lequel des plus plausibles est
+    // tiré. Jamais dans l'endroit où ils s'affichent.
+    std::ranges::sort( choices, []( const Interval & p_left, const Interval & p_right ) {
+        const std::int32_t leftPosition = circleOfFifthsPosition( p_left );
+        const std::int32_t rightPosition = circleOfFifthsPosition( p_right );
+
+        if( leftPosition != rightPosition )
+        {
+            return leftPosition < rightPosition;
+        }
+
+        // Deux intervalles de la même classe - une tierce mineure et une dixième mineure - partagent leur place
+        // dans le cercle : le plus petit des deux passe en premier, pour que la grille reste lisible.
+        return p_left.semitones() < p_right.semitones();
+    } );
 
     return choices;
+}
+
+std::array<std::vector<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> layoutOnCircle(
+  std::span<const Interval> p_choices )
+{
+    std::array<std::vector<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> slots{};
+
+    for( const Interval & choice : p_choices )
+    {
+        // Deux intervalles de la MEME CLASSE - une tierce majeure et une dixieme majeure - visent la meme place,
+        // et c'est voulu : c'est la meme couleur, un octave plus haut. Tous les deux y sont poses, parce que le
+        // joueur doit pouvoir DESIGNE l'un ou l'autre : c'est la seule facon de lui demander de les distinguer.
+        std::vector<Interval> & intervals = slots.at( circleOfFifthsSlot( choice ) );
+
+        intervals.push_back( choice );
+    }
+
+    // Du plus petit au plus grand, dans chaque case : le simple en tete, ses composes a sa suite. Un intervalle
+    // donne garde ainsi la meme extremite de la case quelle que soit la question, ce qui donne a l'oeil un
+    // repere qui ne bouge pas.
+    for( std::vector<Interval> & intervals : slots )
+    {
+        std::ranges::sort( intervals, []( const Interval & p_left, const Interval & p_right ) {
+            return p_left.semitones() < p_right.semitones();
+        } );
+    }
+
+    return slots;
 }
 
 }    // namespace musichien::domain

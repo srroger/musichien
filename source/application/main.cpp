@@ -6,15 +6,25 @@
 // =====================================================================================================================
 
 #include "infrastructure/audio/QAudioNotePlayer.h"
+#include "infrastructure/audio/QAudioPitchDetector.h"
+#include "infrastructure/content/JsonAnecdoteBook.h"
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
+#ifdef Q_OS_ANDROID
+#    include "infrastructure/notifications/AndroidNotificationScheduler.h"
+#else
+#    include "infrastructure/notifications/NullNotificationScheduler.h"
+#endif
 #include "infrastructure/preferences/QSettingsPlayerPreferences.h"
 #include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
+#include "ui/MicrophoneController.h"
 
+#include <QAudioDevice>
 #include <QFile>
 #include <QGuiApplication>
+#include <QMediaDevices>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QUrl>
@@ -22,6 +32,7 @@
 
 #include <array>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -44,6 +55,8 @@ constexpr int QML_MODULE_MINOR_VERSION = 0;
 // Where the content files live once embedded. The path is the one they have on disk, thanks to the alias
 // declared in resources.qrc: one path to remember, identical on the desktop and on the phone.
 constexpr const char * INTERVAL_HINTS_RESOURCE = ":/assets/content/interval-hints.json";
+
+constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
 
 // Reads the memory hints from the resources.
 //
@@ -71,6 +84,53 @@ constexpr const char * INTERVAL_HINTS_RESOURCE = ":/assets/content/interval-hint
     std::cerr << "Musichien: " << hintBook.hintCount() << " interval hints read\n";
 
     return hintBook;
+}
+
+// Reads the loading-screen anecdotes, the Morrowind-style little texts. Same contract as the hints: a missing or
+// broken file costs the anecdotes, never the application.
+[[nodiscard]] musichien::domain::AnecdoteBook loadAnecdoteBook()
+{
+    QFile contentFile{ QString::fromUtf8( ANECDOTES_RESOURCE ) };
+
+    if( !contentFile.open( QIODevice::ReadOnly ) )
+    {
+        std::cerr << "Musichien: the anecdotes are missing from the resources.\n";
+
+        return {};
+    }
+
+    const QByteArray content = contentFile.readAll();
+
+    musichien::domain::AnecdoteBook book = musichien::infrastructure::readAnecdoteBook(
+      std::string_view{ content.constData(), static_cast<std::size_t>( content.size() ) } );
+
+    std::cerr << "Musichien: " << book.count() << " anecdotes read\n";
+
+    return book;
+}
+
+// Builds the reminder's content pool: every anecdote, one per line, so that the Android receiver can draw a
+// DIFFERENT one on each daily firing without the application running. An empty book falls back to the plain nudge.
+[[nodiscard]] std::string reminderContentFor( const musichien::domain::AnecdoteBook & p_anecdotes )
+{
+    std::string content;
+
+    for( const std::string & text : p_anecdotes.texts() )
+    {
+        if( !content.empty() )
+        {
+            content += '\n';
+        }
+
+        content += text;
+    }
+
+    if( content.empty() )
+    {
+        return "Une oreille, une minute : l'intervalle du jour t'attend.";
+    }
+
+    return content;
 }
 
 // Reads ONE sampled instrument from the embedded wave files.
@@ -199,11 +259,46 @@ int main( int p_argumentCount, char * p_arguments[] )
     // The vibration is injected as a function rather than called from the view model, and the hint book
     // is handed over to be owned: one keeps Android out of the interface, the other keeps a reference to
     // somebody else's object out of it.
+    // Les anecdotes servent a deux endroits : l'accueil (une par ouverture) et le rappel quotidien (le livre entier,
+    // pour qu'une anecdote DIFFERENTE puisse tomber chaque jour). Le livre est donc charge ici, passe au controleur
+    // par copie, et garde pour le rappel.
+    musichien::domain::AnecdoteBook anecdoteBook = loadAnecdoteBook();
+
     musichien::ui::ExerciseSessionController exerciseController{ notePlayer,
                                                                  {},
                                                                  loadHintBook(),
+                                                                 anecdoteBook,
                                                                  musichien::infrastructure::vibrateForMistake,
                                                                  &playerLevelStore };
+
+    // Le micro. Le view model ne connait que le port PitchDetector : la vraie implementation (QAudioSource + YIN)
+    // est construite ICI, dans la couche de câblage, et livrée par la factory à chaque changement de périphérique.
+    // C'est ce qui permet au réglage de lister et de choisir le micro sans que le view model voie Qt Multimedia.
+    const QList<QAudioDevice> inputDevices = QMediaDevices::audioInputs();
+
+    QStringList inputDeviceNames;
+
+    for( const QAudioDevice & device : inputDevices )
+    {
+        inputDeviceNames << device.description();
+    }
+
+    musichien::ui::MicrophoneController microphoneController{
+      inputDeviceNames,
+      [inputDevices]( int p_deviceIndex ) -> std::unique_ptr<musichien::domain::PitchDetector> {
+          if( p_deviceIndex < 0 || p_deviceIndex >= inputDevices.size() )
+          {
+              return {};
+          }
+
+          return std::make_unique<musichien::infrastructure::QAudioPitchDetector>( inputDevices.at( p_deviceIndex ) );
+      } };
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "MicrophoneController",
+                                  &microphoneController );
 
     // What the player WANTS to hear. The filtering happens HERE, in the wiring layer, which is what keeps the
     // audio adapter from having to know anything about preferences - and it happens again on every change, so
@@ -229,6 +324,43 @@ int main( int p_argumentCount, char * p_arguments[] )
                       playWantedInstruments );
 
     playWantedInstruments();
+
+    // Le rappel quotidien. Le port cache la plateforme : sur le bureau, rien ne se planifie ; sur Android, une
+    // vraie notification sera posee. Ce que l'application sait, c'est qu'une case a ete cochee, et elle demande au
+    // port de s'en occuper.
+#ifdef Q_OS_ANDROID
+    musichien::infrastructure::AndroidNotificationScheduler notificationScheduler;
+#else
+    musichien::infrastructure::NullNotificationScheduler notificationScheduler;
+#endif
+
+    const auto applyReminder = [&exerciseController, &notificationScheduler, &anecdoteBook]() {
+        if( exerciseController.dailyReminderEnabled() )
+        {
+            notificationScheduler.scheduleDailyReminder( exerciseController.reminderHour(),
+                                                         exerciseController.reminderMinute(),
+                                                         reminderContentFor( anecdoteBook ) );
+        }
+        else
+        {
+            notificationScheduler.cancelReminder();
+        }
+    };
+
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::dailyReminderChanged,
+                      applyReminder );
+
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::testReminderRequested,
+                      [&notificationScheduler]() { notificationScheduler.showReminderNow(); } );
+
+    applyReminder();
+
+    // Bonjour. Un arpège montant de do, sol, do : une quinte et une octave, aucune tierce, donc rien
+    // à comprendre - seulement quelque chose qui monte et qui flotte. Au piano, et très discret : c'est
+    // la moitié du reproche qui était juste.
+    notePlayer.playGreeting();
 
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,

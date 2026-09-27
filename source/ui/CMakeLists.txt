@@ -43,6 +43,8 @@ musichienFunction_AddLibrary(ui
     IntervalDescription.cpp
     IntervalPlaybackController.h
     IntervalPlaybackController.cpp
+    MicrophoneController.h
+    MicrophoneController.cpp
 )
 
 target_link_libraries(musichien_ui PUBLIC
@@ -61,11 +63,25 @@ target_link_libraries(musichien_ui PUBLIC
 # ---------------------------------------------------------------------------------------------------------------------
 if(MUSICHIEN_BUILD_TESTING)
 
+    # ExerciseScreen_test.cpp charge l'ecran pour de vrai : la ressource QML doit donc etre embarquee dans le binaire
+    # de test, exactement comme l'application l'embarque, et Qt Quick doit etre lie pour qu'un composant devienne un
+    # item. C'est le seul test qui voit un QML casse - une propriete declaree deux fois, un Repeater qui ne produit
+    # rien, une boucle de liaison - et il les voit AVANT que l'application ne demarre sur une page noire.
     musichienFunction_AddTest(ui
         musichien_ui
         ExerciseSessionController_test.cpp
         IntervalPlaybackController_test.cpp
+        ExerciseScreen_test.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc
     )
+
+    target_link_libraries(test_ui PRIVATE Qt6::Quick)
+
+    # Le binaire de test charge un ecran QML : il lui faut donc un greffon d'affichage, meme quand il n'y a pas
+    # d'ecran. La variable est posee ICI plutot que dans le code du test, parce qu'un qputenv s'execute quand
+    # l'initialisation statique en decide - ce qui marche quand on lance le binaire a la main et echoue sous ctest,
+    # ou la difference se voit sous la forme la plus utile qui soit : "Subprocess aborted".
+    set_tests_properties(test_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 endif()
 

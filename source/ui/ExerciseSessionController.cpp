@@ -6,6 +6,7 @@
 #include <QString>
 
 #include <array>
+#include <limits>
 #include <optional>
 #include <random>
 #include <utility>
@@ -27,6 +28,7 @@ constexpr int NO_LIFE_LIMIT = -1;
 ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_notePlayer,
                                                       domain::SessionSettings p_settings,
                                                       domain::HintBook p_hintBook,
+                                                      domain::AnecdoteBook p_anecdoteBook,
                                                       VibrationCallback p_vibrate,
                                                       domain::PlayerPreferences * p_levelStore,
                                                       QObject * p_parent )
@@ -34,6 +36,7 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
   , m_notePlayer{ p_notePlayer }
   , m_settings{ p_settings }
   , m_hintBook{ std::move( p_hintBook ) }
+  , m_anecdoteBook{ std::move( p_anecdoteBook ) }
   , m_vibrate{ std::move( p_vibrate ) }
   , m_levelStore{ p_levelStore }
 {
@@ -71,7 +74,78 @@ int ExerciseSessionController::questionNumber() const noexcept
 
 int ExerciseSessionController::questionCount() const noexcept
 {
-    return ( m_session != nullptr ) ? static_cast<int>( m_session->settings().questionCount ) : 0;
+    if( m_session == nullptr )
+    {
+        return 0;
+    }
+
+    // Le mode infini met le nombre de questions a la limite de size_t : le convertir en int le fait retomber sur
+    // -1, que l'ecran afficherait tel quel. On le traduit en une sentinelle propre, que l'ecran lit comme "sans
+    // fin".
+    const std::size_t total = m_session->settings().questionCount;
+
+    return ( total > static_cast<std::size_t>( std::numeric_limits<int>::max() ) ) ? -1 : static_cast<int>( total );
+}
+
+QVariantList ExerciseSessionController::gridPositions() const
+{
+    QVariantList positions;
+
+    if( m_session == nullptr )
+    {
+        return positions;
+    }
+
+    // Les choix ont deja ete decides par la session : lesquels, et combien. Ici on ne fait que les PLACER, ce
+    // qui est la seule chose qui manquait pour que la grille devienne une carte.
+    const std::array<std::vector<domain::Interval>, domain::CIRCLE_OF_FIFTHS_SLOT_COUNT> layout =
+      domain::layoutOnCircle( m_session->currentQuestion().choices );
+
+    // UNE LISTE PLATE DE BOUTONS, et non douze places contenant chacune leurs intervalles.
+    //
+    // La difference n'est pas cosmetique : c'est ce qui rend l'ecran a la fois juste et simple. Une place porte
+    // plusieurs intervalles - une seconde majeure et sa neuvieme, la meme couleur a une octave pres - et l'ecran
+    // doit les dessiner empiles dans la case. Une liste imbriquee demandait deux Repeaters l'un dans l'autre, et
+    // un seul Repeater ne produit rien en silence : la page se charge, aucun avertissement, aucun bouton.
+    //
+    // Aplati, chaque bouton sait tout ce qu'il lui faut pour se placer lui-meme :
+    //
+    //   * 'slot'       : 0 a 11, la place du cercle - c'est ce qui donne l'ANGLE ;
+    //   * 'stackIndex' : son rang dans la case, 0 en haut ;
+    //   * 'stackSize'  : combien de boutons la case porte, pour savoir comment les repartir ;
+    //   * 'isEmpty'    : une place que la palette n'a pas encore, dessinee en anneau.
+    for( std::size_t slot = 0; slot < layout.size(); ++slot )
+    {
+        const std::vector<domain::Interval> & intervals = layout.at( slot );
+
+        if( intervals.empty() )
+        {
+            QVariantMap position;
+            position.insert( QStringLiteral( "slot" ), static_cast<int>( slot ) );
+            position.insert( QStringLiteral( "stackIndex" ), 0 );
+            position.insert( QStringLiteral( "stackSize" ), 1 );
+            position.insert( QStringLiteral( "isEmpty" ), true );
+
+            positions.append( position );
+
+            continue;
+        }
+
+        // Du plus petit au plus grand, donc : le simple en tete de case, ses composes colles juste dessous.
+        for( std::size_t rank = 0; rank < intervals.size(); ++rank )
+        {
+            QVariantMap position = describeInterval( intervals.at( rank ) );
+
+            position.insert( QStringLiteral( "slot" ), static_cast<int>( slot ) );
+            position.insert( QStringLiteral( "stackIndex" ), static_cast<int>( rank ) );
+            position.insert( QStringLiteral( "stackSize" ), static_cast<int>( intervals.size() ) );
+            position.insert( QStringLiteral( "isEmpty" ), false );
+
+            positions.append( position );
+        }
+    }
+
+    return positions;
 }
 
 QVariantList ExerciseSessionController::choices() const
@@ -164,6 +238,9 @@ int ExerciseSessionController::playerLevel() const noexcept
 
 void ExerciseSessionController::choosePlayerLevel( int p_level )
 {
+    // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
+    m_notePlayer.playTapCue();
+
     const domain::PlayerLevel level = domain::playerLevelFromIndex( static_cast<std::size_t>( p_level ) );
 
     m_playerLevel = level;
@@ -195,6 +272,12 @@ QVariantList ExerciseSessionController::playerLevels()
 
             case domain::PlayerLevel::Advanced:
                 return ExerciseSessionController::tr( "Jusqu'à l'octave" );
+
+            case domain::PlayerLevel::BeyondTheOctave:
+                return ExerciseSessionController::tr( "Les composés" );
+
+            case domain::PlayerLevel::Master:
+                return ExerciseSessionController::tr( "Je maîtrise" );
         }
 
         return QString{};
@@ -227,7 +310,7 @@ QVariantList ExerciseSessionController::instruments() const
         // A list shorter than the instruments this build knows about means "everything": a first run must sound
         // complete, not empty.
         instrument.insert( QStringLiteral( "enabled" ),
-                           ( index < m_enabledInstruments.size() ) ? m_enabledInstruments.at( index ) : true );
+                           std::cmp_less( index, m_enabledInstruments.size() ) ? m_enabledInstruments.at( index ) : true );
 
         instruments.append( instrument );
     }
@@ -237,6 +320,9 @@ QVariantList ExerciseSessionController::instruments() const
 
 void ExerciseSessionController::setInstrumentEnabled( int p_index, bool p_isEnabled )
 {
+    // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
+    m_notePlayer.playTapCue();
+
     // Two tests rather than one: comparing a signed index with an unsigned count in the same
     // expression is exactly the kind of comparison that lets a negative index through.
     if( p_index < 0 )
@@ -244,7 +330,7 @@ void ExerciseSessionController::setInstrumentEnabled( int p_index, bool p_isEnab
         return;
     }
 
-    if( static_cast<std::size_t>( p_index ) >= domain::INSTRUMENT_COUNT )
+    if( std::cmp_greater_equal( p_index, domain::INSTRUMENT_COUNT ) )
     {
         return;
     }
@@ -311,6 +397,37 @@ bool ExerciseSessionController::starEarned() const noexcept
 
 void ExerciseSessionController::startSession()
 {
+    beginSession( m_settings );
+}
+
+void ExerciseSessionController::startInfiniteSession()
+{
+    domain::SessionSettings settings = m_settings;
+
+    // Le mode infini, c'est le mode qui ne s'arrete jamais : pas de vies, pas de fin, juste enchaner. Une erreur
+    // coute du rythme - la serie retombe - mais jamais la partie.
+    settings.lives = std::nullopt;
+    settings.questionCount = std::numeric_limits<std::size_t>::max();
+
+    beginSession( settings );
+}
+
+void ExerciseSessionController::startSurvivalSession()
+{
+    domain::SessionSettings settings = m_settings;
+
+    // Le survival, c'est l'arcade avec des vies : un nombre de questions sans fin, et la partie s'arrete quand les
+    // vies tombent a zero. Les vies restent donc celles du niveau, pas un retour en arriere vers "illimite".
+    settings.questionCount = std::numeric_limits<std::size_t>::max();
+
+    beginSession( settings );
+}
+
+void ExerciseSessionController::beginSession( domain::SessionSettings p_settings )
+{
+    // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
+    m_notePlayer.playTapCue();
+
     // The seed is drawn HERE, in the interface layer, and never inside the domain.
     //
     // That is what keeps a session reproducible from its seed in a test, and it is also why the rules
@@ -318,7 +435,10 @@ void ExerciseSessionController::startSession()
     // source, on purpose.
     std::random_device entropySource;
 
-    m_session = std::make_unique<domain::ExerciseSession>( entropySource(), m_settings );
+    m_session = std::make_unique<domain::ExerciseSession>( entropySource(), p_settings );
+
+    // The end of the previous session has been announced; this one gets its own turn.
+    m_sessionEndAnnounced = false;
 
     emit runningChanged();
 
@@ -370,13 +490,33 @@ void ExerciseSessionController::answer( int p_semitones )
         return;
     }
 
-    const bool isCorrect = m_session->answer( p_semitones );
+    processAnswer( m_session->answer( p_semitones ) );
+}
 
+void ExerciseSessionController::answerDirection( int p_direction )
+{
+    if( ( m_session == nullptr ) || !isAsking() )
+    {
+        return;
+    }
+
+    const auto direction = static_cast<domain::IntervalDirection>( p_direction );
+
+    processAnswer( m_session->answerDirection( direction ) );
+}
+
+int ExerciseSessionController::questionKind() const noexcept
+{
+    return ( m_session != nullptr ) ? static_cast<int>( m_session->currentQuestion().kind ) : 0;
+}
+
+void ExerciseSessionController::processAnswer( bool p_isCorrect )
+{
     // Always, and not only when the question is over: a wrong answer closes the grid in, and the
     // screen must show the grid that exists rather than the one it had a moment ago.
     refreshChoices();
 
-    if( isCorrect )
+    if( p_isCorrect )
     {
         // A correct answer is heard again as a CHORD: the two notes together, one block instead of two,
         // which is twice as short - and a genuinely different listen of the same interval, the colour
@@ -405,6 +545,8 @@ void ExerciseSessionController::answer( int p_semitones )
             m_vibrate();
         }
     }
+
+    announceSessionEndIfNeeded();
 
     emit scoreChanged();
     emit sessionChanged();
@@ -442,14 +584,163 @@ void ExerciseSessionController::continueToNextQuestion()
     {
         playCurrentQuestion();
     }
+    else
+    {
+        persistSessionOutcome();
+    }
+
+    announceSessionEndIfNeeded();
 
     emit scoreChanged();
     emit sessionChanged();
 }
 
+int ExerciseSessionController::rank() const noexcept
+{
+    return ( m_session != nullptr ) ? static_cast<int>( domain::rankForStreak( m_session->score().streak() ) ) : 0;
+}
+
+QString ExerciseSessionController::rankLabel() const
+{
+    const domain::Rank rank = ( m_session != nullptr ) ? domain::rankForStreak( m_session->score().streak() )
+                                                       : domain::Rank::D;
+
+    switch( rank )
+    {
+        case domain::Rank::SSS:
+            return QStringLiteral( "SSS" );
+        case domain::Rank::SS:
+            return QStringLiteral( "SS" );
+        case domain::Rank::S:
+            return QStringLiteral( "S" );
+        case domain::Rank::A:
+            return QStringLiteral( "A" );
+        case domain::Rank::B:
+            return QStringLiteral( "B" );
+        case domain::Rank::C:
+            return QStringLiteral( "C" );
+        case domain::Rank::D:
+            return QStringLiteral( "D" );
+    }
+
+    return QStringLiteral( "D" );
+}
+
+QString ExerciseSessionController::anecdoteText() const
+{
+    return m_anecdoteText;
+}
+
+void ExerciseSessionController::refreshAnecdote()
+{
+    const std::optional<domain::Anecdote> anecdote = m_anecdoteBook.random( m_anecdoteRandomEngine );
+
+    m_anecdoteText = anecdote.has_value() ? QString::fromStdString( anecdote->text ) : QString{};
+
+    emit anecdoteChanged();
+}
+
+void ExerciseSessionController::announceSessionEndIfNeeded()
+{
+    if( m_sessionEndAnnounced || !isFinished() )
+    {
+        return;
+    }
+
+    m_sessionEndAnnounced = true;
+
+    // On entre dans une session sur une anecdote et on en sort sur une autre : le joueur a appris quelque chose,
+    // meme quand la partie s'arrete la. Un seul tirage, garanti par le drapeau.
+    refreshAnecdote();
+}
+
 void ExerciseSessionController::stopPlayback()
 {
     m_notePlayer.stopAll();
+}
+
+QString ExerciseSessionController::playerName() const
+{
+    return ( m_levelStore != nullptr ) ? QString::fromStdString( m_levelStore->playerName() ) : QString{};
+}
+
+void ExerciseSessionController::setPlayerName( const QString & p_name )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    m_levelStore->storePlayerName( p_name.toStdString() );
+
+    emit playerNameChanged();
+}
+
+int ExerciseSessionController::totalExperience() const
+{
+    return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->totalExperience() ) : 0;
+}
+
+void ExerciseSessionController::persistSessionOutcome()
+{
+    if( ( m_levelStore == nullptr ) || ( m_session == nullptr ) )
+    {
+        return;
+    }
+
+    // The session is over: its experience, its count and its star become part of the profile, once. Calling this
+    // twice would count the same session twice, so it happens only from the transition into "finished".
+    m_levelStore->storeTotalExperience( m_levelStore->totalExperience() + m_session->score().experience() );
+    m_levelStore->storeSessionCount( m_levelStore->sessionCount() + 1 );
+
+    if( m_session->hasEarnedStar() )
+    {
+        m_levelStore->storeStarCount( m_levelStore->starCount() + 1 );
+    }
+
+    emit totalExperienceChanged();
+}
+
+int ExerciseSessionController::sessionCount() const
+{
+    return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->sessionCount() ) : 0;
+}
+
+int ExerciseSessionController::starCount() const
+{
+    return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->starCount() ) : 0;
+}
+
+bool ExerciseSessionController::dailyReminderEnabled() const
+{
+    return ( m_levelStore != nullptr ) && m_levelStore->dailyReminderEnabled();
+}
+
+void ExerciseSessionController::setDailyReminderEnabled( bool p_enabled )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    m_levelStore->storeDailyReminderEnabled( p_enabled );
+
+    emit dailyReminderChanged();
+}
+
+int ExerciseSessionController::reminderHour() const noexcept    // NOLINT(readability-convert-member-functions-to-static)
+{
+    return 19;
+}
+
+int ExerciseSessionController::reminderMinute() const noexcept    // NOLINT(readability-convert-member-functions-to-static)
+{
+    return 0;
+}
+
+void ExerciseSessionController::testReminder()
+{
+    emit testReminderRequested();
 }
 
 void ExerciseSessionController::refreshChoices()

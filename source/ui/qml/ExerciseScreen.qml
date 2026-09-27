@@ -173,6 +173,14 @@ Item {
             // Its place is RESERVED whether or not there is a hint, and that is not cosmetic: a screen that
             // grows and shrinks moves the buttons under the finger of the player, which in a game played by
             // tapping is unforgivable.
+            // The grid comes from the session, and it CLOSES IN on every mistake: the wrong answers that
+            // were the least plausible step aside, one at a time. The player is helped without asking, and
+            // without ever being told that they are being helped.
+            // -------------------------------------------------------------------------------------------------
+            // Les douze places, disposees EN CERCLE - et pas en colonnes.
+            // Ce n'est pas une question de joliesse : c'est la CONDITION pour qu'un jour les notes d'un accord
+            // puissent se relier par des traits. Un accord se lira alors comme une FIGURE - un triangle pour un
+            // majeur, une autre pour un septieme - et la forme dira quelque chose de la musique, sans un mot.
 
             anchors.fill: parent
             anchors.margins: 16
@@ -186,7 +194,7 @@ Item {
                 Layout.fillWidth: true
 
                 Text {
-                    text: qsTr("%1 / %2").arg(ExerciseController.questionNumber).arg(ExerciseController.questionCount)
+                    text: ExerciseController.questionCount < 0 ? qsTr("%1 / ∞").arg(ExerciseController.questionNumber) : qsTr("%1 / %2").arg(ExerciseController.questionNumber).arg(ExerciseController.questionCount)
                     color: "#cbb8e8"
                     font.pixelSize: 15
                 }
@@ -200,6 +208,17 @@ Item {
                     text: qsTr("série ×%1").arg(ExerciseController.streak)
                     color: "#ffd479"
                     font.pixelSize: 15
+                    font.bold: true
+                }
+
+                // Le rang de la serie, facon Devil May Cry : un grade qui monte avec l'enchainement, affiche en
+                // grand et en couleur. Il ne dit rien d'autre que "tu enchaines", et c'est exactement ce qu'il doit
+                // dire.
+                Text {
+                    visible: ExerciseController.streak >= 2
+                    text: ExerciseController.rankLabel
+                    color: "#ff5e8a"
+                    font.pixelSize: 22
                     font.bold: true
                 }
 
@@ -319,67 +338,146 @@ Item {
 
             }
 
-            // The grid comes from the session, and it CLOSES IN on every mistake: the wrong answers that
-            // were the least plausible step aside, one at a time. The player is helped without asking, and
-            // without ever being told that they are being helped.
             // -------------------------------------------------------------------------------------------------
-            Flow {
-                id: choiceFlow
-
+            // Le mode guide : "ca monte ou ca descend ?" Quand la question le demande, le cercle s'efface et deux
+            // boutons prennent sa place. Une question plus petite, mais c'est la premiere qu'un debutant repond.
+            // -------------------------------------------------------------------------------------------------
+            RowLayout {
                 Layout.fillWidth: true
+                visible: ExerciseController.questionKind === 1
                 spacing: 10
 
-                Repeater {
-                    model: ExerciseController.choices
+                Button {
+                    Layout.fillWidth: true
+                    height: 68
+                    text: qsTr("↑ Monte")
+                    onClicked: ExerciseController.answerDirection(0)
+                }
 
-                    delegate: Button {
-                        id: choiceButton
+                Button {
+                    Layout.fillWidth: true
+                    height: 68
+                    text: qsTr("↓ Descend")
+                    onClicked: ExerciseController.answerDirection(1)
+                }
+
+            }
+
+            // Douze places, trente degres chacune, la premiere a midi : do en haut, puis les quintes dans le sens
+            // des aiguilles d'une montre. C'est exactement la disposition d'un vrai cercle des quintes.
+            Item {
+                id: circleBoard
+
+                readonly property real ringRadius: width * 0.36
+                readonly property real slotWidth: width * 0.19
+                readonly property real slotHeight: width * 0.19
+
+                Layout.fillWidth: true
+                Layout.preferredHeight: width
+                visible: ExerciseController.questionKind === 0
+
+                Repeater {
+                    // UN SEUL Repeater, et PLAT : une entree par bouton, chacune sachant sa place, son rang dans
+                    // Un seul Repeater, PLAT : une entree par bouton. Chaque bouton porte sa place (l'angle), son octave (la
+                    // couche), et son identifiant. Le cercle des quintes se dessine comme des couches d'electrons - voir
+                    // la geometrie du delegue juste en dessous.
+                    // COUCHES CONCENTRIQUES, comme les electrons d'un atome - l'image de Roger, enfin comprise.
+                    // Chaque CLASSE d'intervalle a son ANGLE sur le cercle, et chaque OCTAVE a sa COUCHE : un
+                    // rayon plus petit. Le simple vit sur la couche externe, la neuvieme sur la couche interne,
+                    // au MEME angle que la seconde, juste plus proche du centre ; la quinzieme sur une troisieme
+                    // couche, plus proche encore.
+
+                    // Un Repeater DANS un Repeater ne produit rien, en silence : la page se charge, aucun
+                    // avertissement, et pas un bouton a l'ecran. C'est une lecon apprise a la dure.
+                    model: ExerciseController.gridPositions
+
+                    delegate: Item {
+                        id: gridButton
 
                         required property var modelData
+                        required property int index
+                        // Ainsi deux intervalles d'une meme classe ne peuvent jamais se chevaucher : ils sont l'un
+                        // derriere l'autre, sur le meme rayon. La distance se lit radialement - c'est exactement ce
+                        // que les cercles imbriques et les piles de pastilles ne savaient pas faire.
+                        readonly property real octaveSpan: (gridButton.modelData.octaveSpan > 0) ? gridButton.modelData.octaveSpan : 0
+                        // Le facteur de la couche : le simple est a 1, chaque octave au-dessus est 0,6 fois plus
+                        // proche du centre. La TAILLE suit le meme facteur, pour que les cases d'une couche interne
+                        // ne se touchent pas entre elles - la largeur d'arc disponible diminue avec le rayon.
+                        readonly property real layerFactor: Math.pow(0.55, octaveSpan)
+                        readonly property real buttonSize: circleBoard.slotWidth * layerFactor
+                        // Moins quatre-vingt-dix degres, c'est midi : la place zero du cercle est le do, et le do se
+                        // met en haut. Le sens des aiguilles d'une montre donne ensuite sol, re, la, mi, si -
+                        // l'ordre du cercle, tel qu'il s'enseigne. Le MEME angle pour toutes les couches.
+                        readonly property real slotAngleRadians: (-90 + (30 * gridButton.modelData.slot)) * Math.PI / 180
+                        // Le rayon de la couche ou vit cet intervalle.
+                        readonly property real layerRadius: circleBoard.ringRadius * layerFactor
 
-                        width: (choiceFlow.width - choiceFlow.spacing) / 2
-                        height: 60
-                        text: choiceButton.modelData.identifier
-                        // The chosen button keeps a visible mark, so that the verdict can be read against
-                        // what was really tapped.
-                        highlighted: exerciseScreen.hasAnswered && (exerciseScreen.answeredInterval.semitones === choiceButton.modelData.semitones)
-                        onClicked: ExerciseController.answer(choiceButton.modelData.semitones)
-                        // A short scale bump on press: the smallest possible acknowledgement that the
-                        // finger was heard, before anything else has time to happen.
-                        scale: choiceButton.down ? 0.94 : 1
+                        x: (circleBoard.width / 2) + (layerRadius * Math.cos(slotAngleRadians)) - (width / 2)
+                        y: (circleBoard.height / 2) + (layerRadius * Math.sin(slotAngleRadians)) - (height / 2)
+                        width: buttonSize
+                        height: buttonSize
 
-                        Behavior on scale {
-                            NumberAnimation {
-                                duration: 90
-                            }
-
+                        // Une case vide reste DANS le cercle : meme place, meme taille, un simple anneau. Le joueur
+                        // voit donc ou l'intervalle viendra, et sa progression a une forme.
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: width / 2
+                            color: "#00000000"
+                            border.width: 1
+                            border.color: "#3a2a5c"
+                            visible: gridButton.modelData.isEmpty
                         }
 
-                        background: Rectangle {
-                            radius: 14
-                            color: exerciseScreen.colourForInterval(choiceButton.modelData)
-                            border.width: choiceButton.highlighted ? 3 : 0
-                            border.color: "#ffffff"
-                            // The grid fades a little once the answer is known: the question is over, and
-                            // what matters then is the verdict, not the buttons.
-                            opacity: ExerciseController.isAsking ? 1 : 0.72
+                        Button {
+                            // La police suit la hauteur du bouton : une quinzaine de pixels pour un rond
+                            // plein, neuf pour une pastille partagee en trois. Sans cela, le texte du dernier
+                            // niveau deborderait de sa case.
 
-                            Behavior on opacity {
+                            id: intervalButton
+
+                            anchors.fill: parent
+                            visible: !gridButton.modelData.isEmpty
+                            text: gridButton.modelData.isEmpty ? "" : String(gridButton.modelData.identifier)
+                            highlighted: exerciseScreen.hasAnswered && !gridButton.modelData.isEmpty && (exerciseScreen.answeredInterval.semitones === gridButton.modelData.semitones)
+                            onClicked: ExerciseController.answer(gridButton.modelData.semitones)
+                            scale: intervalButton.down ? 0.9 : 1
+
+                            Behavior on scale {
                                 NumberAnimation {
-                                    duration: 180
+                                    duration: 90
                                 }
 
                             }
 
-                        }
+                            background: Rectangle {
+                                radius: height / 2
+                                color: gridButton.modelData.isEmpty ? "#00000000" : exerciseScreen.colourForInterval(gridButton.modelData)
+                                border.width: intervalButton.highlighted ? 3 : 0
+                                border.color: "#ffffff"
+                                opacity: ExerciseController.isAsking ? 1 : 0.72
 
-                        contentItem: Text {
-                            text: choiceButton.text
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            color: "#2b1b47"
-                            font.pixelSize: 17
-                            font.bold: true
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: 180
+                                    }
+
+                                }
+
+                            }
+
+                            contentItem: Text {
+                                text: intervalButton.text
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                color: "#2b1b47"
+                                // La taille lue est CELLE DU CALCUL, pas celle du bouton : un bouton qui s'ajuste a
+                                // son propre contenu et un contenu qui s'ajuste au bouton font une boucle de liaison,
+                                // et QML la signale - sainement - a chaque image. Le Math.max protege le cas ou la
+                                // case n'est pas encore mesuree : une taille NaN ne se peint pas du tout.
+                                font.pixelSize: Math.max(8, Math.round(gridButton.buttonSize * 0.42))
+                                font.bold: true
+                            }
+
                         }
 
                     }
@@ -467,6 +565,20 @@ Item {
                 color: "#cbb8e8"
                 font.pixelSize: 16
                 text: ExerciseController.starEarned ? qsTr("%1 XP · tout reconnu à l'oreille").arg(ExerciseController.experience) : qsTr("%1 XP · la prochaine fois sera meilleure").arg(ExerciseController.experience)
+            }
+
+            // L'anecdote de sortie : on quitte sur quelque chose a apprendre, comme on est entre. Bornee en largeur
+            // (fillWidth + WordWrap), sinon un texte long pousserait les boutons hors de l'ecran.
+            Text {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                color: "#8a77ad"
+                font.pixelSize: 13
+                font.italic: true
+                visible: ExerciseController.anecdoteText !== ""
+                text: ExerciseController.anecdoteText
             }
 
             Item {

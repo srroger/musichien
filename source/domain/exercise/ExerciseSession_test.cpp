@@ -1,5 +1,7 @@
 #include "domain/exercise/ExerciseSession.h"
 
+#include "domain/exercise/LearningOrder.h"
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -495,6 +497,90 @@ TEST( ExerciseSessionTest, the_hint_is_offered_before_the_answer_is )
 
     // At the third: the rescue.
     EXPECT_TRUE( session.isHelpAvailable() );
+}
+
+TEST( ExerciseSessionTest, a_session_without_aids_gives_none_however_hard_the_player_tries )
+{
+    SessionSettings settings = unlimitedLivesSettings();
+    settings.aidsAllowed = false;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    answerWrongly( session );
+    answerWrongly( session );
+    answerWrongly( session );
+    answerWrongly( session );
+
+    // Un mode sans filet est un mode sans filet : l'indice ne souffle pas, et la reponse ne se donne pas -
+    // meme apres quatre essais, et meme si les seuils de settings disent le contraire. C'est le DOMAINE qui
+    // decide, donc aucun ecran ne peut oublier de verifier.
+    EXPECT_FALSE( session.isHintAvailable() );
+    EXPECT_FALSE( session.isHelpAvailable() );
+}
+
+TEST( ExerciseSessionTest, the_whole_palette_stays_whole_however_many_mistakes_are_made )
+{
+    SessionSettings settings = unlimitedLivesSettings();
+    settings.startingPaletteSize = learningOrderIntervals().size();
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    const std::size_t wholePalette = session.palette().size();
+
+    ASSERT_EQ( learningOrderIntervals().size(), wholePalette );
+
+    // Une erreur retire d'ordinaire le dernier intervalle arrive dans la palette. Dans un mode ou la carte est
+    // complete des la premiere question, il n'y a pas de "dernier arrive" : la carte doit rester entiere.
+    //
+    // C'est narrowPalette qui s'en charge, en ne descendant jamais sous la taille de depart - et c'est
+    // exactement le genre de regle qui casse en silence le jour ou quelqu'un la "simplifie".
+    answerWrongly( session );
+    answerWrongly( session );
+
+    EXPECT_EQ( wholePalette, session.palette().size() );
+}
+
+TEST( ExerciseSessionTest, a_guided_question_asks_the_direction_and_takes_a_direction )
+{
+    SessionSettings settings = unlimitedLivesSettings();
+
+    settings.directionQuestionShare = 100;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    // Le mode guide ne peut pas demander un intervalle harmonique : "monte ou descend ?" n'a pas de sens sur un
+    // accord.
+    EXPECT_EQ( QuestionKind::Direction, session.currentQuestion().kind );
+    EXPECT_NE( IntervalDirection::Harmonic, session.currentQuestion().direction );
+
+    // La bonne direction est une bonne reponse.
+    EXPECT_TRUE( session.answerDirection( session.currentQuestion().direction ) );
+
+    // Et une direction sur une question qui demandait un nom est un autre langage : elle ne compte pas.
+    ExerciseSession namedSession{ TEST_SEED, unlimitedLivesSettings() };
+
+    EXPECT_EQ( QuestionKind::NamedInterval, namedSession.currentQuestion().kind );
+    EXPECT_FALSE( namedSession.answerDirection( IntervalDirection::Ascending ) );
+}
+
+TEST( ExerciseSessionTest, two_mistakes_turn_the_question_in_progress_guided )
+{
+    SessionSettings settings = unlimitedLivesSettings();
+
+    // Une direction forcee : le basculement guide n'a pas de sens sur un intervalle harmonique, donc le test pin
+    // la question en montant.
+    settings.ascendingShare = 100;
+    settings.descendingShare = 0;
+    settings.harmonicShare = 0;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    // Deux erreurs sur la question en cours...
+    answerWrongly( session );
+    answerWrongly( session );
+
+    // ...et c'est CETTE question, pas la suivante, qui devient guidee - comme un indice.
+    EXPECT_EQ( QuestionKind::Direction, session.currentQuestion().kind );
 }
 
 }    // namespace musichien::domain
