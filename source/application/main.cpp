@@ -8,7 +8,11 @@
 #include "infrastructure/audio/QAudioNotePlayer.h"
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
-#include "infrastructure/notifications/NullNotificationScheduler.h"
+#ifdef Q_OS_ANDROID
+#    include "infrastructure/notifications/AndroidNotificationScheduler.h"
+#else
+#    include "infrastructure/notifications/NullNotificationScheduler.h"
+#endif
 #include "infrastructure/preferences/QSettingsPlayerPreferences.h"
 #include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
@@ -234,7 +238,11 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Le rappel quotidien. Le port cache la plateforme : sur le bureau, rien ne se planifie ; sur Android, une
     // vraie notification sera posee. Ce que l'application sait, c'est qu'une case a ete cochee, et elle demande au
     // port de s'en occuper.
+#ifdef Q_OS_ANDROID
+    musichien::infrastructure::AndroidNotificationScheduler notificationScheduler;
+#else
     musichien::infrastructure::NullNotificationScheduler notificationScheduler;
+#endif
 
     const auto applyReminder = [&exerciseController, &notificationScheduler]() {
         if( exerciseController.dailyReminderEnabled() )

@@ -37,6 +37,14 @@ target_link_libraries(musichien_infrastructure PUBLIC
 set_target_properties(musichien_infrastructure PROPERTIES FOLDER "infrastructure")
 
 # ---------------------------------------------------------------------------------------------------------------------
+# La vraie planification des rappels, compilee seulement sur Android : elle parle a AlarmManager par JNI, et elle
+# n'a rien a faire - ni a compiler - sur le bureau, ou le port "rien" est celui qui compte.
+# ---------------------------------------------------------------------------------------------------------------------
+if(ANDROID)
+    target_sources(musichien_infrastructure PRIVATE notifications/AndroidNotificationScheduler.cpp)
+endif()
+
+# ---------------------------------------------------------------------------------------------------------------------
 # Unit tests
 #
 # What is tested here is a CONTRACT with something outside the code: the shape of a content file a human

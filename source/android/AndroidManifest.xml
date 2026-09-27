@@ -46,6 +46,14 @@
     -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!--
+      The daily reminder is a notification, and on Android 13 and later a notification can only be shown if the
+      application has asked. POST_NOTIFICATIONS is that permission: a dialog, once, that the player can refuse -
+      and refusing it simply means "no reminder", never anything else. It reaches no file, no camera, no
+      microphone, no location, no network.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- %%INSERT_FEATURES -->
 
     <supports-screens
@@ -82,6 +90,10 @@
                 android:name="android.app.arguments"
                 android:value="-- %%INSERT_APP_ARGUMENTS%% --" />
         </activity>
+
+        <receiver
+            android:name=".ReminderReceiver"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
