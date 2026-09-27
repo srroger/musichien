@@ -175,6 +175,14 @@ bool ExerciseSession::answerDirection( IntervalDirection p_direction )
 
 QuestionKind ExerciseSession::drawKind()
 {
+    if( m_consecutiveErrors >= 2 )
+    {
+        // Deux erreurs de suite, et la question suivante devient "ca monte ou ca descend ?" : une question plus
+        // petite, a laquelle le joueur sait encore repondre, et qui le remet en selle. De l'aide qui ne dit pas
+        // son nom, arrivee au moment ou elle compte.
+        return QuestionKind::Direction;
+    }
+
     if( m_settings.directionQuestionShare <= 0 )
     {
         // The guided mode is OFF by default: the original game is what a fresh session asks.
@@ -213,6 +221,8 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
     }
 
     ++m_currentQuestion.wrongAttemptCount;
+
+    ++m_consecutiveErrors;
 
     m_score.registerError();
 
@@ -275,6 +285,10 @@ void ExerciseSession::advance()
     ++m_questionNumber;
 
     m_currentQuestion = buildQuestion();
+
+    // Le compteur d'erreurs vaut pour la question qui VENAIT d'etre posee : deux erreurs dessus, et la suivante -
+    // celle qui vient d'etre construite - a ete tiree guidee. On repart de zero pour celle-ci.
+    m_consecutiveErrors = 0;
 
     m_lastAnswer.reset();
     m_lastAnswerWasCorrect = false;

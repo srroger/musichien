@@ -30,6 +30,10 @@ public:
 
     // No more reminders.
     virtual void cancelReminder() = 0;
+
+    // Fires a reminder RIGHT NOW: the developer button, to check that the plumbing works. It is honest to expose
+    // it here, because testing a reminder is the one thing a reminder feature needs most.
+    virtual void showReminderNow() = 0;
 };
 
 }    // namespace musichien::infrastructure

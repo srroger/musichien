@@ -271,6 +271,13 @@ private:
     std::vector<Interval> m_palette;
     SessionScore m_score;
 
+    // Wrong answers in a row. Two of them, and the next question becomes a guided one - a smaller question the
+    // player can still answer, which is help that does not announce itself.
+    //
+    // Declared BEFORE m_currentQuestion, and that order is not decorative: buildQuestion() reads it while it
+    // initialises m_currentQuestion, so it must already exist.
+    std::size_t m_consecutiveErrors{ 0 };
+
     Question m_currentQuestion;
     SessionState m_state{ SessionState::Asking };
     std::size_t m_questionNumber{ 1 };

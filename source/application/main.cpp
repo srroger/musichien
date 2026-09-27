@@ -247,7 +247,8 @@ int main( int p_argumentCount, char * p_arguments[] )
     const auto applyReminder = [&exerciseController, &notificationScheduler]() {
         if( exerciseController.dailyReminderEnabled() )
         {
-            notificationScheduler.scheduleDailyReminder( 19, 0 );
+            notificationScheduler.scheduleDailyReminder( exerciseController.reminderHour(),
+                                                         exerciseController.reminderMinute() );
         }
         else
         {
@@ -258,6 +259,10 @@ int main( int p_argumentCount, char * p_arguments[] )
     QObject::connect( &exerciseController,
                       &musichien::ui::ExerciseSessionController::dailyReminderChanged,
                       applyReminder );
+
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::testReminderRequested,
+                      [&notificationScheduler]() { notificationScheduler.showReminderNow(); } );
 
     applyReminder();
 

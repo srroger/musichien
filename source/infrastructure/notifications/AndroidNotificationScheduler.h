@@ -13,6 +13,8 @@ public:
     void scheduleDailyReminder( int p_hour, int p_minute ) override;
 
     void cancelReminder() override;
+
+    void showReminderNow() override;
 };
 
 }    // namespace musichien::infrastructure

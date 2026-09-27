@@ -52,6 +52,20 @@ ApplicationWindow {
         feedbackTimer.restart();
     }
 
+    // Combien de temps avant la prochaine notification, en "X h MM". Lu par la page de profil ; l'heure vient du
+    // controleur, pas du QML - une heure qui existe deux fois est une heure qui derive.
+    function reminderCountdown() {
+        var now = new Date();
+        var next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), ExerciseController.reminderHour, ExerciseController.reminderMinute, 0);
+        if (next <= now)
+            next.setDate(next.getDate() + 1);
+
+        var minutes = Math.round((next - now) / 60000);
+        var hours = Math.floor(minutes / 60);
+        var rest = minutes % 60;
+        return hours + " h " + (rest < 10 ? "0" : "") + rest;
+    }
+
     // Plays the interval at a given distance, then reveals the feedback.
     // The distance is all this screen knows how to say about an interval: it never names one, never
     // decides whether one is simple or compound, and never builds one. It asks, then it displays what
@@ -570,6 +584,20 @@ ApplicationWindow {
                 color: "#cbb8e8"
                 font.pixelSize: 14
                 text: qsTr("%1 sessions · %2 étoiles").arg(ExerciseController.sessionCount).arg(ExerciseController.starCount)
+            }
+
+            Text {
+                Layout.fillWidth: true
+                color: "#8ef2b0"
+                font.pixelSize: 13
+                visible: ExerciseController.dailyReminderEnabled
+                text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
+            }
+
+            Button {
+                Layout.alignment: Qt.AlignRight
+                text: qsTr("Tester la notification")
+                onClicked: ExerciseController.testReminder()
             }
 
             Button {

@@ -621,6 +621,21 @@ void ExerciseSessionController::setDailyReminderEnabled( bool p_enabled )
     emit dailyReminderChanged();
 }
 
+int ExerciseSessionController::reminderHour() const noexcept    // NOLINT(readability-convert-member-functions-to-static)
+{
+    return 19;
+}
+
+int ExerciseSessionController::reminderMinute() const noexcept    // NOLINT(readability-convert-member-functions-to-static)
+{
+    return 0;
+}
+
+void ExerciseSessionController::testReminder()
+{
+    emit testReminderRequested();
+}
+
 void ExerciseSessionController::refreshChoices()
 {
     if( m_session == nullptr )

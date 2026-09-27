@@ -123,6 +123,10 @@ class ExerciseSessionController final : public QObject
     // itself is not this object's job - the application wires the signal to the platform scheduler.
     Q_PROPERTY( bool dailyReminderEnabled READ dailyReminderEnabled WRITE setDailyReminderEnabled NOTIFY dailyReminderChanged )
 
+    // L'heure du rappel : une constante pour l'instant, lue par le compte a rebours de l'ecran.
+    Q_PROPERTY( int reminderHour READ reminderHour CONSTANT )
+    Q_PROPERTY( int reminderMinute READ reminderMinute CONSTANT )
+
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
 
@@ -148,6 +152,13 @@ public:
     [[nodiscard]] bool dailyReminderEnabled() const;
 
     void setDailyReminderEnabled( bool p_enabled );
+
+    [[nodiscard]] int reminderHour() const noexcept;
+
+    [[nodiscard]] int reminderMinute() const noexcept;
+
+    // The developer button that fires a reminder right now, to check the plumbing.
+    Q_INVOKABLE void testReminder();
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
@@ -249,6 +260,9 @@ signals:
 
     // The player has just turned the daily reminder on or off.
     void dailyReminderChanged();
+
+    // The player has just pressed the "test the notification" button.
+    void testReminderRequested();
 
 private:
     // Rebuilds the list of choices from the question being asked, and only then notifies. Called

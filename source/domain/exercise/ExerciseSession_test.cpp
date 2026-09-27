@@ -563,4 +563,20 @@ TEST( ExerciseSessionTest, a_guided_question_asks_the_direction_and_takes_a_dire
     EXPECT_FALSE( namedSession.answerDirection( IntervalDirection::Ascending ) );
 }
 
+TEST( ExerciseSessionTest, two_mistakes_turn_the_next_question_guided )
+{
+    ExerciseSession session{ TEST_SEED, unlimitedLivesSettings() };
+
+    // Deux erreurs sur la meme question...
+    answerWrongly( session );
+    answerWrongly( session );
+
+    // ...une bonne reponse pour en sortir...
+    answerCorrectly( session );
+    session.advance();
+
+    // ...et la question suivante est guidee, sans qu'aucun reglage ne l'ait demande.
+    EXPECT_EQ( QuestionKind::Direction, session.currentQuestion().kind );
+}
+
 }    // namespace musichien::domain

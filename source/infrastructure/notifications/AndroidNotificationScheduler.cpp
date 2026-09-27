@@ -1,7 +1,7 @@
 #include "infrastructure/notifications/AndroidNotificationScheduler.h"
 
 #include <QJniObject>
-#include <QtCore/private/qandroidextras_p.h>
+#include <QtCore/qcoreapplication_platform.h>
 
 namespace musichien::infrastructure
 {
@@ -31,6 +31,14 @@ void AndroidNotificationScheduler::cancelReminder()
 {
     QJniObject::callStaticMethod<void>( "io/github/srroger/musichien/ReminderScheduler",
                                         "cancel",
+                                        "(Landroid/content/Context;)V",
+                                        applicationContext().object() );
+}
+
+void AndroidNotificationScheduler::showReminderNow()
+{
+    QJniObject::callStaticMethod<void>( "io/github/srroger/musichien/ReminderReceiver",
+                                        "showReminder",
                                         "(Landroid/content/Context;)V",
                                         applicationContext().object() );
 }

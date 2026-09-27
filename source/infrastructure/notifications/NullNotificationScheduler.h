@@ -17,6 +17,10 @@ public:
     void cancelReminder() override
     {
     }
+
+    void showReminderNow() override
+    {
+    }
 };
 
 }    // namespace musichien::infrastructure
