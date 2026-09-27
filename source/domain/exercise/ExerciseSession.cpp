@@ -29,7 +29,13 @@ Question ExerciseSession::buildQuestion()
 
     question.kind = drawKind();
 
-    if( question.kind == QuestionKind::Direction )
+    if( question.kind == QuestionKind::Sing )
+    {
+        // Une question chantee monte toujours : chanter un intervalle descendant depuis une note inconnue est un
+        // autre exercice, et le premier jet chante vers le haut.
+        question.direction = IntervalDirection::Ascending;
+    }
+    else if( question.kind == QuestionKind::Direction )
     {
         // Le mode guide demande "ca monte ou ca descend ?" : un intervalle harmonique n'a pas de sens a ce
         // moment-la, donc il est sorti du tirage.
@@ -173,18 +179,36 @@ bool ExerciseSession::answerDirection( IntervalDirection p_direction )
     return resolveAnswer( p_direction == m_currentQuestion.direction, std::nullopt );
 }
 
-QuestionKind ExerciseSession::drawKind()
+bool ExerciseSession::answerSung( bool p_isCorrect )
 {
-    if( m_settings.directionQuestionShare <= 0 )
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::Sing ) )
     {
-        // The guided mode is OFF by default: the original game is what a fresh session asks.
-        return QuestionKind::NamedInterval;
+        // A sung answer where no singing was asked changes nothing: the voice is the answer, and only on a sung
+        // question.
+        return false;
     }
 
+    return resolveAnswer( p_isCorrect, std::nullopt );
+}
+
+QuestionKind ExerciseSession::drawKind()
+{
     std::uniform_int_distribution<std::int32_t> distribution{ 0, 99 };
 
-    return ( distribution( m_randomEngine ) < m_settings.directionQuestionShare ) ? QuestionKind::Direction
-                                                                                  : QuestionKind::NamedInterval;
+    const std::int32_t draw = distribution( m_randomEngine );
+
+    if( draw < m_settings.singQuestionShare )
+    {
+        return QuestionKind::Sing;
+    }
+
+    if( ( m_settings.directionQuestionShare > 0 )
+        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare ) )
+    {
+        return QuestionKind::Direction;
+    }
+
+    return QuestionKind::NamedInterval;
 }
 
 bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p_answer )

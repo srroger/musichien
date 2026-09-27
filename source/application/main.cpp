@@ -303,6 +303,9 @@ int main( int p_argumentCount, char * p_arguments[] )
                                   "MicrophoneController",
                                   &microphoneController );
 
+    // La session peut poser des questions CHANTEES : elle a besoin du micro pour les juger.
+    exerciseController.setMicrophoneController( &microphoneController );
+
     // What the player WANTS to hear. The filtering happens HERE, in the wiring layer, which is what keeps the
     // audio adapter from having to know anything about preferences - and it happens again on every change, so
     // that unticking the saxophone is heard on the very next question rather than at the next launch.

@@ -229,6 +229,15 @@ void MicrophoneController::newSingingQuestion()
     emit sungIntervalChanged();
 }
 
+void MicrophoneController::setSingingTarget( int p_semitones )
+{
+    m_singingTargetSemitones = p_semitones;
+    m_sungIntervalDetector.reset();
+
+    emit singingTargetChanged();
+    emit sungIntervalChanged();
+}
+
 void MicrophoneController::playSingingTarget()
 {
     if( m_notePlayer == nullptr )

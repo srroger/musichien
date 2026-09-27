@@ -117,6 +117,10 @@ public:
     // Draws a new interval to sing. Called when the page opens, and after every answer.
     Q_INVOKABLE void newSingingQuestion();
 
+    // Sets the interval to sing from OUTSIDE: the exercise session knows its own target, and hands it over here so
+    // that the capture and the verdict judge the right interval.
+    Q_INVOKABLE void setSingingTarget( int p_semitones );
+
     // Starts a fresh session: the score returns to zero, and the first question is drawn.
     Q_INVOKABLE void startSingingSession();
 

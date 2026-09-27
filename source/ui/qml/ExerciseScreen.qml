@@ -363,6 +363,52 @@ Item {
 
             }
 
+            // Le chant : quand la question le demande, la grille s'efface et il ne reste qu'a chanter. Le micro sert
+            // de retour, et la session juge. La barre de stabilite et la boule vivent dans le controleur du micro.
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: ExerciseController.questionKind === 2
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#ffffff"
+                    font.pixelSize: 22
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Chante : %1").arg(MicrophoneController.singingTargetLabel)
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    visible: !MicrophoneController.hasSungInterval
+                    text: MicrophoneController.hasFirstNote ? qsTr("Première note tenue — maintenant la deuxième") : qsTr("Tiens la première note…")
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    height: 58
+                    highlighted: MicrophoneController.isSingingCaptureActive
+                    text: MicrophoneController.isSingingCaptureActive ? qsTr("J'écoute…") : qsTr("Je chante")
+                    onClicked: MicrophoneController.isSingingCaptureActive ? MicrophoneController.stopSingingCapture() : MicrophoneController.startSingingCapture()
+                }
+
+                Connections {
+                    function onSungIntervalChanged() {
+                        if (ExerciseController.questionKind === 2 && MicrophoneController.hasSungInterval)
+                            ExerciseController.answerSung(MicrophoneController.sungVerdict === 1);
+
+                    }
+
+                    target: MicrophoneController
+                }
+
+            }
+
             // Douze places, trente degres chacune, la premiere a midi : do en haut, puis les quintes dans le sens
             // des aiguilles d'une montre. C'est exactement la disposition d'un vrai cercle des quintes.
             Item {

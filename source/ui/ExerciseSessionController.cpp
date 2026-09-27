@@ -3,6 +3,7 @@
 #include "domain/music/Interval.h"
 #include "domain/music/Temperament.h"
 #include "ui/IntervalDescription.h"
+#include "ui/MicrophoneController.h"
 
 #include <QString>
 
@@ -508,6 +509,21 @@ void ExerciseSessionController::answerDirection( int p_direction )
     processAnswer( m_session->answerDirection( direction ) );
 }
 
+void ExerciseSessionController::answerSung( bool p_isCorrect )
+{
+    if( ( m_session == nullptr ) || !isAsking() )
+    {
+        return;
+    }
+
+    processAnswer( m_session->answerSung( p_isCorrect ) );
+}
+
+void ExerciseSessionController::setMicrophoneController( MicrophoneController * p_microphone )
+{
+    m_microphone = p_microphone;
+}
+
 int ExerciseSessionController::questionKind() const noexcept
 {
     return ( m_session != nullptr ) ? static_cast<int>( m_session->currentQuestion().kind ) : 0;
@@ -849,6 +865,13 @@ void ExerciseSessionController::refreshChoices()
     if( m_session == nullptr )
     {
         return;
+    }
+
+    // Pour une question CHANTEE, la cible du micro doit etre celle de la session : on la lui confie a chaque
+    // nouvelle question. Sans cette synchronisation, l'accordeur jugerait contre sa propre cible.
+    if( ( m_microphone != nullptr ) && ( m_session->currentQuestion().kind == domain::QuestionKind::Sing ) )
+    {
+        m_microphone->setSingingTarget( m_session->currentQuestion().target.semitones() );
     }
 
     QVariantList choices;
