@@ -230,6 +230,22 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     playWantedInstruments();
 
+    // Une poignée de main en musique, tout de suite après le lancement : les trois premiers degrés de la gamme
+    // majeure, joués en accord. C'est le plus court moyen de dire deux choses à la fois - "ça marche", et "c'est
+    // de la musique" - et elle passe par le même chemin que tout le reste, donc par l'instrument que le joueur a
+    // choisi.
+    //
+    // Un accord plutôt qu'une mélodie, et c'est une contrainte du moment : une note dure 700 ms dans tout le
+    // moteur, donc trois notes feraient déjà deux secondes. L'arpège viendra le jour où la durée d'une note
+    // deviendra un réglage.
+    {
+        const std::array<musichien::domain::Note, 3> GREETING_CHORD{ musichien::domain::Note{ 72 },
+                                                                     musichien::domain::Note{ 76 },
+                                                                     musichien::domain::Note{ 79 } };
+
+        notePlayer.playChord( GREETING_CHORD );
+    }
+
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,
                                   QML_MODULE_MINOR_VERSION,

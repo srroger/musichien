@@ -175,7 +175,7 @@ ApplicationWindow {
                     text: ExerciseController.hasChosenLevel ? qsTr("Ton niveau") : qsTr("Pour commencer : tu en es où ?")
                 }
 
-                Flow {
+                Row {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
@@ -187,6 +187,7 @@ ApplicationWindow {
                             required property var modelData
 
                             text: modelData.name
+                            font.pixelSize: 13
                             // The chosen one stays marked, so that the screen never leaves any doubt about the
                             // level the next session will use.
                             highlighted: ExerciseController.playerLevel === modelData.index
@@ -446,8 +447,17 @@ ApplicationWindow {
 
         anchors.centerIn: parent
         width: Math.min(mainWindow.width * 0.9, 420)
-        title: qsTr("Instruments joues")
         modal: true
+        padding: 16
+
+        // Un fond sombre, et pas la feuille blanche du systeme : cette page fait partie du jeu, et le
+        // blanc de l’application systeme jurait au milieu du bleu nuit.
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
 
         contentItem: ColumnLayout {
             spacing: 8
