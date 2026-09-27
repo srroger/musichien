@@ -18,6 +18,8 @@
 
 #include "domain/audio/NotePlayer.h"
 
+#include <array>
+#include <cstddef>
 #include <vector>
 
 namespace musichien::domain
@@ -59,6 +61,23 @@ public:
         ++m_mistakeCueCount;
     }
 
+    // Le metronome et la batterie sont des sons A PART : les compter separement est ce qui permet a un test de dire
+    // "le clic ET la caisse claire ont ete demandes", et donc de tenir le bug du mixage ferme.
+    void playMetronomeClick( bool p_accented ) override
+    {
+        ++m_metronomeClickCount;
+
+        if( p_accented )
+        {
+            ++m_accentedClickCount;
+        }
+    }
+
+    void playDrum( Drum p_drum ) override
+    {
+        ++m_drumCounts.at( static_cast<std::size_t>( p_drum ) );
+    }
+
     void stopAll() override
     {
         ++m_stopCount;
@@ -75,6 +94,26 @@ public:
     [[nodiscard]] int mistakeCueCount() const noexcept { return m_mistakeCueCount; }
     [[nodiscard]] int stopCount() const noexcept { return m_stopCount; }
 
+    [[nodiscard]] int metronomeClickCount() const noexcept { return m_metronomeClickCount; }
+    [[nodiscard]] int accentedClickCount() const noexcept { return m_accentedClickCount; }
+
+    [[nodiscard]] int drumCount() const noexcept
+    {
+        int total = 0;
+
+        for( const int count : m_drumCounts )
+        {
+            total += count;
+        }
+
+        return total;
+    }
+
+    [[nodiscard]] int drumCount( Drum p_drum ) const noexcept
+    {
+        return m_drumCounts.at( static_cast<std::size_t>( p_drum ) );
+    }
+
     void clear()
     {
         m_playedNotes.clear();
@@ -82,6 +121,9 @@ public:
         m_playedChords.clear();
         m_mistakeCueCount = 0;
         m_stopCount = 0;
+        m_metronomeClickCount = 0;
+        m_accentedClickCount = 0;
+        m_drumCounts = {};
     }
 
 private:
@@ -91,6 +133,9 @@ private:
     std::vector<PlayedGroup> m_playedChords;
     int m_mistakeCueCount{ 0 };
     int m_stopCount{ 0 };
+    int m_metronomeClickCount{ 0 };
+    int m_accentedClickCount{ 0 };
+    std::array<int, DRUM_COUNT> m_drumCounts{};
 };
 
 }    // namespace musichien::domain

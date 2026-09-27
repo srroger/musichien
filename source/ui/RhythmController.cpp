@@ -113,7 +113,16 @@ void RhythmController::tap()
         // The game: the tap is judged against the nearest beat.
         const double elapsedMs = static_cast<double>( m_clock.elapsed() );
 
-        const domain::HitQuality quality = domain::judgeTap( elapsedMs, m_bpm );
+        const double beatMs = domain::beatDurationMs( m_bpm );
+
+        const domain::RhythmPattern * pattern = activePattern();
+
+        // Avec une cellule choisie, la question change : la frappe doit tomber sur une FRAPPE de la cellule, pas sur
+        // un temps. C'est tout l'exercice - reproduire une rythmique, et pas seulement battre la mesure.
+        const domain::HitQuality quality =
+          ( ( pattern != nullptr ) && ( beatMs > 0.0 ) )
+            ? domain::judgeDistance( domain::distanceToNearestOnsetInBeats( *pattern, elapsedMs / beatMs ) * beatMs )
+            : domain::judgeTap( elapsedMs, m_bpm );
 
         switch( quality )
         {
@@ -178,7 +187,94 @@ void RhythmController::onBeat()
 
     emit beatInBarChanged();
 
+    schedulePatternHitsForBeat( m_beatInBar );
+
     ++m_beatInBar;
+}
+
+QVariantList RhythmController::patterns() const
+{
+    QVariantList names;
+
+    // La premiere entree n'est pas une cellule : c'est le metronome nu. Le QML affiche la liste telle quelle et
+    // renvoie l'index choisi, donc aucun decalage n'est a gerer dans l'interface.
+    names.append( tr( "Métronome seul" ) );
+
+    for( const domain::RhythmPattern & pattern : domain::allRhythmPatterns() )
+    {
+        names.append( QString::fromUtf8( pattern.name().data(), static_cast<int>( pattern.name().size() ) ) );
+    }
+
+    return names;
+}
+
+void RhythmController::setCurrentPattern( int p_index )
+{
+    if( ( p_index < 0 ) || ( p_index > static_cast<int>( domain::allRhythmPatterns().size() ) ) )
+    {
+        return;
+    }
+
+    if( p_index == m_currentPattern )
+    {
+        return;
+    }
+
+    m_currentPattern = p_index;
+
+    emit currentPatternChanged();
+}
+
+const domain::RhythmPattern * RhythmController::activePattern() const
+{
+    if( m_currentPattern <= 0 )
+    {
+        return nullptr;
+    }
+
+    return &domain::allRhythmPatterns().at( static_cast<std::size_t>( m_currentPattern - 1 ) );
+}
+
+void RhythmController::schedulePatternHitsForBeat( int p_beatInBar )
+{
+    const domain::RhythmPattern * pattern = activePattern();
+
+    if( pattern == nullptr )
+    {
+        return;
+    }
+
+    const double beatMs = domain::beatDurationMs( m_bpm );
+
+    if( beatMs <= 0.0 )
+    {
+        return;
+    }
+
+    const double barBeat = static_cast<double>( p_beatInBar );
+
+    for( const domain::RhythmHit & hit : pattern->hits() )
+    {
+        if( ( hit.beat < barBeat ) || ( hit.beat >= barBeat + 1.0 ) )
+        {
+            continue;
+        }
+
+        const auto delayMs = static_cast<int>( std::lround( ( hit.beat - barBeat ) * beatMs ) );
+
+        if( delayMs <= 0 )
+        {
+            m_notePlayer.playDrum( hit.drum );
+
+            continue;
+        }
+
+        // Une frappe decalee part en differe : c'est ce qu'est une syncope - une frappe ENTRE deux temps.
+        //
+        // Le controleur est le contexte du tir differe, donc si le metronome s'arrete et que l'objet vit toujours, le
+        // tir part quand meme ; c'est voulu, la fin d'une mesure doit s'entendre.
+        QTimer::singleShot( delayMs, this, [this, drum = hit.drum]() { m_notePlayer.playDrum( drum ); } );
+    }
 }
 
 }    // namespace musichien::ui

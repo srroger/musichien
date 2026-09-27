@@ -1275,6 +1275,35 @@ ApplicationWindow {
 
                 }
 
+                // La cellule rythmique : le metronome seul, ou un cliche a reproduire. Le clic continue de battre la
+                // mesure par-dessus, pour que la pulsation reste le repere.
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 12
+                        text: qsTr("Rythmique à reproduire")
+                    }
+
+                    DarkComboBox {
+                        Layout.fillWidth: true
+                        model: RhythmController.patterns
+                        currentIndex: RhythmController.currentPattern
+                        onActivated: RhythmController.setCurrentPattern(index)
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        color: "#8a77ad"
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Lance le métronome : la rythmique boucle. Tape sur TAPE en même temps que les frappes.")
+                    }
+
+                }
+
                 Button {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 90

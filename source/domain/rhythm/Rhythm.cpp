@@ -20,6 +20,23 @@ double beatTimeMs( double p_bpm, std::size_t p_beatIndex ) noexcept
     return beatDurationMs( p_bpm ) * static_cast<double>( p_beatIndex );
 }
 
+HitQuality judgeDistance( double p_distanceMs ) noexcept
+{
+    const double distance = std::abs( p_distanceMs );
+
+    if( distance <= PERFECT_WINDOW_MS )
+    {
+        return HitQuality::Perfect;
+    }
+
+    if( distance <= GOOD_WINDOW_MS )
+    {
+        return HitQuality::Good;
+    }
+
+    return HitQuality::Miss;
+}
+
 HitQuality judgeTap( double p_tapMs, double p_bpm ) noexcept
 {
     const double beatMs = beatDurationMs( p_bpm );
@@ -33,19 +50,7 @@ HitQuality judgeTap( double p_tapMs, double p_bpm ) noexcept
     // exactly on the rounding boundary and is then judged as a Miss by its distance, which is the honest answer.
     const double nearestBeatMs = std::round( p_tapMs / beatMs ) * beatMs;
 
-    const double distance = std::abs( p_tapMs - nearestBeatMs );
-
-    if( distance <= PERFECT_WINDOW_MS )
-    {
-        return HitQuality::Perfect;
-    }
-
-    if( distance <= GOOD_WINDOW_MS )
-    {
-        return HitQuality::Good;
-    }
-
-    return HitQuality::Miss;
+    return judgeDistance( p_tapMs - nearestBeatMs );
 }
 
 }    // namespace musichien::domain

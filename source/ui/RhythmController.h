@@ -16,10 +16,13 @@
 
 #include "domain/audio/NotePlayer.h"
 #include "domain/rhythm/Rhythm.h"
+#include "domain/rhythm/RhythmPattern.h"
 
 #include <QElapsedTimer>
 #include <QObject>
+#include <QString>
 #include <QTimer>
+#include <QVariantList>
 
 #include <cstdint>
 
@@ -47,6 +50,11 @@ class RhythmController final : public QObject
     // The beat sounding now, 0 = the downbeat. A screen shows it plus one, so a musician counts 1, 2, 3, 4.
     Q_PROPERTY( int beatInBar READ beatInBar NOTIFY beatInBarChanged )
 
+    // Les cellules rythmiques offertes : "Metronome seul" d'abord, puis les cliches. Le QML affiche la liste telle
+    // quelle, et l'index choisi EST celui de la liste - aucune traduction d'index a faire dans l'interface.
+    Q_PROPERTY( QVariantList patterns READ patterns CONSTANT )
+    Q_PROPERTY( int currentPattern READ currentPattern WRITE setCurrentPattern NOTIFY currentPatternChanged )
+
 public:
     explicit RhythmController( domain::NotePlayer & p_notePlayer, QObject * p_parent = nullptr );
 
@@ -71,6 +79,11 @@ public:
     // Frappe un élément de la batterie : 0 = grosse caisse, 1 = caisse claire, 2 = charleston, 3 = tom.
     Q_INVOKABLE void playDrum( int p_drumIndex );
 
+    [[nodiscard]] QVariantList patterns() const;
+
+    [[nodiscard]] int currentPattern() const noexcept { return m_currentPattern; }
+    Q_INVOKABLE void setCurrentPattern( int p_index );
+
 signals:
     void bpmChanged();
     void beatsPerBarChanged();
@@ -79,9 +92,17 @@ signals:
     void comboChanged();
     void lastQualityChanged();
     void beatInBarChanged();
+    void currentPatternChanged();
 
 private:
     void onBeat();
+
+    // Joue les frappes de la cellule qui tombent dans le temps p_beatInBar. Les frappes decalees - les syncopes -
+    // partent en differe, parce que c'est ca une syncope : une frappe ENTRE deux temps.
+    void schedulePatternHitsForBeat( int p_beatInBar );
+
+    // La cellule en cours, ou rien quand seul le metronome joue.
+    [[nodiscard]] const domain::RhythmPattern * activePattern() const;
 
     domain::NotePlayer & m_notePlayer;
 
@@ -96,6 +117,9 @@ private:
     int m_score{ 0 };
     int m_combo{ 0 };
     int m_lastQuality{ 0 };
+
+    // 0 = le metronome seul, n+1 = la n-ieme cellule de domain::allRhythmPatterns().
+    int m_currentPattern{ 0 };
 };
 
 }    // namespace musichien::ui

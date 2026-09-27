@@ -34,6 +34,13 @@ enum class HitQuality
 // The time of the nth beat (0 is the first), in milliseconds from the start of the metronome.
 [[nodiscard]] double beatTimeMs( double p_bpm, std::size_t p_beatIndex ) noexcept;
 
+// The quality of a tap that landed within a given distance of the beat it was aiming at.
+//
+// Exposed on its own because the metronome game measures that distance against the beat GRID, and the pattern game
+// measures it against the onset of a rhythmic CELL: two different questions, one set of windows. Keeping the judgement
+// here is what stops the two from drifting apart.
+[[nodiscard]] HitQuality judgeDistance( double p_distanceMs ) noexcept;
+
 // The quality of a tap that landed at p_tapMs, against the nearest beat of a metronome at p_bpm.
 //
 // The nearest beat is the one whose time is closest to the tap; a tap halfway between two beats is a Miss whichever

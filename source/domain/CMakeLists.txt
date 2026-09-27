@@ -35,6 +35,8 @@ musichienFunction_AddLibrary(domain
     # Rhythm, as pure rules: the metronome's grid and the judgement of a tap, no clock and no sound
     rhythm/Rhythm.h
     rhythm/Rhythm.cpp
+    rhythm/RhythmPattern.h
+    rhythm/RhythmPattern.cpp
 
     # The exercise loop, as pure rules: no sound, no clock, no screen
     exercise/AnswerGrid.h
@@ -80,6 +82,7 @@ if(MUSICHIEN_BUILD_TESTING)
         audio/SungIntervalDetector_test.cpp
         audio/DrumSynthesizer_test.cpp
         rhythm/Rhythm_test.cpp
+        rhythm/RhythmPattern_test.cpp
         exercise/AnswerGrid_test.cpp
         exercise/AnecdoteBook_test.cpp
         exercise/ExerciseSession_test.cpp
