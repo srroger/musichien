@@ -540,4 +540,27 @@ TEST( ExerciseSessionTest, the_whole_palette_stays_whole_however_many_mistakes_a
     EXPECT_EQ( wholePalette, session.palette().size() );
 }
 
+TEST( ExerciseSessionTest, a_guided_question_asks_the_direction_and_takes_a_direction )
+{
+    SessionSettings settings = unlimitedLivesSettings();
+
+    settings.directionQuestionShare = 100;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    // Le mode guide ne peut pas demander un intervalle harmonique : "monte ou descend ?" n'a pas de sens sur un
+    // accord.
+    EXPECT_EQ( QuestionKind::Direction, session.currentQuestion().kind );
+    EXPECT_NE( IntervalDirection::Harmonic, session.currentQuestion().direction );
+
+    // La bonne direction est une bonne reponse.
+    EXPECT_TRUE( session.answerDirection( session.currentQuestion().direction ) );
+
+    // Et une direction sur une question qui demandait un nom est un autre langage : elle ne compte pas.
+    ExerciseSession namedSession{ TEST_SEED, unlimitedLivesSettings() };
+
+    EXPECT_EQ( QuestionKind::NamedInterval, namedSession.currentQuestion().kind );
+    EXPECT_FALSE( namedSession.answerDirection( IntervalDirection::Ascending ) );
+}
+
 }    // namespace musichien::domain

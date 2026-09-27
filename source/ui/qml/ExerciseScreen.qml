@@ -327,6 +327,31 @@ Item {
 
             }
 
+            // -------------------------------------------------------------------------------------------------
+            // Le mode guide : "ca monte ou ca descend ?" Quand la question le demande, le cercle s'efface et deux
+            // boutons prennent sa place. Une question plus petite, mais c'est la premiere qu'un debutant repond.
+            // -------------------------------------------------------------------------------------------------
+            RowLayout {
+                Layout.fillWidth: true
+                visible: ExerciseController.questionKind === 1
+                spacing: 10
+
+                Button {
+                    Layout.fillWidth: true
+                    height: 68
+                    text: qsTr("↑ Monte")
+                    onClicked: ExerciseController.answerDirection(0)
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    height: 68
+                    text: qsTr("↓ Descend")
+                    onClicked: ExerciseController.answerDirection(1)
+                }
+
+            }
+
             // Douze places, trente degres chacune, la premiere a midi : do en haut, puis les quintes dans le sens
             // des aiguilles d'une montre. C'est exactement la disposition d'un vrai cercle des quintes.
             Item {
@@ -338,6 +363,7 @@ Item {
 
                 Layout.fillWidth: true
                 Layout.preferredHeight: width
+                visible: ExerciseController.questionKind === 0
 
                 Repeater {
                     // UN SEUL Repeater, et PLAT : une entree par bouton, chacune sachant sa place, son rang dans

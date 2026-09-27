@@ -610,4 +610,22 @@ TEST( ExerciseSessionControllerTest, a_place_holds_every_octave_of_its_class )
     EXPECT_EQ( 24, stacked.at( 2 ) );
 }
 
+TEST( ExerciseSessionControllerTest, a_guided_question_reports_its_kind_and_takes_a_direction )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings = ascendingOnlySettings();
+    settings.directionQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+
+    // Le mode guide est annonce a l'ecran...
+    EXPECT_EQ( 1, controller.questionKind() );
+
+    // ...et une reponse par direction est acceptee sans erreur, quelle qu'en soit la justesse.
+    controller.answerDirection( 0 );
+}
+
 }    // namespace musichien::ui

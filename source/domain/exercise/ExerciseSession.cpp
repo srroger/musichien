@@ -27,9 +27,22 @@ Question ExerciseSession::buildQuestion()
 
     question.target = drawTarget();
 
-    // The direction is drawn BEFORE the root, because the root depends on it: the room an interval
-    // needs is on one side or the other.
-    question.direction = drawDirection();
+    question.kind = drawKind();
+
+    if( question.kind == QuestionKind::Direction )
+    {
+        // Le mode guide demande "ca monte ou ca descend ?" : un intervalle harmonique n'a pas de sens a ce
+        // moment-la, donc il est sorti du tirage.
+        question.direction = ( std::uniform_int_distribution<std::int32_t>{ 0, 1 }( m_randomEngine ) == 0 )
+                               ? IntervalDirection::Ascending
+                               : IntervalDirection::Descending;
+    }
+    else
+    {
+        // The direction is drawn BEFORE the root, because the root depends on it: the room an interval
+        // needs is on one side or the other.
+        question.direction = drawDirection();
+    }
 
     question.rootMidiNumber = drawRootMidiNumber( question.target, question.direction );
 
@@ -145,12 +158,41 @@ bool ExerciseSession::answer( std::int32_t p_semitones )
         return false;
     }
 
-    const bool isCorrect = ( p_semitones == m_currentQuestion.target.semitones() );
+    return resolveAnswer( p_semitones == m_currentQuestion.target.semitones(),
+                          intervalFromSemitones( p_semitones ) );
+}
 
-    m_lastAnswer = intervalFromSemitones( p_semitones );
-    m_lastAnswerWasCorrect = isCorrect;
+bool ExerciseSession::answerDirection( IntervalDirection p_direction )
+{
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::Direction ) )
+    {
+        // A direction where a name was expected is a different language: it changes nothing.
+        return false;
+    }
 
-    if( isCorrect )
+    return resolveAnswer( p_direction == m_currentQuestion.direction, std::nullopt );
+}
+
+QuestionKind ExerciseSession::drawKind()
+{
+    if( m_settings.directionQuestionShare <= 0 )
+    {
+        // The guided mode is OFF by default: the original game is what a fresh session asks.
+        return QuestionKind::NamedInterval;
+    }
+
+    std::uniform_int_distribution<std::int32_t> distribution{ 0, 99 };
+
+    return ( distribution( m_randomEngine ) < m_settings.directionQuestionShare ) ? QuestionKind::Direction
+                                                                                  : QuestionKind::NamedInterval;
+}
+
+bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p_answer )
+{
+    m_lastAnswer = std::move( p_answer );
+    m_lastAnswerWasCorrect = p_isCorrect;
+
+    if( p_isCorrect )
     {
         m_score.registerSuccess( m_currentQuestion.replayCount, m_currentQuestion.wrongAttemptCount );
 

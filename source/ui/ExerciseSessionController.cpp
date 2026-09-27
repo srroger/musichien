@@ -446,13 +446,33 @@ void ExerciseSessionController::answer( int p_semitones )
         return;
     }
 
-    const bool isCorrect = m_session->answer( p_semitones );
+    processAnswer( m_session->answer( p_semitones ) );
+}
 
+void ExerciseSessionController::answerDirection( int p_direction )
+{
+    if( ( m_session == nullptr ) || !isAsking() )
+    {
+        return;
+    }
+
+    const auto direction = static_cast<domain::IntervalDirection>( p_direction );
+
+    processAnswer( m_session->answerDirection( direction ) );
+}
+
+int ExerciseSessionController::questionKind() const noexcept
+{
+    return ( m_session != nullptr ) ? static_cast<int>( m_session->currentQuestion().kind ) : 0;
+}
+
+void ExerciseSessionController::processAnswer( bool p_isCorrect )
+{
     // Always, and not only when the question is over: a wrong answer closes the grid in, and the
     // screen must show the grid that exists rather than the one it had a moment ago.
     refreshChoices();
 
-    if( isCorrect )
+    if( p_isCorrect )
     {
         // A correct answer is heard again as a CHORD: the two notes together, one block instead of two,
         // which is twice as short - and a genuinely different listen of the same interval, the colour

@@ -70,6 +70,10 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( bool wasLastAnswerCorrect READ wasLastAnswerCorrect NOTIFY sessionChanged )
     Q_PROPERTY( bool isHelpAvailable READ isHelpAvailable NOTIFY sessionChanged )
 
+    // Ce que la question en cours demande : 0 pour nommer un intervalle, 1 pour dire dans quel sens il a ete joue.
+    // C'est ce que l'ecran lit pour savoir s'il montre le cercle ou les deux boutons monte/descend.
+    Q_PROPERTY( int questionKind READ questionKind NOTIFY questionChanged )
+
     // What the domain says about the interval that was asked, and about the one the player chose. The
     // screen reads names and identifiers, it composes neither.
     Q_PROPERTY( QVariantMap heardInterval READ heardInterval NOTIFY sessionChanged )
@@ -112,6 +116,9 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
 
 public:
+    // Ce que la question en cours demande : nommer un intervalle, ou dire dans quel sens il a ete joue. La valeur
+    // est celle du domaine, transposee en entier pour le QML.
+    int questionKind() const noexcept;
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
@@ -173,6 +180,9 @@ public:
     // The player picks an interval, given as a distance in semitones: the screen never sends a name.
     Q_INVOKABLE void answer( int p_semitones );
 
+    // The player says which way the interval went, on a guided question: 0 up, 1 down.
+    Q_INVOKABLE void answerDirection( int p_direction );
+
     // The player asks for the answer, after the session said it may be revealed.
     Q_INVOKABLE void revealAnswer();
 
@@ -206,6 +216,10 @@ private:
     // Rebuilds the list of choices from the question being asked, and only then notifies. Called
     // whenever the question changes AND whenever the grid closes in after a mistake.
     void refreshChoices();
+
+    // What follows a right or a wrong answer, whatever its form: replay the question one way or the other, shake
+    // on a mistake, and tell the screen. Both answer() and answerDirection() end here.
+    void processAnswer( bool p_isCorrect );
 
     // Plays the interval of the question being asked, from its own root note.
     void playCurrentQuestion();
