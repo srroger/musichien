@@ -10,13 +10,6 @@
 -->
 <RCC>
     <qresource prefix="/">
-        <!--
-          Les QML sont listes ici, et c'est bien le .qrc que CMake compile. Reste que AUTORCC ne recompile que si CE
-          FICHIER est plus recent : il ignore les fichiers cites. Un QML modifie laissait donc le binaire avec
-          l'ecran de la veille - compile, teste, vert, et faux. C'est la cible de build declaree dans
-          source/ui/CMakeLists.txt qui rend la dependance reelle, en touchant ce fichier des qu'un QML change.
-          Le chemin de chargement ne change pas : "qrc:/qml/ExerciseScreen.qml".
-        -->
         <file>qml/ExerciseScreen.qml</file>
         <file>qml/Main.qml</file>
         <!--

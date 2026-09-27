@@ -12,13 +12,6 @@
 # copied next to the binary.
 set(MUSICHIEN_QML_RESOURCE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc PARENT_SCOPE)
 
-# Liste des QML en chemins absolus : les dependances reelles de la ressource, pour la cible de build declaree plus
-# bas. Voir le long commentaire qui l'accompagne.
-set(MUSICHIEN_QML_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/qml/ExerciseScreen.qml
-    ${CMAKE_CURRENT_SOURCE_DIR}/qml/Main.qml
-)
-
 # Listed explicitly rather than globbed: a new QML file must be added here on purpose, which keeps
 # the build honest and reproducible.
 set(MUSICHIEN_QML_FILES
@@ -78,26 +71,6 @@ target_link_libraries(musichien_ui PUBLIC
 
     Qt6::Core
     Qt6::Qml
-)
-
-# ---------------------------------------------------------------------------------------------------------------------
-# A changed QML file must rebuild the RESOURCE, and AUTORCC will not do it on its own
-#
-# AUTORCC reads resources.qrc, sees a list of relative paths, and generates a C++ file carrying the CONTENT of each
-# one - at that moment, and never again. It regenerates that file when the .qrc changes, and it does NOT look at
-# the files the .qrc cites.
-#
-# So: change a QML file, and nothing is regenerated. The build succeeds, the tests pass, the application starts,
-# and the screen is yesterday's. That is exactly what happened, and an afternoon went into hunting a bug in a QML
-# file that was never loaded - the screen under test was three versions old.
-#
-# The target below is what makes the dependency real: it touches the .qrc whenever a QML is newer, which is the
-# only thing AUTORCC listens to. Touching changes the CONTENT of nothing, so the file stays clean in git.
-add_custom_target(musichien-touch-qml-resources ALL
-    COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc
-    DEPENDS ${MUSICHIEN_QML_SOURCES}
-    COMMENT "Musichien: QML resources up to date"
-    VERBATIM
 )
 
 # ---------------------------------------------------------------------------------------------------------------------
