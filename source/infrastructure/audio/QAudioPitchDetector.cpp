@@ -132,6 +132,13 @@ private:
     QIODevice * m_io{ nullptr };
     musichien::domain::PitchDetector::PitchCallback m_callback;
     std::vector<double> m_window;
+
+    // The last GOOD pitch, and how many frames have been silent since. A voice drops out for a few frames and YIN
+    // can read the octave: both would make the ball blink, so the last good pitch is held for a moment and the
+    // octave is folded back.
+    double m_lastFrequency{ 0.0 };
+
+    std::int32_t m_silenceFrames{ 0 };
 };
 
 QAudioPitchDetector::QAudioPitchDetector()
@@ -218,9 +225,50 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
                 frequencyHz = estimatePitch( impl.m_window, SAMPLE_RATE );
             }
 
+            // Post-traitement de robustesse, pour la VOIX.
+            //
+            // Deux defauts classiques d'un estimateur de periode sur un son riche en harmoniques :
+            //   * l'erreur d'octave : il lit 2x (ou 1/2) la vraie periode, donc la fondamentale saute d'une octave ;
+            //   * le dropout : une frame sans reponse claire, qui vaut "silence" pendant quelques millisecondes.
+            // L'un comme l'autre font clignoter la boule, alors que le chanteur, lui, tient sa note.
+            if( frequencyHz > 0.0 )
+            {
+                // Replie l'octave : un saut soudain d'un facteur deux n'est pas la voix, c'est l'estimateur.
+                if( impl.m_lastFrequency > 0.0 )
+                {
+                    const double ratio = frequencyHz / impl.m_lastFrequency;
+
+                    if( ratio > 1.8 )
+                    {
+                        frequencyHz /= 2.0;
+                    }
+                    else if( ratio < 0.55 )
+                    {
+                        frequencyHz *= 2.0;
+                    }
+                }
+
+                impl.m_lastFrequency = frequencyHz;
+                impl.m_silenceFrames = 0;
+            }
+            else if( impl.m_lastFrequency > 0.0 && impl.m_silenceFrames < 5 )
+            {
+                // Un bref silence n'est pas la fin de la note : on tient la derniere bonne hauteur une fraction de
+                // seconde (5 frames, environ 115 ms), et la boule ne s'eteint plus en plein milieu.
+                frequencyHz = impl.m_lastFrequency;
+                ++impl.m_silenceFrames;
+            }
+
             if( impl.m_callback )
             {
                 impl.m_callback( static_cast<float>( frequencyHz ) );
+            }
+
+            // The callback may have stopped the detector (the tuner stops itself once it has heard enough): the
+            // buffer and the device are then gone, and touching them again is a use-after-free.
+            if( impl.m_io == nullptr )
+            {
+                return;
             }
 
             impl.m_window.erase( impl.m_window.begin(),
@@ -237,11 +285,18 @@ void QAudioPitchDetector::stop()
     {
         impl.m_source->stop();
         impl.m_io = nullptr;
-        impl.m_source = nullptr;
+
+        // deleteLater rather than resetting to null: stop() may be called FROM the readyRead slot itself - the tuner
+        // stops itself the moment it has heard enough. Destroying the QAudioSource, and the QIODevice whose slot is
+        // on the stack right now, would be a use-after-free. Deferring the deletion to the event loop is the safe way.
+        impl.m_source->deleteLater();
+        impl.m_source.release();
     }
 
     impl.m_callback = nullptr;
     impl.m_window.clear();
+    impl.m_lastFrequency = 0.0;
+    impl.m_silenceFrames = 0;
 }
 
 }    // namespace musichien::infrastructure

@@ -583,4 +583,18 @@ TEST( ExerciseSessionTest, two_mistakes_turn_the_question_in_progress_guided )
     EXPECT_EQ( QuestionKind::Direction, session.currentQuestion().kind );
 }
 
+TEST( ExerciseSessionTest, a_session_can_ask_to_sing_instead_of_naming )
+{
+    SessionSettings settings;
+    settings.singQuestionShare = 100;    // toute la session est chantee
+
+    ExerciseSession session{ 7, settings };
+
+    EXPECT_EQ( QuestionKind::Sing, session.currentQuestion().kind );
+
+    // Une question chantee n'offre rien a choisir : la voix est la reponse, et elle peut etre juste...
+    EXPECT_TRUE( session.answerSung( true ) );
+    EXPECT_EQ( 1, session.score().streak() );
+}
+
 }    // namespace musichien::domain

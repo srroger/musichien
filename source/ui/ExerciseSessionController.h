@@ -41,6 +41,8 @@
 namespace musichien::ui
 {
 
+class MicrophoneController;
+
 // Called when a wrong answer should be FELT, not only seen.
 //
 // An empty function means "this device cannot vibrate", which is the honest description of a development
@@ -278,6 +280,14 @@ public:
     // The player says which way the interval went, on a guided question: 0 up, 1 down.
     Q_INVOKABLE void answerDirection( int p_direction );
 
+    // The player sang, on a sung question. Whether it was right comes from the microphone controller, which has
+    // listened and compared the sung interval to the target.
+    Q_INVOKABLE void answerSung( bool p_isCorrect );
+
+    // The microphone controller, injected so that a sung question can reach the voice. Null in the tests: a sung
+    // question then cannot be answered, but nothing breaks.
+    void setMicrophoneController( MicrophoneController * p_microphone );
+
     // The player asks for the answer, after the session said it may be revealed.
     Q_INVOKABLE void revealAnswer();
 
@@ -387,6 +397,9 @@ private:
 
     // Empty until a session starts: the bench is what the application shows before that.
     std::unique_ptr<domain::ExerciseSession> m_session;
+
+    // The microphone, for the sung questions. Null until the application wires it in; the tests leave it null.
+    MicrophoneController * m_microphone{ nullptr };
 
     // False until the end of the running session has been announced once. Reset when a session begins.
     bool m_sessionEndAnnounced{ false };

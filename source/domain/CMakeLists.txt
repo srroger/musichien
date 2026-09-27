@@ -23,6 +23,8 @@ musichienFunction_AddLibrary(domain
     audio/NotePlayer.h
     audio/NotePlayerFake.h
     audio/PitchDetector.h
+    audio/SungIntervalDetector.h
+    audio/SungIntervalDetector.cpp
     audio/ToneSynthesizer.h
     audio/ToneSynthesizer.cpp
     audio/SampledInstrument.h
@@ -69,6 +71,7 @@ if(MUSICHIEN_BUILD_TESTING)
         music/Interval_test.cpp
         music/Temperament_test.cpp
         audio/ToneSynthesizer_test.cpp
+        audio/SungIntervalDetector_test.cpp
         exercise/AnswerGrid_test.cpp
         exercise/AnecdoteBook_test.cpp
         exercise/ExerciseSession_test.cpp

@@ -31,6 +31,10 @@ ApplicationWindow {
     // Roger : "le saxophone a un volume et un timbre vraiment particulier, le jouer de maniere aleatoire
     // surtout la nuit peut etre desagreable". Un instrument qu'on ne veut pas doit donc pouvoir etre ecarte,
     // et le choix doit SURVIVRE au lancement suivant - un reglage qui s'oublie n'est pas un reglage.
+    // Un ComboBox aux couleurs du jeu.
+    // Pourquoi un composant : le style Material peint la CASE sur fond clair ET la LISTE ouverte sur fond blanc.
+    // Regler seulement `background` ne suffit donc pas - un texte clair sur une liste blanche reste illisible. Il
+    // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
 
     id: mainWindow
 
@@ -82,6 +86,18 @@ ApplicationWindow {
         return "#f2848e";
     }
 
+    // La couleur du verdict de chant : vert quand l'intervalle entendu est le bon, rouge sinon.
+    function singingVerdictColor() {
+        var verdict = MicrophoneController.sungVerdict;
+        if (verdict === 1)
+            return "#7ee8a2";
+
+        if (verdict === 2)
+            return "#f2848e";
+
+        return "#8a77ad";
+    }
+
     // Plays the interval at a given distance, then reveals the feedback.
     // The distance is all this screen knows how to say about an interval: it never names one, never
     // decides whether one is simple or compound, and never builds one. It asks, then it displays what
@@ -128,86 +144,6 @@ ApplicationWindow {
     // Leaving the screen must never leave an audio stream open: on a phone that is a battery drain,
     // and a bug. The view model was given a method for exactly this call.
     onClosing: IntervalController.stopPlayback()
-
-    // La police musicale, embarquee dans les ressources : les polices Android par defaut n'ont pas la clef de Sol.
-    FontLoader {
-        id: musicFont
-
-        source: "qrc:/assets/fonts/NotoMusic-Regular.ttf"
-    }
-
-    // Un ComboBox aux couleurs du jeu.
-    //
-    // Pourquoi un composant : le style Material peint la CASE sur fond clair ET la LISTE ouverte sur fond blanc.
-    // Regler seulement `background` ne suffit donc pas - un texte clair sur une liste blanche reste illisible. Il
-    // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
-    //
-    // Un composant inline plutot qu'un fichier : il n'est utile qu'ici, et il evite de dupliquer trois fois le meme
-    // style pour les trois listes de la page.
-    component DarkComboBox: ComboBox {
-        id: combo
-
-        Layout.fillWidth: true
-
-        contentItem: Text {
-            text: combo.displayText
-            color: "#ffffff"
-            verticalAlignment: Text.AlignVCenter
-            leftPadding: 10
-        }
-
-        delegate: ItemDelegate {
-            width: combo.width
-
-            contentItem: Text {
-                text: modelData
-                color: "#e8dcff"
-                verticalAlignment: Text.AlignVCenter
-            }
-
-            // La ligne survolee : sans ca, on ne sait pas ce qu'on est en train de choisir.
-            background: Rectangle {
-                color: combo.highlightedIndex === index ? "#3a1f5c" : "transparent"
-            }
-
-        }
-
-        background: Rectangle {
-            color: "#1b1035"
-            radius: 8
-            border.width: 1
-            border.color: "#5c4a80"
-        }
-
-        popup: Popup {
-            y: combo.height - 1
-            width: combo.width
-            implicitHeight: Math.min(contentItem.implicitHeight, 240)
-            padding: 1
-
-            contentItem: ListView {
-                clip: true
-                implicitHeight: contentHeight
-                currentIndex: combo.highlightedIndex
-                // Le modele n'est lu que quand la liste est ouverte : c'est le motif du style d'origine, et il
-                // evite de construire les lignes d'une liste que personne ne regarde.
-                model: combo.popup.visible ? combo.delegateModel : null
-
-                ScrollIndicator.vertical: ScrollIndicator {
-                }
-
-            }
-
-            background: Rectangle {
-                color: "#241442"
-                radius: 8
-                border.width: 1
-                border.color: "#5c4a80"
-            }
-
-        }
-
-    }
 
     Rectangle {
         // The loop itself, and the only thing the player ever sees of it: the bench below is a tool for
@@ -365,6 +301,16 @@ ApplicationWindow {
                         Layout.preferredHeight: 46
                         text: qsTr("Mode infini")
                         onClicked: ExerciseController.startInfiniteSession()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Chanter")
+                        onClicked: {
+                            MicrophoneController.startSingingSession();
+                            singingDialog.open();
+                        }
                     }
 
                     Button {
@@ -812,6 +758,8 @@ ApplicationWindow {
                     border.color: "#5c4a80"
 
                     ColumnLayout {
+                        // --- Chanter un intervalle -----------------------------------------------------------
+
                         id: microphoneColumn
 
                         anchors.left: parent.left
@@ -834,59 +782,8 @@ ApplicationWindow {
                             onActivated: MicrophoneController.selectDevice(index)
                         }
 
-                        // La portee miniature : cinq lignes, une boule qui suit la hauteur. Le ratio est logarithmique,
-                        // donc la boule monte d'une octave pour un doublement de frequence, comme une vraie note.
-                        Item {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 90
-
-                            // La clef de Sol. Un simple glyphe : c'est le point de repere, et il sera
-                            // probablement configurable plus tard pour les exercices de solfege.
-                            Text {
-                                x: 2
-                                y: -2
-                                text: "\uD834\uDD1E"
-                                color: "#cbb8e8"
-                                font.pixelSize: 40
-                                font.family: musicFont.name
-                            }
-
-                            Repeater {
-                                model: 5
-
-                                delegate: Rectangle {
-                                    required property int index
-
-                                    x: 0
-                                    y: parent.height * (0.15 + index * 0.175)
-                                    width: parent.width
-                                    height: 1
-                                    color: "#5c4a80"
-                                }
-
-                            }
-
-                            Rectangle {
-                                id: pitchBall
-
-                                width: 18
-                                height: 18
-                                radius: 9
-                                visible: MicrophoneController.detectedFrequencyHz > 0
-                                color: mainWindow.tuningColor()
-                                x: parent.width / 2 - width / 2
-                                y: parent.height * (1 - MicrophoneController.detectedStaffFraction) - height / 2
-
-                                Behavior on y {
-                                    NumberAnimation {
-                                        duration: 60
-                                        easing.type: Easing.OutQuad
-                                    }
-
-                                }
-
-                            }
-
+                        // La portee miniature : la boule suit la hauteur chantee. Le composant StaffBall porte le style.
+                        StaffBall {
                         }
 
                         // La note la plus proche, l'ecart en cents, et la couleur : c'est un ACCORDEUR, et il sert
@@ -933,6 +830,136 @@ ApplicationWindow {
                     Layout.alignment: Qt.AlignRight
                     text: qsTr("Fermer")
                     onClicked: settingsDialog.close()
+                }
+
+            }
+
+        }
+
+    }
+
+    // L'exercice de chant : une petite serie d'intervalles a chanter, jugee par le detecteur. Le bouton "Ecouter"
+    // est le niveau debutant (on entend la cible), ne pas l'ecouter est le niveau avance (il ne reste que le nom).
+    Dialog {
+        id: singingDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 420)
+        height: Math.min(mainWindow.height * 0.9, singingColumn.implicitHeight + 32)
+        modal: true
+        padding: 16
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        contentItem: ScrollView {
+            clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+            ColumnLayout {
+                id: singingColumn
+
+                width: parent.width
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#ffffff"
+                    font.pixelSize: 20
+                    font.bold: true
+                    text: qsTr("Chanter")
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    text: qsTr("Question %1 / %2 · %3 juste(s)").arg(MicrophoneController.singingQuestionIndex).arg(MicrophoneController.singingTotalQuestions).arg(MicrophoneController.singingCorrectCount)
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#ffffff"
+                    font.pixelSize: 20
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                    text: MicrophoneController.singingTargetLabel
+                }
+
+                // La boule sur la portee, pendant que le joueur chante.
+                StaffBall {
+                }
+
+                // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
+                // C'est le feedback qui dit au chanteur si sa note TIENT ou si elle glisse.
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 8
+                    radius: 4
+                    color: "#1b1035"
+
+                    Rectangle {
+                        height: 8
+                        radius: 4
+                        color: "#8ef2b0"
+                        width: parent.width * MicrophoneController.sungStability
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#cbb8e8"
+                    font.pixelSize: 13
+                    text: MicrophoneController.hasSungInterval ? qsTr("Deux notes entendues.") : (MicrophoneController.hasFirstNote ? qsTr("Première note tenue — maintenant la deuxième") : qsTr("Tiens la première note…"))
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Écouter")
+                        onClicked: MicrophoneController.playSingingTarget()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        highlighted: MicrophoneController.isSingingCaptureActive
+                        text: MicrophoneController.isSingingCaptureActive ? qsTr("J'écoute…") : qsTr("Je chante")
+                        onClicked: MicrophoneController.isSingingCaptureActive ? MicrophoneController.stopSingingCapture() : MicrophoneController.startSingingCapture()
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: mainWindow.singingVerdictColor()
+                    font.pixelSize: 18
+                    font.bold: true
+                    visible: MicrophoneController.hasSungInterval
+                    text: MicrophoneController.sungVerdict === 1 ? qsTr("Juste !") : qsTr("Raté — entendu : %1 demi-tons").arg(MicrophoneController.sungSemitones)
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    text: MicrophoneController.singingSessionOver ? qsTr("Recommencer") : qsTr("Suivant")
+                    onClicked: MicrophoneController.singingSessionOver ? MicrophoneController.startSingingSession() : MicrophoneController.newSingingQuestion()
+                }
+
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    text: qsTr("Fermer")
+                    onClicked: singingDialog.close()
                 }
 
             }
@@ -1031,6 +1058,73 @@ ApplicationWindow {
 
         interval: 6000
         onTriggered: mainWindow.feedbackVisible = false
+    }
+
+    // Un composant inline plutot qu'un fichier : il n'est utile qu'ici, et il evite de dupliquer trois fois le meme
+    // style pour les trois listes de la page.
+    component DarkComboBox: ComboBox {
+        id: combo
+
+        Layout.fillWidth: true
+
+        contentItem: Text {
+            text: combo.displayText
+            color: "#ffffff"
+            verticalAlignment: Text.AlignVCenter
+            leftPadding: 10
+        }
+
+        delegate: ItemDelegate {
+            width: combo.width
+
+            contentItem: Text {
+                text: modelData
+                color: "#e8dcff"
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            // La ligne survolee : sans ca, on ne sait pas ce qu'on est en train de choisir.
+            background: Rectangle {
+                color: combo.highlightedIndex === index ? "#3a1f5c" : "transparent"
+            }
+
+        }
+
+        background: Rectangle {
+            color: "#1b1035"
+            radius: 8
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        popup: Popup {
+            y: combo.height - 1
+            width: combo.width
+            implicitHeight: Math.min(contentItem.implicitHeight, 240)
+            padding: 1
+
+            contentItem: ListView {
+                clip: true
+                implicitHeight: contentHeight
+                currentIndex: combo.highlightedIndex
+                // Le modele n'est lu que quand la liste est ouverte : c'est le motif du style d'origine, et il
+                // evite de construire les lignes d'une liste que personne ne regarde.
+                model: combo.popup.visible ? combo.delegateModel : null
+
+                ScrollIndicator.vertical: ScrollIndicator {
+                }
+
+            }
+
+            background: Rectangle {
+                color: "#241442"
+                radius: 8
+                border.width: 1
+                border.color: "#5c4a80"
+            }
+
+        }
+
     }
 
 }

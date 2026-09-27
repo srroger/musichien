@@ -294,13 +294,17 @@ int main( int p_argumentCount, char * p_arguments[] )
 
           return std::make_unique<musichien::infrastructure::QAudioPitchDetector>( inputDevices.at( p_deviceIndex ) );
       },
-      &playerLevelStore };
+      &playerLevelStore,
+      &notePlayer };
 
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,
                                   QML_MODULE_MINOR_VERSION,
                                   "MicrophoneController",
                                   &microphoneController );
+
+    // La session peut poser des questions CHANTEES : elle a besoin du micro pour les juger.
+    exerciseController.setMicrophoneController( &microphoneController );
 
     // What the player WANTS to hear. The filtering happens HERE, in the wiring layer, which is what keeps the
     // audio adapter from having to know anything about preferences - and it happens again on every change, so

@@ -363,6 +363,83 @@ Item {
 
             }
 
+            // Le chant : quand la question le demande, la grille s'efface et il ne reste qu'a chanter. La portee, la
+            // boule et la barre de stabilite sont le composant partage avec l'accordeur ; seule la cible change.
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: ExerciseController.questionKind === 2
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#ffffff"
+                    font.pixelSize: 22
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Chante : %1").arg(MicrophoneController.singingTargetLabel)
+                }
+
+                StaffBall {
+                    Layout.preferredHeight: 120
+                }
+
+                // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 8
+                    radius: 4
+                    color: "#1b1035"
+
+                    Rectangle {
+                        height: 8
+                        radius: 4
+                        color: "#8ef2b0"
+                        width: parent.width * MicrophoneController.sungStability
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#cbb8e8"
+                    font.pixelSize: 13
+                    visible: !MicrophoneController.hasSungInterval
+                    text: MicrophoneController.hasFirstNote ? qsTr("Première note tenue — maintenant la deuxième") : qsTr("Tiens la première note…")
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Écouter")
+                        onClicked: MicrophoneController.playSingingTarget()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        highlighted: MicrophoneController.isSingingCaptureActive
+                        text: MicrophoneController.isSingingCaptureActive ? qsTr("J'écoute…") : qsTr("Je chante")
+                        onClicked: MicrophoneController.isSingingCaptureActive ? MicrophoneController.stopSingingCapture() : MicrophoneController.startSingingCapture()
+                    }
+
+                }
+
+                Connections {
+                    function onSungIntervalChanged() {
+                        if (ExerciseController.questionKind === 2 && MicrophoneController.hasSungInterval)
+                            ExerciseController.answerSung(MicrophoneController.sungVerdict === 1);
+
+                    }
+
+                    target: MicrophoneController
+                }
+
+            }
+
             // Douze places, trente degres chacune, la premiere a midi : do en haut, puis les quintes dans le sens
             // des aiguilles d'une montre. C'est exactement la disposition d'un vrai cercle des quintes.
             Item {

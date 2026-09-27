@@ -1,7 +1,9 @@
 #include "ui/MicrophoneController.h"
 
+#include "domain/audio/NotePlayer.h"
 #include "domain/audio/PitchDetector.h"
 #include "domain/exercise/PlayerPreferences.h"
+#include "domain/music/Interval.h"
 #include "domain/music/Note.h"
 #include "domain/music/Temperament.h"
 
@@ -10,6 +12,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -132,11 +135,13 @@ constexpr double OFF_CENTS = 20.0;
 MicrophoneController::MicrophoneController( QStringList p_deviceNames,
                                             DetectorFactory p_factory,
                                             musichien::domain::PlayerPreferences * p_preferences,
+                                            musichien::domain::NotePlayer * p_notePlayer,
                                             QObject * p_parent )
   : QObject{ p_parent }
   , m_deviceNames{ std::move( p_deviceNames ) }
   , m_factory{ std::move( p_factory ) }
   , m_preferences{ p_preferences }
+  , m_notePlayer{ p_notePlayer }
 {
     // An empty list would leave the ComboBox with nothing to show. The message says what to LOOK AT: on a desktop
     // this is almost always a sound card whose active profile has no input - the microphone exists, ALSA sees it, and
@@ -145,6 +150,9 @@ MicrophoneController::MicrophoneController( QStringList p_deviceNames,
     {
         m_deviceNames = { tr( "Aucune entrée audio détectée — vérifie le profil de ta carte son (entrée stéréo)" ) };
     }
+
+    // Une premiere cible des l'ouverture : la page de chant ne doit jamais s'afficher sans rien a chanter.
+    newSingingQuestion();
 }
 
 MicrophoneController::~MicrophoneController() = default;
@@ -205,6 +213,124 @@ void MicrophoneController::stopTest()
     onPitch( 0.0F );
 }
 
+void MicrophoneController::newSingingQuestion()
+{
+    // Une petite liste d'intervalles CHANTABLES : on reste dans l'octave, et on ecarte pour l'instant ce que la voix
+    // trouve le plus dur (la seconde mineure, le triton). Une grosse tolerance vaut mieux qu'un exercice decourageant.
+    constexpr std::array<int, 5> SINGABLE_SEMITONES{ 2, 3, 4, 5, 7 };
+
+    std::uniform_int_distribution<std::size_t> distribution{ 0, SINGABLE_SEMITONES.size() - 1 };
+
+    m_singingTargetSemitones = SINGABLE_SEMITONES.at( distribution( m_singingRandomEngine ) );
+
+    m_sungIntervalDetector.reset();
+
+    emit singingTargetChanged();
+    emit sungIntervalChanged();
+}
+
+void MicrophoneController::setSingingTarget( int p_semitones )
+{
+    m_singingTargetSemitones = p_semitones;
+    m_sungIntervalDetector.reset();
+
+    emit singingTargetChanged();
+    emit sungIntervalChanged();
+}
+
+void MicrophoneController::playSingingTarget()
+{
+    if( m_notePlayer == nullptr )
+    {
+        return;
+    }
+
+    // Le mode DEBUTANT : on entend l'intervalle, puis on le chante. Le mode avance n'appelle simplement pas ceci.
+    const std::array<domain::Note, 2> notes{ domain::Note{ 60 },
+                                             domain::Note{ 60 + m_singingTargetSemitones } };
+
+    m_notePlayer->playMelody( notes, std::chrono::milliseconds{ 400 } );
+}
+
+void MicrophoneController::startSingingCapture()
+{
+    m_sungIntervalDetector.reset();
+    m_isSingingCaptureActive = true;
+    m_pitchClock.start();
+
+    emit sungIntervalChanged();
+    emit singingCaptureStateChanged();
+
+    // La meme porte que le test du micro : la permission runtime est demandee une fois, au premier usage.
+    startTest();
+}
+
+void MicrophoneController::stopSingingCapture()
+{
+    m_isSingingCaptureActive = false;
+
+    emit singingCaptureStateChanged();
+
+    stopTest();
+}
+
+QString MicrophoneController::singingTargetLabel() const
+{
+    const QString identifier = QString::fromStdString( domain::Interval{ m_singingTargetSemitones }.identifier() );
+
+    // Le nom francais : une etiquette d'ECRAN, pas une regle du jeu. L'identifiant, lui, vient du domaine, comme sur
+    // les boutons du banc d'essai.
+    QString frenchName;
+
+    switch( m_singingTargetSemitones )
+    {
+        case 2:
+            frenchName = tr( "seconde majeure" );
+            break;
+        case 3:
+            frenchName = tr( "tierce mineure" );
+            break;
+        case 4:
+            frenchName = tr( "tierce majeure" );
+            break;
+        case 5:
+            frenchName = tr( "quarte juste" );
+            break;
+        case 7:
+            frenchName = tr( "quinte juste" );
+            break;
+        default:
+            frenchName = QString::fromStdString( domain::Interval{ m_singingTargetSemitones }.name() );
+            break;
+    }
+
+    // Les cibles sont toujours MONTANTES pour l'instant ; le jour ou l'on en tirera des descendantes, le mot suivra.
+    return QStringLiteral( "%1 · %2 %3" ).arg( identifier ).arg( frenchName ).arg( tr( "ascendante" ) );
+}
+
+void MicrophoneController::startSingingSession()
+{
+    m_singingQuestionIndex = 0;
+    m_singingCorrectCount = 0;
+
+    emit singingQuestionChanged();
+
+    newSingingQuestion();
+}
+
+int MicrophoneController::sungVerdict() const
+{
+    const domain::SungIntervalDetector::Reading & reading = m_sungIntervalDetector.reading();
+
+    if( !reading.hasInterval() )
+    {
+        return 0;
+    }
+
+    // Un demi-ton de tolerance : chanter juste veut dire "la bonne note", pas "le bon cent".
+    return ( std::abs( reading.semitones() - m_singingTargetSemitones ) <= 1 ) ? 1 : 2;
+}
+
 void MicrophoneController::ensureDetector()
 {
     if( m_detector )
@@ -222,14 +348,15 @@ void MicrophoneController::onPitch( float p_frequencyHz )
 {
     const auto rawFrequency = static_cast<double>( p_frequencyHz );
 
-    // A light smoothing: on a noisy desktop YIN can flicker between two neighbouring notes, and a tuner should not.
-    // A jump of less than half a semitone blends with the previous reading; a real jump passes straight through.
+    // Inertie douce : la VOIX vibre, l'affichage ne doit pas. On garde 80% de la lecture precedente a chaque pas -
+    // c'est ce qui donne a la boule son mouvement lisse au lieu d'un tremblement de mesures instables.
+    constexpr double DISPLAY_SMOOTHING = 0.2;
+
     double frequency = rawFrequency;
 
-    if( m_detectedFrequencyHz > 0.0 && rawFrequency > 0.0
-        && std::abs( domain::centsBetween( rawFrequency, m_detectedFrequencyHz ) ) < 50.0 )
+    if( m_detectedFrequencyHz > 0.0 && rawFrequency > 0.0 )
     {
-        frequency = ( m_detectedFrequencyHz + rawFrequency ) / 2.0;
+        frequency = m_detectedFrequencyHz + ( ( rawFrequency - m_detectedFrequencyHz ) * DISPLAY_SMOOTHING );
     }
 
     m_detectedFrequencyHz = frequency;
@@ -286,6 +413,32 @@ void MicrophoneController::onPitch( float p_frequencyHz )
     emit detectedNoteLabelChanged();
     emit detectedCentsChanged();
     emit detectedTuningStateChanged();
+
+    // La question chantee : le detecteur a besoin du TEMPS reel ecoule entre deux lectures, et c'est l'horloge de ce
+    // controleur qui le lui donne - un detecteur sans horloge reste une regle pure, donc testable.
+    if( m_isSingingCaptureActive )
+    {
+        const auto elapsedMilliseconds = static_cast<std::int32_t>( m_pitchClock.restart() );
+
+        m_sungIntervalDetector.update( m_detectedFrequencyHz, referencePitch, elapsedMilliseconds );
+
+        if( m_sungIntervalDetector.reading().hasInterval() )
+        {
+            // La reponse est complete : on rend le micro, on compte, et on avance d'une question.
+            stopSingingCapture();
+
+            if( sungVerdict() == 1 )
+            {
+                ++m_singingCorrectCount;
+            }
+
+            ++m_singingQuestionIndex;
+
+            emit singingQuestionChanged();
+        }
+
+        emit sungIntervalChanged();
+    }
 }
 
 }    // namespace musichien::ui

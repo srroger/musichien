@@ -121,6 +121,13 @@ struct SessionSettings
     // screen flips.
     std::int32_t directionQuestionShare{ 0 };
 
+    // Share of questions, in percent, that ask the player to SING the interval instead of naming it.
+    //
+    // Twenty by default: enough that the voice shows up regularly in a session, small enough that the listening
+    // core stays the main game. Like the direction share, it is a RULE - the mixed session is one setting, not a
+    // separate screen.
+    std::int32_t singQuestionShare{ 20 };
+
     // Silence left between the two notes of a question, as heard.
     //
     // A musical value rather than a technical one: too short and the two notes sound like one glide,
@@ -137,7 +144,8 @@ struct SessionSettings
 enum class QuestionKind
 {
     NamedInterval,
-    Direction
+    Direction,
+    Sing
 };
 
 // A question, as the screen needs it.
@@ -228,6 +236,10 @@ public:
     // Refused on a question that asked for a name: the two answers are different languages, and accepting a
     // direction where an interval was expected would let a lucky tap score by accident.
     bool answerDirection( IntervalDirection p_direction );
+
+    // The player SANG the interval, on a sung question. Returns whether it was right. Nothing was picked from a
+    // grid - the voice is the answer, so there is no interval to record as "chosen".
+    bool answerSung( bool p_isCorrect );
 
     // The player gave up on this question and asked to see the answer. Worth nothing, and it costs
     // nothing: help is not a mistake.
