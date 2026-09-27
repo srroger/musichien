@@ -85,28 +85,30 @@ QVariantList ExerciseSessionController::gridPositions() const
 
     // Les choix ont deja ete decides par la session : lesquels, et combien. Ici on ne fait que les PLACER, ce
     // qui est la seule chose qui manquait pour que la grille devienne une carte.
-    const std::array<std::optional<domain::Interval>, domain::CIRCLE_OF_FIFTHS_SLOT_COUNT> layout =
+    const std::array<std::vector<domain::Interval>, domain::CIRCLE_OF_FIFTHS_SLOT_COUNT> layout =
       domain::layoutOnCircle( m_session->currentQuestion().choices );
 
     for( std::size_t slot = 0; slot < layout.size(); ++slot )
     {
         QVariantMap position;
         position.insert( QStringLiteral( "slot" ), static_cast<int>( slot ) );
-        position.insert( QStringLiteral( "isAvailable" ), layout.at( slot ).has_value() );
 
-        if( layout.at( slot ).has_value() )
+        // Une place porte PLUSIEURS intervalles, et c'est le coeur de la carte : une seconde majeure et une
+        // neuvieme majeure sont la meme couleur, donc la meme place, la meme teinte - et elles n'y sont
+        // distinguables que si les DEUX y sont posees.
+        //
+        // C'est aussi ce qui rend toute question repondable sans exception : la cible est toujours dans les
+        // choix, donc toujours sur sa place, quoi qu'elle partage avec ses voisines de classe. Une place qui
+        // n'aurait garde que le plus petit intervalle rendrait la neuvieme introuvable - ce que le bouton
+        // unique d'avant ne pouvait pas eviter, et qui avait coute un correctif.
+        QVariantList intervals;
+
+        for( const domain::Interval & interval : layout.at( slot ) )
         {
-            const QVariantMap description = describeInterval( *layout.at( slot ) );
-
-            position.insert( QStringLiteral( "semitones" ), description.value( QStringLiteral( "semitones" ) ) );
-            position.insert( QStringLiteral( "identifier" ), description.value( QStringLiteral( "identifier" ) ) );
-            position.insert( QStringLiteral( "name" ), description.value( QStringLiteral( "name" ) ) );
-
-            // La classe de l'intervalle, ET PAS SEULEMENT SA TAILLE : c'est elle qui porte la COULEUR d'une
-            // place. L'oublier donne un cercle tout gris - la carte perd d'un coup la moitie de ce qu'elle dit.
-            position.insert( QStringLiteral( "intervalClass" ),
-                             description.value( QStringLiteral( "intervalClass" ) ) );
+            intervals.append( describeInterval( interval ) );
         }
+
+        position.insert( QStringLiteral( "intervals" ), intervals );
 
         positions.append( position );
     }
@@ -240,7 +242,10 @@ QVariantList ExerciseSessionController::playerLevels()
                 return ExerciseSessionController::tr( "Jusqu'à l'octave" );
 
             case domain::PlayerLevel::BeyondTheOctave:
-                return ExerciseSessionController::tr( "Les composes" );
+                return ExerciseSessionController::tr( "Les composés" );
+
+            case domain::PlayerLevel::Master:
+                return ExerciseSessionController::tr( "Je maîtrise" );
         }
 
         return QString{};

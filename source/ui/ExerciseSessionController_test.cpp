@@ -494,4 +494,103 @@ TEST( ExerciseSessionControllerTest, the_levels_to_offer_are_ready_to_display )
     }
 }
 
+TEST( ExerciseSessionControllerTest, every_choice_is_on_the_circle_at_the_place_of_its_class )
+{
+    // Le bug que ce test surveille a coute une soiree de test a Roger : la carte ignorait silencieusement un
+    // intervalle quand un AUTRE de la meme classe occupait deja sa place. La question devenait alors impossible
+    // a repondre - le bouton affichait l'octave quand l'unisson etait demande - et rien n'echouait.
+    //
+    // La regle est donc verifiee pour CHAQUE intervalle offert, sur chaque question d'une session entiere, et
+    // non seulement pour la cible : tout ce que la session propose doit se retrouver sur la carte.
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    controller.startSession();
+
+    for( int question = 0; question < static_cast<int>( SESSION_QUESTION_COUNT ); ++question )
+    {
+        const QVariantList positions = controller.gridPositions();
+
+        ASSERT_EQ( domain::CIRCLE_OF_FIFTHS_SLOT_COUNT, static_cast<std::size_t>( positions.size() ) );
+
+        // Est-ce que cet intervalle se trouve bien sur la place de sa classe ?
+        const auto isPlaced = [&positions]( std::int32_t p_semitones ) {
+            const auto slot = static_cast<int>( domain::circleOfFifthsSlot( domain::Interval{ p_semitones } ) );
+
+            for( const QVariant & position : positions )
+            {
+                const QVariantMap map = position.toMap();
+
+                if( map.value( "slot" ).toInt() != slot )
+                {
+                    continue;
+                }
+
+                for( const QVariant & interval : map.value( "intervals" ).toList() )
+                {
+                    if( interval.toMap().value( "semitones" ).toInt() == p_semitones )
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        };
+
+        for( const QVariant & choice : controller.choices() )
+        {
+            const std::int32_t semitones = choice.toMap().value( "semitones" ).toInt();
+
+            EXPECT_TRUE( isPlaced( semitones ) ) << "l'intervalle de " << semitones << " demi-tons manque a sa place";
+        }
+
+        // La question est jouee jusqu'au verdict, pour que la suivante soit tiree a son tour.
+        answerCorrectly( controller );
+        controller.continueToNextQuestion();
+    }
+}
+
+TEST( ExerciseSessionControllerTest, a_place_holds_every_octave_of_its_class )
+{
+    // Le cas precis rapporte par Roger, et il est traitre parce qu'il n'arrive qu'avec les intervalles composes :
+    // quand l'unisson ET l'octave sont sur la table, ils visent la MEME place du cercle. La carte les ecrasait
+    // l'un par l'autre, et le joueur n'avait plus rien de juste a cliquer.
+    //
+    // Ce test CONSTRUIT la situation au lieu de l'attendre au hasard : la carte entiere, donc les trois octaves
+    // de la meme note sur la meme place.
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings = ascendingOnlySettings();
+
+    settings.startingPaletteSize = domain::SUPPORTED_INTERVAL_COUNT;
+    settings.choiceCount = domain::SUPPORTED_INTERVAL_COUNT;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+
+    // L'unisson, l'octave et la quinzieme sont la meme note a une ou deux octaves pres : une seule place.
+    const std::size_t unisonSlot = domain::circleOfFifthsSlot( domain::Interval{ 0 } );
+
+    ASSERT_EQ( unisonSlot, domain::circleOfFifthsSlot( domain::Interval{ 12 } ) );
+    ASSERT_EQ( unisonSlot, domain::circleOfFifthsSlot( domain::Interval{ 24 } ) );
+
+    QVariantList intervals;
+
+    for( const QVariant & position : controller.gridPositions() )
+    {
+        if( position.toMap().value( "slot" ).toInt() == static_cast<int>( unisonSlot ) )
+        {
+            intervals = position.toMap().value( "intervals" ).toList();
+        }
+    }
+
+    // Trois boutons sur une seule place, et dans l'ordre des octaves : le simple d'abord, ses composes a sa suite.
+    ASSERT_EQ( 3, intervals.size() );
+    EXPECT_EQ( 0, intervals.at( 0 ).toMap().value( "semitones" ).toInt() );
+    EXPECT_EQ( 12, intervals.at( 1 ).toMap().value( "semitones" ).toInt() );
+    EXPECT_EQ( 24, intervals.at( 2 ).toMap().value( "semitones" ).toInt() );
+}
+
 }    // namespace musichien::ui

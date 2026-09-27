@@ -246,12 +246,16 @@ bool ExerciseSession::isHintAvailable() const noexcept
     // choosing AND after the answer is known, where it becomes "that is how you could have remembered
     // it". It appears on the first mistake and stays for the rest of the question, because a new
     // question brings a new Question with a count back at zero.
-    return m_currentQuestion.wrongAttemptCount >= m_settings.wrongAttemptsBeforeHint;
+    //
+    // A mode that offers no aid at all cuts it here, at the source: nothing on the screen has to know
+    // that such a mode exists, and no screen can forget to check.
+    return m_settings.aidsAllowed
+           && ( m_currentQuestion.wrongAttemptCount >= m_settings.wrongAttemptsBeforeHint );
 }
 
 bool ExerciseSession::isHelpAvailable() const noexcept
 {
-    return ( m_state == SessionState::Asking )
+    return m_settings.aidsAllowed && ( m_state == SessionState::Asking )
            && ( m_currentQuestion.wrongAttemptCount >= m_settings.wrongAttemptsBeforeHelp );
 }
 

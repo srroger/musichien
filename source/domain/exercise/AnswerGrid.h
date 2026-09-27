@@ -107,7 +107,22 @@ inline constexpr std::size_t CIRCLE_OF_FIFTHS_SLOT_COUNT = 12;
 //
 // Une case vide est donc une INFORMATION : elle dit qu'il y a une place pour cet intervalle, et que la palette
 // ne l'a pas encore.
-[[nodiscard]] std::array<std::optional<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> layoutOnCircle(
+//
+// ---------------------------------------------------------------------------------------------------------------------
+// Pourquoi une LISTE par case, et pas un intervalle
+//
+// Parce que plusieurs intervalles partagent une place, et que c'est justement ce qu'il y a a apprendre.
+//
+// Une seconde majeure et une neuvieme majeure sont la MEME couleur - leur classe est la meme - donc la meme
+// place, le meme bouton, la meme teinte. Elles ne different que d'une octave, et distinguer l'une de l'autre
+// est exactement ce qu'un musicien appelle ENTENDRE L'OCTAVE. Une grille qui n'en montrerait qu'une - en
+// ecrasant l'autre - rendrait la question impossible a repondre : le joueur chercherait la neuvieme la ou elle
+// n'est pas.
+//
+// La liste est TRIEE du plus petit au plus grand, et cela compte : le simple vient en premier, ses composes
+// restent COLLES a lui, dans l'ordre des octaves. Le bouton du simple est donc toujours a la meme extremite de
+// la case, ce qui laisse au joueur un repere stable.
+[[nodiscard]] std::array<std::vector<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> layoutOnCircle(
   std::span<const Interval> p_choices );
 
 }    // namespace musichien::domain

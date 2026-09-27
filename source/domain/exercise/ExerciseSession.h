@@ -66,6 +66,17 @@ struct SessionSettings
     // discouraged, and the hint is a nudge where the "Réponse" button is a rescue.
     std::int32_t wrongAttemptsBeforeHint{ 1 };
 
+    // Whether the two aids are offered at all: the hint that nudges on the first mistake, and the button
+    // that gives the answer away after three.
+    //
+    // ONE flag for both, because "no aid" is one decision and not two: a mode where the player measures
+    // himself against the whole palette cannot afford either. Cutting only one of them would leave the
+    // other to give away the same answer.
+    //
+    // It is a RULE and not a setting of the screen, which is why it lives here with the others: the day
+    // the rules move to a data file, "Master offers no help" is a line of that file, not a line of QML.
+    bool aidsAllowed{ true };
+
     // Lives of the session. Empty means no limit: it is what the training mode of the first version
     // will use. The first playable loop keeps it finite, because a rule nobody can feel is a rule
     // nobody can judge.

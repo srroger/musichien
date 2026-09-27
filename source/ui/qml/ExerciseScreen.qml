@@ -340,6 +340,14 @@ Item {
                 Layout.preferredHeight: width
 
                 Repeater {
+                    // Les intervalles de la place, EMPILES dans la case : le simple en tete, ses composes colles
+                    // juste dessous, du plus petit au plus grand.
+                    // C'est la reponse a une question de Roger - "les composes colles a leur simple" - et c'est
+                    // aussi ce qui rend le dernier niveau jouable : sur une carte complete, trois intervalles
+                    // peuvent partager une case (l'unisson, l'octave, la quinzieme), et il faut pouvoir
+                    // designer CHACUN. Deux intervalles de la meme classe, c'est la meme couleur : la case
+                    // n'a donc qu'une teinte, et ce sont les boutons qui disent laquelle est laquelle.
+
                     model: ExerciseController.gridPositions
 
                     delegate: Item {
@@ -365,49 +373,75 @@ Item {
                             color: "#00000000"
                             border.width: 1
                             border.color: "#3a2a5c"
-                            visible: !choiceSlot.modelData.isAvailable
+                            visible: choiceSlot.modelData.intervals.length === 0
                         }
 
-                        Button {
-                            id: choiceButton
+                        // La case garde la meme hauteur quel que soit leur nombre : un bouton seul prend toute la
+                        // place et reste le rond d'avant, deux ou trois se partagent la hauteur. Rien ne bouge
+                        // d'une question a l'autre sur le cercle.
+                        Column {
+                            id: choiceStack
 
                             anchors.fill: parent
-                            visible: choiceSlot.modelData.isAvailable
-                            text: choiceSlot.modelData.isAvailable ? choiceSlot.modelData.identifier : ""
-                            highlighted: exerciseScreen.hasAnswered && (exerciseScreen.answeredInterval.semitones === choiceSlot.modelData.semitones)
-                            onClicked: ExerciseController.answer(choiceSlot.modelData.semitones)
-                            scale: choiceButton.down ? 0.9 : 1
+                            spacing: 3
+                            visible: choiceSlot.modelData.intervals.length > 0
 
-                            Behavior on scale {
-                                NumberAnimation {
-                                    duration: 90
-                                }
+                            Repeater {
+                                model: choiceSlot.modelData.intervals
 
-                            }
+                                delegate: Button {
+                                    id: intervalButton
 
-                            background: Rectangle {
-                                radius: width / 2
-                                color: choiceSlot.modelData.isAvailable ? exerciseScreen.colourForInterval(choiceSlot.modelData) : "#00000000"
-                                border.width: choiceButton.highlighted ? 3 : 0
-                                border.color: "#ffffff"
-                                opacity: ExerciseController.isAsking ? 1 : 0.72
+                                    required property var modelData
+                                    // Toute la hauteur, moins les intervalles qui separent les boutons : ce qui
+                                    // reste, partage entre eux. Un seul intervalle donne donc exactement la case
+                                    // entiere, et le rond d'autrefois.
+                                    readonly property int intervalCount: choiceSlot.modelData.intervals.length
 
-                                Behavior on opacity {
-                                    NumberAnimation {
-                                        duration: 180
+                                    width: parent.width
+                                    height: (parent.height - ((intervalCount - 1) * choiceStack.spacing)) / intervalCount
+                                    text: modelData.identifier
+                                    highlighted: exerciseScreen.hasAnswered && (exerciseScreen.answeredInterval.semitones === intervalButton.modelData.semitones)
+                                    onClicked: ExerciseController.answer(intervalButton.modelData.semitones)
+                                    scale: intervalButton.down ? 0.9 : 1
+
+                                    Behavior on scale {
+                                        NumberAnimation {
+                                            duration: 90
+                                        }
+
+                                    }
+
+                                    background: Rectangle {
+                                        radius: height / 2
+                                        color: exerciseScreen.colourForInterval(intervalButton.modelData)
+                                        border.width: intervalButton.highlighted ? 3 : 0
+                                        border.color: "#ffffff"
+                                        opacity: ExerciseController.isAsking ? 1 : 0.72
+
+                                        Behavior on opacity {
+                                            NumberAnimation {
+                                                duration: 180
+                                            }
+
+                                        }
+
+                                    }
+
+                                    contentItem: Text {
+                                        text: intervalButton.text
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                        color: "#2b1b47"
+                                        // La police suit la hauteur du bouton : dix-huit pixels pour un rond plein,
+                                        // neuf pour une pastille partagee en trois. Sans cela, le texte du dernier
+                                        // niveau deborderait de sa case.
+                                        font.pixelSize: Math.max(9, Math.min(14, intervalButton.height * 0.45))
+                                        font.bold: true
                                     }
 
                                 }
 
-                            }
-
-                            contentItem: Text {
-                                text: choiceButton.text
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                color: "#2b1b47"
-                                font.pixelSize: 14
-                                font.bold: true
                             }
 
                         }

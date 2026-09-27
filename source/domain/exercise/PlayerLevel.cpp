@@ -57,6 +57,25 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             settings.successesBeforeWidening = 2;
             settings.choiceCount = 8;
             break;
+
+        case PlayerLevel::Master:
+            // TOUTE la carte des le premier coup : les vingt-cinq intervalles que l'application connait, du
+            // simple a la quinzieme - deux octaves pleines.
+            //
+            // La palette n'a plus rien a elargir, et c'est le domaine lui-meme qui s'en charge : widenPalette
+            // s'arrete quand tout est en jeu. Elle n'a surtout rien a RETRECIR, ce qui est le vrai piege de ce
+            // niveau : narrowPalette ne descend jamais sous la taille de depart, et une grille qui se vide sur
+            // une erreur ne serait plus la carte entiere que ce mode promet.
+            settings.startingPaletteSize = SUPPORTED_INTERVAL_COUNT;
+
+            // Les vingt-cinq, donc : plus de leurres choisis dans le voisinage, plus rien a eliminer. Le joueur
+            // entend un intervalle et il le NOMME, sur une carte complete. C'est tout l'interet, et c'est aussi
+            // ce qui rend le mode mesurable : aucune question ne peut etre reussie par deducation.
+            settings.choiceCount = SUPPORTED_INTERVAL_COUNT;
+
+            // Aucune aide : ni l'indice qui souffle, ni le bouton qui donne la reponse.
+            settings.aidsAllowed = false;
+            break;
     }
 
     return settings;

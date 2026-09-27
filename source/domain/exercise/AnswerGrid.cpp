@@ -135,21 +135,29 @@ std::vector<Interval> AnswerGrid::build( std::span<const Interval> p_palette,
     return choices;
 }
 
-std::array<std::optional<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> layoutOnCircle(
+std::array<std::vector<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> layoutOnCircle(
   std::span<const Interval> p_choices )
 {
-    std::array<std::optional<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> slots{};
+    std::array<std::vector<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> slots{};
 
     for( const Interval & choice : p_choices )
     {
-        const std::size_t slot = circleOfFifthsSlot( choice );
+        // Deux intervalles de la MEME CLASSE - une tierce majeure et une dixieme majeure - visent la meme place,
+        // et c'est voulu : c'est la meme couleur, un octave plus haut. Tous les deux y sont poses, parce que le
+        // joueur doit pouvoir DESIGNE l'un ou l'autre : c'est la seule facon de lui demander de les distinguer.
+        std::vector<Interval> & intervals = slots.at( circleOfFifthsSlot( choice ) );
 
-        // Deux intervalles de la MEME CLASSE - une tierce mineure et une dixieme mineure - visent la meme place.
-        // Le plus petit garde la sienne, parce que c'est celui que la carte doit montrer.
-        if( !slots.at( slot ).has_value() || ( choice.semitones() < slots.at( slot )->semitones() ) )
-        {
-            slots.at( slot ) = choice;
-        }
+        intervals.push_back( choice );
+    }
+
+    // Du plus petit au plus grand, dans chaque case : le simple en tete, ses composes a sa suite. Un intervalle
+    // donne garde ainsi la meme extremite de la case quelle que soit la question, ce qui donne a l'oeil un
+    // repere qui ne bouge pas.
+    for( std::vector<Interval> & intervals : slots )
+    {
+        std::ranges::sort( intervals, []( const Interval & p_left, const Interval & p_right ) {
+            return p_left.semitones() < p_right.semitones();
+        } );
     }
 
     return slots;

@@ -253,13 +253,55 @@ TEST( AnswerGridTest, a_choice_that_disappears_leaves_a_hole_and_moves_nothing )
     EXPECT_NE( fifthSlot, thirdSlot );
 
     // La quinte est a la meme place dans les deux cas...
-    ASSERT_TRUE( fullLayout.at( fifthSlot ).has_value() );
-    EXPECT_TRUE( narrowedLayout.at( fifthSlot ).has_value() );
-    EXPECT_EQ( 7, narrowedLayout.at( fifthSlot )->semitones() );
+    ASSERT_FALSE( fullLayout.at( fifthSlot ).empty() );
+    ASSERT_FALSE( narrowedLayout.at( fifthSlot ).empty() );
+    EXPECT_EQ( 7, narrowedLayout.at( fifthSlot ).front().semitones() );
 
     // ...et la tierce laisse simplement sa case VIDE.
-    EXPECT_TRUE( fullLayout.at( thirdSlot ).has_value() );
-    EXPECT_FALSE( narrowedLayout.at( thirdSlot ).has_value() );
+    EXPECT_FALSE( fullLayout.at( thirdSlot ).empty() );
+    EXPECT_TRUE( narrowedLayout.at( thirdSlot ).empty() );
+}
+
+TEST( AnswerGridTest, a_compound_stays_glued_to_its_simple_on_the_same_place )
+{
+    // Une seconde majeure et une neuvieme majeure sont la MEME couleur : leur classe est la meme, donc leur
+    // place sur le cercle est la meme. Et toutes les deux doivent y etre posees.
+    //
+    // C'est la difference entre une carte et une carte TRONQUEE : n'en montrer qu'une - en ecrasant l'autre -
+    // reviendrait a demander au joueur de designer la neuvieme la ou elle n'est pas affichee.
+    const Interval majorSecond{ 2 };
+    const Interval majorNinth{ 14 };
+
+    ASSERT_EQ( majorSecond.intervalClass(), majorNinth.intervalClass() );
+
+    const std::vector<Interval> choices{ majorNinth, majorSecond };
+
+    const auto layout = layoutOnCircle( choices );
+
+    const std::size_t slot = circleOfFifthsSlot( majorSecond );
+
+    ASSERT_EQ( 2U, layout.at( slot ).size() );
+
+    // Le simple d'abord, son compose colle juste derriere : la case a donc un sens de lecture constant, et le
+    // bouton du simple reste toujours de la meme extremite quelle que soit la question.
+    EXPECT_EQ( majorSecond.semitones(), layout.at( slot ).front().semitones() );
+    EXPECT_EQ( majorNinth.semitones(), layout.at( slot ).back().semitones() );
+}
+
+TEST( AnswerGridTest, a_class_holds_every_octave_of_it_in_one_place )
+{
+    // La classe zero est le cas extreme : l'unisson, l'octave et la quinzieme sont la MEME note a une ou deux
+    // octaves pres, et trois intervalles distincts. Une seule place, et les trois dessus.
+    const std::vector<Interval> choices{ Interval{ 24 }, Interval{ 0 }, Interval{ 12 } };
+
+    const auto layout = layoutOnCircle( choices );
+
+    const auto & slot = layout.at( circleOfFifthsSlot( Interval{ 0 } ) );
+
+    ASSERT_EQ( 3U, slot.size() );
+    EXPECT_EQ( 0, slot.at( 0 ).semitones() );
+    EXPECT_EQ( 12, slot.at( 1 ).semitones() );
+    EXPECT_EQ( 24, slot.at( 2 ).semitones() );
 }
 
 }    // namespace musichien::domain
