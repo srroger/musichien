@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <utility>
 
 namespace musichien::infrastructure
@@ -23,9 +24,15 @@ void AudioMixer::play( std::vector<float> p_samples, float p_gain )
         return;
     }
 
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    {
+        const std::lock_guard<std::mutex> lock{ m_mutex };
 
-    m_voices.push_back( Voice{ std::move( p_samples ), 0, p_gain } );
+        m_voices.push_back( Voice{ std::move( p_samples ), 0, p_gain } );
+    }
+
+    // Et on PREVIENT le peripherique : c'est ce signal qui le fait sortir de sa veille et le fait venir chercher des
+    // echantillons. Sans lui, un QIODevice sequentiel reste "vide" a ses yeux et rien ne sort jamais.
+    emit readyRead();
 }
 
 void AudioMixer::clear()
@@ -40,6 +47,30 @@ bool AudioMixer::isPlaying() const
     const std::lock_guard<std::mutex> lock{ m_mutex };
 
     return !m_voices.empty();
+}
+
+qint64 AudioMixer::bytesAvailable() const
+{
+    const std::lock_guard<std::mutex> lock{ m_mutex };
+
+    std::size_t remainingFrames = 0;
+
+    for( const Voice & voice : m_voices )
+    {
+        if( voice.position < voice.samples.size() )
+        {
+            remainingFrames = std::max( remainingFrames, voice.samples.size() - voice.position );
+        }
+    }
+
+    if( remainingFrames == 0 )
+    {
+        // Silence : on le dit, et le peripherique peut retourner en veille. C'est ce qui lui permet de rendre
+        // l'appareil audio quand plus rien ne joue.
+        return QIODevice::bytesAvailable();
+    }
+
+    return static_cast<qint64>( remainingFrames * static_cast<std::size_t>( m_channelCount ) * sizeof( float ) );
 }
 
 std::size_t AudioMixer::voiceCount() const

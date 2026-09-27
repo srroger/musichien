@@ -49,6 +49,13 @@ public:
     // True while at least one sound is still playing: the caller stops the sink when it goes false.
     [[nodiscard]] bool isPlaying() const;
 
+    // How many bytes are ready to be read.
+    //
+    // OVERRIDDEN, and this is not a detail - it is the whole reason the application was silent for a while. A
+    // sequential QIODevice that announces nothing to read is read as EMPTY, and the audio device then stays idle
+    // without ever asking for samples: the sound never comes out. The sink asks this method before pulling.
+    [[nodiscard]] qint64 bytesAvailable() const override;
+
     // How many sounds are being mixed right now. Exposed because it is what a test needs to see, and because it
     // makes the mixer's behaviour readable from the outside.
     [[nodiscard]] std::size_t voiceCount() const;

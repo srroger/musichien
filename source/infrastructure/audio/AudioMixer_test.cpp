@@ -1,5 +1,7 @@
 #include "infrastructure/audio/AudioMixer.h"
 
+#include <QObject>
+
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -85,11 +87,47 @@ TEST( AudioMixerTest, silence_is_written_when_nothing_plays )
 
     EXPECT_FALSE( mixer.isPlaying() );
 
+    // Rien a lire : le peripherique doit le savoir, sinon il reste en veille au lieu de rendre l'appareil.
+    EXPECT_EQ( 0, mixer.bytesAvailable() );
+
     // The buffer must still be FILLED: returning nothing would be read as "no data" and stall the stream.
     for( const float frame : mixer.readFrames( 16 ) )
     {
         EXPECT_FLOAT_EQ( 0.0F, frame );
     }
+}
+
+TEST( AudioMixerTest, a_sound_announces_itself_to_the_device )
+{
+    TestableMixer mixer{ TEST_SAMPLE_RATE, TEST_CHANNELS };
+
+    // C'EST LE BUG QUI A RENDU L'APPLICATION MUETTE : un QIODevice sequentiel qui n'annonce RIEN a lire est lu comme
+    // vide par le peripherique, qui reste alors en veille (IdleState) sans jamais venir chercher d'echantillons. Le
+    // son ne sort jamais, et rien ne plante : l'application est simplement silencieuse.
+    EXPECT_EQ( 0, mixer.bytesAvailable() );
+
+    mixer.play( std::vector<float>( 4, 0.5F ) );
+
+    // Une voix de quatre echantillons, un canal, des flottants de quatre octets.
+    EXPECT_EQ( static_cast<qint64>( 4 * sizeof( float ) ), mixer.bytesAvailable() );
+
+    // Et le signal qui reveille le peripherique a bien ete emis.
+    int readyReadCount = 0;
+
+    const auto connection = QObject::connect( &mixer, &QIODevice::readyRead, [&readyReadCount]() {
+        ++readyReadCount;
+    } );
+
+    mixer.play( std::vector<float>( 4, 0.5F ) );
+
+    EXPECT_EQ( 1, readyReadCount );
+
+    QObject::disconnect( connection );
+
+    // Une fois la voix consommee, plus rien a annoncer.
+    mixer.readFrames( 4 );
+
+    EXPECT_EQ( 0, mixer.bytesAvailable() );
 }
 
 TEST( AudioMixerTest, a_finished_sound_stops_playing )
