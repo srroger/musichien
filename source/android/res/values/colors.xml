@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Musichien - colours of the Android shell.
+
+    These are the colours of the WINDOW, not of the application: the application paints itself in QML. The
+    one here is the top of its gradient, so that the system bars blend into the game instead of framing it.
+-->
+<resources>
+    <color name="musichien_night">#FF1B1035</color>
+</resources>

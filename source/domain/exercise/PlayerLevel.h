@@ -1,0 +1,56 @@
+#pragma once
+
+// =====================================================================================================================
+// Musichien - PlayerLevel
+//
+// What the player already knows, in three rough steps.
+//
+// ---------------------------------------------------------------------------------------------------------------------
+// Why it exists, and why it is not a setting
+//
+// The first session must not be a formality. A player who already hears a fifth and a third would otherwise
+// be asked to tell two intervals apart for three questions in a row - and would close the application before
+// discovering the rest. Roger said it in one line: "j'ai déjà une bonne connaissance des intervalles jusqu'à
+// l'octave, et les accords mineurs ou majeurs ne sont plus un problème".
+//
+// It is deliberately NOT a setting, though: it is the first piece of the PROFILE - the thing the application
+// remembers about a player - and the difference matters. A setting is changed on a whim and explained in a
+// screen full of them; a profile is asked once, and puts the player on a path.
+//
+// The level does not change the RULES of the game: same ten questions, same lives, same scoring. It changes
+// where the player starts, and how fast the palette widens. That is all, and that is enough.
+// =====================================================================================================================
+
+#include "domain/exercise/ExerciseSession.h"
+
+#include <cstddef>
+#include <string_view>
+
+namespace musichien::domain
+{
+
+enum class PlayerLevel : std::size_t
+{
+    // Never played: two intervals nobody confuses, widening slowly.
+    Beginner = 0,
+
+    // Hears the obvious colours: a third, a fourth, a fifth.
+    Fluent = 1,
+
+    // Hears every simple interval, and wants the whole palette at once.
+    Advanced = 2
+};
+
+// How many levels there are, which is what a screen offering them needs to know.
+inline constexpr std::size_t PLAYER_LEVEL_COUNT = 3;
+
+// The rules of a session for a player of this level.
+[[nodiscard]] SessionSettings sessionSettingsFor( PlayerLevel p_level );
+
+// The level a stored number means, and Beginner for anything that is not a level.
+//
+// Reading a preference is reading a file a human can edit, and a corrupted value must cost the player his
+// settings, never a crash on start up.
+[[nodiscard]] PlayerLevel playerLevelFromIndex( std::size_t p_index ) noexcept;
+
+}    // namespace musichien::domain

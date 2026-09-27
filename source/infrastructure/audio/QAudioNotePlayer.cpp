@@ -208,6 +208,17 @@ void QAudioNotePlayer::playNote( const domain::Note & p_note )
         return;
     }
 
+    if( !m_instruments.empty() )
+    {
+        const std::span<const domain::Note> notes{ &p_note, 1 };
+
+        playSamples( instrumentFor( notes ).renderNote( p_note,
+                                                        noteDuration(),
+                                                        m_audioFormat.sampleRate() ) );
+
+        return;
+    }
+
     playSamples( m_synthesizer->renderNote( p_note, noteDuration() ) );
 }
 
@@ -218,6 +229,16 @@ void QAudioNotePlayer::playMelody( std::span<const domain::Note> p_notes,
 
     if( !m_synthesizer.has_value() )
     {
+        return;
+    }
+
+    if( !m_instruments.empty() )
+    {
+        playSamples( instrumentFor( p_notes ).renderMelody( p_notes,
+                                                            noteDuration(),
+                                                            p_gap,
+                                                            m_audioFormat.sampleRate() ) );
+
         return;
     }
 
@@ -233,7 +254,41 @@ void QAudioNotePlayer::playChord( std::span<const domain::Note> p_notes )
         return;
     }
 
+    if( !m_instruments.empty() )
+    {
+        playSamples( instrumentFor( p_notes ).renderChord( p_notes,
+                                                           noteDuration(),
+                                                           m_audioFormat.sampleRate() ) );
+
+        return;
+    }
+
     playSamples( m_synthesizer->renderChord( p_notes, noteDuration() ) );
+}
+
+void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_instruments )
+{
+    m_instruments = std::move( p_instruments );
+
+    m_instrumentIndex = 0;
+
+    m_lastPlayedNotes.clear();
+}
+
+const domain::SampledInstrument & QAudioNotePlayer::instrumentFor( std::span<const domain::Note> p_notes )
+{
+    const bool sameQuestion = ( p_notes.size() == m_lastPlayedNotes.size() ) && std::equal( p_notes.begin(), p_notes.end(), m_lastPlayedNotes.begin() );
+
+    if( !sameQuestion )
+    {
+        m_lastPlayedNotes.assign( p_notes.begin(), p_notes.end() );
+
+        std::uniform_int_distribution<std::size_t> distribution{ 0, m_instruments.size() - 1 };
+
+        m_instrumentIndex = distribution( m_instrumentRandomEngine );
+    }
+
+    return m_instruments.at( m_instrumentIndex );
 }
 
 void QAudioNotePlayer::playMistakeCue()

@@ -22,6 +22,8 @@ musichienFunction_AddLibrary(domain
     audio/NotePlayerFake.h
     audio/ToneSynthesizer.h
     audio/ToneSynthesizer.cpp
+    audio/SampledInstrument.h
+    audio/SampledInstrument.cpp
 
     # The exercise loop, as pure rules: no sound, no clock, no screen
     exercise/AnswerGrid.h
@@ -36,6 +38,11 @@ musichienFunction_AddLibrary(domain
     # The memory hooks, as content the domain holds and the infrastructure fills
     exercise/HintBook.h
     exercise/HintBook.cpp
+
+    # What the player already knows, and where the answer is remembered
+    exercise/PlayerLevel.h
+    exercise/PlayerLevel.cpp
+    exercise/PlayerPreferences.h
 )
 
 # Expose the module to the rest of the project under a stable name.
@@ -57,6 +64,7 @@ if(MUSICHIEN_BUILD_TESTING)
         exercise/ExerciseSession_test.cpp
         exercise/HintBook_test.cpp
         exercise/LearningOrder_test.cpp
+        exercise/PlayerLevel_test.cpp
         exercise/SessionScore_test.cpp
     )
 

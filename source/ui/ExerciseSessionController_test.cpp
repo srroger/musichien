@@ -395,4 +395,103 @@ TEST( ExerciseSessionControllerTest, an_interval_without_a_hint_shows_nothing )
     EXPECT_TRUE( controller.hintText().isEmpty() );
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// The level of the player
+//
+// Asked once, remembered, and used to decide where the sessions start. Three things, and the third is the one
+// that would be easy to lose: a level must never make the game unplayable.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionControllerTest, a_level_decides_where_the_sessions_start )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
+
+    // Nothing chosen yet, and that is a question to ask - not a default to assume.
+    EXPECT_FALSE( controller.hasChosenLevel() );
+
+    controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+
+    EXPECT_TRUE( controller.hasChosenLevel() );
+    EXPECT_EQ( static_cast<int>( domain::PlayerLevel::Advanced ), controller.playerLevel() );
+
+    // And it is REMEMBERED, which is the whole difference between a level and a setting.
+    EXPECT_TRUE( levelStore.storedLevel().has_value() );
+
+    controller.startSession();
+
+    // A player who says he knows the intervals is not asked to tell two of them apart: the grid he is offered
+    // is wide, where a beginner gets two choices.
+    EXPECT_GT( controller.choices().size(), 2 );
+}
+
+TEST( ExerciseSessionControllerTest, a_remembered_level_is_there_at_start_up )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    levelStore.storeLevel( domain::PlayerLevel::Advanced );
+
+    // No choosePlayerLevel call at all: the application opens on what it remembers.
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
+
+    EXPECT_TRUE( controller.hasChosenLevel() );
+    EXPECT_EQ( static_cast<int>( domain::PlayerLevel::Advanced ), controller.playerLevel() );
+}
+
+TEST( ExerciseSessionControllerTest, a_level_changes_the_palette_and_nothing_else )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
+
+    controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Beginner ) );
+    controller.startSession();
+
+    // The same ten questions, the same lives, the same scoring as always: a level says WHERE to start, never
+    // HOW the game is played.
+    EXPECT_EQ( SESSION_QUESTION_COUNT, controller.questionCount() );
+    EXPECT_EQ( 5, controller.lives() );
+
+    // A beginner gets the two intervals of the learning order, and not one more.
+    EXPECT_EQ( 2, controller.choices().size() );
+}
+
+TEST( ExerciseSessionControllerTest, an_application_with_nowhere_to_remember_still_runs )
+{
+    // No store at all, which is what a test or a machine without a writable settings file looks like. Nothing
+    // must depend on it.
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    EXPECT_FALSE( controller.hasChosenLevel() );
+    EXPECT_EQ( -1, controller.playerLevel() );
+
+    controller.startSession();
+
+    EXPECT_TRUE( controller.running() );
+}
+
+TEST( ExerciseSessionControllerTest, the_levels_to_offer_are_ready_to_display )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    const QVariantList levels = controller.playerLevels();
+
+    ASSERT_EQ( domain::PLAYER_LEVEL_COUNT, static_cast<std::size_t>( levels.size() ) );
+
+    for( int index = 0; index < levels.size(); ++index )
+    {
+        const QVariantMap level = levels.at( index ).toMap();
+
+        // Every entry an index and a name: the screen displays them and never composes one.
+        EXPECT_EQ( index, level.value( "index" ).toInt() );
+        EXPECT_FALSE( level.value( "name" ).toString().isEmpty() );
+    }
+}
+
 }    // namespace musichien::ui

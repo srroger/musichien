@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Musichien - the theme of the Android window.
+
+    Why this file exists, in one sentence: without it, the application inherits the PLATFORM DEFAULT theme,
+    which is a LIGHT one - and Roger found a white status bar with white icons on it, where nothing but the
+    battery could be read.
+
+    A status bar is drawn by the system, not by QML: no amount of styling inside the application can reach it.
+    The theme is the only lever, so the theme says two things - paint the bars in the colour the game starts
+    with, and use LIGHT icons on them.
+
+    The parent is a PLATFORM theme on purpose. Qt's own activity extends android.app.Activity (verified in
+    Qt's QtActivityBase, not assumed), so there is no AppCompat requirement to satisfy, and depending on a
+    library theme would only add a library to keep in step.
+-->
+<resources>
+    <style name="MusichienTheme" parent="@android:style/Theme.Material.NoActionBar">
+
+        <item name="android:statusBarColor">@color/musichien_night</item>
+        <item name="android:navigationBarColor">@color/musichien_night</item>
+
+        <!--
+            'Light' in the name of these two means a LIGHT BACKGROUND with dark icons. False is therefore what
+            asks for white icons, which is what a night blue bar needs. Both need API 23 and 27, and the
+            project requires 28: no version guard is needed anywhere.
+        -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>
