@@ -494,6 +494,13 @@ ApplicationWindow {
 
             }
 
+            CheckBox {
+                Layout.fillWidth: true
+                text: qsTr("Un rappel chaque jour")
+                checked: ExerciseController.dailyReminderEnabled
+                onClicked: ExerciseController.setDailyReminderEnabled(checked)
+            }
+
             Button {
                 Layout.alignment: Qt.AlignRight
                 text: qsTr("Fermer")
@@ -536,6 +543,18 @@ ApplicationWindow {
                 placeholderText: qsTr("Ton nom…")
                 text: ExerciseController.playerName
                 onEditingFinished: ExerciseController.setPlayerName(text)
+                // Le style Material ne connait pas le bleu nuit derriere lui : le texte restait noir sur sombre.
+                // La couleur est donc dite ici, comme pour les autres boutons de l'application.
+                color: "#ffffff"
+                placeholderTextColor: "#7a6a9e"
+
+                background: Rectangle {
+                    color: "#2a1a46"
+                    radius: 8
+                    border.width: 1
+                    border.color: "#5c4a80"
+                }
+
             }
 
             Text {
