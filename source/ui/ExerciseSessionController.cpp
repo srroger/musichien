@@ -56,6 +56,13 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
         m_settings = domain::sessionSettingsFor( *m_playerLevel );
     }
 
+    // The share of sung questions, remembered from the last time the player set it: it overrides the level's default,
+    // exactly like the level itself overrode the settings the caller passed.
+    if( m_levelStore != nullptr )
+    {
+        m_settings.singQuestionShare = m_levelStore->storedSingQuestionShare();
+    }
+
     // The instruments the player asked for. An empty list is a first run: everything is offered, which is what a
     // fresh installation should sound like.
     if( m_levelStore != nullptr )
@@ -255,6 +262,8 @@ void ExerciseSessionController::choosePlayerLevel( int p_level )
 
     if( m_levelStore != nullptr )
     {
+        m_settings.singQuestionShare = m_levelStore->storedSingQuestionShare();
+
         m_levelStore->storeLevel( level );
     }
 
@@ -845,6 +854,74 @@ void ExerciseSessionController::setReferencePitch( double p_hertz )
     emit referencePitchChanged();
 }
 
+int ExerciseSessionController::singQuestionShare() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedSingQuestionShare() : 20;
+}
+
+void ExerciseSessionController::setSingQuestionShare( int p_share )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    // A share is a percentage: outside the range it is a typo, not a setting.
+    if( p_share < 0 || p_share > 100 )
+    {
+        return;
+    }
+
+    m_levelStore->storeSingQuestionShare( p_share );
+
+    // The NEXT session takes the new share; a session already running keeps its own rules.
+    m_settings.singQuestionShare = p_share;
+
+    emit singQuestionShareChanged();
+}
+
+void ExerciseSessionController::listenToTarget()
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    // For a non-beginner, hearing the target first is help: it counts as a replay, and a replay reduces the
+    // experience earned. A beginner hears the target automatically, without penalty.
+    if( !isBeginner() )
+    {
+        m_session->registerReplay();
+    }
+
+    if( m_microphone != nullptr )
+    {
+        m_microphone->playSingingTarget();
+    }
+}
+
+void ExerciseSessionController::resetProfile()
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    // The score is wiped: experience, sessions and stars back to zero. The name and the level stay - they are
+    // choices, not a score.
+    m_levelStore->storeTotalExperience( 0 );
+    m_levelStore->storeSessionCount( 0 );
+    m_levelStore->storeStarCount( 0 );
+
+    emit totalExperienceChanged();
+    emit sessionChanged();
+}
+
+bool ExerciseSessionController::isBeginner() const noexcept
+{
+    return !m_playerLevel.has_value() || ( *m_playerLevel == domain::PlayerLevel::Beginner );
+}
+
 int ExerciseSessionController::reminderHour() const noexcept    // NOLINT(readability-convert-member-functions-to-static)
 {
     return 19;
@@ -894,6 +971,13 @@ void ExerciseSessionController::playCurrentQuestion()
     }
 
     const domain::Question & question = m_session->currentQuestion();
+
+    // Une question chantee n'est pas jouee d'office, sauf pour un debutant : les autres ont le bouton "Ecouter",
+    // et s'en servir coute de l'experience (voir listenToTarget).
+    if( ( question.kind == domain::QuestionKind::Sing ) && !isBeginner() )
+    {
+        return;
+    }
 
     const domain::Note rootNote{ question.rootMidiNumber };
     const domain::Note upperNote = rootNote.transposedBy( question.target.semitones() );

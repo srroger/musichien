@@ -416,7 +416,7 @@ Item {
                     Button {
                         Layout.fillWidth: true
                         text: qsTr("Écouter")
-                        onClicked: MicrophoneController.playSingingTarget()
+                        onClicked: ExerciseController.listenToTarget()
                     }
 
                     Button {

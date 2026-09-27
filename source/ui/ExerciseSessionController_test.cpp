@@ -733,4 +733,38 @@ TEST( ExerciseSessionControllerTest, the_tuning_is_remembered_and_stays_in_range
     EXPECT_EQ( 442.0, controller.referencePitch() );
 }
 
+TEST( ExerciseSessionControllerTest, the_sing_share_is_remembered_and_the_profile_can_be_reset )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    // Twenty per cent by default, and the share can be changed and remembered.
+    EXPECT_EQ( 20, controller.singQuestionShare() );
+
+    controller.setSingQuestionShare( 40 );
+
+    EXPECT_EQ( 40, controller.singQuestionShare() );
+    EXPECT_EQ( 40, levelStore.storedSingQuestionShare() );
+
+    // A value that makes no sense is refused.
+    controller.setSingQuestionShare( 150 );
+
+    EXPECT_EQ( 40, controller.singQuestionShare() );
+
+    // The profile: some history, then wiped clean.
+    levelStore.storeTotalExperience( 320 );
+    levelStore.storeSessionCount( 5 );
+    levelStore.storeStarCount( 2 );
+
+    EXPECT_EQ( 320, controller.totalExperience() );
+
+    controller.resetProfile();
+
+    EXPECT_EQ( 0, controller.totalExperience() );
+    EXPECT_EQ( 0, controller.sessionCount() );
+    EXPECT_EQ( 0, controller.starCount() );
+}
+
 }    // namespace musichien::ui

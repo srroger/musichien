@@ -764,6 +764,62 @@ ApplicationWindow {
 
                 }
 
+                // Le chant : combien de questions demandent de chanter l'intervalle au lieu de le nommer. Une regle de
+                // session que le joueur regle une fois, et les sessions suivantes s'y tiennent.
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    spacing: 6
+
+                    Text {
+                        Layout.fillWidth: true
+                        color: "#e8dcff"
+                        font.pixelSize: 14
+                        font.bold: true
+                        text: qsTr("Chant")
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        color: "#8a77ad"
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Part des questions chantées, en pour cent. 0 = jamais, 100 = tout chanter.")
+                    }
+
+                    SpinBox {
+                        Layout.preferredWidth: 150
+                        Layout.preferredHeight: 32
+                        Layout.alignment: Qt.AlignLeft
+                        from: 0
+                        to: 100
+                        stepSize: 5
+                        editable: true
+                        value: ExerciseController.singQuestionShare
+                        onValueModified: ExerciseController.setSingQuestionShare(value)
+
+                        contentItem: TextInput {
+                            text: parent.textFromValue(parent.value, parent.locale)
+                            color: "#ffffff"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 15
+                            validator: parent.validator
+                            inputMethodHints: Qt.ImhFormattedNumbersOnly
+                            readOnly: !parent.editable
+                        }
+
+                        background: Rectangle {
+                            color: "#1b1035"
+                            radius: 4
+                            border.width: 1
+                            border.color: "#5c4a80"
+                        }
+
+                    }
+
+                }
+
                 // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
                 // miniature au rythme de la voix - c'est l'affichage qu'aura la question chantee, expose ici d'abord.
                 Rectangle {
@@ -1063,6 +1119,14 @@ ApplicationWindow {
                 Layout.alignment: Qt.AlignRight
                 text: qsTr("Tester la notification")
                 onClicked: ExerciseController.testReminder()
+            }
+
+            // Remet l'experience, les sessions et les etoiles a zero. Le nom et le niveau restent : ce sont des
+            // choix, pas un score. Aucune confirmation pour l'instant - l'application est en developpement.
+            Button {
+                Layout.alignment: Qt.AlignRight
+                text: qsTr("Remise à zéro du profil")
+                onClicked: ExerciseController.resetProfile()
             }
 
             Button {

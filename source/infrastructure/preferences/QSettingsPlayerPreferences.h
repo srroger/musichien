@@ -65,6 +65,10 @@ public:
     [[nodiscard]] double storedReferencePitch() const override;
 
     void storeReferencePitch( double p_hertz ) override;
+
+    [[nodiscard]] std::int32_t storedSingQuestionShare() const override;
+
+    void storeSingQuestionShare( std::int32_t p_share ) override;
 };
 
 }    // namespace musichien::infrastructure

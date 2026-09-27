@@ -118,6 +118,12 @@ public:
     [[nodiscard]] virtual double storedReferencePitch() const = 0;
 
     virtual void storeReferencePitch( double p_hertz ) = 0;
+
+    // How many questions in a hundred ask the player to SING the interval, the rest asking him to name it. A rule of
+    // the session, remembered so that a player who wants more singing does not ask for it every time.
+    [[nodiscard]] virtual std::int32_t storedSingQuestionShare() const = 0;
+
+    virtual void storeSingQuestionShare( std::int32_t p_share ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -170,6 +176,10 @@ public:
 
     void storeReferencePitch( double p_hertz ) override { m_referencePitch = p_hertz; }
 
+    [[nodiscard]] std::int32_t storedSingQuestionShare() const override { return m_singQuestionShare; }
+
+    void storeSingQuestionShare( std::int32_t p_share ) override { m_singQuestionShare = p_share; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -190,6 +200,8 @@ private:
     Note m_tuningRoot{ 60 };
 
     double m_referencePitch{ 440.0 };
+
+    std::int32_t m_singQuestionShare{ 20 };
 };
 
 }    // namespace musichien::domain

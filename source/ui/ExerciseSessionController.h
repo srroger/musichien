@@ -146,6 +146,10 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( QVariantList tuningRoots READ tuningRoots CONSTANT )
     Q_PROPERTY( double referencePitch READ referencePitch NOTIFY referencePitchChanged )
 
+    // How many questions in a hundred ask the player to SING, the rest asking him to name the interval. A rule the
+    // player can tune: from zero (no singing) to one hundred (nothing but singing).
+    Q_PROPERTY( int singQuestionShare READ singQuestionShare NOTIFY singQuestionShareChanged )
+
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
 
@@ -198,6 +202,19 @@ public:
     [[nodiscard]] double referencePitch() const;
 
     Q_INVOKABLE void setReferencePitch( double p_hertz );
+
+    // How many questions in a hundred ask the player to sing, remembered between launches.
+    [[nodiscard]] int singQuestionShare() const;
+
+    Q_INVOKABLE void setSingQuestionShare( int p_share );
+
+    // The player pressed "Écouter" on a sung question: play the target, and count it as a replay when the player is
+    // not a beginner - hearing the answer first is the easy way, and it costs experience.
+    Q_INVOKABLE void listenToTarget();
+
+    // Wipes the experience and the statistics of the profile: points, sessions and stars back to zero. The name and
+    // the level stay - they are choices, not a score.
+    Q_INVOKABLE void resetProfile();
 
     // The rank of the current streak, as an index and as its display label.
     [[nodiscard]] int rank() const noexcept;
@@ -335,6 +352,9 @@ signals:
     // The player has just changed the A4 diapason.
     void referencePitchChanged();
 
+    // The player has just changed how often questions ask him to sing.
+    void singQuestionShareChanged();
+
     // The player has just pressed the "test the notification" button.
     void testReminderRequested();
 
@@ -365,6 +385,10 @@ private:
 
     // Plays the same two notes TOGETHER, whatever direction the question was asked in.
     void playCurrentQuestionAsChord();
+
+    // Whether the player still gets the answer played for him: a beginner hears the interval first, everyone else
+    // has to ask for it (and pays for the asking).
+    [[nodiscard]] bool isBeginner() const noexcept;
 
     domain::NotePlayer & m_notePlayer;
 
