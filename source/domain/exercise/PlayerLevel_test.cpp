@@ -117,13 +117,13 @@ TEST( PlayerLevelTest, an_unknown_level_is_the_beginner_one )
     EXPECT_EQ( PlayerLevel::Advanced, playerLevelFromIndex( 2 ) );
 }
 
-TEST( PlayerLevelTest, every_level_offers_the_guided_mode_by_default )
+TEST( PlayerLevelTest, the_guided_mode_is_not_on_by_default )
 {
-    // Le mode guide est une question sur deux, a tous les niveaux : sans cela, aucun reglage ne l'active, et le
-    // joueur ne le voit jamais - ce qui est exactement ce que Roger a rapporte.
+    // Le mode guide n'est plus tire au hasard : il arrive apres deux erreurs de suite, et seulement la. Le defaut
+    // reste donc zero, et c'est ce que ce test fige - un retour en arriere silencieux se verrait ici.
     for( const PlayerLevel level : EVERY_LEVEL )
     {
-        EXPECT_EQ( 50, sessionSettingsFor( level ).directionQuestionShare );
+        EXPECT_EQ( 0, sessionSettingsFor( level ).directionQuestionShare );
     }
 }
 

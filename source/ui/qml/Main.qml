@@ -504,6 +504,15 @@ ApplicationWindow {
                     text: modelData.name
                     checked: modelData.enabled
                     onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+
+                    // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre.
+                    contentItem: Text {
+                        text: parent.text
+                        color: "#e8dcff"
+                        verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: 15
+                    }
+
                 }
 
             }
@@ -513,6 +522,14 @@ ApplicationWindow {
                 text: qsTr("Un rappel chaque jour")
                 checked: ExerciseController.dailyReminderEnabled
                 onClicked: ExerciseController.setDailyReminderEnabled(checked)
+
+                contentItem: Text {
+                    text: parent.text
+                    color: "#e8dcff"
+                    verticalAlignment: Text.AlignVCenter
+                    font.pixelSize: 15
+                }
+
             }
 
             Button {

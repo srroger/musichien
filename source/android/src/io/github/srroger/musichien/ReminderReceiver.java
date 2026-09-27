@@ -21,6 +21,8 @@ public class ReminderReceiver extends BroadcastReceiver {
 
     // Affiche le rappel. Statique, pour que le planificateur puisse l'appeler aussi, s'il le faut.
     public static void showReminder(Context context) {
+        ensurePermission(context);
+
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) {
             return;
@@ -52,5 +54,23 @@ public class ReminderReceiver extends BroadcastReceiver {
             .build();
 
         manager.notify(1, notification);
+    }
+
+    // Sur Android 13 et plus, une notification ne s'affiche pas sans la permission POST_NOTIFICATIONS. Elle est
+    // demandee ici, au moment ou l'on en a besoin - jamais au demarrage, jamais pour rien.
+    private static void ensurePermission(Context context) {
+        if (Build.VERSION.SDK_INT < 33) {
+            return;
+        }
+
+        if (context.checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        if (context instanceof android.app.Activity) {
+            ((android.app.Activity) context).requestPermissions(
+                new String[] { "android.permission.POST_NOTIFICATIONS" }, 1);
+        }
     }
 }
