@@ -8,6 +8,7 @@
 #include "infrastructure/audio/QAudioNotePlayer.h"
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
+#include "infrastructure/preferences/QSettingsPlayerLevelStore.h"
 #include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
@@ -103,6 +104,10 @@ int main( int p_argumentCount, char * p_arguments[] )
     // -------------------------------------------------------------------------------------------------------------
     musichien::infrastructure::QAudioNotePlayer notePlayer;
 
+    // What the application remembers about its player. A small settings file, on the device: the package
+    // cannot reach the network, so nothing about him ever leaves the phone.
+    musichien::infrastructure::QSettingsPlayerLevelStore playerLevelStore;
+
     // Opening the output now, rather than at the first note, means a machine without a sound card is
     // reported at start up instead of silently refusing to play in the middle of an exercise.
     notePlayer.prepareAudioOutput();
@@ -128,7 +133,8 @@ int main( int p_argumentCount, char * p_arguments[] )
     musichien::ui::ExerciseSessionController exerciseController{ notePlayer,
                                                                  {},
                                                                  loadHintBook(),
-                                                                 musichien::infrastructure::vibrateForMistake };
+                                                                 musichien::infrastructure::vibrateForMistake,
+                                                                 &playerLevelStore };
 
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,

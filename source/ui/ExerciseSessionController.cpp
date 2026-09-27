@@ -28,13 +28,26 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
                                                       domain::SessionSettings p_settings,
                                                       domain::HintBook p_hintBook,
                                                       VibrationCallback p_vibrate,
+                                                      domain::PlayerLevelStore * p_levelStore,
                                                       QObject * p_parent )
   : QObject{ p_parent }
   , m_notePlayer{ p_notePlayer }
   , m_settings{ p_settings }
   , m_hintBook{ std::move( p_hintBook ) }
   , m_vibrate{ std::move( p_vibrate ) }
+  , m_levelStore{ p_levelStore }
 {
+    // What the application remembers about the player is read once, here, and it OVERRIDES the settings the
+    // caller passed: a level the player has chosen is a decision, and a decision beats a default.
+    if( m_levelStore != nullptr )
+    {
+        m_playerLevel = m_levelStore->storedLevel();
+    }
+
+    if( m_playerLevel.has_value() )
+    {
+        m_settings = domain::sessionSettingsFor( *m_playerLevel );
+    }
 }
 
 bool ExerciseSessionController::running() const noexcept
@@ -128,6 +141,68 @@ QString ExerciseSessionController::hintText() const
     }
 
     return QString::fromStdString( hint->label );
+}
+
+bool ExerciseSessionController::hasChosenLevel() const noexcept
+{
+    return m_playerLevel.has_value();
+}
+
+int ExerciseSessionController::playerLevel() const noexcept
+{
+    return m_playerLevel.has_value() ? static_cast<int>( *m_playerLevel ) : -1;
+}
+
+void ExerciseSessionController::choosePlayerLevel( int p_level )
+{
+    const domain::PlayerLevel level = domain::playerLevelFromIndex( static_cast<std::size_t>( p_level ) );
+
+    m_playerLevel = level;
+
+    // The rules of the session to COME. A session already running is deliberately left alone: changing the
+    // difficulty under the feet of a player in the middle of ten questions is not a kindness.
+    m_settings = domain::sessionSettingsFor( level );
+
+    if( m_levelStore != nullptr )
+    {
+        m_levelStore->storeLevel( level );
+    }
+
+    emit playerLevelChanged();
+}
+
+QVariantList ExerciseSessionController::playerLevels()
+{
+    // The names live here, and not in the QML, for the same reason the answer grid is built here: a list that
+    // exists twice drifts.
+    const auto nameOfLevel = []( domain::PlayerLevel p_level ) {
+        switch( p_level )
+        {
+            case domain::PlayerLevel::Beginner:
+                return ExerciseSessionController::tr( "Je débute" );
+
+            case domain::PlayerLevel::Fluent:
+                return ExerciseSessionController::tr( "À l'aise" );
+
+            case domain::PlayerLevel::Advanced:
+                return ExerciseSessionController::tr( "Jusqu'à l'octave" );
+        }
+
+        return QString{};
+    };
+
+    QVariantList levels;
+
+    for( std::size_t index = 0; index < domain::PLAYER_LEVEL_COUNT; ++index )
+    {
+        QVariantMap level;
+        level.insert( QStringLiteral( "index" ), static_cast<int>( index ) );
+        level.insert( QStringLiteral( "name" ), nameOfLevel( domain::playerLevelFromIndex( index ) ) );
+
+        levels.append( level );
+    }
+
+    return levels;
 }
 
 int ExerciseSessionController::experience() const noexcept

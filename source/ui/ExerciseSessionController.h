@@ -23,6 +23,7 @@
 #include "domain/audio/NotePlayer.h"
 #include "domain/exercise/ExerciseSession.h"
 #include "domain/exercise/HintBook.h"
+#include "domain/exercise/PlayerLevelStore.h"
 
 #include <QObject>
 #include <QString>
@@ -74,6 +75,22 @@ class ExerciseSessionController final : public QObject
     // apart: no mistake yet, the answer already known, or a gap in the content file.
     Q_PROPERTY( QString hintText READ hintText NOTIFY sessionChanged )
 
+    // ---------------------------------------------------------------------------------------------------------------
+    // The player
+    //
+    // Asked ONCE, and remembered. Not a setting: the first piece of the profile. See PlayerLevel.
+    // ---------------------------------------------------------------------------------------------------------------
+    Q_PROPERTY( bool hasChosenLevel READ hasChosenLevel NOTIFY playerLevelChanged )
+
+    Q_PROPERTY( int playerLevel READ playerLevel NOTIFY playerLevelChanged )
+
+    // The levels to offer, each ready to display: an index and a name. Built here rather than written in the
+    // QML, for the same reason the answer grid is: a list that exists twice drifts.
+    //
+    // Static because it reads nothing of this object: the list of levels is a fact of the domain, and saying
+    // so in the signature is cheaper than a comment. Qt hands it to the screen all the same.
+    Q_PROPERTY( QVariantList playerLevels READ playerLevels CONSTANT )
+
     Q_PROPERTY( int experience READ experience NOTIFY scoreChanged )
     Q_PROPERTY( int streak READ streak NOTIFY scoreChanged )
     Q_PROPERTY( int lives READ lives NOTIFY scoreChanged )
@@ -94,6 +111,7 @@ public:
                                         domain::SessionSettings p_settings = {},
                                         domain::HintBook p_hintBook = {},
                                         VibrationCallback p_vibrate = {},
+                                        domain::PlayerLevelStore * p_levelStore = nullptr,
                                         QObject * p_parent = nullptr );
 
     [[nodiscard]] bool running() const noexcept;
@@ -108,6 +126,9 @@ public:
     [[nodiscard]] QVariantMap heardInterval() const;
     [[nodiscard]] QVariantMap answeredInterval() const;
     [[nodiscard]] QString hintText() const;
+    [[nodiscard]] bool hasChosenLevel() const noexcept;
+    [[nodiscard]] int playerLevel() const noexcept;
+    [[nodiscard]] static QVariantList playerLevels();
     [[nodiscard]] int experience() const noexcept;
     [[nodiscard]] int streak() const noexcept;
     [[nodiscard]] int lives() const noexcept;
@@ -116,6 +137,9 @@ public:
 
     // Starts a new session and plays its first question. Called by the "Jouer" button.
     Q_INVOKABLE void startSession();
+
+    // The player says where he is, once. His answer is remembered, and it decides where his sessions start.
+    Q_INVOKABLE void choosePlayerLevel( int p_level );
 
     // Leaves the loop and goes back to the bench. Stops the sound first: a stream left open on a phone
     // is a battery drain.
@@ -150,6 +174,9 @@ signals:
     // wrong ATTEMPT, not the end of a question: a player who is told the answer has not made a mistake.
     void wrongAnswerGiven();
 
+    // The player has just said where he is, or the application has just remembered it.
+    void playerLevelChanged();
+
 private:
     // Rebuilds the list of choices from the question being asked, and only then notifies. Called
     // whenever the question changes AND whenever the grid closes in after a mistake.
@@ -171,6 +198,13 @@ private:
 
     // Empty when the device cannot vibrate.
     VibrationCallback m_vibrate;
+
+    // May be null: a test, or an application that has nowhere to remember anything, must still run.
+    domain::PlayerLevelStore * m_levelStore{ nullptr };
+
+    // Read once from the store, then kept here: the screen asks for it on every question, and a settings file
+    // has no business being read that often.
+    std::optional<domain::PlayerLevel> m_playerLevel;
 
     // Empty until a session starts: the bench is what the application shows before that.
     std::unique_ptr<domain::ExerciseSession> m_session;

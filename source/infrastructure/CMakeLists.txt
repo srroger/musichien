@@ -17,6 +17,8 @@ musichienFunction_AddLibrary(infrastructure
     content/JsonHintBook.cpp
     haptics/DeviceHaptics.h
     haptics/DeviceHaptics.cpp
+    preferences/QSettingsPlayerLevelStore.h
+    preferences/QSettingsPlayerLevelStore.cpp
 )
 
 # nlohmann/json is header only: linking it is only about the include path of the pinned version. It is

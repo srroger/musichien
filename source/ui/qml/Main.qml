@@ -113,6 +113,11 @@ ApplicationWindow {
                 // is read back. This is the point of the bench - the screen shows the model, it does not
                 // reproduce it.
                 // --------------------------------------------------------------------------------------------
+                // -----------------------------------------------------------------------------------------
+                // Where the player is at
+                // Asked right here, and right before "Jouer", because it is the only thing the landing screen
+                // needs to know before a session starts - and it decides where the sessions begin. It is NOT a
+                // setting: the answer is remembered, and it is the first piece of the profile.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -149,6 +154,43 @@ ApplicationWindow {
 
                 Item {
                     Layout.preferredHeight: 8
+                }
+
+                // The list comes from the view model, exactly as the answer grid does, so that a level added
+                // to the domain appears here without a line of QML changing.
+                // -----------------------------------------------------------------------------------------
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#cbb8e8"
+                    font.pixelSize: 15
+                    text: ExerciseController.hasChosenLevel ? qsTr("Ton niveau") : qsTr("Pour commencer : tu en es où ?")
+                }
+
+                Flow {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    spacing: 8
+
+                    Repeater {
+                        model: ExerciseController.playerLevels
+
+                        delegate: Button {
+                            required property var modelData
+
+                            text: modelData.name
+                            // The chosen one stays marked, so that the screen never leaves any doubt about the
+                            // level the next session will use.
+                            highlighted: ExerciseController.playerLevel === modelData.index
+                            onClicked: ExerciseController.choosePlayerLevel(modelData.index)
+                        }
+
+                    }
+
+                }
+
+                Item {
+                    Layout.preferredHeight: 6
                 }
 
                 // The way into the loop. It sits above the bench on purpose: the bench is a tool for
