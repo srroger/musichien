@@ -459,6 +459,18 @@ ApplicationWindow {
                     onClicked: IntervalController.playSustainedInterval(mainWindow.heardInterval.semitones)
                 }
 
+                // Les frequences EXACTES jouees, en hertz, telles que le temperament et le diapason les calculent.
+                // C'est ce qu'un accordeur externe doit retrouver - et ce qui prouve, chiffre a l'appui, qu'un
+                // changement de temperament est bien descendu jusqu'au son.
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    color: "#8ef2b0"
+                    font.pixelSize: 16
+                    font.bold: true
+                    visible: IntervalController.playedFrequencies !== ""
+                    text: IntervalController.playedFrequencies
+                }
+
                 Text {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true

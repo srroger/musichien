@@ -18,10 +18,14 @@
 
 #include "domain/audio/NotePlayer.h"
 #include "domain/music/Note.h"
+#include "domain/music/Temperament.h"
 
 #include <QObject>
+#include <QString>
 #include <QVariantList>
 #include <QVariantMap>
+
+#include <span>
 
 namespace musichien::ui
 {
@@ -48,14 +52,22 @@ class IntervalPlaybackController final : public QObject
     Q_PROPERTY( bool harmonicPlayback READ harmonicPlayback WRITE setHarmonicPlayback NOTIFY
                   harmonicPlaybackChanged )
 
+    // The exact frequencies of the notes heard last, in hertz, WITH the temperament and the diapason applied. This is
+    // what an external tuner should agree with, and it is what proves a temperament change is really heard.
+    Q_PROPERTY( QString playedFrequencies READ playedFrequencies NOTIFY playedFrequenciesChanged )
+
 public:
     explicit IntervalPlaybackController( domain::NotePlayer & p_notePlayer, QObject * p_parent = nullptr );
 
     [[nodiscard]] QVariantList supportedIntervals() const;
     [[nodiscard]] QVariantMap lastPlayedInterval() const;
+    [[nodiscard]] QString playedFrequencies() const;
 
     [[nodiscard]] bool harmonicPlayback() const;
     void setHarmonicPlayback( bool p_harmonicPlayback );
+
+    // The tuning the frequencies below are computed with. Fed by the wiring layer, exactly like the NotePlayer.
+    void setTuning( domain::TuningContext p_tuning );
 
     // Plays an interval at a given distance above the root note, and tells the interface what was
     // heard. The distance is the ONLY thing the interface provides: the name, the quality, the class
@@ -76,6 +88,7 @@ public:
 signals:
     void lastPlayedIntervalChanged();
     void harmonicPlaybackChanged();
+    void playedFrequenciesChanged();
 
 private:
     // Plays an interval and describes it, so that what is displayed and what is played can never
@@ -84,10 +97,18 @@ private:
 
     void setLastPlayedInterval( QVariantMap p_description );
 
+    // Computes and stores the exact frequencies of the notes, heard from their first note under the current tuning.
+    void setPlayedFrequencies( std::span<const domain::Note> p_notes );
+
     domain::NotePlayer & m_notePlayer;
     QVariantList m_supportedIntervals;
     QVariantMap m_lastPlayedInterval;
     bool m_harmonicPlayback{ false };
+
+    // Equal temperament at 440 Hz until the wiring layer says otherwise.
+    domain::TuningContext m_tuning;
+
+    QString m_playedFrequencies;
 };
 
 }    // namespace musichien::ui

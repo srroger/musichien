@@ -348,8 +348,13 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Le réglage descend jusqu'à la couche audio, et il descend à CHAQUE changement : basculer le tempérament ou le
     // diapason s'entend à la note suivante, pas au prochain lancement. La TONIQUE n'en fait pas partie - la couche
     // audio connaît toujours la sienne (la première note qu'elle joue) ; seul l'accordeur a besoin d'une tonique à lui.
-    const auto applyTuning = [&playerLevelStore, &notePlayer]() {
-        notePlayer.setTuning( { playerLevelStore.storedTemperament(), playerLevelStore.storedReferencePitch() } );
+    const auto applyTuning = [&playerLevelStore, &notePlayer, &intervalController]() {
+        const musichien::domain::TuningContext tuning{ playerLevelStore.storedTemperament(),
+                                                       playerLevelStore.storedReferencePitch() };
+
+        notePlayer.setTuning( tuning );
+
+        intervalController.setTuning( tuning );
     };
 
     QObject::connect( &exerciseController,

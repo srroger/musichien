@@ -1,11 +1,13 @@
 #include "domain/audio/ToneSynthesizer.h"
 
 #include "domain/audio/NotePlayerFake.h"
+#include "domain/audio/SampledInstrument.h"
 #include "domain/music/Note.h"
 
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <numbers>
@@ -621,6 +623,60 @@ TEST( ToneSynthesizerTest, the_mistake_cue_is_the_same_every_time )
     // asserted.
     EXPECT_EQ( synthesizer.renderMistakeCue( ToneSynthesizer::MISTAKE_CUE_DURATION ),
                synthesizer.renderMistakeCue( ToneSynthesizer::MISTAKE_CUE_DURATION ) );
+}
+
+TEST( SampledInstrumentTest, the_sampler_follows_the_temperament )
+{
+    // A synthetic C4: a pure sine at the equal-temperament frequency of C4. The sampler will transpose it by playing
+    // it faster or slower, and the temperament decides how far.
+    SampledNote recorded;
+    recorded.rootMidiNumber = 60;
+    recorded.sampleRate = TEST_SAMPLE_RATE;
+
+    const double c4Hz = Note{ 60 }.frequencyHz();
+
+    recorded.samples.reserve( static_cast<std::size_t>( TEST_SAMPLE_RATE ) );
+
+    for( const std::size_t sampleIndex : std::views::iota( std::size_t{ 0 }, static_cast<std::size_t>( TEST_SAMPLE_RATE ) ) )
+    {
+        recorded.samples.push_back( static_cast<float>(
+          std::sin( 2.0 * std::numbers::pi * c4Hz * static_cast<double>( sampleIndex ) / static_cast<double>( TEST_SAMPLE_RATE ) ) ) );
+    }
+
+    SampledInstrument instrument;
+    instrument.addNote( std::move( recorded ) );
+
+    // A fifth, played as a melody, in PYTHAGOREAN tuning: the second note (G4) must be 3/2 of C4, not the tempered
+    // 2^(7/12). That is the whole question the sampler must answer, and it answers it by reading the sample at the
+    // speed that reaches the temperament's frequency.
+    const std::vector<Note> melody{ Note{ 60 }, Note{ 67 } };
+
+    constexpr std::chrono::milliseconds noteDuration{ 500 };
+    constexpr std::chrono::milliseconds gap{ 100 };
+
+    const std::vector<float> pythagorean = instrument.renderMelody( melody,
+                                                                    noteDuration,
+                                                                    gap,
+                                                                    TEST_SAMPLE_RATE,
+                                                                    TuningContext{ Temperament::Pythagorean, 440.0 } );
+
+    const std::size_t noteSampleCount = static_cast<std::size_t>( TEST_SAMPLE_RATE ) / 2;    // 500 ms
+    const std::size_t gapSampleCount = static_cast<std::size_t>( TEST_SAMPLE_RATE ) / 10;    // 100 ms
+
+    const std::span<const float> allSamples = pythagorean;
+
+    const std::span<const float> secondNote = allSamples.subspan( noteSampleCount + gapSampleCount );
+
+    const double rootFrequency = frequencyFor( Note{ 60 }, Note{ 60 }, Temperament::Pythagorean, 440.0 );
+    const double fifthFrequency = frequencyFor( Note{ 67 }, Note{ 60 }, Temperament::Pythagorean, 440.0 );
+
+    // The rule the temperament states: a Pythagorean fifth is 3/2.
+    EXPECT_NEAR( 3.0 / 2.0, fifthFrequency / rootFrequency, 1e-9 );
+
+    // And the SAMPLER renders it at that frequency - not at the tempered one.
+    EXPECT_NEAR( fifthFrequency,
+                 measuredFrequency( secondNote, fifthFrequency ),
+                 fifthFrequency * 0.0025 );
 }
 
 }    // namespace musichien::domain
