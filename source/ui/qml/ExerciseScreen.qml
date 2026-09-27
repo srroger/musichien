@@ -173,6 +173,14 @@ Item {
             // Its place is RESERVED whether or not there is a hint, and that is not cosmetic: a screen that
             // grows and shrinks moves the buttons under the finger of the player, which in a game played by
             // tapping is unforgivable.
+            // The grid comes from the session, and it CLOSES IN on every mistake: the wrong answers that
+            // were the least plausible step aside, one at a time. The player is helped without asking, and
+            // without ever being told that they are being helped.
+            // -------------------------------------------------------------------------------------------------
+            // Les douze places, disposees EN CERCLE - et pas en colonnes.
+            // Ce n'est pas une question de joliesse : c'est la CONDITION pour qu'un jour les notes d'un accord
+            // puissent se relier par des traits. Un accord se lira alors comme une FIGURE - un triangle pour un
+            // majeur, une autre pour un septieme - et la forme dira quelque chose de la musique, sans un mot.
 
             anchors.fill: parent
             anchors.margins: 16
@@ -319,34 +327,41 @@ Item {
 
             }
 
-            // The grid comes from the session, and it CLOSES IN on every mistake: the wrong answers that
-            // were the least plausible step aside, one at a time. The player is helped without asking, and
-            // without ever being told that they are being helped.
-            // -------------------------------------------------------------------------------------------------
-            Flow {
-                id: choiceFlow
+            // Douze places, trente degres chacune, la premiere a midi : do en haut, puis les quintes dans le sens
+            // des aiguilles d'une montre. C'est exactement la disposition d'un vrai cercle des quintes.
+            Item {
+                id: circleBoard
+
+                readonly property real ringRadius: width * 0.36
+                readonly property real slotWidth: width * 0.19
+                readonly property real slotHeight: width * 0.19
 
                 Layout.fillWidth: true
-                spacing: 10
+                Layout.preferredHeight: width
 
                 Repeater {
-                    // Chaque place garde sa CASE, meme vide, et c'est ce qui transforme la grille en carte : la quinte
-                    // est toujours au meme endroit, que la palette en offre deux ou douze.
-
                     model: ExerciseController.gridPositions
 
-                    // Trois par ligne et des boutons plus petits : douze places tiennent sans que l'ecran debord.
                     delegate: Item {
                         id: choiceSlot
 
                         required property var modelData
+                        required property int index
+                        // Moins quatre-vingt-dix degres, c'est midi : la place zero du cercle est le do, et le do
+                        // se met en haut. Le sens des aiguilles d'une montre donne ensuite sol, re, la, mi, si -
+                        // l'ordre du cercle, tel qu'il s'enseigne.
+                        readonly property real slotAngleRadians: (-90 + 30 * choiceSlot.index) * Math.PI / 180
 
-                        width: (choiceFlow.width - 2 * choiceFlow.spacing) / 3
-                        height: 52
+                        x: (circleBoard.width / 2) + (circleBoard.ringRadius * Math.cos(slotAngleRadians)) - (width / 2)
+                        y: (circleBoard.height / 2) + (circleBoard.ringRadius * Math.sin(slotAngleRadians)) - (height / 2)
+                        width: circleBoard.slotWidth
+                        height: circleBoard.slotHeight
 
+                        // Une case vide reste DANS le cercle : meme place, meme taille, un simple anneau. Le joueur
+                        // voit donc ou l'intervalle viendra, et sa progression a une forme.
                         Rectangle {
                             anchors.fill: parent
-                            radius: 12
+                            radius: width / 2
                             color: "#00000000"
                             border.width: 1
                             border.color: "#3a2a5c"
@@ -361,7 +376,7 @@ Item {
                             text: choiceSlot.modelData.isAvailable ? choiceSlot.modelData.identifier : ""
                             highlighted: exerciseScreen.hasAnswered && (exerciseScreen.answeredInterval.semitones === choiceSlot.modelData.semitones)
                             onClicked: ExerciseController.answer(choiceSlot.modelData.semitones)
-                            scale: choiceButton.down ? 0.94 : 1
+                            scale: choiceButton.down ? 0.9 : 1
 
                             Behavior on scale {
                                 NumberAnimation {
@@ -371,7 +386,7 @@ Item {
                             }
 
                             background: Rectangle {
-                                radius: 12
+                                radius: width / 2
                                 color: choiceSlot.modelData.isAvailable ? exerciseScreen.colourForInterval(choiceSlot.modelData) : "#00000000"
                                 border.width: choiceButton.highlighted ? 3 : 0
                                 border.color: "#ffffff"
@@ -391,7 +406,7 @@ Item {
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 color: "#2b1b47"
-                                font.pixelSize: 15
+                                font.pixelSize: 14
                                 font.bold: true
                             }
 
