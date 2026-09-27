@@ -88,29 +88,48 @@ QVariantList ExerciseSessionController::gridPositions() const
     const std::array<std::vector<domain::Interval>, domain::CIRCLE_OF_FIFTHS_SLOT_COUNT> layout =
       domain::layoutOnCircle( m_session->currentQuestion().choices );
 
+    // UNE LISTE PLATE DE BOUTONS, et non douze places contenant chacune leurs intervalles.
+    //
+    // La difference n'est pas cosmetique : c'est ce qui rend l'ecran a la fois juste et simple. Une place porte
+    // plusieurs intervalles - une seconde majeure et sa neuvieme, la meme couleur a une octave pres - et l'ecran
+    // doit les dessiner empiles dans la case. Une liste imbriquee demandait deux Repeaters l'un dans l'autre, et
+    // un seul Repeater ne produit rien en silence : la page se charge, aucun avertissement, aucun bouton.
+    //
+    // Aplati, chaque bouton sait tout ce qu'il lui faut pour se placer lui-meme :
+    //
+    //   * 'slot'       : 0 a 11, la place du cercle - c'est ce qui donne l'ANGLE ;
+    //   * 'stackIndex' : son rang dans la case, 0 en haut ;
+    //   * 'stackSize'  : combien de boutons la case porte, pour savoir comment les repartir ;
+    //   * 'isEmpty'    : une place que la palette n'a pas encore, dessinee en anneau.
     for( std::size_t slot = 0; slot < layout.size(); ++slot )
     {
-        QVariantMap position;
-        position.insert( QStringLiteral( "slot" ), static_cast<int>( slot ) );
+        const std::vector<domain::Interval> & intervals = layout.at( slot );
 
-        // Une place porte PLUSIEURS intervalles, et c'est le coeur de la carte : une seconde majeure et une
-        // neuvieme majeure sont la meme couleur, donc la meme place, la meme teinte - et elles n'y sont
-        // distinguables que si les DEUX y sont posees.
-        //
-        // C'est aussi ce qui rend toute question repondable sans exception : la cible est toujours dans les
-        // choix, donc toujours sur sa place, quoi qu'elle partage avec ses voisines de classe. Une place qui
-        // n'aurait garde que le plus petit intervalle rendrait la neuvieme introuvable - ce que le bouton
-        // unique d'avant ne pouvait pas eviter, et qui avait coute un correctif.
-        QVariantList intervals;
-
-        for( const domain::Interval & interval : layout.at( slot ) )
+        if( intervals.empty() )
         {
-            intervals.append( describeInterval( interval ) );
+            QVariantMap position;
+            position.insert( QStringLiteral( "slot" ), static_cast<int>( slot ) );
+            position.insert( QStringLiteral( "stackIndex" ), 0 );
+            position.insert( QStringLiteral( "stackSize" ), 1 );
+            position.insert( QStringLiteral( "isEmpty" ), true );
+
+            positions.append( position );
+
+            continue;
         }
 
-        position.insert( QStringLiteral( "intervals" ), intervals );
+        // Du plus petit au plus grand, donc : le simple en tete de case, ses composes colles juste dessous.
+        for( std::size_t rank = 0; rank < intervals.size(); ++rank )
+        {
+            QVariantMap position = describeInterval( intervals.at( rank ) );
 
-        positions.append( position );
+            position.insert( QStringLiteral( "slot" ), static_cast<int>( slot ) );
+            position.insert( QStringLiteral( "stackIndex" ), static_cast<int>( rank ) );
+            position.insert( QStringLiteral( "stackSize" ), static_cast<int>( intervals.size() ) );
+            position.insert( QStringLiteral( "isEmpty" ), false );
+
+            positions.append( position );
+        }
     }
 
     return positions;

@@ -340,30 +340,39 @@ Item {
                 Layout.preferredHeight: width
 
                 Repeater {
-                    // Les intervalles de la place, EMPILES dans la case : le simple en tete, ses composes colles
-                    // juste dessous, du plus petit au plus grand.
-                    // C'est la reponse a une question de Roger - "les composes colles a leur simple" - et c'est
-                    // aussi ce qui rend le dernier niveau jouable : sur une carte complete, trois intervalles
-                    // peuvent partager une case (l'unisson, l'octave, la quinzieme), et il faut pouvoir
-                    // designer CHACUN. Deux intervalles de la meme classe, c'est la meme couleur : la case
-                    // n'a donc qu'une teinte, et ce sont les boutons qui disent laquelle est laquelle.
+                    // UN SEUL Repeater, et PLAT : une entree par bouton, chacune sachant sa place, son rang dans
+                    // la case, et le nombre de ses voisines.
 
+                    // C'est la reponse a deux choses a la fois. D'abord une demande de Roger : les composes
+                    // restent COLLES a leur simple, parce qu'une seconde majeure et une neuvieme majeure sont la
+                    // MEME couleur - elles partagent leur place sur le cercle, et il faut pouvoir designer chacune.
+                    // Ensuite une lecon apprise a la dure : un Repeater DANS un Repeater ne produit rien, en
+                    // silence. La page se charge, aucun avertissement, et pas un bouton a l'ecran.
                     model: ExerciseController.gridPositions
 
                     delegate: Item {
-                        id: choiceSlot
+                        id: gridButton
 
                         required property var modelData
                         required property int index
-                        // Moins quatre-vingt-dix degres, c'est midi : la place zero du cercle est le do, et le do
-                        // se met en haut. Le sens des aiguilles d'une montre donne ensuite sol, re, la, mi, si -
+                        // Deux constantes de la pile, ecrites ici parce qu'elles decrivent cet ecran et rien
+                        // d'autre : l'ecart entre deux boutons d'une meme case, et la hauteur d'un bouton.
+                        readonly property real stackSpacing: 3
+                        readonly property int stackSize: (gridButton.modelData.stackSize > 0) ? gridButton.modelData.stackSize : 1
+                        readonly property real buttonHeight: (circleBoard.slotHeight - ((gridButton.stackSize - 1) * stackSpacing)) / gridButton.stackSize
+                        // Moins quatre-vingt-dix degres, c'est midi : la place zero du cercle est le do, et le do se
+                        // met en haut. Le sens des aiguilles d'une montre donne ensuite sol, re, la, mi, si -
                         // l'ordre du cercle, tel qu'il s'enseigne.
-                        readonly property real slotAngleRadians: (-90 + 30 * choiceSlot.index) * Math.PI / 180
+                        readonly property real slotAngleRadians: (-90 + 30 * gridButton.modelData.slot) * Math.PI / 180
+                        // La pile est CENTREE sur le point du cercle, comme le serait une colonne : une case a un
+                        // intervalle, une case a trois et une case vide se ressemblent alors assez pour qu'on lise
+                        // la carte d'un seul coup d'oeil.
+                        readonly property real stackOffset: (((gridButton.modelData.stackIndex > 0) ? gridButton.modelData.stackIndex : 0) - ((gridButton.stackSize - 1) / 2)) * (buttonHeight + stackSpacing)
 
                         x: (circleBoard.width / 2) + (circleBoard.ringRadius * Math.cos(slotAngleRadians)) - (width / 2)
-                        y: (circleBoard.height / 2) + (circleBoard.ringRadius * Math.sin(slotAngleRadians)) - (height / 2)
+                        y: (circleBoard.height / 2) + (circleBoard.ringRadius * Math.sin(slotAngleRadians)) - (height / 2) + stackOffset
                         width: circleBoard.slotWidth
-                        height: circleBoard.slotHeight
+                        height: buttonHeight
 
                         // Une case vide reste DANS le cercle : meme place, meme taille, un simple anneau. Le joueur
                         // voit donc ou l'intervalle viendra, et sa progression a une forme.
@@ -373,75 +382,56 @@ Item {
                             color: "#00000000"
                             border.width: 1
                             border.color: "#3a2a5c"
-                            visible: choiceSlot.modelData.intervals.length === 0
+                            visible: gridButton.modelData.isEmpty
                         }
 
-                        // La case garde la meme hauteur quel que soit leur nombre : un bouton seul prend toute la
-                        // place et reste le rond d'avant, deux ou trois se partagent la hauteur. Rien ne bouge
-                        // d'une question a l'autre sur le cercle.
-                        Column {
-                            id: choiceStack
+                        Button {
+                            // La police suit la hauteur du bouton : une quinzaine de pixels pour un rond
+                            // plein, neuf pour une pastille partagee en trois. Sans cela, le texte du dernier
+                            // niveau deborderait de sa case.
+
+                            id: intervalButton
 
                             anchors.fill: parent
-                            spacing: 3
-                            visible: choiceSlot.modelData.intervals.length > 0
+                            visible: !gridButton.modelData.isEmpty
+                            text: gridButton.modelData.identifier === undefined ? "uid=" + gridButton.index : gridButton.modelData.identifier
+                            highlighted: exerciseScreen.hasAnswered && !gridButton.modelData.isEmpty && (exerciseScreen.answeredInterval.semitones === gridButton.modelData.semitones)
+                            onClicked: ExerciseController.answer(gridButton.modelData.semitones)
+                            scale: intervalButton.down ? 0.9 : 1
 
-                            Repeater {
-                                model: choiceSlot.modelData.intervals
+                            Behavior on scale {
+                                NumberAnimation {
+                                    duration: 90
+                                }
 
-                                delegate: Button {
-                                    id: intervalButton
+                            }
 
-                                    required property var modelData
-                                    // Toute la hauteur, moins les intervalles qui separent les boutons : ce qui
-                                    // reste, partage entre eux. Un seul intervalle donne donc exactement la case
-                                    // entiere, et le rond d'autrefois.
-                                    readonly property int intervalCount: choiceSlot.modelData.intervals.length
+                            background: Rectangle {
+                                radius: height / 2
+                                color: gridButton.modelData.isEmpty ? "#00000000" : exerciseScreen.colourForInterval(gridButton.modelData)
+                                border.width: intervalButton.highlighted ? 3 : 0
+                                border.color: "#ffffff"
+                                opacity: ExerciseController.isAsking ? 1 : 0.72
 
-                                    width: parent.width
-                                    height: (parent.height - ((intervalCount - 1) * choiceStack.spacing)) / intervalCount
-                                    text: modelData.identifier
-                                    highlighted: exerciseScreen.hasAnswered && (exerciseScreen.answeredInterval.semitones === intervalButton.modelData.semitones)
-                                    onClicked: ExerciseController.answer(intervalButton.modelData.semitones)
-                                    scale: intervalButton.down ? 0.9 : 1
-
-                                    Behavior on scale {
-                                        NumberAnimation {
-                                            duration: 90
-                                        }
-
-                                    }
-
-                                    background: Rectangle {
-                                        radius: height / 2
-                                        color: exerciseScreen.colourForInterval(intervalButton.modelData)
-                                        border.width: intervalButton.highlighted ? 3 : 0
-                                        border.color: "#ffffff"
-                                        opacity: ExerciseController.isAsking ? 1 : 0.72
-
-                                        Behavior on opacity {
-                                            NumberAnimation {
-                                                duration: 180
-                                            }
-
-                                        }
-
-                                    }
-
-                                    contentItem: Text {
-                                        text: intervalButton.text
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                        color: "#2b1b47"
-                                        // La police suit la hauteur du bouton : dix-huit pixels pour un rond plein,
-                                        // neuf pour une pastille partagee en trois. Sans cela, le texte du dernier
-                                        // niveau deborderait de sa case.
-                                        font.pixelSize: Math.max(9, Math.min(14, intervalButton.height * 0.45))
-                                        font.bold: true
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: 180
                                     }
 
                                 }
 
+                            }
+
+                            contentItem: Text {
+                                text: intervalButton.text
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                color: "#2b1b47"
+                                // La hauteur lue est CELLE DU CALCUL, pas celle du bouton : un bouton qui s'ajuste
+                                // a son propre contenu et un contenu qui s'ajuste au bouton font une boucle de
+                                // liaison, et QML la signale - sainement - a chaque image.
+                                font.pixelSize: Math.max(9, Math.min(14, gridButton.buttonHeight * 0.45)) || 12
+                                font.bold: true
                             }
 
                         }

@@ -120,6 +120,13 @@ cmake --preset "${CONFIGURE_PRESET}"
 echo
 echo "--- Step 3/5: compilation ---------------------------------------------------------------------"
 
+# ---------------------------------------------------------------------------------------------------------------------
+# Les QML sont dans le .qrc, et AUTORCC ne recompile la ressource que si CE fichier est plus recent - jamais parce
+# qu'un .qml a change. Sans la ligne ci-dessous, un ecran modifie part dans le paquet dans sa version precedente : il
+# compile, il s'installe, et il montre autre chose que ce qu'on vient d'ecrire. Toucher le .qrc ne change rien a son
+# contenu, donc rien a git : c'est seulement la date qui dit "regenere-moi".
+touch source/ui/resources.qrc
+
 cmake --build --preset "${BUILD_PRESET}" --target apk
 
 # ---------------------------------------------------------------------------------------------------------------------

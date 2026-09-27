@@ -2,6 +2,7 @@
 
 #include "domain/audio/NotePlayerFake.h"
 
+#include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -513,6 +514,23 @@ TEST( ExerciseSessionControllerTest, every_choice_is_on_the_circle_at_the_place_
 
         ASSERT_EQ( domain::CIRCLE_OF_FIFTHS_SLOT_COUNT, static_cast<std::size_t>( positions.size() ) );
 
+        // Une place pleine porte un identifiant a montrer, et une place vide n'en porte pas. C'est la seule chose
+        // que l'ecran lira pour ecrire dans le bouton : si elle manque, l'ecran affiche des boutons vides - et
+        // rien ne le dit.
+        for( const QVariant & position : positions )
+        {
+            const QVariantMap map = position.toMap();
+
+            if( map.value( "isEmpty" ).toBool() )
+            {
+                continue;
+            }
+
+            EXPECT_FALSE( map.value( "identifier" ).toString().isEmpty() )
+              << "la place " << map.value( "slot" ).toInt() << " n'a pas d'identifiant a montrer. Cles : "
+              << QStringList{ map.keys() }.join( ", " ).toStdString();
+        }
+
         // Est-ce que cet intervalle se trouve bien sur la place de sa classe ?
         const auto isPlaced = [&positions]( std::int32_t p_semitones ) {
             const auto slot = static_cast<int>( domain::circleOfFifthsSlot( domain::Interval{ p_semitones } ) );
@@ -521,17 +539,10 @@ TEST( ExerciseSessionControllerTest, every_choice_is_on_the_circle_at_the_place_
             {
                 const QVariantMap map = position.toMap();
 
-                if( map.value( "slot" ).toInt() != slot )
+                if( ( map.value( "slot" ).toInt() == slot )
+                    && ( map.value( "semitones" ).toInt() == p_semitones ) )
                 {
-                    continue;
-                }
-
-                for( const QVariant & interval : map.value( "intervals" ).toList() )
-                {
-                    if( interval.toMap().value( "semitones" ).toInt() == p_semitones )
-                    {
-                        return true;
-                    }
+                    return true;
                 }
             }
 
@@ -576,21 +587,27 @@ TEST( ExerciseSessionControllerTest, a_place_holds_every_octave_of_its_class )
     ASSERT_EQ( unisonSlot, domain::circleOfFifthsSlot( domain::Interval{ 12 } ) );
     ASSERT_EQ( unisonSlot, domain::circleOfFifthsSlot( domain::Interval{ 24 } ) );
 
-    QVariantList intervals;
+    // Les trois boutons de cette place, dans l'ordre ou l'ecran les empile.
+    std::vector<std::int32_t> stacked;
 
     for( const QVariant & position : controller.gridPositions() )
     {
-        if( position.toMap().value( "slot" ).toInt() == static_cast<int>( unisonSlot ) )
+        const QVariantMap map = position.toMap();
+
+        if( map.value( "slot" ).toInt() == static_cast<int>( unisonSlot ) )
         {
-            intervals = position.toMap().value( "intervals" ).toList();
+            stacked.push_back( map.value( "semitones" ).toInt() );
+
+            // Et chacun sait combien ils sont et ou il se place : c'est ce qui permet a l'ecran de les repartir
+            // sans rien savoir de la musique.
+            EXPECT_EQ( 3, map.value( "stackSize" ).toInt() );
         }
     }
 
-    // Trois boutons sur une seule place, et dans l'ordre des octaves : le simple d'abord, ses composes a sa suite.
-    ASSERT_EQ( 3, intervals.size() );
-    EXPECT_EQ( 0, intervals.at( 0 ).toMap().value( "semitones" ).toInt() );
-    EXPECT_EQ( 12, intervals.at( 1 ).toMap().value( "semitones" ).toInt() );
-    EXPECT_EQ( 24, intervals.at( 2 ).toMap().value( "semitones" ).toInt() );
+    ASSERT_EQ( 3U, stacked.size() );
+    EXPECT_EQ( 0, stacked.at( 0 ) );
+    EXPECT_EQ( 12, stacked.at( 1 ) );
+    EXPECT_EQ( 24, stacked.at( 2 ) );
 }
 
 }    // namespace musichien::ui
