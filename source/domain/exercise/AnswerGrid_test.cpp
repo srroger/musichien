@@ -210,4 +210,29 @@ TEST( AnswerGridTest, a_grid_asking_for_one_choice_still_offers_two )
     EXPECT_EQ( AnswerGrid::MINIMUM_CHOICE_COUNT, choices.size() );
 }
 
+TEST( AnswerGridTest, the_grid_is_laid_out_in_circle_of_fifths_order )
+{
+    // Roger : "les intervalles places au bon endroit du cercle". La position d'un bouton doit vouloir dire
+    // quelque chose, et elle ne le peut que si elle ne change jamais : c'est ce que ce test protege.
+    //
+    // Une quinte fait sept demi-tons, donc l'ordre attendu est do, sol, re, la, mi, si, fa diese...
+    const std::vector<Interval> palette{ Interval{ 0 }, Interval{ 1 }, Interval{ 2 }, Interval{ 3 }, Interval{ 4 }, Interval{ 5 }, Interval{ 6 }, Interval{ 7 }, Interval{ 8 }, Interval{ 9 }, Interval{ 10 }, Interval{ 11 }, Interval{ 12 } };
+
+    // Plusieurs tirages : un ordre qui ne tient qu'avec une graine serait un ordre qui ne tient pas.
+    for( std::uint32_t seed = 1; seed <= 20; ++seed )
+    {
+        std::mt19937 randomEngine{ seed };
+
+        const std::vector<Interval> choices = AnswerGrid::build( palette, Interval{ 7 }, 6, randomEngine );
+
+        std::vector<std::int32_t> positions;
+
+        std::ranges::transform( choices, std::back_inserter( positions ), []( const Interval & p_choice ) {
+            return ( 7 * p_choice.intervalClass() ) % 12;
+        } );
+
+        EXPECT_TRUE( std::ranges::is_sorted( positions ) ) << "graine " << seed;
+    }
+}
+
 }    // namespace musichien::domain
