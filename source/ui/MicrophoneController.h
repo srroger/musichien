@@ -37,6 +37,7 @@ class MicrophoneController final : public QObject
     Q_PROPERTY( double detectedFrequencyHz READ detectedFrequencyHz NOTIFY detectedFrequencyHzChanged )
     Q_PROPERTY( double detectedPitchRatio READ detectedPitchRatio NOTIFY detectedPitchRatioChanged )
     Q_PROPERTY( double detectedMidi READ detectedMidi NOTIFY detectedMidiChanged )
+    Q_PROPERTY( double detectedStaffFraction READ detectedStaffFraction NOTIFY detectedStaffFractionChanged )
     Q_PROPERTY( QString detectedNoteLabel READ detectedNoteLabel NOTIFY detectedNoteLabelChanged )
 
     // How far the voice is from the nearest note, in cents, and how good that is. This is what turns the microphone
@@ -69,6 +70,7 @@ public:
     [[nodiscard]] double detectedFrequencyHz() const { return m_detectedFrequencyHz; }
     [[nodiscard]] double detectedPitchRatio() const { return m_detectedPitchRatio; }
     [[nodiscard]] double detectedMidi() const { return m_detectedMidi; }
+    [[nodiscard]] double detectedStaffFraction() const { return m_detectedStaffFraction; }
     [[nodiscard]] QString detectedNoteLabel() const { return m_detectedNoteLabel; }
     [[nodiscard]] double detectedCents() const { return m_detectedCents; }
     [[nodiscard]] int detectedTuningState() const { return m_detectedTuningState; }
@@ -83,6 +85,7 @@ signals:
     void detectedFrequencyHzChanged();
     void detectedPitchRatioChanged();
     void detectedMidiChanged();
+    void detectedStaffFractionChanged();
     void detectedNoteLabelChanged();
     void detectedCentsChanged();
     void detectedTuningStateChanged();
@@ -99,6 +102,7 @@ private:
     double m_detectedFrequencyHz{ 0.0 };
     double m_detectedPitchRatio{ 0.0 };
     double m_detectedMidi{ 0.0 };
+    double m_detectedStaffFraction{ 0.5 };
     double m_detectedCents{ 0.0 };
     int m_detectedTuningState{ 0 };
     QString m_detectedNoteLabel;

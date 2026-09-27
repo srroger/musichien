@@ -9,6 +9,7 @@
 #include <QPermission>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -89,6 +90,24 @@ constexpr double OFF_CENTS = 20.0;
     }
 
     return 2;
+}
+
+// Where the ball sits on the staff, in treble clef. The five lines are E, G, B, D, F (bottom to top), and one scale
+// step - a line to the next space - is one eighth of the staff's span. The note is folded onto the octave, so it
+// never leaves the staff, and a C always lands back on its space.
+[[nodiscard]] double staffFractionFor( std::int32_t p_midi )
+{
+    // The scale step of each pitch class from C. The five altered notes fall halfway between two naturals.
+    constexpr std::array<double, 12> STEP_FROM_C{ 0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0 };
+
+    const auto pitchClass = static_cast<std::size_t>( ( ( p_midi % 12 ) + 12 ) % 12 );
+
+    // E is two steps above C. Then fold onto the octave - seven steps - so the ball wraps instead of hitting a wall.
+    double stepFromE = STEP_FROM_C.at( pitchClass ) - 2.0;
+    stepFromE -= std::floor( stepFromE / 7.0 ) * 7.0;
+
+    // The bottom line sits at 0.15 of the item's height and the top line at 0.85, so one step is 0.0875.
+    return 0.15 + ( stepFromE * 0.0875 );
 }
 
 [[nodiscard]] QString noteLabelFor( double p_frequencyHz, double p_referencePitchHz )
@@ -201,7 +220,19 @@ void MicrophoneController::ensureDetector()
 
 void MicrophoneController::onPitch( float p_frequencyHz )
 {
-    m_detectedFrequencyHz = static_cast<double>( p_frequencyHz );
+    const auto rawFrequency = static_cast<double>( p_frequencyHz );
+
+    // A light smoothing: on a noisy desktop YIN can flicker between two neighbouring notes, and a tuner should not.
+    // A jump of less than half a semitone blends with the previous reading; a real jump passes straight through.
+    double frequency = rawFrequency;
+
+    if( m_detectedFrequencyHz > 0.0 && rawFrequency > 0.0
+        && std::abs( domain::centsBetween( rawFrequency, m_detectedFrequencyHz ) ) < 50.0 )
+    {
+        frequency = ( m_detectedFrequencyHz + rawFrequency ) / 2.0;
+    }
+
+    m_detectedFrequencyHz = frequency;
 
     const double referencePitch = ( m_preferences != nullptr ) ? m_preferences->storedReferencePitch() : 440.0;
 
@@ -215,6 +246,12 @@ void MicrophoneController::onPitch( float p_frequencyHz )
                            + ( static_cast<double>( domain::SEMITONES_PER_OCTAVE )
                                * std::log2( m_detectedFrequencyHz / referencePitch ) )
                        : 0.0;
+
+    // The ball's exact place on the staff: rounded to the nearest note, so a C is always on its space, then folded
+    // onto the octave. The cents and the colour carry the fine tuning, the ball carries WHICH note it is.
+    m_detectedStaffFraction = ( m_detectedFrequencyHz > 0.0 )
+                                ? staffFractionFor( static_cast<std::int32_t>( std::lround( m_detectedMidi ) ) )
+                                : 0.5;
 
     // The tuner part: how far the voice is from the note it is closest to. This is what makes the page useful
     // outside the game - checking a guitar string, or hearing how flat yesterday's cold left the voice.
@@ -245,6 +282,7 @@ void MicrophoneController::onPitch( float p_frequencyHz )
     emit detectedFrequencyHzChanged();
     emit detectedPitchRatioChanged();
     emit detectedMidiChanged();
+    emit detectedStaffFractionChanged();
     emit detectedNoteLabelChanged();
     emit detectedCentsChanged();
     emit detectedTuningStateChanged();

@@ -82,18 +82,6 @@ ApplicationWindow {
         return "#f2848e";
     }
 
-    // Position verticale d'une note sur la portee, en clef de Sol : 64 (E4) sur la ligne du bas. La boule se replie a
-    // l'octave : une note qui monte au-dessus de la portee repart d'en bas, comme une ligne qui se reboucle - jamais
-    // d'effet de mur.
-    function staffY(p_midi) {
-        if (p_midi <= 0)
-            return 0.5;
-
-        var relative = p_midi - 64;
-        relative -= Math.floor(relative / 12) * 12;
-        return relative / 12;
-    }
-
     // Plays the interval at a given distance, then reveals the feedback.
     // The distance is all this screen knows how to say about an interval: it never names one, never
     // decides whether one is simple or compound, and never builds one. It asks, then it displays what
@@ -568,7 +556,7 @@ ApplicationWindow {
                 id: settingsColumn
 
                 width: settingsScroll.availableWidth
-                spacing: 8
+                spacing: 5
 
                 Text {
                     Layout.fillWidth: true
@@ -596,7 +584,7 @@ ApplicationWindow {
                             color: "#e8dcff"
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: parent.indicator.width + parent.spacing
-                            font.pixelSize: 15
+                            font.pixelSize: 13
                         }
 
                     }
@@ -614,7 +602,7 @@ ApplicationWindow {
                         color: "#e8dcff"
                         verticalAlignment: Text.AlignVCenter
                         leftPadding: parent.indicator.width + parent.spacing
-                        font.pixelSize: 15
+                        font.pixelSize: 13
                     }
 
                 }
@@ -751,7 +739,8 @@ ApplicationWindow {
                         }
 
                         SpinBox {
-                            Layout.fillWidth: true
+                            Layout.preferredWidth: 150
+                            Layout.alignment: Qt.AlignLeft
                             from: 400
                             to: 480
                             stepSize: 1
@@ -889,7 +878,7 @@ ApplicationWindow {
                                 visible: MicrophoneController.detectedFrequencyHz > 0
                                 color: mainWindow.tuningColor()
                                 x: parent.width / 2 - width / 2
-                                y: parent.height * (1 - mainWindow.staffY(MicrophoneController.detectedMidi)) - height / 2
+                                y: parent.height * (1 - MicrophoneController.detectedStaffFraction) - height / 2
 
                                 Behavior on y {
                                     NumberAnimation {
