@@ -9,7 +9,7 @@ namespace musichien::ui
 namespace
 {
 
-constexpr int MINIMUM_BPM = 30;
+constexpr int MINIMUM_BPM = 1;
 constexpr int MAXIMUM_BPM = 300;
 
 constexpr int MINIMUM_BEATS_PER_BAR = 1;

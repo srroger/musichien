@@ -11,6 +11,8 @@
 # =====================================================================================================================
 
 musichienFunction_AddLibrary(infrastructure
+    audio/AudioMixer.h
+    audio/AudioMixer.cpp
     audio/QAudioNotePlayer.h
     audio/QAudioNotePlayer.cpp
     audio/NullPitchDetector.h
@@ -61,6 +63,7 @@ if(MUSICHIEN_BUILD_TESTING)
 
     musichienFunction_AddTest(infrastructure
         musichien_infrastructure
+        audio/AudioMixer_test.cpp
         content/JsonHintBook_test.cpp
     )
 

@@ -19,6 +19,7 @@
 #include "domain/audio/NotePlayer.h"
 #include "domain/audio/SampledInstrument.h"
 #include "domain/audio/ToneSynthesizer.h"
+#include "infrastructure/audio/AudioMixer.h"
 
 #include <QAudioFormat>
 #include <QAudioSink>
@@ -121,13 +122,27 @@ private:
     // Opens the audio output on first use, and decides the sample format once and for all.
     void ensureAudioOutputIsOpen();
 
-    // Replaces whatever is playing by a new buffer of samples.
-    void playSamples( std::vector<float> p_samples );
+    // Starts the sink on the mixer on first need, and hands the device back once the mix falls silent: an output
+    // left open on a phone drains the battery.
+    void startSinkIfNeeded();
+    void stopSinkWhenSilent();
+
+    // Replaces whatever is playing by a new buffer of samples. The right behaviour for a note, a melody, a chord:
+    // two overlapping notes would make an interval impossible to name.
+    void playSamples( std::vector<float> p_samples, float p_gain = 1.0F );
+
+    // ADDS a buffer to what is already playing. The right behaviour for percussion and for the metronome: a drum hit
+    // and a click must be heard TOGETHER, not one instead of the other.
+    void mixSamples( std::vector<float> p_samples, float p_gain = 1.0F );
 
     std::unique_ptr<QAudioSink> m_audioSink;
 
-    // Owned by the sink: it must not be deleted here.
-    QIODevice * m_audioOutputDevice{ nullptr };
+    // Everything the sink reads. Owned here, handed to the sink by start().
+    std::unique_ptr<AudioMixer> m_mixer;
+
+    // Whether the sink is currently pulling from the mixer. Tracked because start() on an already running sink
+    // restarts it, which would cut the sound being played.
+    bool m_isSinkRunning{ false };
 
     // The timbre the next listening will use. Drawn at random among the samples AND the sine (when it is enabled),
     // but STABLE as long as the question does not change: being played back on a different instrument would turn
@@ -171,7 +186,6 @@ private:
     domain::TuningContext m_tuning;
 
     QAudioFormat m_audioFormat;
-    std::vector<float> m_currentSamples;
     std::string m_outputDescription{ "not opened yet" };
 };
 

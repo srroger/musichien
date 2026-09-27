@@ -4,6 +4,7 @@
 
 #include <QAudioDevice>
 #include <QMediaDevices>
+#include <QTimer>
 
 #include <algorithm>
 #include <array>
@@ -21,11 +22,17 @@ namespace
 // Duration of a single note, as heard in an exercise.
 constexpr std::chrono::milliseconds DEFAULT_NOTE_DURATION{ 700 };
 
-// Extra room given to the sink buffer, so that a single write always fits.
-constexpr int BUFFER_MARGIN_BYTES = 4096;
-
 // The synthesizer already normalises its own output, so the sink must not attenuate it further.
 constexpr double SINK_VOLUME = 1.0;
+
+// The sink buffer, in bytes. Its size IS the latency: the mixer is pulled ahead by that much, so a metronome click
+// triggered now would be heard one buffer later. Sixteen kilobytes is roughly forty milliseconds at 48 kHz in stereo
+// float - small enough that the click stays in time, large enough that the stream does not starve.
+constexpr int SINK_BUFFER_BYTES = 16384;
+
+// A drum hit is a SHORT sound, where a note lasts: at equal peak it sounds far quieter. This is what puts it back at
+// the level of the rest, and Roger heard the lack of it immediately ("le volume de la batterie a l'air plutot faible").
+constexpr float DRUM_GAIN = 2.4F;
 
 }    // namespace
 
@@ -56,6 +63,8 @@ void QAudioNotePlayer::reopenAudioOutput()
     m_audioSink.reset();
     m_synthesizer.reset();
     m_drumSynthesizer.reset();
+    m_mixer.reset();
+    m_isSinkRunning = false;
     m_outputDescription = "not opened yet";
 
     ensureAudioOutputIsOpen();
@@ -137,6 +146,13 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
     m_synthesizer.emplace( m_audioFormat.sampleRate() );
     m_drumSynthesizer.emplace( m_audioFormat.sampleRate() );
 
+    // The mixer is built from the REAL format, like the synthesisers: it is what the sink reads, and it is what lets
+    // two sounds be heard at once.
+    m_mixer = std::make_unique<AudioMixer>( m_audioFormat.sampleRate(), m_audioFormat.channelCount() );
+
+    // A bounded sink buffer, because its size is the delay between a click being asked for and being heard.
+    m_audioSink->setBufferSize( SINK_BUFFER_BYTES );
+
     m_outputDescription = std::format( "{} ({} Hz, {} channel(s), sample format {})",
                                        outputDevice.description().toStdString(),
                                        m_audioFormat.sampleRate(),
@@ -146,69 +162,88 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
     std::cerr << "Musichien: audio output opened on " << m_outputDescription << "\n";
 }
 
-void QAudioNotePlayer::playSamples( std::vector<float> p_samples )
+void QAudioNotePlayer::startSinkIfNeeded()
+{
+    if( ( m_audioSink == nullptr ) || ( m_mixer == nullptr ) || m_isSinkRunning )
+    {
+        return;
+    }
+
+    // The sink PULLS from the mixer: nothing is written, the sink asks for what it needs. Starting it on an already
+    // running sink would restart the stream and cut the sound being played, hence the flag.
+    m_audioSink->setVolume( SINK_VOLUME );
+    m_audioSink->start( m_mixer.get() );
+
+    m_isSinkRunning = true;
+}
+
+void QAudioNotePlayer::stopSinkWhenSilent()
+{
+    if( m_mixer == nullptr )
+    {
+        return;
+    }
+
+    // A single shot rather than a timer of our own: when nothing is left to play, the device is handed back. Leaving
+    // an output open on a phone drains the battery, which the project has always refused.
+    //
+    // The mixer is the CONTEXT of the single shot, and that is deliberate: it is owned by this object, so if the
+    // player is destroyed the pending call goes with it instead of touching a dangling pointer.
+    QTimer::singleShot( 250, m_mixer.get(), [this]() {
+        if( ( m_audioSink == nullptr ) || ( m_mixer == nullptr ) )
+        {
+            return;
+        }
+
+        if( !m_mixer->isPlaying() )
+        {
+            m_audioSink->stop();
+
+            m_isSinkRunning = false;
+        }
+    } );
+}
+
+void QAudioNotePlayer::playSamples( std::vector<float> p_samples, float p_gain )
 {
     ensureAudioOutputIsOpen();
 
-    if( !m_audioSink || p_samples.empty() )
+    if( ( m_mixer == nullptr ) || p_samples.empty() )
     {
         return;
     }
 
-    // A new note interrupts the previous one: in an ear training exercise, two overlapping notes make
-    // the interval impossible to identify.
-    stopAll();
+    // A new note REPLACES the previous one: in an ear training exercise, two overlapping notes make the interval
+    // impossible to identify. Percussion goes through mixSamples instead.
+    m_mixer->clear();
+    m_mixer->play( std::move( p_samples ), p_gain );
 
-    m_currentSamples = std::move( p_samples );
+    startSinkIfNeeded();
+    stopSinkWhenSilent();
+}
 
-    // The synthesizer produces MONO samples, which is musically correct: a single tone is a single
-    // signal. Turning that into the channel layout of the device is the job of this adapter.
-    //
-    // The same sample is written to EVERY channel. Letting the audio backend upmix a mono stream is
-    // what produced a sound heard only from the left channel.
-    const auto channelCount = static_cast<std::size_t>( std::max( 1, m_audioFormat.channelCount() ) );
+void QAudioNotePlayer::mixSamples( std::vector<float> p_samples, float p_gain )
+{
+    ensureAudioOutputIsOpen();
 
-    std::vector<float> channelSamples;
-    channelSamples.reserve( m_currentSamples.size() * channelCount );
-
-    for( const float monoSample : m_currentSamples )
+    if( ( m_mixer == nullptr ) || p_samples.empty() )
     {
-        std::fill_n( std::back_inserter( channelSamples ), channelCount, monoSample );
-    }
-
-    const auto byteCount = static_cast<qint64>( channelSamples.size() )
-                           * static_cast<qint64>( sizeof( float ) );
-
-    // The whole buffer is handed over in a single write, so the sink must be able to hold it. Without
-    // this, a write longer than the internal buffer would be truncated and the note cut in the middle.
-    m_audioSink->setBufferSize( static_cast<int>( byteCount ) + BUFFER_MARGIN_BYTES );
-    m_audioSink->setVolume( SINK_VOLUME );
-
-    m_audioOutputDevice = m_audioSink->start();
-
-    if( m_audioOutputDevice == nullptr )
-    {
-        std::cerr << "Musichien: the audio output could not be started.\n";
         return;
     }
 
-    // QIODevice::write only accepts a "const char *", even for binary data. This is the documented Qt
-    // idiom for pushing raw audio, and the only place in the project where a cast of this kind is
-    // needed. It is therefore silenced locally rather than globally.
-    const qint64 writtenByteCount = m_audioOutputDevice->write(
-      reinterpret_cast<const char *>( channelSamples.data() ),    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-      byteCount );
+    // ADDED to what is playing, never instead of it: the metronome click and a drum hit must be heard together.
+    m_mixer->play( std::move( p_samples ), p_gain );
 
-    if( writtenByteCount < byteCount )
-    {
-        std::cerr << "Musichien: only " << writtenByteCount << " of " << byteCount
-                  << " bytes could be written to the audio output.\n";
-    }
+    startSinkIfNeeded();
+    stopSinkWhenSilent();
 }
 
 void QAudioNotePlayer::stopAll()
 {
-    m_currentSamples.clear();
+    if( m_mixer != nullptr )
+    {
+        m_mixer->clear();
+    }
 
     if( m_audioSink )
     {
@@ -217,7 +252,7 @@ void QAudioNotePlayer::stopAll()
         m_audioSink->stop();
     }
 
-    m_audioOutputDevice = nullptr;
+    m_isSinkRunning = false;
 }
 
 void QAudioNotePlayer::setTuning( domain::TuningContext p_tuning )
@@ -422,7 +457,8 @@ void QAudioNotePlayer::playTapCue()
         sample *= TAP_GAIN;
     }
 
-    playSamples( std::move( samples ) );
+    // MIXE : un clic de menu doit s'entendre par-dessus ce qui joue deja, pas le remplacer.
+    mixSamples( std::move( samples ) );
 }
 
 void QAudioNotePlayer::playMetronomeClick( bool p_accented )
@@ -451,7 +487,9 @@ void QAudioNotePlayer::playMetronomeClick( bool p_accented )
         sample *= gain;
     }
 
-    playSamples( std::move( samples ) );
+    // MIXE et non remplace : le metronome doit s'entendre EN MEME TEMPS que la batterie. C'etait le bug - le clic
+    // tuait le son de batterie en cours, et reciproquement.
+    mixSamples( std::move( samples ) );
 }
 
 void QAudioNotePlayer::playDrum( domain::Drum p_drum )
@@ -463,7 +501,8 @@ void QAudioNotePlayer::playDrum( domain::Drum p_drum )
         return;
     }
 
-    playSamples( m_drumSynthesizer->renderDrum( p_drum ) );
+    // MIXE, comme le metronome : un roulement de batterie, c'est des sons qui se chevauchent.
+    mixSamples( m_drumSynthesizer->renderDrum( p_drum ), DRUM_GAIN );
 }
 
 void QAudioNotePlayer::playGreeting()

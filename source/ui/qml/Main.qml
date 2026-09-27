@@ -1209,7 +1209,7 @@ ApplicationWindow {
 
                         SpinBox {
                             Layout.preferredWidth: 130
-                            from: 30
+                            from: 1
                             to: 300
                             editable: true
                             value: RhythmController.bpm
