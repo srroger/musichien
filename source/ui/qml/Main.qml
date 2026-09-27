@@ -24,6 +24,14 @@ import QtQuick.Controls.Material
 import QtQuick.Layouts
 
 ApplicationWindow {
+    // Hides the explanatory text after a few seconds: enough time to read a name and a number, short
+    // enough that the screen does not stay cluttered.
+    // -------------------------------------------------------------------------------------------------
+    // Les instruments joues
+    // Roger : "le saxophone a un volume et un timbre vraiment particulier, le jouer de maniere aleatoire
+    // surtout la nuit peut etre desagreable". Un instrument qu'on ne veut pas doit donc pouvoir etre ecarte,
+    // et le choix doit SURVIVRE au lancement suivant - un reglage qui s'oublie n'est pas un reglage.
+
     id: mainWindow
 
     // Width shared by the standalone controls, so that they line up without each repeating the rule.
@@ -195,6 +203,13 @@ ApplicationWindow {
 
                 // The way into the loop. It sits above the bench on purpose: the bench is a tool for
                 // building the project, and playing is what the application is FOR.
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: ExerciseController.instruments.length > 0
+                    text: qsTr("Instruments…")
+                    onClicked: settingsDialog.open()
+                }
+
                 Button {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
@@ -424,8 +439,51 @@ ApplicationWindow {
 
     }
 
-    // Hides the explanatory text after a few seconds: enough time to read a name and a number, short
-    // enough that the screen does not stay cluttered.
+    // Le dernier coche ne peut pas etre decoche : sans instrument, il n'y a plus de jeu.
+    // -------------------------------------------------------------------------------------------------
+    Dialog {
+        id: settingsDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 420)
+        title: qsTr("Instruments joues")
+        modal: true
+
+        contentItem: ColumnLayout {
+            spacing: 8
+
+            Text {
+                Layout.fillWidth: true
+                color: "#cbb8e8"
+                font.pixelSize: 14
+                wrapMode: Text.WordWrap
+                text: qsTr("Le tirage se fait au hasard parmi les instruments coches.")
+            }
+
+            Repeater {
+                model: ExerciseController.instruments
+
+                delegate: CheckBox {
+                    required property var modelData
+
+                    Layout.fillWidth: true
+                    text: modelData.name
+                    checked: modelData.enabled
+                    onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+                }
+
+            }
+
+            Button {
+                Layout.alignment: Qt.AlignRight
+                text: qsTr("Fermer")
+                onClicked: settingsDialog.close()
+            }
+
+        }
+
+    }
+
     Timer {
         id: feedbackTimer
 

@@ -28,7 +28,7 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
                                                       domain::SessionSettings p_settings,
                                                       domain::HintBook p_hintBook,
                                                       VibrationCallback p_vibrate,
-                                                      domain::PlayerLevelStore * p_levelStore,
+                                                      domain::PlayerPreferences * p_levelStore,
                                                       QObject * p_parent )
   : QObject{ p_parent }
   , m_notePlayer{ p_notePlayer }
@@ -48,6 +48,15 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
     {
         m_settings = domain::sessionSettingsFor( *m_playerLevel );
     }
+
+    // The instruments the player asked for. An empty list is a first run: everything is offered, which is what a
+    // fresh installation should sound like.
+    if( m_levelStore != nullptr )
+    {
+        m_enabledInstruments = m_levelStore->storedEnabledInstruments();
+    }
+
+    m_enabledInstruments.resize( domain::INSTRUMENT_COUNT, true );
 }
 
 bool ExerciseSessionController::running() const noexcept
@@ -203,6 +212,60 @@ QVariantList ExerciseSessionController::playerLevels()
     }
 
     return levels;
+}
+
+QVariantList ExerciseSessionController::instruments() const
+{
+    QVariantList instruments;
+
+    for( std::size_t index = 0; index < domain::INSTRUMENT_COUNT; ++index )
+    {
+        QVariantMap instrument;
+        instrument.insert( QStringLiteral( "index" ), static_cast<int>( index ) );
+        instrument.insert( QStringLiteral( "name" ), QString::fromLatin1( domain::INSTRUMENT_NAMES.at( index ) ) );
+
+        // A list shorter than the instruments this build knows about means "everything": a first run must sound
+        // complete, not empty.
+        instrument.insert( QStringLiteral( "enabled" ),
+                           ( index < m_enabledInstruments.size() ) ? m_enabledInstruments.at( index ) : true );
+
+        instruments.append( instrument );
+    }
+
+    return instruments;
+}
+
+void ExerciseSessionController::setInstrumentEnabled( int p_index, bool p_isEnabled )
+{
+    if( ( p_index < 0 ) || ( static_cast<std::size_t>( p_index ) >= domain::INSTRUMENT_COUNT ) )
+    {
+        return;
+    }
+
+    m_enabledInstruments.resize( domain::INSTRUMENT_COUNT, true );
+
+    m_enabledInstruments.at( static_cast<std::size_t>( p_index ) ) = p_isEnabled;
+
+    // The LAST one cannot be switched off: an instrument list with nothing in it is a game with no sound. The
+    // signal is emitted all the same, so that a checkbox which refused to change snaps back where it belongs
+    // instead of lying about the state.
+    const bool anythingLeft = std::ranges::any_of( m_enabledInstruments, []( bool p_isEnabledFlag ) {
+        return p_isEnabledFlag;
+    } );
+
+    if( anythingLeft )
+    {
+        if( m_levelStore != nullptr )
+        {
+            m_levelStore->storeEnabledInstruments( m_enabledInstruments );
+        }
+    }
+    else
+    {
+        m_enabledInstruments.at( static_cast<std::size_t>( p_index ) ) = true;
+    }
+
+    emit instrumentsChanged();
 }
 
 int ExerciseSessionController::experience() const noexcept

@@ -1,7 +1,7 @@
 #pragma once
 
 // =====================================================================================================================
-// Musichien - QSettingsPlayerLevelStore
+// Musichien - QSettingsPlayerPreferences
 //
 // Where the level of the player actually lives between two launches: a settings file, on the machine.
 //
@@ -16,19 +16,23 @@
 // drawer it is kept in.
 // =====================================================================================================================
 
-#include "domain/exercise/PlayerLevelStore.h"
+#include "domain/exercise/PlayerPreferences.h"
 
 namespace musichien::infrastructure
 {
 
-class QSettingsPlayerLevelStore final : public domain::PlayerLevelStore
+class QSettingsPlayerPreferences final : public domain::PlayerPreferences
 {
 public:
-    QSettingsPlayerLevelStore() = default;
+    QSettingsPlayerPreferences() = default;
 
     [[nodiscard]] std::optional<domain::PlayerLevel> storedLevel() const override;
 
     void storeLevel( domain::PlayerLevel p_level ) override;
+
+    [[nodiscard]] std::vector<bool> storedEnabledInstruments() const override;
+
+    void storeEnabledInstruments( std::vector<bool> p_enabledInstruments ) override;
 };
 
 }    // namespace musichien::infrastructure

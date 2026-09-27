@@ -42,7 +42,7 @@ musichienFunction_AddLibrary(domain
     # What the player already knows, and where the answer is remembered
     exercise/PlayerLevel.h
     exercise/PlayerLevel.cpp
-    exercise/PlayerLevelStore.h
+    exercise/PlayerPreferences.h
 )
 
 # Expose the module to the rest of the project under a stable name.

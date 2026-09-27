@@ -8,7 +8,7 @@
 #include "infrastructure/audio/QAudioNotePlayer.h"
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
-#include "infrastructure/preferences/QSettingsPlayerLevelStore.h"
+#include "infrastructure/preferences/QSettingsPlayerPreferences.h"
 #include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
@@ -156,7 +156,7 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     // What the application remembers about its player. A small settings file, on the device: the package
     // cannot reach the network, so nothing about him ever leaves the phone.
-    musichien::infrastructure::QSettingsPlayerLevelStore playerLevelStore;
+    musichien::infrastructure::QSettingsPlayerPreferences playerLevelStore;
 
     // The sampled instruments, embedded in the resources. From here on they are the sound of the EXERCISES; the
     // synthesiser keeps the mistake cue, which must not be beautiful, and stays the fallback if a sample is
@@ -175,7 +175,7 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     std::cerr << "Musichien: " << instruments.size() << " sampled instrument(s)\n";
 
-    notePlayer.useInstruments( std::move( instruments ) );
+    notePlayer.useInstruments( instruments );
 
     // Opening the output now, rather than at the first note, means a machine without a sound card is
     // reported at start up instead of silently refusing to play in the middle of an exercise.
@@ -204,6 +204,31 @@ int main( int p_argumentCount, char * p_arguments[] )
                                                                  loadHintBook(),
                                                                  musichien::infrastructure::vibrateForMistake,
                                                                  &playerLevelStore };
+
+    // What the player WANTS to hear. The filtering happens HERE, in the wiring layer, which is what keeps the
+    // audio adapter from having to know anything about preferences - and it happens again on every change, so
+    // that unticking the saxophone is heard on the very next question rather than at the next launch.
+    const auto playWantedInstruments = [&exerciseController, &notePlayer, &instruments]() {
+        const std::vector<bool> enabled = exerciseController.enabledInstruments();
+
+        std::vector<musichien::domain::SampledInstrument> wantedInstruments;
+
+        for( std::size_t index = 0; index < instruments.size(); ++index )
+        {
+            if( ( index >= enabled.size() ) || enabled.at( index ) )
+            {
+                wantedInstruments.push_back( instruments.at( index ) );
+            }
+        }
+
+        notePlayer.useInstruments( std::move( wantedInstruments ) );
+    };
+
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::instrumentsChanged,
+                      playWantedInstruments );
+
+    playWantedInstruments();
 
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,

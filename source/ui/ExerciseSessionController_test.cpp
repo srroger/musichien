@@ -405,7 +405,7 @@ TEST( ExerciseSessionControllerTest, an_interval_without_a_hint_shows_nothing )
 TEST( ExerciseSessionControllerTest, a_level_decides_where_the_sessions_start )
 {
     domain::NotePlayerFake notePlayer;
-    domain::PlayerLevelStoreFake levelStore;
+    domain::PlayerPreferencesFake levelStore;
 
     ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
 
@@ -430,7 +430,7 @@ TEST( ExerciseSessionControllerTest, a_level_decides_where_the_sessions_start )
 TEST( ExerciseSessionControllerTest, a_remembered_level_is_there_at_start_up )
 {
     domain::NotePlayerFake notePlayer;
-    domain::PlayerLevelStoreFake levelStore;
+    domain::PlayerPreferencesFake levelStore;
 
     levelStore.storeLevel( domain::PlayerLevel::Advanced );
 
@@ -444,7 +444,7 @@ TEST( ExerciseSessionControllerTest, a_remembered_level_is_there_at_start_up )
 TEST( ExerciseSessionControllerTest, a_level_changes_the_palette_and_nothing_else )
 {
     domain::NotePlayerFake notePlayer;
-    domain::PlayerLevelStoreFake levelStore;
+    domain::PlayerPreferencesFake levelStore;
 
     ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
 

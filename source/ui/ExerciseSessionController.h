@@ -21,9 +21,10 @@
 // =====================================================================================================================
 
 #include "domain/audio/NotePlayer.h"
+#include "domain/audio/SampledInstrument.h"
 #include "domain/exercise/ExerciseSession.h"
 #include "domain/exercise/HintBook.h"
-#include "domain/exercise/PlayerLevelStore.h"
+#include "domain/exercise/PlayerPreferences.h"
 
 #include <QObject>
 #include <QString>
@@ -91,6 +92,12 @@ class ExerciseSessionController final : public QObject
     // so in the signature is cheaper than a comment. Qt hands it to the screen all the same.
     Q_PROPERTY( QVariantList playerLevels READ playerLevels CONSTANT )
 
+    // The instruments the player wants to hear, each with its index, its name and whether it is enabled.
+    //
+    // See PlayerPreferences: a saxophone at the same level as a piano is aggressive, and a timbre that grates
+    // gets an application closed. What the player turns off stays off.
+    Q_PROPERTY( QVariantList instruments READ instruments NOTIFY instrumentsChanged )
+
     Q_PROPERTY( int experience READ experience NOTIFY scoreChanged )
     Q_PROPERTY( int streak READ streak NOTIFY scoreChanged )
     Q_PROPERTY( int lives READ lives NOTIFY scoreChanged )
@@ -111,7 +118,7 @@ public:
                                         domain::SessionSettings p_settings = {},
                                         domain::HintBook p_hintBook = {},
                                         VibrationCallback p_vibrate = {},
-                                        domain::PlayerLevelStore * p_levelStore = nullptr,
+                                        domain::PlayerPreferences * p_levelStore = nullptr,
                                         QObject * p_parent = nullptr );
 
     [[nodiscard]] bool running() const noexcept;
@@ -129,6 +136,11 @@ public:
     [[nodiscard]] bool hasChosenLevel() const noexcept;
     [[nodiscard]] int playerLevel() const noexcept;
     [[nodiscard]] static QVariantList playerLevels();
+    [[nodiscard]] QVariantList instruments() const;
+
+    // The flags as the rest of the application needs them: main.cpp filters the loaded instruments with this,
+    // which is what keeps the audio adapter from having to know anything about preferences.
+    [[nodiscard]] std::vector<bool> enabledInstruments() const { return m_enabledInstruments; }
     [[nodiscard]] int experience() const noexcept;
     [[nodiscard]] int streak() const noexcept;
     [[nodiscard]] int lives() const noexcept;
@@ -140,6 +152,10 @@ public:
 
     // The player says where he is, once. His answer is remembered, and it decides where his sessions start.
     Q_INVOKABLE void choosePlayerLevel( int p_level );
+
+    // Turns one instrument on or off. The last enabled one cannot be turned off: an instrument list with nothing
+    // in it is a game with no sound.
+    Q_INVOKABLE void setInstrumentEnabled( int p_index, bool p_isEnabled );
 
     // Leaves the loop and goes back to the bench. Stops the sound first: a stream left open on a phone
     // is a battery drain.
@@ -177,6 +193,9 @@ signals:
     // The player has just said where he is, or the application has just remembered it.
     void playerLevelChanged();
 
+    // The player has just turned an instrument on or off.
+    void instrumentsChanged();
+
 private:
     // Rebuilds the list of choices from the question being asked, and only then notifies. Called
     // whenever the question changes AND whenever the grid closes in after a mistake.
@@ -200,11 +219,15 @@ private:
     VibrationCallback m_vibrate;
 
     // May be null: a test, or an application that has nowhere to remember anything, must still run.
-    domain::PlayerLevelStore * m_levelStore{ nullptr };
+    domain::PlayerPreferences * m_levelStore{ nullptr };
 
     // Read once from the store, then kept here: the screen asks for it on every question, and a settings file
     // has no business being read that often.
     std::optional<domain::PlayerLevel> m_playerLevel;
+
+    // One flag per instrument, in the order of domain::INSTRUMENT_NAMES. Empty means "everything", which is
+    // what a first run has and what the screen must show as all enabled.
+    std::vector<bool> m_enabledInstruments;
 
     // Empty until a session starts: the bench is what the application shows before that.
     std::unique_ptr<domain::ExerciseSession> m_session;

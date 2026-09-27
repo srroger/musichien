@@ -29,6 +29,7 @@
 #include "domain/audio/ToneSynthesizer.h"
 #include "domain/music/Note.h"
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -38,6 +39,14 @@
 
 namespace musichien::domain
 {
+
+// The sampled instruments the game can play, and the ORDER they are loaded in.
+//
+// That order is a contract, not a detail: a preference is stored as one flag per instrument, so an instrument
+// inserted in the middle would silently exchange the choices the player made. New instruments go LAST.
+inline constexpr std::size_t INSTRUMENT_COUNT = 3;
+
+inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{ "piano", "guitare", "saxo" };
 
 // One recorded note: its samples, the note they were recorded at, and the rate they were recorded at.
 struct SampledNote
