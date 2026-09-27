@@ -117,4 +117,14 @@ TEST( PlayerLevelTest, an_unknown_level_is_the_beginner_one )
     EXPECT_EQ( PlayerLevel::Advanced, playerLevelFromIndex( 2 ) );
 }
 
+TEST( PlayerLevelTest, every_level_offers_the_guided_mode_by_default )
+{
+    // Le mode guide est une question sur deux, a tous les niveaux : sans cela, aucun reglage ne l'active, et le
+    // joueur ne le voit jamais - ce qui est exactement ce que Roger a rapporte.
+    for( const PlayerLevel level : EVERY_LEVEL )
+    {
+        EXPECT_EQ( 50, sessionSettingsFor( level ).directionQuestionShare );
+    }
+}
+
 }    // namespace musichien::domain

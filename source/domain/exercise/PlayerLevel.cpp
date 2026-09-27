@@ -12,7 +12,15 @@ namespace
 // has the same length, the same lives and the same scoring whoever is playing.
 [[nodiscard]] SessionSettings defaultSessionSettings()
 {
-    return SessionSettings{};
+    SessionSettings settings;
+
+    // Le mode guide est offert a tous les niveaux : une question sur deux demande "ca monte ou ca descend ?". C'est
+    // la plus petite question du jeu, et la premiere qu'un debutant repond. Il finira en reglage du joueur ; en
+    // attendant, il faut qu'il soit VU - un mode qu'aucun reglage n'active est un mode qui n'existe pas, et c'est
+    // exactement ce qui s'est passe a la premiere livraison.
+    settings.directionQuestionShare = 50;
+
+    return settings;
 }
 
 }    // namespace
