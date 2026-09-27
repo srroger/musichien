@@ -303,6 +303,10 @@ private:
     // on a mistake, and tell the screen. Both answer() and answerDirection() end here.
     void processAnswer( bool p_isCorrect );
 
+    // Draws a fresh anecdote the FIRST time the session is seen finished, so that a session opens and closes on
+    // something to learn. Guarded, because the last question and the last life can both be the end.
+    void announceSessionEndIfNeeded();
+
     // Starts a session with these settings, drawing the seed in the interface layer where entropy belongs.
     void beginSession( domain::SessionSettings p_settings );
 
@@ -346,6 +350,9 @@ private:
 
     // Empty until a session starts: the bench is what the application shows before that.
     std::unique_ptr<domain::ExerciseSession> m_session;
+
+    // False until the end of the running session has been announced once. Reset when a session begins.
+    bool m_sessionEndAnnounced{ false };
 
     QVariantList m_choices;
 };

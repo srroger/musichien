@@ -506,7 +506,9 @@ ApplicationWindow {
 
         anchors.centerIn: parent
         width: Math.min(mainWindow.width * 0.9, 420)
-        height: Math.min(mainWindow.height * 0.9, 600)
+        // La popup s'adapte a son contenu, et se borne seulement quand il ne tient pas : plus d'espace vide en bas,
+        // et le defilement prend le relais quand il y a trop a montrer.
+        height: Math.min(mainWindow.height * 0.9, settingsColumn.implicitHeight + 32)
         modal: true
         padding: 16
 
@@ -526,6 +528,8 @@ ApplicationWindow {
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
             ColumnLayout {
+                id: settingsColumn
+
                 width: settingsScroll.availableWidth
                 spacing: 8
 
@@ -591,15 +595,24 @@ ApplicationWindow {
                 // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
                 // miniature au rythme de la voix - c'est l'affichage qu'aura la question chantee, expose ici d'abord.
                 Rectangle {
+                    id: microphonePanel
+
                     Layout.fillWidth: true
                     Layout.topMargin: 10
+                    // Un Rectangle qui ne contient qu'un layout ancre n'a AUCUNE hauteur propre : ses enfants se
+                    // posaient les uns sur les autres. La hauteur vient donc du contenu, explicitement.
+                    Layout.preferredHeight: microphoneColumn.implicitHeight + 24
                     color: "#2a1a46"
                     radius: 8
                     border.width: 1
                     border.color: "#5c4a80"
 
                     ColumnLayout {
-                        anchors.fill: parent
+                        id: microphoneColumn
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
                         anchors.margins: 12
                         spacing: 10
 

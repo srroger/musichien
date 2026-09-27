@@ -437,6 +437,9 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
 
     m_session = std::make_unique<domain::ExerciseSession>( entropySource(), p_settings );
 
+    // The end of the previous session has been announced; this one gets its own turn.
+    m_sessionEndAnnounced = false;
+
     emit runningChanged();
 
     refreshChoices();
@@ -543,6 +546,8 @@ void ExerciseSessionController::processAnswer( bool p_isCorrect )
         }
     }
 
+    announceSessionEndIfNeeded();
+
     emit scoreChanged();
     emit sessionChanged();
 }
@@ -583,6 +588,8 @@ void ExerciseSessionController::continueToNextQuestion()
     {
         persistSessionOutcome();
     }
+
+    announceSessionEndIfNeeded();
 
     emit scoreChanged();
     emit sessionChanged();
@@ -631,6 +638,20 @@ void ExerciseSessionController::refreshAnecdote()
     m_anecdoteText = anecdote.has_value() ? QString::fromStdString( anecdote->text ) : QString{};
 
     emit anecdoteChanged();
+}
+
+void ExerciseSessionController::announceSessionEndIfNeeded()
+{
+    if( m_sessionEndAnnounced || !isFinished() )
+    {
+        return;
+    }
+
+    m_sessionEndAnnounced = true;
+
+    // On entre dans une session sur une anecdote et on en sort sur une autre : le joueur a appris quelque chose,
+    // meme quand la partie s'arrete la. Un seul tirage, garanti par le drapeau.
+    refreshAnecdote();
 }
 
 void ExerciseSessionController::stopPlayback()

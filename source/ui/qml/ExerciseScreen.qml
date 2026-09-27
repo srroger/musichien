@@ -567,6 +567,20 @@ Item {
                 text: ExerciseController.starEarned ? qsTr("%1 XP · tout reconnu à l'oreille").arg(ExerciseController.experience) : qsTr("%1 XP · la prochaine fois sera meilleure").arg(ExerciseController.experience)
             }
 
+            // L'anecdote de sortie : on quitte sur quelque chose a apprendre, comme on est entre. Bornee en largeur
+            // (fillWidth + WordWrap), sinon un texte long pousserait les boutons hors de l'ecran.
+            Text {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                color: "#8a77ad"
+                font.pixelSize: 13
+                font.italic: true
+                visible: ExerciseController.anecdoteText !== ""
+                text: ExerciseController.anecdoteText
+            }
+
             Item {
                 Layout.fillHeight: true
             }
