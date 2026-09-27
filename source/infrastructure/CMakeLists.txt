@@ -47,6 +47,7 @@ set_target_properties(musichien_infrastructure PROPERTIES FOLDER "infrastructure
 # ---------------------------------------------------------------------------------------------------------------------
 if(ANDROID)
     target_sources(musichien_infrastructure PRIVATE notifications/AndroidNotificationScheduler.cpp)
+    target_sources(musichien_infrastructure PRIVATE android/AndroidSystemBars.cpp)
 endif()
 
 # ---------------------------------------------------------------------------------------------------------------------

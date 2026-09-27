@@ -114,11 +114,12 @@ MicrophoneController::MicrophoneController( QStringList p_deviceNames, DetectorF
   , m_deviceNames{ std::move( p_deviceNames ) }
   , m_factory{ std::move( p_factory ) }
 {
-    // An empty list would leave the ComboBox with nothing to show; the screen still needs one line, and "nothing
-    // detected" is the honest description of a machine without a microphone.
+    // An empty list would leave the ComboBox with nothing to show. The message says what to LOOK AT: on a desktop
+    // this is almost always a sound card whose active profile has no input - the microphone exists, ALSA sees it, and
+    // the audio server simply does not expose it. Telling the player that is worth more than saying "nothing here".
     if( m_deviceNames.isEmpty() )
     {
-        m_deviceNames = { tr( "No microphone detected" ) };
+        m_deviceNames = { tr( "Aucune entrée audio détectée — vérifie le profil de ta carte son (entrée stéréo)" ) };
     }
 }
 

@@ -11,6 +11,7 @@
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
 #ifdef Q_OS_ANDROID
+#    include "infrastructure/android/AndroidSystemBars.h"
 #    include "infrastructure/notifications/AndroidNotificationScheduler.h"
 #else
 #    include "infrastructure/notifications/NullNotificationScheduler.h"
@@ -381,6 +382,12 @@ int main( int p_argumentCount, char * p_arguments[] )
         std::cerr << "Musichien: the QML scene could not be loaded\n";
         return -1;
     }
+
+#ifdef Q_OS_ANDROID
+    // La barre systeme. Depuis Android 15, le theme ne decide plus de sa couleur ni de celle de ses icones : il faut
+    // le redire a la fenetre, une fois qu'elle existe. Voir infrastructure/android/AndroidSystemBars.h.
+    musichien::infrastructure::applyAndroidNightSystemBars();
+#endif
 
     const int exitCode = QGuiApplication::exec();
 

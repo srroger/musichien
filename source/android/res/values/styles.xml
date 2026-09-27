@@ -28,6 +28,14 @@
             that strip disappear into the game instead of glaring.
         -->
         <item name="android:windowBackground">@color/musichien_night</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+
+        <!--
+            And the ICONS themselves, which the XML can no longer decide on its own from Android 15 onwards. They are
+            forced at run time, from the Kotlin free side: see source/android/src/.../SystemBars.java, called by
+            infrastructure/android/AndroidSystemBars.cpp as soon as the window exists.
+        -->
 
         <!--
             'Light' in the name of these two means a LIGHT BACKGROUND with dark icons. False is therefore what
