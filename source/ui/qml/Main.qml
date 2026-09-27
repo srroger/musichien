@@ -31,6 +31,10 @@ ApplicationWindow {
     // Roger : "le saxophone a un volume et un timbre vraiment particulier, le jouer de maniere aleatoire
     // surtout la nuit peut etre desagreable". Un instrument qu'on ne veut pas doit donc pouvoir etre ecarte,
     // et le choix doit SURVIVRE au lancement suivant - un reglage qui s'oublie n'est pas un reglage.
+    // Un ComboBox aux couleurs du jeu.
+    // Pourquoi un composant : le style Material peint la CASE sur fond clair ET la LISTE ouverte sur fond blanc.
+    // Regler seulement `background` ne suffit donc pas - un texte clair sur une liste blanche reste illisible. Il
+    // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
 
     id: mainWindow
 
@@ -80,6 +84,18 @@ ApplicationWindow {
             return "#f2d982";
 
         return "#f2848e";
+    }
+
+    // La couleur du verdict de chant : vert quand l'intervalle entendu est le bon, rouge sinon.
+    function singingVerdictColor() {
+        var verdict = MicrophoneController.sungVerdict;
+        if (verdict === 1)
+            return "#7ee8a2";
+
+        if (verdict === 2)
+            return "#f2848e";
+
+        return "#8a77ad";
     }
 
     // Plays the interval at a given distance, then reveals the feedback.
@@ -134,79 +150,6 @@ ApplicationWindow {
         id: musicFont
 
         source: "qrc:/assets/fonts/NotoMusic-Regular.ttf"
-    }
-
-    // Un ComboBox aux couleurs du jeu.
-    //
-    // Pourquoi un composant : le style Material peint la CASE sur fond clair ET la LISTE ouverte sur fond blanc.
-    // Regler seulement `background` ne suffit donc pas - un texte clair sur une liste blanche reste illisible. Il
-    // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
-    //
-    // Un composant inline plutot qu'un fichier : il n'est utile qu'ici, et il evite de dupliquer trois fois le meme
-    // style pour les trois listes de la page.
-    component DarkComboBox: ComboBox {
-        id: combo
-
-        Layout.fillWidth: true
-
-        contentItem: Text {
-            text: combo.displayText
-            color: "#ffffff"
-            verticalAlignment: Text.AlignVCenter
-            leftPadding: 10
-        }
-
-        delegate: ItemDelegate {
-            width: combo.width
-
-            contentItem: Text {
-                text: modelData
-                color: "#e8dcff"
-                verticalAlignment: Text.AlignVCenter
-            }
-
-            // La ligne survolee : sans ca, on ne sait pas ce qu'on est en train de choisir.
-            background: Rectangle {
-                color: combo.highlightedIndex === index ? "#3a1f5c" : "transparent"
-            }
-
-        }
-
-        background: Rectangle {
-            color: "#1b1035"
-            radius: 8
-            border.width: 1
-            border.color: "#5c4a80"
-        }
-
-        popup: Popup {
-            y: combo.height - 1
-            width: combo.width
-            implicitHeight: Math.min(contentItem.implicitHeight, 240)
-            padding: 1
-
-            contentItem: ListView {
-                clip: true
-                implicitHeight: contentHeight
-                currentIndex: combo.highlightedIndex
-                // Le modele n'est lu que quand la liste est ouverte : c'est le motif du style d'origine, et il
-                // evite de construire les lignes d'une liste que personne ne regarde.
-                model: combo.popup.visible ? combo.delegateModel : null
-
-                ScrollIndicator.vertical: ScrollIndicator {
-                }
-
-            }
-
-            background: Rectangle {
-                color: "#241442"
-                radius: 8
-                border.width: 1
-                border.color: "#5c4a80"
-            }
-
-        }
-
     }
 
     Rectangle {
@@ -925,6 +868,73 @@ ApplicationWindow {
                             onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
                         }
 
+                        // --- Chanter un intervalle -----------------------------------------------------------
+                        //
+                        // Le meme detecteur que l'accordeur, mais qui retient deux notes TENUES et mesure l'ecart.
+                        // Deux niveaux, comme Roger les a decrits : "Ecouter" fait entendre la cible (debutant),
+                        // et ne pas l'ecouter suffit pour le niveau avance - il ne reste que son nom affiche.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 1
+                            Layout.topMargin: 6
+                            color: "#5c4a80"
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#e8dcff"
+                            font.pixelSize: 14
+                            font.bold: true
+                            text: qsTr("Chanter un intervalle")
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#cbb8e8"
+                            font.pixelSize: 15
+                            text: qsTr("À chanter : %1").arg(MicrophoneController.singingTargetLabel)
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Button {
+                                Layout.fillWidth: true
+                                text: qsTr("Écouter")
+                                onClicked: MicrophoneController.playSingingTarget()
+                            }
+
+                            Button {
+                                Layout.fillWidth: true
+                                text: qsTr("Autre")
+                                onClicked: MicrophoneController.newSingingQuestion()
+                            }
+
+                        }
+
+                        Button {
+                            Layout.fillWidth: true
+                            highlighted: MicrophoneController.isSingingCaptureActive
+                            text: MicrophoneController.isSingingCaptureActive ? qsTr("J'écoute…") : qsTr("Je chante")
+                            onClicked: MicrophoneController.isSingingCaptureActive ? MicrophoneController.stopSingingCapture() : MicrophoneController.startSingingCapture()
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: mainWindow.singingVerdictColor()
+                            font.pixelSize: 15
+                            font.bold: true
+                            visible: MicrophoneController.hasSungInterval
+                            text: {
+                                var heard = MicrophoneController.sungSemitones + (qsTr(" demi-tons"));
+                                if (MicrophoneController.sungVerdict === 1)
+                                    return qsTr("Juste — %1").arg(heard);
+
+                                return qsTr("Raté — %1").arg(heard);
+                            }
+                        }
+
                     }
 
                 }
@@ -1031,6 +1041,73 @@ ApplicationWindow {
 
         interval: 6000
         onTriggered: mainWindow.feedbackVisible = false
+    }
+
+    // Un composant inline plutot qu'un fichier : il n'est utile qu'ici, et il evite de dupliquer trois fois le meme
+    // style pour les trois listes de la page.
+    component DarkComboBox: ComboBox {
+        id: combo
+
+        Layout.fillWidth: true
+
+        contentItem: Text {
+            text: combo.displayText
+            color: "#ffffff"
+            verticalAlignment: Text.AlignVCenter
+            leftPadding: 10
+        }
+
+        delegate: ItemDelegate {
+            width: combo.width
+
+            contentItem: Text {
+                text: modelData
+                color: "#e8dcff"
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            // La ligne survolee : sans ca, on ne sait pas ce qu'on est en train de choisir.
+            background: Rectangle {
+                color: combo.highlightedIndex === index ? "#3a1f5c" : "transparent"
+            }
+
+        }
+
+        background: Rectangle {
+            color: "#1b1035"
+            radius: 8
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        popup: Popup {
+            y: combo.height - 1
+            width: combo.width
+            implicitHeight: Math.min(contentItem.implicitHeight, 240)
+            padding: 1
+
+            contentItem: ListView {
+                clip: true
+                implicitHeight: contentHeight
+                currentIndex: combo.highlightedIndex
+                // Le modele n'est lu que quand la liste est ouverte : c'est le motif du style d'origine, et il
+                // evite de construire les lignes d'une liste que personne ne regarde.
+                model: combo.popup.visible ? combo.delegateModel : null
+
+                ScrollIndicator.vertical: ScrollIndicator {
+                }
+
+            }
+
+            background: Rectangle {
+                color: "#241442"
+                radius: 8
+                border.width: 1
+                border.color: "#5c4a80"
+            }
+
+        }
+
     }
 
 }

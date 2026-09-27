@@ -1,0 +1,70 @@
+#pragma once
+
+// =====================================================================================================================
+// Musichien - SungIntervalDetector
+//
+// What the player just SANG, read as an interval: two held notes, and the distance between them.
+//
+// The hard part is not measuring a pitch - PitchDetector does that. It is deciding WHICH pitches were MEANT. A voice
+// glides, wobbles and cracks, so a naive reading would report ten different notes in two seconds. A note therefore
+// counts only when it is HELD: steady within a tolerance, and long enough to be a note rather than a slide.
+//
+// This is a pure rule, deliberately kept out of the screen that displays it: readings and time go in, an answer comes
+// out, and the tests below run it on synthetic readings with no microphone in sight.
+//
+// The voice is also what makes this a MUSICAL rule rather than a signal-processing one: judging an interval means
+// comparing a note to another note, exactly like the rest of the domain, and never comparing a frequency to a
+// reference frequency.
+// =====================================================================================================================
+
+#include <cstdint>
+
+namespace musichien::domain
+{
+
+class SungIntervalDetector
+{
+public:
+    // What the detector has understood so far.
+    struct Reading
+    {
+        // The note the singer started on, once one has been held long enough. 0 means "not yet heard".
+        std::int32_t firstMidiNumber{ 0 };
+
+        // The note the singer arrived on, once IT has been held long enough. 0 means "not yet".
+        std::int32_t secondMidiNumber{ 0 };
+
+        // True once both notes have been heard: the answer is complete.
+        [[nodiscard]] bool hasInterval() const noexcept { return ( firstMidiNumber != 0 ) && ( secondMidiNumber != 0 ); }
+
+        // The distance between the two, in semitones. Negative when the singer went DOWN, which matters: a falling
+        // fifth and a rising fifth are not the same interval.
+        [[nodiscard]] std::int32_t semitones() const noexcept { return secondMidiNumber - firstMidiNumber; }
+    };
+
+    // A reading arrives every few milliseconds. The caller says how much time passed since the previous one: the
+    // detector has no clock of its own, and a rule of the game must not own one.
+    void update( double p_frequencyHz, double p_referencePitchHz, std::int32_t p_elapsedMilliseconds ) noexcept;
+
+    void reset() noexcept;
+
+    [[nodiscard]] const Reading & reading() const noexcept { return m_reading; }
+
+private:
+    // How long a note must be held before it counts as the note the singer MEANT. A quarter of a second is short
+    // enough to feel responsive and long enough to ignore a crack of the voice or a slide on the way.
+    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 250;
+
+    // How far a reading may drift while still counting as the SAME note. Half a semitone is the ear's own line
+    // between "the same note, slightly off" and "another note".
+    static constexpr double SAME_NOTE_SEMITONES = 0.5;
+
+    Reading m_reading;
+
+    // The note being held right now, and for how long. 0 means no note is being held.
+    std::int32_t m_heldMidiNumber{ 0 };
+
+    std::int32_t m_heldMilliseconds{ 0 };
+};
+
+}    // namespace musichien::domain
