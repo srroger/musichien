@@ -236,7 +236,7 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     std::cerr << "Musichien: " << instruments.size() << " sampled instrument(s)\n";
 
-    notePlayer.useInstruments( instruments );
+    notePlayer.useInstruments( instruments, false );
 
     // Opening the output now, rather than at the first note, means a machine without a sound card is
     // reported at start up instead of silently refusing to play in the middle of an exercise.
@@ -322,7 +322,11 @@ int main( int p_argumentCount, char * p_arguments[] )
             }
         }
 
-        notePlayer.useInstruments( std::move( wantedInstruments ) );
+        // The sine is the ONE instrument that is not a sample: it is the last flag, and it asks the adapter to
+        // render the pure fundamental instead of a recording.
+        const bool sineEnabled = ( enabled.size() > instruments.size() ) && enabled.at( instruments.size() );
+
+        notePlayer.useInstruments( std::move( wantedInstruments ), sineEnabled );
     };
 
     QObject::connect( &exerciseController,

@@ -309,7 +309,7 @@ QVariantList ExerciseSessionController::instruments() const
     {
         QVariantMap instrument;
         instrument.insert( QStringLiteral( "index" ), static_cast<int>( index ) );
-        instrument.insert( QStringLiteral( "name" ), QString::fromLatin1( domain::INSTRUMENT_NAMES.at( index ) ) );
+        instrument.insert( QStringLiteral( "name" ), QString::fromUtf8( domain::INSTRUMENT_NAMES.at( index ) ) );
 
         // A list shorter than the instruments this build knows about means "everything": a first run must sound
         // complete, not empty.

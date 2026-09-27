@@ -79,8 +79,10 @@ public:
     // colour. The day the player chooses his instrument explicitly, this becomes a preference - the drawing here
     // is what makes the variety exist in the meantime.
     //
-    // Passing an empty list is legal and means "no samples": the synthesiser then plays everything.
-    void useInstruments( std::vector<domain::SampledInstrument> p_instruments );
+    // Passing an empty list is legal and means "no samples". p_sineEnabled asks for the PURE SINE as an additional
+    // timbre: it joins the drawing, so an exercise can be heard with nothing but the fundamental. With no samples and
+    // no sine, the synthesiser (the struck string) plays everything.
+    void useInstruments( std::vector<domain::SampledInstrument> p_instruments, bool p_sineEnabled );
 
     [[nodiscard]] std::chrono::milliseconds noteDuration() const override;
 
@@ -112,16 +114,32 @@ private:
     // Owned by the sink: it must not be deleted here.
     QIODevice * m_audioOutputDevice{ nullptr };
 
-    // Created once the real sample rate of the device is known, because the synthesizer must generate
-    // samples at the very rate the device consumes them. Otherwise every note would be out of tune.
-    // The instrument the next listening will use. Drawn at random from m_instruments, but STABLE as long as the
-    // question does not change: being played back on a different instrument would turn "listen again" into a
-    // different question, and the verdict into a trap.
-    [[nodiscard]] const domain::SampledInstrument & instrumentFor( std::span<const domain::Note> p_notes );
+    // The timbre the next listening will use. Drawn at random among the samples AND the sine (when it is enabled),
+    // but STABLE as long as the question does not change: being played back on a different instrument would turn
+    // "listen again" into a different question, and the verdict into a trap. Returns an index into m_instruments, or
+    // m_instruments.size() for the sine.
+    [[nodiscard]] std::size_t timbreIndexFor( std::span<const domain::Note> p_notes );
 
-    // Empty when there are no samples, in which case every buffer comes from the synthesiser.
+    // One note, rendered with the timbre drawn for the given sequence. Falls back on the struck-string synthesiser
+    // when there is neither a sample nor the sine.
+    [[nodiscard]] std::vector<float> renderNoteFor( std::span<const domain::Note> p_sequence,
+                                                    const domain::Note & p_note,
+                                                    std::chrono::milliseconds p_duration );
+
+    [[nodiscard]] std::vector<float> renderChordFor( std::span<const domain::Note> p_notes,
+                                                     std::chrono::milliseconds p_duration );
+
+    [[nodiscard]] std::vector<float> renderMelodyFor( std::span<const domain::Note> p_notes,
+                                                      std::chrono::milliseconds p_noteDuration,
+                                                      std::chrono::milliseconds p_gap );
+
+    // The sampled instruments, empty when there are none.
     std::vector<domain::SampledInstrument> m_instruments;
 
+    // True when the pure sine joins the drawing.
+    bool m_sineEnabled{ false };
+
+    // The drawn timbre: an index into m_instruments, or m_instruments.size() for the sine.
     std::size_t m_instrumentIndex{ 0 };
 
     // What was played last, which is how "the same question" is recognised.

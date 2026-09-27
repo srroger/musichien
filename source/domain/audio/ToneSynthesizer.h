@@ -137,12 +137,33 @@ public:
                                                    std::chrono::milliseconds p_gap,
                                                    TuningContext p_tuning = {} ) const;
 
+    // The SAME three calls, but for a PURE SINE wave: the fundamental only, no harmonics, no detuned strings. That is
+    // the sound an ear needs to judge a temperament - two pure frequencies beating against each other leave nothing
+    // else to listen to. A sine has no hammer either, so its attack is a short fade rather than a strike.
+    [[nodiscard]] std::vector<float> renderSineNote( const Note & p_note,
+                                                     std::chrono::milliseconds p_duration,
+                                                     TuningContext p_tuning = {} ) const;
+
+    [[nodiscard]] std::vector<float> renderSineChord( std::span<const Note> p_notes,
+                                                      std::chrono::milliseconds p_duration,
+                                                      TuningContext p_tuning = {} ) const;
+
+    [[nodiscard]] std::vector<float> renderSineMelody( std::span<const Note> p_notes,
+                                                       std::chrono::milliseconds p_noteDuration,
+                                                       std::chrono::milliseconds p_gap,
+                                                       TuningContext p_tuning = {} ) const;
+
 private:
     // One note at an EXPLICIT frequency. The frequency is computed by the caller - which alone knows the root - and
     // this method only does the arithmetic of a struck string at that frequency.
     [[nodiscard]] std::vector<float> renderNoteAt( const Note & p_note,
                                                    double p_frequencyHz,
                                                    std::chrono::milliseconds p_duration ) const;
+
+    // The pure-sine counterpart of renderNoteAt.
+    [[nodiscard]] std::vector<float> renderSineNoteAt( const Note & p_note,
+                                                       double p_frequencyHz,
+                                                       std::chrono::milliseconds p_duration ) const;
 
     // Adds ONE struck string to a buffer, without touching its level: mixing, enveloping and normalising
     // belong to the caller, which is the only one that knows how many strings are playing.

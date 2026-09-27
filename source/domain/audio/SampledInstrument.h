@@ -44,9 +44,13 @@ namespace musichien::domain
 //
 // That order is a contract, not a detail: a preference is stored as one flag per instrument, so an instrument
 // inserted in the middle would silently exchange the choices the player made. New instruments go LAST.
-inline constexpr std::size_t INSTRUMENT_COUNT = 3;
+//
+// The SINE is the one instrument that is not a sample: it is the pure fundamental, with no harmonics, and it exists
+// so that a change of temperament can be HEARD for what it is - two pure frequencies whose beating says whether an
+// interval is pure. It is offered in the same list, and rendered by the synthesiser, not by a recording.
+inline constexpr std::size_t INSTRUMENT_COUNT = 4;
 
-inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{ "piano", "guitare", "saxo" };
+inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{ "piano", "guitare", "saxo", "sinusoïdal" };
 
 // One recorded note: its samples, the note they were recorded at, and the rate they were recorded at.
 struct SampledNote

@@ -377,6 +377,107 @@ std::vector<float> ToneSynthesizer::renderMelody( std::span<const Note> p_notes,
     return melodySamples;
 }
 
+std::vector<float> ToneSynthesizer::renderSineNote( const Note & p_note,
+                                                    std::chrono::milliseconds p_duration,
+                                                    TuningContext p_tuning ) const
+{
+    return renderSineNoteAt( p_note,
+                             frequencyFor( p_note,
+                                           p_note,
+                                           p_tuning.temperament,
+                                           p_tuning.referencePitchHz ),
+                             p_duration );
+}
+
+std::vector<float> ToneSynthesizer::renderSineNoteAt( const Note & p_note,
+                                                      double p_frequencyHz,
+                                                      std::chrono::milliseconds p_duration ) const
+{
+    const std::size_t sampleCount = sampleCountFor( p_duration );
+
+    std::vector<float> samples( sampleCount, 0.0F );
+
+    if( ( sampleCount == 0 ) || !p_note.isValid() )
+    {
+        return samples;
+    }
+
+    const double angularFrequency =
+      ( 2.0 * std::numbers::pi * p_frequencyHz ) / static_cast<double>( m_sampleRate );
+
+    for( const std::size_t sampleIndex : std::views::iota( std::size_t{ 0 }, sampleCount ) )
+    {
+        samples.at( sampleIndex ) =
+          static_cast<float>( std::sin( angularFrequency * static_cast<double>( sampleIndex ) ) );
+    }
+
+    // No hammer: the sine starts with a short fade to remove the click, and ends with the same release as every note.
+    applyEnvelope( samples, STRIKE_ATTACK_DURATION, RELEASE_DURATION );
+
+    normaliseOnsetEnergyTo( samples, TARGET_RMS_AMPLITUDE, NOTE_ONSET_DURATION );
+
+    return samples;
+}
+
+std::vector<float> ToneSynthesizer::renderSineChord( std::span<const Note> p_notes,
+                                                     std::chrono::milliseconds p_duration,
+                                                     TuningContext p_tuning ) const
+{
+    const std::size_t sampleCount = sampleCountFor( p_duration );
+
+    std::vector<float> mixedSamples( sampleCount, 0.0F );
+
+    if( ( sampleCount == 0 ) || p_notes.empty() )
+    {
+        return mixedSamples;
+    }
+
+    const Note root = p_notes.front();
+
+    for( const Note & note : p_notes )
+    {
+        const std::vector<float> noteSamples =
+          renderSineNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_duration );
+
+        std::ranges::transform( noteSamples, mixedSamples, mixedSamples.begin(), std::plus<>{} );
+    }
+
+    normaliseOnsetEnergyTo( mixedSamples, TARGET_RMS_AMPLITUDE, NOTE_ONSET_DURATION );
+
+    return mixedSamples;
+}
+
+std::vector<float> ToneSynthesizer::renderSineMelody( std::span<const Note> p_notes,
+                                                      std::chrono::milliseconds p_noteDuration,
+                                                      std::chrono::milliseconds p_gap,
+                                                      TuningContext p_tuning ) const
+{
+    std::vector<float> melodySamples;
+
+    if( p_notes.empty() )
+    {
+        return melodySamples;
+    }
+
+    const std::size_t gapSampleCount = sampleCountFor( p_gap );
+
+    melodySamples.reserve( p_notes.size() * ( sampleCountFor( p_noteDuration ) + gapSampleCount ) );
+
+    const Note root = p_notes.front();
+
+    for( const Note & note : p_notes )
+    {
+        const std::vector<float> noteSamples =
+          renderSineNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_noteDuration );
+
+        melodySamples.insert( melodySamples.end(), noteSamples.begin(), noteSamples.end() );
+
+        melodySamples.insert( melodySamples.end(), gapSampleCount, 0.0F );
+    }
+
+    return melodySamples;
+}
+
 void ToneSynthesizer::applyEnvelope( std::span<float> p_samples,
                                      std::chrono::milliseconds p_attack,
                                      std::chrono::milliseconds p_release ) const

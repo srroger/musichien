@@ -441,6 +441,27 @@ TEST( ToneSynthesizerTest, a_pythagorean_fifth_is_pure_in_a_melody )
                  fifthFrequency * 0.0025 );
 }
 
+TEST( ToneSynthesizerTest, the_sine_is_the_pure_fundamental )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const Note note{ 69 };    // A4
+
+    const std::vector<float> sine =
+      synthesizer.renderSineNote( note, std::chrono::milliseconds{ 1000 } );
+
+    EXPECT_NEAR( note.frequencyHz(),
+                 measuredFrequency( sine, note.frequencyHz() ),
+                 note.frequencyHz() * 0.0025 );
+
+    // A pure sine has its energy at the fundamental and NONE at the second harmonic: that is the whole point of the
+    // instrument, and what makes it the honest tool for hearing a temperament.
+    const double fundamentalEnergy = energyAtFrequency( sine, note.frequencyHz() );
+    const double secondHarmonicEnergy = energyAtFrequency( sine, note.frequencyHz() * 2.0 );
+
+    EXPECT_GT( fundamentalEnergy, secondHarmonicEnergy * 1000.0 );
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Degenerate cases must not crash and must not produce noise
 // ---------------------------------------------------------------------------------------------------------------------
