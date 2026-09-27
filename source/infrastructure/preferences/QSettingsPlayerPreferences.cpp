@@ -25,6 +25,11 @@ constexpr const char * NAME_KEY = "player/name";
 
 constexpr const char * EXPERIENCE_KEY = "player/experience";
 
+// The statistics page, in two numbers: how many sessions were played, and how many earned their star.
+constexpr const char * SESSIONS_KEY = "player/sessions";
+
+constexpr const char * STARS_KEY = "player/stars";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -105,6 +110,30 @@ void QSettingsPlayerPreferences::storeTotalExperience( std::int64_t p_total )
     QSettings settings;
 
     settings.setValue( EXPERIENCE_KEY, static_cast<qlonglong>( p_total ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::sessionCount() const
+{
+    return static_cast<std::int64_t>( QSettings{}.value( SESSIONS_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeSessionCount( std::int64_t p_count )
+{
+    QSettings settings;
+
+    settings.setValue( SESSIONS_KEY, static_cast<qlonglong>( p_count ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::starCount() const
+{
+    return static_cast<std::int64_t>( QSettings{}.value( STARS_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeStarCount( std::int64_t p_count )
+{
+    QSettings settings;
+
+    settings.setValue( STARS_KEY, static_cast<qlonglong>( p_count ) );
 }
 
 }    // namespace musichien::infrastructure

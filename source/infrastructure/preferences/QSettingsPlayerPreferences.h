@@ -41,6 +41,14 @@ public:
     [[nodiscard]] std::int64_t totalExperience() const override;
 
     void storeTotalExperience( std::int64_t p_total ) override;
+
+    [[nodiscard]] std::int64_t sessionCount() const override;
+
+    void storeSessionCount( std::int64_t p_count ) override;
+
+    [[nodiscard]] std::int64_t starCount() const override;
+
+    void storeStarCount( std::int64_t p_count ) override;
 };
 
 }    // namespace musichien::infrastructure

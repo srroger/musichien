@@ -650,6 +650,9 @@ TEST( ExerciseSessionControllerTest, the_session_experience_joins_the_profile_to
 
     // Le total du profil a recu l'experience de la session, une fois et pas deux.
     EXPECT_GT( store.totalExperience(), 0 );
+
+    // Et la session a ete comptee, une fois.
+    EXPECT_EQ( 1, store.sessionCount() );
 }
 
 }    // namespace musichien::ui

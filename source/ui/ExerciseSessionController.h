@@ -116,6 +116,8 @@ class ExerciseSessionController final : public QObject
     // profile is asked once, not read from disk on every frame.
     Q_PROPERTY( QString playerName READ playerName WRITE setPlayerName NOTIFY playerNameChanged )
     Q_PROPERTY( int totalExperience READ totalExperience NOTIFY totalExperienceChanged )
+    Q_PROPERTY( int sessionCount READ sessionCount NOTIFY sessionChanged )
+    Q_PROPERTY( int starCount READ starCount NOTIFY sessionChanged )
 
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
@@ -132,6 +134,11 @@ public:
 
     // Experience earned across every session, remembered between launches.
     [[nodiscard]] int totalExperience() const;
+
+    // How many sessions were played to the end, and how many earned their star.
+    [[nodiscard]] int sessionCount() const;
+
+    [[nodiscard]] int starCount() const;
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
@@ -240,8 +247,8 @@ private:
     // on a mistake, and tell the screen. Both answer() and answerDirection() end here.
     void processAnswer( bool p_isCorrect );
 
-    // Adds the session's experience to the profile total, once, when the session ends.
-    void persistSessionExperience();
+    // Adds the session's outcome - its experience, its count, its star - to the profile, once, when it ends.
+    void persistSessionOutcome();
 
     // Plays the interval of the question being asked, from its own root note.
     void playCurrentQuestion();

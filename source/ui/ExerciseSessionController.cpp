@@ -540,7 +540,7 @@ void ExerciseSessionController::continueToNextQuestion()
     }
     else
     {
-        persistSessionExperience();
+        persistSessionOutcome();
     }
 
     emit scoreChanged();
@@ -574,18 +574,34 @@ int ExerciseSessionController::totalExperience() const
     return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->totalExperience() ) : 0;
 }
 
-void ExerciseSessionController::persistSessionExperience()
+void ExerciseSessionController::persistSessionOutcome()
 {
     if( ( m_levelStore == nullptr ) || ( m_session == nullptr ) )
     {
         return;
     }
 
-    // The session is over: its experience becomes part of the profile total, once. Calling this twice would count
-    // the same session twice, so it happens only from the transition into "finished".
+    // The session is over: its experience, its count and its star become part of the profile, once. Calling this
+    // twice would count the same session twice, so it happens only from the transition into "finished".
     m_levelStore->storeTotalExperience( m_levelStore->totalExperience() + m_session->score().experience() );
+    m_levelStore->storeSessionCount( m_levelStore->sessionCount() + 1 );
+
+    if( m_session->hasEarnedStar() )
+    {
+        m_levelStore->storeStarCount( m_levelStore->starCount() + 1 );
+    }
 
     emit totalExperienceChanged();
+}
+
+int ExerciseSessionController::sessionCount() const
+{
+    return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->sessionCount() ) : 0;
+}
+
+int ExerciseSessionController::starCount() const
+{
+    return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->starCount() ) : 0;
 }
 
 void ExerciseSessionController::refreshChoices()

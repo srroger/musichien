@@ -70,6 +70,18 @@ public:
     [[nodiscard]] virtual std::int64_t totalExperience() const = 0;
 
     virtual void storeTotalExperience( std::int64_t p_total ) = 0;
+
+    // How many sessions have been played to the end, and how many earned their star.
+    //
+    // These two are the spine of the statistics page: a player who sees his sessions grow and his stars appear
+    // sees himself improving. They are ADDED, never reset, by the controller when a session ends.
+    [[nodiscard]] virtual std::int64_t sessionCount() const = 0;
+
+    virtual void storeSessionCount( std::int64_t p_count ) = 0;
+
+    [[nodiscard]] virtual std::int64_t starCount() const = 0;
+
+    virtual void storeStarCount( std::int64_t p_count ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -98,6 +110,14 @@ public:
 
     void storeTotalExperience( std::int64_t p_total ) override { m_totalExperience = p_total; }
 
+    [[nodiscard]] std::int64_t sessionCount() const override { return m_sessionCount; }
+
+    void storeSessionCount( std::int64_t p_count ) override { m_sessionCount = p_count; }
+
+    [[nodiscard]] std::int64_t starCount() const override { return m_starCount; }
+
+    void storeStarCount( std::int64_t p_count ) override { m_starCount = p_count; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -106,6 +126,10 @@ private:
     std::string m_playerName;
 
     std::int64_t m_totalExperience{ 0 };
+
+    std::int64_t m_sessionCount{ 0 };
+
+    std::int64_t m_starCount{ 0 };
 };
 
 }    // namespace musichien::domain

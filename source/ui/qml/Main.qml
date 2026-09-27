@@ -213,6 +213,14 @@ ApplicationWindow {
                     onClicked: settingsDialog.open()
                 }
 
+                // La page du joueur : le nom, le total, les etoiles. Assis a cote des instruments, parce que c'est
+                // la que l'on trouve ce qui est a soi.
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: qsTr("Profil…")
+                    onClicked: profileDialog.open()
+                }
+
                 Button {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
@@ -490,6 +498,65 @@ ApplicationWindow {
                 Layout.alignment: Qt.AlignRight
                 text: qsTr("Fermer")
                 onClicked: settingsDialog.close()
+            }
+
+        }
+
+    }
+
+    // La page du joueur. Le personnage et les statistiques sont UNE SEULE page : un profil n'est pas un reglage, et
+    // des statistiques ne sont pas une personne - c'est la meme chose, regardee sous le nom qu'on lui a donne.
+    Dialog {
+        id: profileDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 420)
+        modal: true
+        padding: 16
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 10
+
+            Text {
+                Layout.fillWidth: true
+                color: "#cbb8e8"
+                font.pixelSize: 16
+                text: qsTr("Ton profil")
+            }
+
+            TextField {
+                Layout.fillWidth: true
+                placeholderText: qsTr("Ton nom…")
+                text: ExerciseController.playerName
+                onEditingFinished: ExerciseController.setPlayerName(text)
+            }
+
+            Text {
+                Layout.fillWidth: true
+                color: "#ffffff"
+                font.pixelSize: 16
+                font.bold: true
+                text: qsTr("%1 XP").arg(ExerciseController.totalExperience)
+            }
+
+            Text {
+                Layout.fillWidth: true
+                color: "#cbb8e8"
+                font.pixelSize: 14
+                text: qsTr("%1 sessions · %2 étoiles").arg(ExerciseController.sessionCount).arg(ExerciseController.starCount)
+            }
+
+            Button {
+                Layout.alignment: Qt.AlignRight
+                text: qsTr("Fermer")
+                onClicked: profileDialog.close()
             }
 
         }
