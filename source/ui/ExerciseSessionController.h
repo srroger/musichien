@@ -214,6 +214,10 @@ public:
     // is a battery drain.
     Q_INVOKABLE void stopSession();
 
+    // Starts the endless arcade mode: no lives, no end, just one question after another. A mistake costs rhythm,
+    // not the game.
+    Q_INVOKABLE void startInfiniteSession();
+
     // The player asks to hear the interval again. Counted by the session, played here.
     Q_INVOKABLE void replay();
 
@@ -272,6 +276,9 @@ private:
     // What follows a right or a wrong answer, whatever its form: replay the question one way or the other, shake
     // on a mistake, and tell the screen. Both answer() and answerDirection() end here.
     void processAnswer( bool p_isCorrect );
+
+    // Starts a session with these settings, drawing the seed in the interface layer where entropy belongs.
+    void beginSession( domain::SessionSettings p_settings );
 
     // Adds the session's outcome - its experience, its count, its star - to the profile, once, when it ends.
     void persistSessionOutcome();

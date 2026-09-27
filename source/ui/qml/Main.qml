@@ -244,6 +244,14 @@ ApplicationWindow {
                     onClicked: ExerciseController.startSession()
                 }
 
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 48
+                    text: qsTr("Mode infini")
+                    onClicked: ExerciseController.startInfiniteSession()
+                }
+
                 Item {
                     Layout.preferredHeight: 6
                 }

@@ -6,6 +6,7 @@
 #include <QString>
 
 #include <array>
+#include <limits>
 #include <optional>
 #include <random>
 #include <utility>
@@ -384,6 +385,23 @@ bool ExerciseSessionController::starEarned() const noexcept
 
 void ExerciseSessionController::startSession()
 {
+    beginSession( m_settings );
+}
+
+void ExerciseSessionController::startInfiniteSession()
+{
+    domain::SessionSettings settings = m_settings;
+
+    // Le mode infini, c'est le mode qui ne s'arrete jamais : pas de vies, pas de fin, juste enchaner. Une erreur
+    // coute du rythme - la serie retombe - mais jamais la partie.
+    settings.lives = std::nullopt;
+    settings.questionCount = std::numeric_limits<std::size_t>::max();
+
+    beginSession( settings );
+}
+
+void ExerciseSessionController::beginSession( domain::SessionSettings p_settings )
+{
     // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
     m_notePlayer.playTapCue();
 
@@ -394,7 +412,7 @@ void ExerciseSessionController::startSession()
     // source, on purpose.
     std::random_device entropySource;
 
-    m_session = std::make_unique<domain::ExerciseSession>( entropySource(), m_settings );
+    m_session = std::make_unique<domain::ExerciseSession>( entropySource(), p_settings );
 
     emit runningChanged();
 

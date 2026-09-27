@@ -655,4 +655,15 @@ TEST( ExerciseSessionControllerTest, the_session_experience_joins_the_profile_to
     EXPECT_EQ( 1, store.sessionCount() );
 }
 
+TEST( ExerciseSessionControllerTest, the_infinite_mode_has_no_lives )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    controller.startInfiniteSession();
+
+    // Le mode infini, c'est exactement cela : aucune vie, donc aucune fin - juste enchainer.
+    EXPECT_TRUE( controller.hasUnlimitedLives() );
+}
+
 }    // namespace musichien::ui
