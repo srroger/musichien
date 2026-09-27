@@ -4,6 +4,7 @@
 #include <cmath>
 #include <numbers>
 #include <random>
+#include <ranges>
 #include <span>
 
 namespace musichien::domain
@@ -21,6 +22,9 @@ constexpr std::uint32_t DRUM_NOISE_SEED = 20260927U;
 }
 
 // An exponential fade over the whole buffer: a struck drum dies out, it does not stop.
+//
+// Written with ranges rather than by index: libc++ 18 - the one the Android NDK ships - has no span::at(), and the
+// project refuses unchecked indexing. See docs/BUILD_AND_SETUP.md, the pitfalls table.
 void applyExponentialDecay( std::span<float> p_samples, double p_decayRate )
 {
     if( p_samples.empty() )
@@ -28,12 +32,17 @@ void applyExponentialDecay( std::span<float> p_samples, double p_decayRate )
         return;
     }
 
-    for( std::size_t sampleIndex = 0; sampleIndex < p_samples.size(); ++sampleIndex )
-    {
-        const double progress = static_cast<double>( sampleIndex ) / static_cast<double>( p_samples.size() );
+    const auto sampleCount = static_cast<double>( p_samples.size() );
 
-        p_samples.at( sampleIndex ) *= static_cast<float>( std::exp( -p_decayRate * progress ) );
-    }
+    std::size_t sampleIndex = 0;
+
+    std::ranges::for_each( p_samples, [&sampleIndex, sampleCount, p_decayRate]( float & p_sample ) {
+        const double progress = static_cast<double>( sampleIndex ) / sampleCount;
+
+        p_sample *= static_cast<float>( std::exp( -p_decayRate * progress ) );
+
+        ++sampleIndex;
+    } );
 }
 
 // Peak normalisation, so every piece of the kit speaks at the same level whatever its waveform.
