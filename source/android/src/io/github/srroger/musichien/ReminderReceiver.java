@@ -16,11 +16,18 @@ public class ReminderReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        showReminder(context);
+        String content = intent.getStringExtra("content");
+        showReminder(context, content);
     }
 
     // Affiche le rappel. Statique, pour que le planificateur puisse l'appeler aussi, s'il le faut.
     public static void showReminder(Context context) {
+        showReminder(context, null);
+    }
+
+    // La notification porte l'anecdote tiree au moment de la planification ; sans elle, on retombe sur le petit
+    // rappel fixe. L'utilisateur reçoit donc un contenu different a chaque fois qu'il re-coche le rappel.
+    public static void showReminder(Context context, String content) {
         ensurePermission(context);
 
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -45,10 +52,15 @@ public class ReminderReceiver extends BroadcastReceiver {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        String text = (content == null || content.isEmpty())
+            ? "Une oreille, une minute : l'intervalle du jour t'attend."
+            : content;
+
         android.app.Notification notification = new android.app.Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Musichien")
-            .setContentText("Une oreille, une minute : l'intervalle du jour t'attend.")
+            .setContentText(text)
+            .setStyle(new android.app.Notification.BigTextStyle().bigText(text))
             .setContentIntent(pending)
             .setAutoCancel(true)
             .build();

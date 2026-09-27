@@ -25,8 +25,10 @@ public:
 
     virtual ~NotificationScheduler() = default;
 
-    // A reminder every day at this hour and minute. Scheduling twice replaces the previous one.
-    virtual void scheduleDailyReminder( int p_hour, int p_minute ) = 0;
+    // A reminder every day at this hour and minute, carrying the given content (a drawn anecdote, or a plain
+    // nudge). Scheduling twice replaces the previous one. The text is frozen into the alarm, so the receiver can
+    // show it without asking back - a notification is the one message that must survive a reboot.
+    virtual void scheduleDailyReminder( int p_hour, int p_minute, std::string_view p_content ) = 0;
 
     // No more reminders.
     virtual void cancelReminder() = 0;

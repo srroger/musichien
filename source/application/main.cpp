@@ -230,10 +230,15 @@ int main( int p_argumentCount, char * p_arguments[] )
     // The vibration is injected as a function rather than called from the view model, and the hint book
     // is handed over to be owned: one keeps Android out of the interface, the other keeps a reference to
     // somebody else's object out of it.
+    // Les anecdotes servent a deux endroits : l'accueil (une par ouverture) et le rappel quotidien (une par
+    // planification). Le livre est donc charge ici, passe au controleur par copie, et garde pour le rappel.
+    musichien::domain::AnecdoteBook anecdoteBook = loadAnecdoteBook();
+    std::mt19937 randomEngine{ std::random_device{}() };
+
     musichien::ui::ExerciseSessionController exerciseController{ notePlayer,
                                                                  {},
                                                                  loadHintBook(),
-                                                                 loadAnecdoteBook(),
+                                                                 anecdoteBook,
                                                                  musichien::infrastructure::vibrateForMistake,
                                                                  &playerLevelStore };
 
@@ -271,11 +276,19 @@ int main( int p_argumentCount, char * p_arguments[] )
     musichien::infrastructure::NullNotificationScheduler notificationScheduler;
 #endif
 
-    const auto applyReminder = [&exerciseController, &notificationScheduler]() {
+    const auto applyReminder = [&exerciseController, &notificationScheduler, &anecdoteBook, &randomEngine]() {
         if( exerciseController.dailyReminderEnabled() )
         {
+            // Une anecdote differente a chaque fois que le joueur re-coche : c'est un contenu, pas un slogan fixe.
+            std::string content = "Une oreille, une minute : l'intervalle du jour t'attend.";
+            if( const auto anecdote = anecdoteBook.random( randomEngine ); anecdote.has_value() )
+            {
+                content = anecdote->text;
+            }
+
             notificationScheduler.scheduleDailyReminder( exerciseController.reminderHour(),
-                                                         exerciseController.reminderMinute() );
+                                                         exerciseController.reminderMinute(),
+                                                         content );
         }
         else
         {

@@ -13,7 +13,7 @@ public class ReminderScheduler {
 
     private static final int REQUEST_CODE = 1;
 
-    public static void scheduleDaily(Context context, int hour, int minute) {
+    public static void scheduleDaily(Context context, int hour, int minute, String content) {
         AlarmManager alarm = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarm == null) {
             return;
@@ -37,7 +37,7 @@ public class ReminderScheduler {
             AlarmManager.RTC_WAKEUP,
             triggerAt,
             AlarmManager.INTERVAL_DAY,
-            pendingIntent(context)
+            pendingIntent(context, content)
         );
     }
 
@@ -47,11 +47,16 @@ public class ReminderScheduler {
             return;
         }
 
-        alarm.cancel(pendingIntent(context));
+        // Les extras ne comptent pas dans le matching d'un PendingIntent : un intent sans texte annule bien
+        // celui qui en portait un.
+        alarm.cancel(pendingIntent(context, null));
     }
 
-    private static PendingIntent pendingIntent(Context context) {
+    private static PendingIntent pendingIntent(Context context, String content) {
         Intent intent = new Intent(context, ReminderReceiver.class);
+        if (content != null) {
+            intent.putExtra("content", content);
+        }
         return PendingIntent.getBroadcast(
             context,
             REQUEST_CODE,
