@@ -177,6 +177,22 @@ ApplicationWindow {
                     wrapMode: Text.WordWrap
                 }
 
+                // L'anecdote du chargement, sous le sous-titre : c'est la qu'elle se lit, et fillWidth + WordWrap
+                // borne sa largeur a celle de la page - sans cela un texte long pousse les boutons vers la droite.
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    text: ExerciseController.anecdoteText
+                    color: "#8a77ad"
+                    font.pixelSize: 13
+                    font.italic: true
+                    wrapMode: Text.WordWrap
+                    visible: ExerciseController.anecdoteText !== ""
+                }
+
                 Item {
                     Layout.preferredHeight: 8
                 }
@@ -442,19 +458,6 @@ ApplicationWindow {
 
                 Item {
                     Layout.preferredHeight: 16
-                }
-
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.leftMargin: 24
-                    Layout.rightMargin: 24
-                    horizontalAlignment: Text.AlignHCenter
-                    color: "#8a77ad"
-                    font.pixelSize: 13
-                    font.italic: true
-                    wrapMode: Text.WordWrap
-                    visible: ExerciseController.anecdoteText !== ""
-                    text: ExerciseController.anecdoteText
                 }
 
                 Text {

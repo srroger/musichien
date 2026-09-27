@@ -40,9 +40,10 @@ void SessionScore::registerSuccess( std::int32_t p_replayCount, std::int32_t p_a
 
 void SessionScore::registerError() noexcept
 {
-    // The series is broken, and that is the whole cost as long as the lives are not limited. Note that
-    // the experience is left untouched: see the header.
-    m_streak = 0;
+    // The series goes DOWN A STEP, but never collapses to zero at once: it is a ladder, not a switch. An error
+    // halves the streak, exactly like the Devil May Cry style that fades without ever dropping dead. Experience is
+    // left untouched, as always.
+    m_streak /= 2;
 
     if( m_remainingLives.has_value() )
     {

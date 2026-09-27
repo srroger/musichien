@@ -99,18 +99,25 @@ TEST( SessionScoreTest, a_wrong_answer_never_takes_experience_away )
     EXPECT_EQ( earned, score.experience() );
 }
 
-TEST( SessionScoreTest, a_wrong_answer_ends_the_series )
+TEST( SessionScoreTest, a_wrong_answer_softens_the_series_instead_of_breaking_it )
 {
     SessionScore score{ UNLIMITED_LIVES };
 
     score.registerSuccess( 0, 0 );
     score.registerSuccess( 0, 0 );
+    score.registerSuccess( 0, 0 );
+    score.registerSuccess( 0, 0 );
 
-    ASSERT_EQ( 2, score.streak() );
+    ASSERT_EQ( 4, score.streak() );
+
+    // Une erreur fait descendre d'un cran, pas d'un coup a zero : c'est une echelle, pas un interrupteur.
+    score.registerError();
+
+    EXPECT_EQ( 2, score.streak() );
 
     score.registerError();
 
-    EXPECT_EQ( 0, score.streak() );
+    EXPECT_EQ( 1, score.streak() );
 }
 
 TEST( SessionScoreTest, a_session_without_lives_never_runs_out )
