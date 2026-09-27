@@ -51,9 +51,10 @@ public:
     [[nodiscard]] const Reading & reading() const noexcept { return m_reading; }
 
 private:
-    // How long a note must be held before it counts as the note the singer MEANT. A quarter of a second is short
-    // enough to feel responsive and long enough to ignore a crack of the voice or a slide on the way.
-    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 250;
+    // How long a note must be held before it counts as the note the singer MEANT. Long on purpose: a whole second
+    // and a bit means a wobble, a breath or a slide never reads as a note - the voice gets the time it needs, and
+    // the result feels smooth rather than twitchy.
+    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 1200;
 
     // How fast the tracked pitch follows a reading. 0.3 keeps 70% of the previous estimate at every reading: slow
     // enough to absorb noise, fast enough to follow a real change of note. The tracked pitch is then ROUNDED to the

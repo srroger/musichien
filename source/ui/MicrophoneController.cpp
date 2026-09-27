@@ -267,8 +267,46 @@ void MicrophoneController::stopSingingCapture()
 
 QString MicrophoneController::singingTargetLabel() const
 {
-    // Le nom vient du DOMAINE : c'est lui qui sait qu'un ecart de sept demi-tons s'appelle une quinte.
-    return QString::fromStdString( domain::Interval{ m_singingTargetSemitones }.name() );
+    const QString identifier = QString::fromStdString( domain::Interval{ m_singingTargetSemitones }.identifier() );
+
+    // Le nom francais : une etiquette d'ECRAN, pas une regle du jeu. L'identifiant, lui, vient du domaine, comme sur
+    // les boutons du banc d'essai.
+    QString frenchName;
+
+    switch( m_singingTargetSemitones )
+    {
+        case 2:
+            frenchName = tr( "seconde majeure" );
+            break;
+        case 3:
+            frenchName = tr( "tierce mineure" );
+            break;
+        case 4:
+            frenchName = tr( "tierce majeure" );
+            break;
+        case 5:
+            frenchName = tr( "quarte juste" );
+            break;
+        case 7:
+            frenchName = tr( "quinte juste" );
+            break;
+        default:
+            frenchName = QString::fromStdString( domain::Interval{ m_singingTargetSemitones }.name() );
+            break;
+    }
+
+    // Les cibles sont toujours MONTANTES pour l'instant ; le jour ou l'on en tirera des descendantes, le mot suivra.
+    return QStringLiteral( "%1 · %2 %3" ).arg( identifier ).arg( frenchName ).arg( tr( "ascendante" ) );
+}
+
+void MicrophoneController::startSingingSession()
+{
+    m_singingQuestionIndex = 0;
+    m_singingCorrectCount = 0;
+
+    emit singingQuestionChanged();
+
+    newSingingQuestion();
 }
 
 int MicrophoneController::sungVerdict() const
@@ -301,14 +339,15 @@ void MicrophoneController::onPitch( float p_frequencyHz )
 {
     const auto rawFrequency = static_cast<double>( p_frequencyHz );
 
-    // A light smoothing: on a noisy desktop YIN can flicker between two neighbouring notes, and a tuner should not.
-    // A jump of less than half a semitone blends with the previous reading; a real jump passes straight through.
+    // Inertie douce : la VOIX vibre, l'affichage ne doit pas. On garde 80% de la lecture precedente a chaque pas -
+    // c'est ce qui donne a la boule son mouvement lisse au lieu d'un tremblement de mesures instables.
+    constexpr double DISPLAY_SMOOTHING = 0.2;
+
     double frequency = rawFrequency;
 
-    if( m_detectedFrequencyHz > 0.0 && rawFrequency > 0.0
-        && std::abs( domain::centsBetween( rawFrequency, m_detectedFrequencyHz ) ) < 50.0 )
+    if( m_detectedFrequencyHz > 0.0 && rawFrequency > 0.0 )
     {
-        frequency = ( m_detectedFrequencyHz + rawFrequency ) / 2.0;
+        frequency = m_detectedFrequencyHz + ( ( rawFrequency - m_detectedFrequencyHz ) * DISPLAY_SMOOTHING );
     }
 
     m_detectedFrequencyHz = frequency;
@@ -376,8 +415,17 @@ void MicrophoneController::onPitch( float p_frequencyHz )
 
         if( m_sungIntervalDetector.reading().hasInterval() )
         {
-            // La reponse est complete : on rend le micro, et on efface le voyant d'ecoute.
+            // La reponse est complete : on rend le micro, on compte, et on avance d'une question.
             stopSingingCapture();
+
+            if( sungVerdict() == 1 )
+            {
+                ++m_singingCorrectCount;
+            }
+
+            ++m_singingQuestionIndex;
+
+            emit singingQuestionChanged();
         }
 
         emit sungIntervalChanged();

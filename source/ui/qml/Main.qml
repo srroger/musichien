@@ -313,6 +313,16 @@ ApplicationWindow {
                     Button {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
+                        text: qsTr("Chanter")
+                        onClicked: {
+                            MicrophoneController.startSingingSession();
+                            singingDialog.open();
+                        }
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
                         text: qsTr("Survie")
                         onClicked: ExerciseController.startSurvivalSession()
                     }
@@ -779,59 +789,8 @@ ApplicationWindow {
                             onActivated: MicrophoneController.selectDevice(index)
                         }
 
-                        // La portee miniature : cinq lignes, une boule qui suit la hauteur. Le ratio est logarithmique,
-                        // donc la boule monte d'une octave pour un doublement de frequence, comme une vraie note.
-                        Item {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 90
-
-                            // La clef de Sol. Un simple glyphe : c'est le point de repere, et il sera
-                            // probablement configurable plus tard pour les exercices de solfege.
-                            Text {
-                                x: 2
-                                y: -2
-                                text: "\uD834\uDD1E"
-                                color: "#cbb8e8"
-                                font.pixelSize: 40
-                                font.family: musicFont.name
-                            }
-
-                            Repeater {
-                                model: 5
-
-                                delegate: Rectangle {
-                                    required property int index
-
-                                    x: 0
-                                    y: parent.height * (0.15 + index * 0.175)
-                                    width: parent.width
-                                    height: 1
-                                    color: "#5c4a80"
-                                }
-
-                            }
-
-                            Rectangle {
-                                id: pitchBall
-
-                                width: 18
-                                height: 18
-                                radius: 9
-                                visible: MicrophoneController.detectedFrequencyHz > 0
-                                color: mainWindow.tuningColor()
-                                x: parent.width / 2 - width / 2
-                                y: parent.height * (1 - MicrophoneController.detectedStaffFraction) - height / 2
-
-                                Behavior on y {
-                                    NumberAnimation {
-                                        duration: 60
-                                        easing.type: Easing.OutQuad
-                                    }
-
-                                }
-
-                            }
-
+                        // La portee miniature : la boule suit la hauteur chantee. Le composant StaffBall porte le style.
+                        StaffBall {
                         }
 
                         // La note la plus proche, l'ecart en cents, et la couleur : c'est un ACCORDEUR, et il sert
@@ -870,71 +829,6 @@ ApplicationWindow {
                             onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
                         }
 
-                        // Le meme detecteur que l'accordeur, mais qui retient deux notes TENUES et mesure l'ecart.
-                        // Deux niveaux, comme Roger les a decrits : "Ecouter" fait entendre la cible (debutant),
-                        // et ne pas l'ecouter suffit pour le niveau avance - il ne reste que son nom affiche.
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 1
-                            Layout.topMargin: 6
-                            color: "#5c4a80"
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            color: "#e8dcff"
-                            font.pixelSize: 14
-                            font.bold: true
-                            text: qsTr("Chanter un intervalle")
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            color: "#cbb8e8"
-                            font.pixelSize: 15
-                            text: qsTr("À chanter : %1").arg(MicrophoneController.singingTargetLabel)
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-
-                            Button {
-                                Layout.fillWidth: true
-                                text: qsTr("Écouter")
-                                onClicked: MicrophoneController.playSingingTarget()
-                            }
-
-                            Button {
-                                Layout.fillWidth: true
-                                text: qsTr("Autre")
-                                onClicked: MicrophoneController.newSingingQuestion()
-                            }
-
-                        }
-
-                        Button {
-                            Layout.fillWidth: true
-                            highlighted: MicrophoneController.isSingingCaptureActive
-                            text: MicrophoneController.isSingingCaptureActive ? qsTr("J'écoute…") : qsTr("Je chante")
-                            onClicked: MicrophoneController.isSingingCaptureActive ? MicrophoneController.stopSingingCapture() : MicrophoneController.startSingingCapture()
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            color: mainWindow.singingVerdictColor()
-                            font.pixelSize: 15
-                            font.bold: true
-                            visible: MicrophoneController.hasSungInterval
-                            text: {
-                                var heard = MicrophoneController.sungSemitones + (qsTr(" demi-tons"));
-                                if (MicrophoneController.sungVerdict === 1)
-                                    return qsTr("Juste — %1").arg(heard);
-
-                                return qsTr("Raté — %1").arg(heard);
-                            }
-                        }
-
                     }
 
                 }
@@ -943,6 +837,111 @@ ApplicationWindow {
                     Layout.alignment: Qt.AlignRight
                     text: qsTr("Fermer")
                     onClicked: settingsDialog.close()
+                }
+
+            }
+
+        }
+
+    }
+
+    // L'exercice de chant : une petite serie d'intervalles a chanter, jugee par le detecteur. Le bouton "Ecouter"
+    // est le niveau debutant (on entend la cible), ne pas l'ecouter est le niveau avance (il ne reste que le nom).
+    Dialog {
+        id: singingDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 420)
+        height: Math.min(mainWindow.height * 0.9, singingColumn.implicitHeight + 32)
+        modal: true
+        padding: 16
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        contentItem: ScrollView {
+            clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+            ColumnLayout {
+                id: singingColumn
+
+                width: parent.width
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#ffffff"
+                    font.pixelSize: 20
+                    font.bold: true
+                    text: qsTr("Chanter")
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    text: qsTr("Question %1 / %2 · %3 juste(s)").arg(MicrophoneController.singingQuestionIndex).arg(MicrophoneController.singingTotalQuestions).arg(MicrophoneController.singingCorrectCount)
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#ffffff"
+                    font.pixelSize: 20
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                    text: MicrophoneController.singingTargetLabel
+                }
+
+                // La boule sur la portee, pendant que le joueur chante.
+                StaffBall {
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Écouter")
+                        onClicked: MicrophoneController.playSingingTarget()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        highlighted: MicrophoneController.isSingingCaptureActive
+                        text: MicrophoneController.isSingingCaptureActive ? qsTr("J'écoute…") : qsTr("Je chante")
+                        onClicked: MicrophoneController.isSingingCaptureActive ? MicrophoneController.stopSingingCapture() : MicrophoneController.startSingingCapture()
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: mainWindow.singingVerdictColor()
+                    font.pixelSize: 18
+                    font.bold: true
+                    visible: MicrophoneController.hasSungInterval
+                    text: MicrophoneController.sungVerdict === 1 ? qsTr("Juste !") : qsTr("Raté — entendu : %1 demi-tons").arg(MicrophoneController.sungSemitones)
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    text: MicrophoneController.singingSessionOver ? qsTr("Recommencer") : qsTr("Suivant")
+                    onClicked: MicrophoneController.singingSessionOver ? MicrophoneController.startSingingSession() : MicrophoneController.newSingingQuestion()
+                }
+
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    text: qsTr("Fermer")
+                    onClicked: singingDialog.close()
                 }
 
             }
@@ -1104,6 +1103,59 @@ ApplicationWindow {
                 radius: 8
                 border.width: 1
                 border.color: "#5c4a80"
+            }
+
+        }
+
+    }
+
+    // La portee miniature et sa boule : la clef de Sol, cinq lignes, et la boule qui suit la hauteur chantee. Un
+    // composant parce qu'elle sert a DEUX endroits - l'accordeur et l'exercice de chant - et un seul style evite
+    // qu'ils divergent.
+    component StaffBall: Item {
+        Layout.fillWidth: true
+        Layout.preferredHeight: 100
+
+        Text {
+            x: 2
+            y: -2
+            text: "\uD834\uDD1E"
+            color: "#cbb8e8"
+            font.pixelSize: 40
+            font.family: musicFont.name
+        }
+
+        Repeater {
+            model: 5
+
+            delegate: Rectangle {
+                required property int index
+
+                x: 0
+                y: parent.height * (0.15 + index * 0.175)
+                width: parent.width
+                height: 1
+                color: "#5c4a80"
+            }
+
+        }
+
+        Rectangle {
+            width: 18
+            height: 18
+            radius: 9
+            visible: MicrophoneController.detectedFrequencyHz > 0
+            color: mainWindow.tuningColor()
+            x: parent.width / 2 - width / 2
+            y: parent.height * (1 - MicrophoneController.detectedStaffFraction) - height / 2
+
+            // L'inertie : la boule ne saute pas de note en note, elle GLISSE vers la bonne place.
+            Behavior on y {
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutQuad
+                }
+
             }
 
         }

@@ -65,6 +65,13 @@ class MicrophoneController final : public QObject
     // 0 tant que rien n'a ete chante, 1 quand l'intervalle est juste, 2 quand il ne l'est pas.
     Q_PROPERTY( int sungVerdict READ sungVerdict NOTIFY sungIntervalChanged )
 
+    // La session : une petite serie de questions chantees, avec un score. La fin de session est affichee quand
+    // singingSessionOver devient vrai.
+    Q_PROPERTY( int singingQuestionIndex READ singingQuestionIndex NOTIFY singingQuestionChanged )
+    Q_PROPERTY( int singingCorrectCount READ singingCorrectCount NOTIFY singingQuestionChanged )
+    Q_PROPERTY( int singingTotalQuestions READ singingTotalQuestions CONSTANT )
+    Q_PROPERTY( bool singingSessionOver READ singingSessionOver NOTIFY singingQuestionChanged )
+
 public:
     // Builds a detector for the input at p_deviceIndex. The index matches inputDeviceNames, and the factory is the
     // application's way of handing over a QAudioPitchDetector without this view model ever seeing Qt Multimedia.
@@ -105,6 +112,14 @@ public:
     // Draws a new interval to sing. Called when the page opens, and after every answer.
     Q_INVOKABLE void newSingingQuestion();
 
+    // Starts a fresh session: the score returns to zero, and the first question is drawn.
+    Q_INVOKABLE void startSingingSession();
+
+    [[nodiscard]] int singingQuestionIndex() const { return m_singingQuestionIndex; }
+    [[nodiscard]] int singingCorrectCount() const { return m_singingCorrectCount; }
+    [[nodiscard]] int singingTotalQuestions() const { return m_singingTotalQuestions; }
+    [[nodiscard]] bool singingSessionOver() const { return m_singingQuestionIndex >= m_singingTotalQuestions; }
+
     // Plays the interval to sing, for the beginner level. The advanced level simply does not call it.
     Q_INVOKABLE void playSingingTarget();
 
@@ -133,6 +148,7 @@ signals:
     void singingTargetChanged();
     void singingCaptureStateChanged();
     void sungIntervalChanged();
+    void singingQuestionChanged();
 
 private:
     void onPitch( float p_frequencyHz );
@@ -159,6 +175,11 @@ private:
     bool m_isSingingCaptureActive{ false };
     QElapsedTimer m_pitchClock;
     musichien::domain::NotePlayer * m_notePlayer{ nullptr };
+
+    // La session : la question en cours, le nombre de bonnes reponses, et la taille de la serie.
+    int m_singingQuestionIndex{ 0 };
+    int m_singingCorrectCount{ 0 };
+    int m_singingTotalQuestions{ 5 };
     std::unique_ptr<musichien::domain::PitchDetector> m_detector;
 };
 
