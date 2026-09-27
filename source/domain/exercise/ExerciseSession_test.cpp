@@ -27,11 +27,13 @@ namespace
 constexpr std::uint32_t TEST_SEED = 20260926;
 
 // The settings of most tests: no limit on mistakes, so that a test about the GRID is not disturbed by
-// a test about the lives.
+// a test about the lives - and no sung question, which has its own tests, and which would otherwise make a
+// test about intervals fail at random, one draw in five.
 [[nodiscard]] SessionSettings unlimitedLivesSettings()
 {
     SessionSettings settings;
     settings.lives = std::nullopt;
+    settings.singQuestionShare = 0;
     return settings;
 }
 

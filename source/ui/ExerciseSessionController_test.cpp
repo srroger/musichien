@@ -44,6 +44,10 @@ constexpr std::size_t SESSION_QUESTION_COUNT = 10;
     settings.descendingShare = 0;
     settings.harmonicShare = 0;
 
+    // No sung question either: singing has its own tests, and a sung question in the middle of a test about the grid
+    // would make it fail at random - one draw in five.
+    settings.singQuestionShare = 0;
+
     return settings;
 }
 
