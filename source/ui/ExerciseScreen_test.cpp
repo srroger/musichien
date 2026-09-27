@@ -3,6 +3,7 @@
 
 #include <QCoreApplication>
 #include <QGuiApplication>
+#include <QJSValue>
 #include <QMap>
 #include <QPointF>
 #include <QQmlComponent>
@@ -19,6 +20,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <map>
 #include <string>
@@ -448,52 +450,63 @@ TEST( ExerciseScreenTest, no_two_intervals_of_the_same_place_ever_overlap )
         // Un bouton de taille nulle n'est pas un bouton : c'est le signe d'un calcul parti en NaN.
         EXPECT_GT( button->width(), 0.0 ) << "le bouton " << button->property( "text" ).toString().toStdString() << " est de taille nulle";
 
-        // Le rassemblement se lit dans la GEOMETRIE, pas dans le modele : les boutons d'une meme place partagent
-        // leur centre, quel que soit leur rang dans la pile et quelle que soit leur taille. C'est plus court, et
-        // surtout cela ne depend pas de la facon dont QML transporte le modele - le modelData d'un delegue vit sur
-        // le delegue, pas sur le bouton, et s'y tromper rassemblait les douze places dans la meme case.
-        const QRectF rectangle = rectangleOf( *button );
+        // Le rassemblement se fait par la PLACE, lue sur le DELEGUE du bouton : un bouton ne connait pas son
+        // modelData, c'est son delegue qui le porte.
+        //
+        // Et surtout PAS par la position du centre, ce qui etait une erreur : les composes sont decales a
+        // l'interieur du simple, donc leurs centres diffèrent tous, et chaque bouton se retrouvait seul dans son
+        // groupe. Le test passait alors en ne comparant rien du tout - le pire genre de test vert.
+        const QVariant raw = button->parentItem()->property( "modelData" );
 
-        const int place = qRound( ( rectangle.center().x() * 1000 ) + rectangle.center().y() );
+        const int place = ( raw.canConvert<QVariantMap>() && !raw.toMap().isEmpty() )
+                            ? raw.toMap().value( QStringLiteral( "slot" ) ).toInt()
+                            : raw.value<QJSValue>().property( QStringLiteral( "slot" ) ).toInt();
 
         buttonsPerSlot[place].push_back( button );
     }
 
-    const auto places = buttonsPerSlot.size();
+    EXPECT_GE( buttonsPerSlot.size(), 2U ) << "une seule place porte des intervalles : le test ne prouverait rien";
 
-    EXPECT_GE( places, 2U ) << "une seule place portent des intervalles : le test ne prouverait rien";
-
-    for( const auto & [slot, stacked] : buttonsPerSlot )
+    for( auto & [place, stacked] : buttonsPerSlot )
     {
-        for( std::size_t left = 0; left < stacked.size(); ++left )
+        // Du plus grand au plus petit : le simple en tete, ses composes a sa suite. C'est l'ordre dans lequel ils
+        // sont dessines - donc celui dans lequel ils s'empilent a l'ecran.
+        std::ranges::sort( stacked, []( QQuickItem * p_left, QQuickItem * p_right ) { return p_left->width() > p_right->width(); } );
+
+        QQuickItem * simple = stacked.front();
+
+        // 1. Un composes se pose DEDANS, colle au bord du simple : c'est le dessin voulu, donc leur chevauchement
+        // n'est pas un defaut. Ce qui en serait un, c'est que le CENTRE du simple soit couvert - le simple est ce
+        // qu'on cherche le plus souvent, et c'est la qu'un doigt se pose.
+        const QPointF centre = rectangleOf( *simple ).center();
+
+        for( QQuickItem * button : stacked )
+        {
+            if( button != simple )
+            {
+                EXPECT_FALSE( rectangleOf( *button ).contains( centre ) )
+                  << "place " << place << " : '" << button->property( "text" ).toString().toStdString()
+                  << "' couvre le centre du simple '" << simple->property( "text" ).toString().toStdString() << "'";
+            }
+        }
+
+        // 2. Deux composes ne se genent pas : eux ne doivent JAMAIS se recouvrir entre eux.
+        for( std::size_t left = 1; left < stacked.size(); ++left )
         {
             for( std::size_t right = left + 1; right < stacked.size(); ++right )
             {
-                const QRectF first = rectangleOf( *stacked.at( left ) );
-                const QRectF second = rectangleOf( *stacked.at( right ) );
-
-                EXPECT_FALSE( first.intersects( second ) )
-                  << "place " << slot << " : '" << stacked.at( left )->property( "text" ).toString().toStdString()
-                  << "' et '" << stacked.at( right )->property( "text" ).toString().toStdString() << "' se recouvrent - "
-                  << first.x() << "," << first.y() << " " << first.width() << "x" << first.height() << " contre "
-                  << second.x() << "," << second.y() << " " << second.width() << "x" << second.height();
+                EXPECT_FALSE( rectangleOf( *stacked.at( left ) ).intersects( rectangleOf( *stacked.at( right ) ) ) )
+                  << "place " << place << " : '" << stacked.at( left )->property( "text" ).toString().toStdString()
+                  << "' et '" << stacked.at( right )->property( "text" ).toString().toStdString() << "' se recouvrent";
             }
         }
-    }
 
-    // Et les tailles sont DECROISSANTES avec la distance : le simple est le plus grand, la quinzieme la plus petite.
-    // C'est la demande de Roger, et c'est aussi ce qui rend la case lisible d'un coup d'oeil.
-    for( const auto & [slot, stacked] : buttonsPerSlot )
-    {
-        if( stacked.size() < 2 )
-        {
-            continue;
-        }
-
+        // 3. Et les tailles DECROISSENT avec la distance : le simple est le plus grand, la quinzieme la plus petite.
+        // C'est la demande de Roger, et c'est ce qui rend la case lisible d'un coup d'oeil.
         for( std::size_t rank = 1; rank < stacked.size(); ++rank )
         {
             EXPECT_LT( stacked.at( rank )->width(), stacked.at( rank - 1 )->width() )
-              << "place " << slot << " : le rang " << rank << " n'est pas plus petit que le precedent";
+              << "place " << place << " : le rang " << rank << " n'est pas plus petit que le precedent";
         }
     }
 }

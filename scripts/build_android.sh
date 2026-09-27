@@ -120,6 +120,10 @@ cmake --preset "${CONFIGURE_PRESET}"
 echo
 echo "--- Step 3/5: compilation ---------------------------------------------------------------------"
 
+# Un QML modifie n'est pas recompile par AUTORCC tant que le .qrc n'a pas bouge : sans cette ligne, le paquet part
+# avec l'ecran de la veille - et rien ne le signale. Toucher ne change pas le contenu, donc rien dans git.
+touch source/ui/resources.qrc
+
 cmake --build --preset "${BUILD_PRESET}" --target apk
 
 # ---------------------------------------------------------------------------------------------------------------------
