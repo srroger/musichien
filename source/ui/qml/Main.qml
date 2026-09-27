@@ -755,6 +755,8 @@ ApplicationWindow {
                     border.color: "#5c4a80"
 
                     ColumnLayout {
+                        // --- Chanter un intervalle -----------------------------------------------------------
+
                         id: microphoneColumn
 
                         anchors.left: parent.left
@@ -868,8 +870,6 @@ ApplicationWindow {
                             onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
                         }
 
-                        // --- Chanter un intervalle -----------------------------------------------------------
-                        //
                         // Le meme detecteur que l'accordeur, mais qui retient deux notes TENUES et mesure l'ecart.
                         // Deux niveaux, comme Roger les a decrits : "Ecouter" fait entendre la cible (debutant),
                         // et ne pas l'ecouter suffit pour le niveau avance - il ne reste que son nom affiche.

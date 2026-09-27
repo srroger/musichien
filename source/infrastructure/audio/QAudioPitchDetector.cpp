@@ -223,6 +223,13 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
                 impl.m_callback( static_cast<float>( frequencyHz ) );
             }
 
+            // The callback may have stopped the detector (the tuner stops itself once it has heard enough): the
+            // buffer and the device are then gone, and touching them again is a use-after-free.
+            if( impl.m_io == nullptr )
+            {
+                return;
+            }
+
             impl.m_window.erase( impl.m_window.begin(),
                                  impl.m_window.begin() + static_cast<std::ptrdiff_t>( WINDOW_SIZE / 2 ) );
         }
@@ -237,7 +244,12 @@ void QAudioPitchDetector::stop()
     {
         impl.m_source->stop();
         impl.m_io = nullptr;
-        impl.m_source = nullptr;
+
+        // deleteLater rather than resetting to null: stop() may be called FROM the readyRead slot itself - the tuner
+        // stops itself the moment it has heard enough. Destroying the QAudioSource, and the QIODevice whose slot is
+        // on the stack right now, would be a use-after-free. Deferring the deletion to the event loop is the safe way.
+        impl.m_source->deleteLater();
+        impl.m_source.release();
     }
 
     impl.m_callback = nullptr;
