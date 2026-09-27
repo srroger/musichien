@@ -175,7 +175,10 @@ ApplicationWindow {
                     text: ExerciseController.hasChosenLevel ? qsTr("Ton niveau") : qsTr("Pour commencer : tu en es où ?")
                 }
 
-                Row {
+                // Sur DEUX lignes : quatre niveaux ne tiennent plus sur une seule, et un bouton qu on ne peut pas
+                // atteindre est un bouton qui n existe pas.
+                Flow {
+                    Layout.preferredWidth: mainWindow.buttonWidth
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
