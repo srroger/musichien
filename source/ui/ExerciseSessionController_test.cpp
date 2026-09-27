@@ -628,4 +628,28 @@ TEST( ExerciseSessionControllerTest, a_guided_question_reports_its_kind_and_take
     controller.answerDirection( 0 );
 }
 
+TEST( ExerciseSessionControllerTest, the_session_experience_joins_the_profile_total_at_the_end )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake store;
+
+    domain::SessionSettings settings = ascendingOnlySettings();
+
+    settings.questionCount = 2;
+
+    ExerciseSessionController controller{ notePlayer, settings, {}, {}, &store };
+
+    controller.startSession();
+
+    // Deux questions jouees jusqu'au bout, toutes les deux justes.
+    while( !controller.isFinished() )
+    {
+        answerCorrectly( controller );
+        controller.continueToNextQuestion();
+    }
+
+    // Le total du profil a recu l'experience de la session, une fois et pas deux.
+    EXPECT_GT( store.totalExperience(), 0 );
+}
+
 }    // namespace musichien::ui

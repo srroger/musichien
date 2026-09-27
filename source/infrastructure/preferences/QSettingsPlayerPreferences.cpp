@@ -20,6 +20,11 @@ constexpr const char * LEVEL_KEY = "player/level";
 // adding an instrument to the end cannot silently shift the others.
 constexpr const char * INSTRUMENTS_KEY = "player/instruments";
 
+// The profile: a name and an experience total. Both stored as readable text, like every other preference.
+constexpr const char * NAME_KEY = "player/name";
+
+constexpr const char * EXPERIENCE_KEY = "player/experience";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -76,6 +81,30 @@ void QSettingsPlayerPreferences::storeEnabledInstruments( std::vector<bool> p_en
     QSettings settings;
 
     settings.setValue( INSTRUMENTS_KEY, storedFlags );
+}
+
+std::string QSettingsPlayerPreferences::playerName() const
+{
+    return QSettings{}.value( NAME_KEY ).toString().toStdString();
+}
+
+void QSettingsPlayerPreferences::storePlayerName( std::string p_name )
+{
+    QSettings settings;
+
+    settings.setValue( NAME_KEY, QString::fromStdString( p_name ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::totalExperience() const
+{
+    return static_cast<std::int64_t>( QSettings{}.value( EXPERIENCE_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeTotalExperience( std::int64_t p_total )
+{
+    QSettings settings;
+
+    settings.setValue( EXPERIENCE_KEY, static_cast<qlonglong>( p_total ) );
 }
 
 }    // namespace musichien::infrastructure

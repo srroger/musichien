@@ -112,6 +112,11 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( int lives READ lives NOTIFY scoreChanged )
     Q_PROPERTY( bool hasUnlimitedLives READ hasUnlimitedLives NOTIFY scoreChanged )
 
+    // The profile: a name and an experience total, remembered between launches. Read from the store on demand - a
+    // profile is asked once, not read from disk on every frame.
+    Q_PROPERTY( QString playerName READ playerName WRITE setPlayerName NOTIFY playerNameChanged )
+    Q_PROPERTY( int totalExperience READ totalExperience NOTIFY totalExperienceChanged )
+
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
 
@@ -119,6 +124,14 @@ public:
     // Ce que la question en cours demande : nommer un intervalle, ou dire dans quel sens il a ete joue. La valeur
     // est celle du domaine, transposee en entier pour le QML.
     [[nodiscard]] int questionKind() const noexcept;
+
+    // The name the player gave himself, empty before the first time he writes one.
+    QString playerName() const;
+
+    void setPlayerName( const QString & p_name );
+
+    // Experience earned across every session, remembered between launches.
+    int totalExperience() const;
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
@@ -212,6 +225,12 @@ signals:
     // The player has just turned an instrument on or off.
     void instrumentsChanged();
 
+    // The player has just written or changed his name.
+    void playerNameChanged();
+
+    // The experience total has just grown, after a session ended.
+    void totalExperienceChanged();
+
 private:
     // Rebuilds the list of choices from the question being asked, and only then notifies. Called
     // whenever the question changes AND whenever the grid closes in after a mistake.
@@ -220,6 +239,9 @@ private:
     // What follows a right or a wrong answer, whatever its form: replay the question one way or the other, shake
     // on a mistake, and tell the screen. Both answer() and answerDirection() end here.
     void processAnswer( bool p_isCorrect );
+
+    // Adds the session's experience to the profile total, once, when the session ends.
+    void persistSessionExperience();
 
     // Plays the interval of the question being asked, from its own root note.
     void playCurrentQuestion();

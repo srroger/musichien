@@ -538,6 +538,10 @@ void ExerciseSessionController::continueToNextQuestion()
     {
         playCurrentQuestion();
     }
+    else
+    {
+        persistSessionExperience();
+    }
 
     emit scoreChanged();
     emit sessionChanged();
@@ -546,6 +550,42 @@ void ExerciseSessionController::continueToNextQuestion()
 void ExerciseSessionController::stopPlayback()
 {
     m_notePlayer.stopAll();
+}
+
+QString ExerciseSessionController::playerName() const
+{
+    return ( m_levelStore != nullptr ) ? QString::fromStdString( m_levelStore->playerName() ) : QString{};
+}
+
+void ExerciseSessionController::setPlayerName( const QString & p_name )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    m_levelStore->storePlayerName( p_name.toStdString() );
+
+    emit playerNameChanged();
+}
+
+int ExerciseSessionController::totalExperience() const
+{
+    return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->totalExperience() ) : 0;
+}
+
+void ExerciseSessionController::persistSessionExperience()
+{
+    if( ( m_levelStore == nullptr ) || ( m_session == nullptr ) )
+    {
+        return;
+    }
+
+    // The session is over: its experience becomes part of the profile total, once. Calling this twice would count
+    // the same session twice, so it happens only from the transition into "finished".
+    m_levelStore->storeTotalExperience( m_levelStore->totalExperience() + m_session->score().experience() );
+
+    emit totalExperienceChanged();
 }
 
 void ExerciseSessionController::refreshChoices()
