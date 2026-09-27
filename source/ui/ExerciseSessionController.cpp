@@ -237,7 +237,14 @@ QVariantList ExerciseSessionController::instruments() const
 
 void ExerciseSessionController::setInstrumentEnabled( int p_index, bool p_isEnabled )
 {
-    if( ( p_index < 0 ) || ( static_cast<std::size_t>( p_index ) >= domain::INSTRUMENT_COUNT ) )
+    // Two tests rather than one: comparing a signed index with an unsigned count in the same
+    // expression is exactly the kind of comparison that lets a negative index through.
+    if( p_index < 0 )
+    {
+        return;
+    }
+
+    if( static_cast<std::size_t>( p_index ) >= domain::INSTRUMENT_COUNT )
     {
         return;
     }

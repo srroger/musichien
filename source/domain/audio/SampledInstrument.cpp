@@ -104,7 +104,7 @@ struct WaveFormat
 
     // One frame at a time, all channels together: a stereo file is averaged rather than half discarded, which
     // would silently lose whatever the two microphones did not record identically.
-    while( byteIterator + ( 2 * p_channelCount ) <= p_data.end() )
+    while( byteIterator + ( static_cast<std::ptrdiff_t>( 2 ) * static_cast<std::ptrdiff_t>( p_channelCount ) ) <= p_data.end() )
     {
         float sum = 0.0F;
 
