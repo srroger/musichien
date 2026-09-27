@@ -330,56 +330,71 @@ Item {
                 spacing: 10
 
                 Repeater {
-                    model: ExerciseController.choices
+                    // Chaque place garde sa CASE, meme vide, et c'est ce qui transforme la grille en carte : la quinte
+                    // est toujours au meme endroit, que la palette en offre deux ou douze.
 
-                    delegate: Button {
-                        id: choiceButton
+                    model: ExerciseController.gridPositions
+
+                    // Trois par ligne et des boutons plus petits : douze places tiennent sans que l'ecran debord.
+                    delegate: Item {
+                        id: choiceSlot
 
                         required property var modelData
 
-                        width: (choiceFlow.width - choiceFlow.spacing) / 2
-                        height: 60
-                        text: choiceButton.modelData.identifier
-                        // The chosen button keeps a visible mark, so that the verdict can be read against
-                        // what was really tapped.
-                        highlighted: exerciseScreen.hasAnswered && (exerciseScreen.answeredInterval.semitones === choiceButton.modelData.semitones)
-                        onClicked: ExerciseController.answer(choiceButton.modelData.semitones)
-                        // A short scale bump on press: the smallest possible acknowledgement that the
-                        // finger was heard, before anything else has time to happen.
-                        scale: choiceButton.down ? 0.94 : 1
+                        width: (choiceFlow.width - 2 * choiceFlow.spacing) / 3
+                        height: 52
 
-                        Behavior on scale {
-                            NumberAnimation {
-                                duration: 90
-                            }
-
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 12
+                            color: "#00000000"
+                            border.width: 1
+                            border.color: "#3a2a5c"
+                            visible: !choiceSlot.modelData.isAvailable
                         }
 
-                        background: Rectangle {
-                            radius: 14
-                            color: exerciseScreen.colourForInterval(choiceButton.modelData)
-                            border.width: choiceButton.highlighted ? 3 : 0
-                            border.color: "#ffffff"
-                            // The grid fades a little once the answer is known: the question is over, and
-                            // what matters then is the verdict, not the buttons.
-                            opacity: ExerciseController.isAsking ? 1 : 0.72
+                        Button {
+                            id: choiceButton
 
-                            Behavior on opacity {
+                            anchors.fill: parent
+                            visible: choiceSlot.modelData.isAvailable
+                            text: choiceSlot.modelData.isAvailable ? choiceSlot.modelData.identifier : ""
+                            highlighted: exerciseScreen.hasAnswered && (exerciseScreen.answeredInterval.semitones === choiceSlot.modelData.semitones)
+                            onClicked: ExerciseController.answer(choiceSlot.modelData.semitones)
+                            scale: choiceButton.down ? 0.94 : 1
+
+                            Behavior on scale {
                                 NumberAnimation {
-                                    duration: 180
+                                    duration: 90
                                 }
 
                             }
 
-                        }
+                            background: Rectangle {
+                                radius: 12
+                                color: choiceSlot.modelData.isAvailable ? exerciseScreen.colourForInterval(choiceSlot.modelData) : "#00000000"
+                                border.width: choiceButton.highlighted ? 3 : 0
+                                border.color: "#ffffff"
+                                opacity: ExerciseController.isAsking ? 1 : 0.72
 
-                        contentItem: Text {
-                            text: choiceButton.text
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            color: "#2b1b47"
-                            font.pixelSize: 17
-                            font.bold: true
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: 180
+                                    }
+
+                                }
+
+                            }
+
+                            contentItem: Text {
+                                text: choiceButton.text
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                color: "#2b1b47"
+                                font.pixelSize: 15
+                                font.bold: true
+                            }
+
                         }
 
                     }

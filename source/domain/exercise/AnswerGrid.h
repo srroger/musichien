@@ -1,5 +1,8 @@
 #pragma once
 
+#include <array>
+#include <optional>
+
 // =====================================================================================================================
 // Musichien - AnswerGrid
 //
@@ -76,5 +79,35 @@ public:
     [[nodiscard]] static std::int32_t plausibilityDistance( const Interval & p_target,
                                                             const Interval & p_other );
 };
+
+// Nombre de places du cercle des quintes : une par classe d'intervalle simple.
+inline constexpr std::size_t CIRCLE_OF_FIFTHS_SLOT_COUNT = 12;
+
+// La place d'un intervalle sur le cercle : sept demi-tons par quinte, modulo douze.
+//
+// Sept et douze sont premiers entre eux, donc chaque classe a une place et une seule : la table n'a pas besoin
+// d'etre ecrite, et elle ne peut pas se desynchroniser du cercle reel.
+[[nodiscard]] constexpr std::size_t circleOfFifthsSlot( const Interval & p_interval ) noexcept
+{
+    constexpr std::size_t SEMITONES_IN_A_FIFTH = 7;
+
+    return ( SEMITONES_IN_A_FIFTH * static_cast<std::size_t>( p_interval.intervalClass() ) ) % CIRCLE_OF_FIFTHS_SLOT_COUNT;
+}
+
+// Les choix d'une question, PLACES sur le cercle des quintes plutot que ranges les uns derriere les autres.
+//
+// La difference est tout : une liste rangee met le troisieme choix en troisieme position, donc un intervalle
+// donne change de place des que la selection change autour de lui. Une position ABSOLUE fait que la quinte est
+// toujours la ou est la quinte - et c'est la seule facon d'apprendre la geographie des intervalles.
+//
+// UN BOUTON QUI DISPARAIT NE DEPLACE RIEN, et c'est le point delicat. Quand la grille se resserre - un leurre
+// retire a chaque erreur - il y a simplement MOINS d'intervalles a placer : les cases liberees redeviennent
+// vides, et aucune autre ne bouge. C'est ce qu'on demande a une carte : elle peut se vider, elle ne se
+// reorganise pas.
+//
+// Une case vide est donc une INFORMATION : elle dit qu'il y a une place pour cet intervalle, et que la palette
+// ne l'a pas encore.
+[[nodiscard]] std::array<std::optional<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> layoutOnCircle(
+  std::span<const Interval> p_choices );
 
 }    // namespace musichien::domain

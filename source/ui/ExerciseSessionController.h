@@ -22,6 +22,7 @@
 
 #include "domain/audio/NotePlayer.h"
 #include "domain/audio/SampledInstrument.h"
+#include "domain/exercise/AnswerGrid.h"
 #include "domain/exercise/ExerciseSession.h"
 #include "domain/exercise/HintBook.h"
 #include "domain/exercise/PlayerPreferences.h"
@@ -58,6 +59,10 @@ class ExerciseSessionController final : public QObject
     // What the player can choose, described for the interface. Rebuilt whenever the question changes,
     // and only then: a grid that moved during the feedback would be unreadable.
     Q_PROPERTY( QVariantList choices READ choices NOTIFY questionChanged )
+
+    // Les memes choix, mais PLACES sur le cercle des quintes : douze cases fixes, dont les vides. C'est ce que
+    // l'ecran affiche, et c'est ce qui donne une geographie stable a la grille - une carte, pas une liste.
+    Q_PROPERTY( QVariantList gridPositions READ gridPositions NOTIFY questionChanged )
 
     Q_PROPERTY( bool isAsking READ isAsking NOTIFY sessionChanged )
     Q_PROPERTY( bool isFinished READ isFinished NOTIFY sessionChanged )
@@ -125,6 +130,7 @@ public:
     [[nodiscard]] int questionNumber() const noexcept;
     [[nodiscard]] int questionCount() const noexcept;
     [[nodiscard]] QVariantList choices() const;
+    [[nodiscard]] QVariantList gridPositions() const;
     [[nodiscard]] bool isAsking() const noexcept;
     [[nodiscard]] bool isFinished() const noexcept;
     [[nodiscard]] bool isFeedbackVisible() const noexcept;

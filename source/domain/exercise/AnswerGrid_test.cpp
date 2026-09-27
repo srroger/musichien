@@ -235,4 +235,31 @@ TEST( AnswerGridTest, the_grid_is_laid_out_in_circle_of_fifths_order )
     }
 }
 
+TEST( AnswerGridTest, a_choice_that_disappears_leaves_a_hole_and_moves_nothing )
+{
+    // La grille se resserre a chaque erreur : un leurre disparait. La place des AUTRES ne doit pas bouger d'un
+    // pouce - c'est toute la difference entre une carte et une liste, et c'est ce qui casse en silence si on
+    // range les boutons par position dans la liste plutot que par classe d'intervalle.
+    const std::vector<Interval> full{ Interval{ 7 }, Interval{ 4 } };
+    const std::vector<Interval> narrowed{ Interval{ 7 } };
+
+    const auto fullLayout = layoutOnCircle( full );
+    const auto narrowedLayout = layoutOnCircle( narrowed );
+
+    const std::size_t fifthSlot = circleOfFifthsSlot( Interval{ 7 } );
+    const std::size_t thirdSlot = circleOfFifthsSlot( Interval{ 4 } );
+
+    // Deux intervalles differents ne tombent jamais sur la meme case.
+    EXPECT_NE( fifthSlot, thirdSlot );
+
+    // La quinte est a la meme place dans les deux cas...
+    ASSERT_TRUE( fullLayout.at( fifthSlot ).has_value() );
+    EXPECT_TRUE( narrowedLayout.at( fifthSlot ).has_value() );
+    EXPECT_EQ( 7, narrowedLayout.at( fifthSlot )->semitones() );
+
+    // ...et la tierce laisse simplement sa case VIDE.
+    EXPECT_TRUE( fullLayout.at( thirdSlot ).has_value() );
+    EXPECT_FALSE( narrowedLayout.at( thirdSlot ).has_value() );
+}
+
 }    // namespace musichien::domain

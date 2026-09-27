@@ -74,6 +74,41 @@ int ExerciseSessionController::questionCount() const noexcept
     return ( m_session != nullptr ) ? static_cast<int>( m_session->settings().questionCount ) : 0;
 }
 
+QVariantList ExerciseSessionController::gridPositions() const
+{
+    QVariantList positions;
+
+    if( m_session == nullptr )
+    {
+        return positions;
+    }
+
+    // Les choix ont deja ete decides par la session : lesquels, et combien. Ici on ne fait que les PLACER, ce
+    // qui est la seule chose qui manquait pour que la grille devienne une carte.
+    const std::array<std::optional<domain::Interval>, domain::CIRCLE_OF_FIFTHS_SLOT_COUNT> layout =
+      domain::layoutOnCircle( m_session->currentQuestion().choices );
+
+    for( std::size_t slot = 0; slot < layout.size(); ++slot )
+    {
+        QVariantMap position;
+        position.insert( QStringLiteral( "slot" ), static_cast<int>( slot ) );
+        position.insert( QStringLiteral( "isAvailable" ), layout.at( slot ).has_value() );
+
+        if( layout.at( slot ).has_value() )
+        {
+            const QVariantMap description = describeInterval( *layout.at( slot ) );
+
+            position.insert( QStringLiteral( "semitones" ), description.value( QStringLiteral( "semitones" ) ) );
+            position.insert( QStringLiteral( "identifier" ), description.value( QStringLiteral( "identifier" ) ) );
+            position.insert( QStringLiteral( "name" ), description.value( QStringLiteral( "name" ) ) );
+        }
+
+        positions.append( position );
+    }
+
+    return positions;
+}
+
 QVariantList ExerciseSessionController::choices() const
 {
     return m_choices;

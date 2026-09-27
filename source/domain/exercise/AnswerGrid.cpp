@@ -135,4 +135,24 @@ std::vector<Interval> AnswerGrid::build( std::span<const Interval> p_palette,
     return choices;
 }
 
+std::array<std::optional<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> layoutOnCircle(
+  std::span<const Interval> p_choices )
+{
+    std::array<std::optional<Interval>, CIRCLE_OF_FIFTHS_SLOT_COUNT> slots{};
+
+    for( const Interval & choice : p_choices )
+    {
+        const std::size_t slot = circleOfFifthsSlot( choice );
+
+        // Deux intervalles de la MEME CLASSE - une tierce mineure et une dixieme mineure - visent la meme place.
+        // Le plus petit garde la sienne, parce que c'est celui que la carte doit montrer.
+        if( !slots.at( slot ).has_value() || ( choice.semitones() < slots.at( slot )->semitones() ) )
+        {
+            slots.at( slot ) = choice;
+        }
+    }
+
+    return slots;
+}
+
 }    // namespace musichien::domain
