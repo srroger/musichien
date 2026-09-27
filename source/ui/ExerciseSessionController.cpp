@@ -1,6 +1,7 @@
 #include "ui/ExerciseSessionController.h"
 
 #include "domain/music/Interval.h"
+#include "domain/music/Temperament.h"
 #include "ui/IntervalDescription.h"
 
 #include <QString>
@@ -9,6 +10,8 @@
 #include <limits>
 #include <optional>
 #include <random>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace musichien::ui
@@ -726,6 +729,104 @@ void ExerciseSessionController::setDailyReminderEnabled( bool p_enabled )
     m_levelStore->storeDailyReminderEnabled( p_enabled );
 
     emit dailyReminderChanged();
+}
+
+int ExerciseSessionController::temperament() const
+{
+    return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->storedTemperament() ) : 0;
+}
+
+void ExerciseSessionController::setTemperament( int p_index )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    if( p_index < 0 )
+    {
+        return;
+    }
+
+    if( static_cast<std::size_t>( p_index ) >= domain::TEMPERAMENT_NAMES.size() )
+    {
+        return;
+    }
+
+    m_levelStore->storeTemperament( static_cast<domain::Temperament>( p_index ) );
+
+    emit temperamentChanged();
+}
+
+// A Q_PROPERTY READ must be a member function, even when it reads nothing from the object.
+QVariantList ExerciseSessionController::temperaments() const    // NOLINT(readability-convert-member-functions-to-static)
+{
+    QVariantList names;
+
+    for( const std::string_view name : domain::TEMPERAMENT_NAMES )
+    {
+        names.append( QString::fromStdString( std::string{ name } ) );
+    }
+
+    return names;
+}
+
+int ExerciseSessionController::tuningRoot() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedTuningRoot().pitchClassIndex() : 0;
+}
+
+void ExerciseSessionController::setTuningRoot( int p_index )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    if( p_index < 0 || p_index >= domain::SEMITONES_PER_OCTAVE )
+    {
+        return;
+    }
+
+    // A root is a PITCH CLASS: which octave it sits in does not change an interval, so it is stored in octave 4.
+    m_levelStore->storeTuningRoot( domain::Note{ 60 + p_index } );
+
+    emit tuningRootChanged();
+}
+
+QVariantList ExerciseSessionController::tuningRoots() const    // NOLINT(readability-convert-member-functions-to-static)
+{
+    QVariantList names;
+
+    for( std::int32_t index = 0; index < domain::SEMITONES_PER_OCTAVE; ++index )
+    {
+        names.append( QString::fromStdString( domain::Note{ 60 + index }.name() ) );
+    }
+
+    return names;
+}
+
+double ExerciseSessionController::referencePitch() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedReferencePitch() : 440.0;
+}
+
+void ExerciseSessionController::setReferencePitch( double p_hertz )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    // A diapason outside this band is a typo, not a tuning: it is refused rather than stored.
+    if( p_hertz < 400.0 || p_hertz > 480.0 )
+    {
+        return;
+    }
+
+    m_levelStore->storeReferencePitch( p_hertz );
+
+    emit referencePitchChanged();
 }
 
 int ExerciseSessionController::reminderHour() const noexcept    // NOLINT(readability-convert-member-functions-to-static)

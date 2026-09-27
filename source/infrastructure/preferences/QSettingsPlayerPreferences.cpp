@@ -33,6 +33,15 @@ constexpr const char * STARS_KEY = "player/stars";
 // The daily reminder.
 constexpr const char * REMINDER_KEY = "player/reminder";
 
+// The tuning. Stored as the enum's own number, and read back through a range check.
+constexpr const char * TEMPERAMENT_KEY = "player/temperament";
+
+// The root note of the tuning, as a MIDI number.
+constexpr const char * TUNING_ROOT_KEY = "player/tuning-root";
+
+// The A4 diapason, in hertz.
+constexpr const char * REFERENCE_PITCH_KEY = "player/reference-pitch";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -149,6 +158,66 @@ void QSettingsPlayerPreferences::storeDailyReminderEnabled( bool p_enabled )
     QSettings settings;
 
     settings.setValue( REMINDER_KEY, p_enabled );
+}
+
+domain::Temperament QSettingsPlayerPreferences::storedTemperament() const
+{
+    // Read as an UNSIGNED number: a settings file is a text file a player can open, and a negative value he typed
+    // there must fall back to the reference, not wrap around into the last temperament of the list.
+    const auto stored = QSettings{}.value( TEMPERAMENT_KEY, 0U ).toUInt();
+
+    if( stored >= domain::TEMPERAMENT_NAMES.size() )
+    {
+        return domain::Temperament::Equal;
+    }
+
+    return static_cast<domain::Temperament>( stored );
+}
+
+void QSettingsPlayerPreferences::storeTemperament( domain::Temperament p_temperament )
+{
+    QSettings settings;
+
+    settings.setValue( TEMPERAMENT_KEY, static_cast<int>( p_temperament ) );
+}
+
+domain::Note QSettingsPlayerPreferences::storedTuningRoot() const
+{
+    const int stored = QSettings{}.value( TUNING_ROOT_KEY, 60 ).toInt();
+
+    if( stored < domain::Note::MINIMUM_MIDI_NUMBER || stored > domain::Note::MAXIMUM_MIDI_NUMBER )
+    {
+        return domain::Note{ 60 };
+    }
+
+    return domain::Note{ stored };
+}
+
+void QSettingsPlayerPreferences::storeTuningRoot( domain::Note p_root )
+{
+    QSettings settings;
+
+    settings.setValue( TUNING_ROOT_KEY, p_root.midiNumber() );
+}
+
+double QSettingsPlayerPreferences::storedReferencePitch() const
+{
+    const double stored = QSettings{}.value( REFERENCE_PITCH_KEY, 440.0 ).toDouble();
+
+    // A settings file is a text file a player can open. A wildly out of range value falls back to the reference.
+    if( stored < 400.0 || stored > 480.0 )
+    {
+        return 440.0;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeReferencePitch( double p_hertz )
+{
+    QSettings settings;
+
+    settings.setValue( REFERENCE_PITCH_KEY, p_hertz );
 }
 
 }    // namespace musichien::infrastructure

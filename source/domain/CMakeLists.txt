@@ -14,6 +14,8 @@ musichienFunction_AddLibrary(domain
     # Music theory primitives
     music/Note.h
     music/Note.cpp
+    music/Temperament.h
+    music/Temperament.cpp
     music/Interval.h
     music/Interval.cpp
 
@@ -65,6 +67,7 @@ if(MUSICHIEN_BUILD_TESTING)
     musichienFunction_AddTest(domain
         musichien_domain
         music/Interval_test.cpp
+        music/Temperament_test.cpp
         audio/ToneSynthesizer_test.cpp
         exercise/AnswerGrid_test.cpp
         exercise/AnecdoteBook_test.cpp

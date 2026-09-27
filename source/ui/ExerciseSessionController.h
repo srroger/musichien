@@ -136,6 +136,14 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( int reminderHour READ reminderHour CONSTANT )
     Q_PROPERTY( int reminderMinute READ reminderMinute CONSTANT )
 
+    // L'accordage. Le tempere egal d'abord, et les anciens pour le plaisir d'entendre ce que "juste" veut dire.
+    // La liste des noms vient du domaine, donc elle ne peut pas deriver de l'enumeration.
+    Q_PROPERTY( int temperament READ temperament NOTIFY temperamentChanged )
+    Q_PROPERTY( QVariantList temperaments READ temperaments CONSTANT )
+    Q_PROPERTY( int tuningRoot READ tuningRoot NOTIFY tuningRootChanged )
+    Q_PROPERTY( QVariantList tuningRoots READ tuningRoots CONSTANT )
+    Q_PROPERTY( double referencePitch READ referencePitch NOTIFY referencePitchChanged )
+
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
 
@@ -168,6 +176,26 @@ public:
 
     // The developer button that fires a reminder right now, to check the plumbing.
     Q_INVOKABLE void testReminder();
+
+    // The tuning, as the index of the domain's enumeration, and the names a screen can show.
+    [[nodiscard]] int temperament() const;
+
+    Q_INVOKABLE void setTemperament( int p_index );
+
+    [[nodiscard]] QVariantList temperaments() const;
+
+    // The root note the tuning is heard from, as its pitch-class index (0 = C), and the twelve names a screen can
+    // show. Equal temperament ignores it; the others do not.
+    [[nodiscard]] int tuningRoot() const;
+
+    Q_INVOKABLE void setTuningRoot( int p_index );
+
+    [[nodiscard]] QVariantList tuningRoots() const;
+
+    // The A4 diapason, in hertz. 440 by default; some wind instruments want 442 or 444.
+    [[nodiscard]] double referencePitch() const;
+
+    Q_INVOKABLE void setReferencePitch( double p_hertz );
 
     // The rank of the current streak, as an index and as its display label.
     [[nodiscard]] int rank() const noexcept;
@@ -287,6 +315,15 @@ signals:
 
     // The player has just turned the daily reminder on or off.
     void dailyReminderChanged();
+
+    // The player has just changed the tuning.
+    void temperamentChanged();
+
+    // The player has just changed the root the tuning is heard from.
+    void tuningRootChanged();
+
+    // The player has just changed the A4 diapason.
+    void referencePitchChanged();
 
     // The player has just pressed the "test the notification" button.
     void testReminderRequested();

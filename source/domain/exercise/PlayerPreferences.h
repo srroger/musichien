@@ -15,6 +15,7 @@
 // =====================================================================================================================
 
 #include "domain/exercise/PlayerLevel.h"
+#include "domain/music/Temperament.h"
 
 #include <cstdint>
 #include <optional>
@@ -91,6 +92,32 @@ public:
     [[nodiscard]] virtual bool dailyReminderEnabled() const = 0;
 
     virtual void storeDailyReminderEnabled( bool p_enabled ) = 0;
+
+    // The TUNING the player wants to hear, and the root it is heard from.
+    //
+    // Equal temperament is the default and the reference: it is what the music around us is built on, and what an ear
+    // must learn first. The older temperaments - a chain of pure fifths, or small whole-number ratios - are an
+    // exploration, and they are only MEANINGFUL with a root note: the same interval does not sound the same in C and
+    // in F#. A setting is justified when two reasonable people want different things; here, one wants the reference
+    // and the other wants to hear what "just" means.
+    [[nodiscard]] virtual Temperament storedTemperament() const = 0;
+
+    virtual void storeTemperament( Temperament p_temperament ) = 0;
+
+    // The ROOT note the tuning is heard from. In equal temperament it is irrelevant - that is the whole point of it.
+    // In the others it is what gives every interval its meaning: a fifth above C is not built on the same reference
+    // as a fifth above F#. Stored as a note, but only its PITCH CLASS matters for tuning; the octave does not change
+    // an interval.
+    [[nodiscard]] virtual Note storedTuningRoot() const = 0;
+
+    virtual void storeTuningRoot( Note p_root ) = 0;
+
+    // The A4 diapason, in hertz. 440 is the modern reference, but whole families of instruments are built sharper on
+    // purpose - wind instruments, to sound brighter - and a tuner that cannot follow them is a tuner that only tunes
+    // pianos. Stored as a plain number.
+    [[nodiscard]] virtual double storedReferencePitch() const = 0;
+
+    virtual void storeReferencePitch( double p_hertz ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -131,6 +158,18 @@ public:
 
     void storeDailyReminderEnabled( bool p_enabled ) override { m_dailyReminderEnabled = p_enabled; }
 
+    [[nodiscard]] Temperament storedTemperament() const override { return m_temperament; }
+
+    void storeTemperament( Temperament p_temperament ) override { m_temperament = p_temperament; }
+
+    [[nodiscard]] Note storedTuningRoot() const override { return m_tuningRoot; }
+
+    void storeTuningRoot( Note p_root ) override { m_tuningRoot = p_root; }
+
+    [[nodiscard]] double storedReferencePitch() const override { return m_referencePitch; }
+
+    void storeReferencePitch( double p_hertz ) override { m_referencePitch = p_hertz; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -145,6 +184,12 @@ private:
     std::int64_t m_starCount{ 0 };
 
     bool m_dailyReminderEnabled{ false };
+
+    Temperament m_temperament{ Temperament::Equal };
+
+    Note m_tuningRoot{ 60 };
+
+    double m_referencePitch{ 440.0 };
 };
 
 }    // namespace musichien::domain

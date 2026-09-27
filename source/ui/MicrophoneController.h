@@ -21,7 +21,8 @@
 namespace musichien::domain
 {
 class PitchDetector;
-}
+class PlayerPreferences;
+}    // namespace musichien::domain
 
 namespace musichien::ui
 {
@@ -35,14 +36,24 @@ class MicrophoneController final : public QObject
     Q_PROPERTY( bool isListening READ isListening NOTIFY isListeningChanged )
     Q_PROPERTY( double detectedFrequencyHz READ detectedFrequencyHz NOTIFY detectedFrequencyHzChanged )
     Q_PROPERTY( double detectedPitchRatio READ detectedPitchRatio NOTIFY detectedPitchRatioChanged )
+    Q_PROPERTY( double detectedMidi READ detectedMidi NOTIFY detectedMidiChanged )
+    Q_PROPERTY( double detectedStaffFraction READ detectedStaffFraction NOTIFY detectedStaffFractionChanged )
     Q_PROPERTY( QString detectedNoteLabel READ detectedNoteLabel NOTIFY detectedNoteLabelChanged )
+
+    // How far the voice is from the nearest note, in cents, and how good that is. This is what turns the microphone
+    // page into a usable tuner: five cents is green, twenty is the edge of "recognisable but off".
+    Q_PROPERTY( double detectedCents READ detectedCents NOTIFY detectedCentsChanged )
+    Q_PROPERTY( int detectedTuningState READ detectedTuningState NOTIFY detectedTuningStateChanged )
 
 public:
     // Builds a detector for the input at p_deviceIndex. The index matches inputDeviceNames, and the factory is the
     // application's way of handing over a QAudioPitchDetector without this view model ever seeing Qt Multimedia.
     using DetectorFactory = std::function<std::unique_ptr<musichien::domain::PitchDetector>( int p_deviceIndex )>;
 
-    MicrophoneController( QStringList p_deviceNames, DetectorFactory p_factory, QObject * p_parent = nullptr );
+    MicrophoneController( QStringList p_deviceNames,
+                          DetectorFactory p_factory,
+                          musichien::domain::PlayerPreferences * p_preferences = nullptr,
+                          QObject * p_parent = nullptr );
 
     // Out-of-line, because the detector is only forward-declared here: the unique_ptr cannot destroy it in the
     // header where the type is still incomplete.
@@ -58,7 +69,11 @@ public:
     [[nodiscard]] bool isListening() const { return m_isListening; }
     [[nodiscard]] double detectedFrequencyHz() const { return m_detectedFrequencyHz; }
     [[nodiscard]] double detectedPitchRatio() const { return m_detectedPitchRatio; }
+    [[nodiscard]] double detectedMidi() const { return m_detectedMidi; }
+    [[nodiscard]] double detectedStaffFraction() const { return m_detectedStaffFraction; }
     [[nodiscard]] QString detectedNoteLabel() const { return m_detectedNoteLabel; }
+    [[nodiscard]] double detectedCents() const { return m_detectedCents; }
+    [[nodiscard]] int detectedTuningState() const { return m_detectedTuningState; }
 
     Q_INVOKABLE void selectDevice( int p_deviceIndex );
     Q_INVOKABLE void startTest();
@@ -69,7 +84,11 @@ signals:
     void isListeningChanged();
     void detectedFrequencyHzChanged();
     void detectedPitchRatioChanged();
+    void detectedMidiChanged();
+    void detectedStaffFractionChanged();
     void detectedNoteLabelChanged();
+    void detectedCentsChanged();
+    void detectedTuningStateChanged();
 
 private:
     void onPitch( float p_frequencyHz );
@@ -77,10 +96,15 @@ private:
 
     QStringList m_deviceNames;
     DetectorFactory m_factory;
+    musichien::domain::PlayerPreferences * m_preferences{ nullptr };
     int m_currentDeviceIndex{ 0 };
     bool m_isListening{ false };
     double m_detectedFrequencyHz{ 0.0 };
     double m_detectedPitchRatio{ 0.0 };
+    double m_detectedMidi{ 0.0 };
+    double m_detectedStaffFraction{ 0.5 };
+    double m_detectedCents{ 0.0 };
+    int m_detectedTuningState{ 0 };
     QString m_detectedNoteLabel;
     std::unique_ptr<musichien::domain::PitchDetector> m_detector;
 };

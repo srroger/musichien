@@ -21,6 +21,30 @@
         <item name="android:navigationBarColor">@color/musichien_night</item>
 
         <!--
+            THE important one. Since Android 15 (API 35) - and this application targets 36 - the status bar colour
+            above is DEPRECATED AND IGNORED: the system draws the bars transparent and lets the window paint under
+            them. What shows through is then the WINDOW BACKGROUND, which defaults to WHITE - a white strip with
+            white icons on it, exactly what Roger saw. Painting the window in the game's own night blue is what makes
+            that strip disappear into the game instead of glaring.
+        -->
+        <item name="android:windowBackground">@color/musichien_night</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+
+        <!--
+            Refuse the edge-to-edge ENFORCEMENT that Android 15 (API 35) imposes on apps targeting 35+. With it, the
+            system ignores statusBarColor and draws the bar transparent; opting out makes the two colour items above
+            work again. It is deprecated and will disappear one day, but until then it is the simplest honest fix.
+        -->
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+
+        <!--
+            And the ICONS themselves, which the XML can no longer decide on its own from Android 15 onwards. They are
+            forced at run time, from the Kotlin free side: see source/android/src/.../SystemBars.java, called by
+            infrastructure/android/AndroidSystemBars.cpp as soon as the window exists.
+        -->
+
+        <!--
             'Light' in the name of these two means a LIGHT BACKGROUND with dark icons. False is therefore what
             asks for white icons, which is what a night blue bar needs. Both need API 23 and 27, and the
             project requires 28: no version guard is needed anywhere.

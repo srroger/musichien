@@ -15,6 +15,7 @@ enum class AnecdoteKind
 {
     Lore,         // the world, the dog, the story
     Tip,          // how to train, how to play
+    Coaching,     // how to practise, and the courage to keep going
     Acoustics,    // how sound and the ear work
     History,      // composers, instruments, music history
     Theory        // a nugget of music theory

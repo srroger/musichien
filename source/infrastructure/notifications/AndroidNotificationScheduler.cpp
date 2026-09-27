@@ -39,12 +39,15 @@ void AndroidNotificationScheduler::cancelReminder()
                                         applicationContext().object() );
 }
 
-void AndroidNotificationScheduler::showReminderNow()
+void AndroidNotificationScheduler::showReminderNow( std::string_view p_content )
 {
+    const QJniObject content = QJniObject::fromString( QString::fromStdString( std::string( p_content ) ) );
+
     QJniObject::callStaticMethod<void>( "io/github/srroger/musichien/ReminderReceiver",
                                         "showReminder",
-                                        "(Landroid/content/Context;)V",
-                                        applicationContext().object() );
+                                        "(Landroid/content/Context;Ljava/lang/String;)V",
+                                        applicationContext().object(),
+                                        content.object() );
 }
 
 }    // namespace musichien::infrastructure

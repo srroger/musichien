@@ -1,6 +1,7 @@
 #include "ui/ExerciseSessionController.h"
 
 #include "domain/audio/NotePlayerFake.h"
+#include "domain/music/Temperament.h"
 
 #include <QStringList>
 #include <QVariantList>
@@ -678,6 +679,58 @@ TEST( ExerciseSessionControllerTest, the_survival_mode_keeps_its_lives )
     // Le survival, c'est l'arcade avec des vies : on garde celles du niveau, et la partie finit quand elles
     // tombent a zero.
     EXPECT_FALSE( controller.hasUnlimitedLives() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The tuning
+//
+// Only the SETTING is checked here: which temperament is heard is the audio layer's business, and it is not wired
+// yet. What matters at this level is that the choice survives, and that a value from QML that makes no sense is
+// refused instead of stored.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionControllerTest, the_tuning_is_remembered_and_stays_in_range )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    // Equal temperament by default: the reference, and what an ear has to learn first.
+    EXPECT_EQ( static_cast<int>( domain::Temperament::Equal ), controller.temperament() );
+
+    controller.setTemperament( static_cast<int>( domain::Temperament::Pythagorean ) );
+
+    EXPECT_EQ( static_cast<int>( domain::Temperament::Pythagorean ), controller.temperament() );
+    EXPECT_EQ( domain::Temperament::Pythagorean, levelStore.storedTemperament() );
+
+    // A value that makes no sense is refused, not cast into a temperament that does not exist.
+    controller.setTemperament( 99 );
+
+    EXPECT_EQ( static_cast<int>( domain::Temperament::Pythagorean ), controller.temperament() );
+
+    // And the names a screen shows come from the domain, one per temperament.
+    EXPECT_EQ( static_cast<int>( domain::TEMPERAMENT_NAMES.size() ), controller.temperaments().size() );
+
+    // The root the tuning is heard from is remembered too, and it is a pitch class - C is 0, G is 7.
+    controller.setTuningRoot( 7 );
+
+    EXPECT_EQ( 7, controller.tuningRoot() );
+    EXPECT_EQ( 7, levelStore.storedTuningRoot().pitchClassIndex() );
+
+    controller.setTuningRoot( 99 );
+
+    EXPECT_EQ( 7, controller.tuningRoot() );
+
+    // The diapason is remembered too, and a value that makes no sense is refused.
+    controller.setReferencePitch( 442.0 );
+
+    EXPECT_EQ( 442.0, controller.referencePitch() );
+    EXPECT_EQ( 442.0, levelStore.storedReferencePitch() );
+
+    controller.setReferencePitch( 999.0 );
+
+    EXPECT_EQ( 442.0, controller.referencePitch() );
 }
 
 }    // namespace musichien::ui

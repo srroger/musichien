@@ -90,9 +90,9 @@ else
 
     set +e
 
-    # AndroidNotificationScheduler.cpp is excluded: it is compiled ONLY on Android, and its JNI headers do not
-    # exist on the desktop. clang-tidy would otherwise fail on a file it cannot parse here.
-    find source -type f -name '*.cpp' ! -name '*_test.cpp' ! -name 'AndroidNotificationScheduler.cpp' -print0 |
+    # AndroidNotificationScheduler.cpp and AndroidSystemBars.cpp are excluded: they are compiled ONLY on Android, and
+    # their JNI headers do not exist on the desktop. clang-tidy would otherwise fail on files it cannot parse here.
+    find source -type f -name '*.cpp' ! -name '*_test.cpp' ! -name 'AndroidNotificationScheduler.cpp' ! -name 'AndroidSystemBars.cpp' -print0 |
         xargs -0 -n1 -P "${TIDY_JOBS}" \
             clang-tidy -p "${PROJECT_DIR}/../Musichien-build/Clang-Debug" \
                        --config-file="${PROJECT_DIR}/.clang-tidy" > "${TIDY_LOG}" 2>&1

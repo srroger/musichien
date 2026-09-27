@@ -165,6 +165,11 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
     }
 
     impl.m_source = std::make_unique<QAudioSource>( impl.m_device, impl.m_format );
+
+    // A small buffer means small chunks. On the desktop the default is a whole second at a time, which makes the ball
+    // jump once a second instead of gliding; twenty milliseconds is the good middle ground between latency and load.
+    impl.m_source->setBufferSize( SAMPLE_RATE * static_cast<int>( sizeof( std::int16_t ) ) * 20 / 1000 );
+
     impl.m_io = impl.m_source->start();
 
     if( impl.m_io == nullptr )
