@@ -19,5 +19,23 @@
           removes a whole class of "found on the desktop, missing on the phone" bugs.
         -->
         <file alias="assets/content/interval-hints.json">../../assets/content/interval-hints.json</file>
+    <!--
+      Les echantillons d instruments : meme motif que les fichiers de contenu, alias compris,
+      pour que le chemin de ressource soit celui du disque sur le PC comme sur le telephone.
+    -->
+        <file alias="assets/soundfonts/piano_c2.wav">../../assets/soundfonts/piano_c2.wav</file>
+        <file alias="assets/soundfonts/piano_c3.wav">../../assets/soundfonts/piano_c3.wav</file>
+        <file alias="assets/soundfonts/piano_c4.wav">../../assets/soundfonts/piano_c4.wav</file>
+        <file alias="assets/soundfonts/piano_c5.wav">../../assets/soundfonts/piano_c5.wav</file>
+        <file alias="assets/soundfonts/piano_c6.wav">../../assets/soundfonts/piano_c6.wav</file>
+        <file alias="assets/soundfonts/guitare_c2.wav">../../assets/soundfonts/guitare_c2.wav</file>
+        <file alias="assets/soundfonts/guitare_c3.wav">../../assets/soundfonts/guitare_c3.wav</file>
+        <file alias="assets/soundfonts/guitare_c4.wav">../../assets/soundfonts/guitare_c4.wav</file>
+        <file alias="assets/soundfonts/guitare_c5.wav">../../assets/soundfonts/guitare_c5.wav</file>
+        <file alias="assets/soundfonts/guitare_c6.wav">../../assets/soundfonts/guitare_c6.wav</file>
+        <file alias="assets/soundfonts/saxo_c2.wav">../../assets/soundfonts/saxo_c2.wav</file>
+        <file alias="assets/soundfonts/saxo_c3.wav">../../assets/soundfonts/saxo_c3.wav</file>
+        <file alias="assets/soundfonts/saxo_c4.wav">../../assets/soundfonts/saxo_c4.wav</file>
+        <file alias="assets/soundfonts/saxo_c5.wav">../../assets/soundfonts/saxo_c5.wav</file>
     </qresource>
 </RCC>

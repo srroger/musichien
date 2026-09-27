@@ -20,8 +20,11 @@
 #include <QUrl>
 #include <QtQml>
 
+#include <array>
 #include <iostream>
+#include <optional>
 #include <string_view>
+#include <vector>
 
 namespace
 {
@@ -70,6 +73,53 @@ constexpr const char * INTERVAL_HINTS_RESOURCE = ":/assets/content/interval-hint
     return hintBook;
 }
 
+// Reads ONE sampled instrument from the embedded wave files.
+//
+// Five recorded notes an octave apart, and the sampler picks the closest one: that is enough for the whole
+// range, because the transposition never goes past three semitones. The list of notes is written here rather
+// than guessed from the file names, so that renaming a file cannot silently move a note.
+//
+// A missing note costs that note and nothing else: the instrument works with what it has, and three notes are
+// still an instrument. Nothing about a missing sample is worth refusing to start over.
+[[nodiscard]] musichien::domain::SampledInstrument loadInstrument( const QString & p_instrumentName )
+{
+    constexpr std::array<std::int32_t, 5> ROOT_MIDI_NUMBERS{ 36, 48, 60, 72, 84 };
+    constexpr std::array<const char *, 5> NOTE_NAMES{ "c2", "c3", "c4", "c5", "c6" };
+
+    musichien::domain::SampledInstrument instrument;
+
+    for( std::size_t noteIndex = 0; noteIndex < ROOT_MIDI_NUMBERS.size(); ++noteIndex )
+    {
+        QFile sampleFile{ QStringLiteral( ":/assets/soundfonts/%1_%2.wav" )
+                            .arg( p_instrumentName, QString::fromLatin1( NOTE_NAMES.at( noteIndex ) ) ) };
+
+        if( !sampleFile.open( QIODevice::ReadOnly ) )
+        {
+            continue;
+        }
+
+        const QByteArray content = sampleFile.readAll();
+
+        // The bytes of a Qt array read as bytes: the sampler understands a FORMAT, not a file.
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        const std::span<const std::byte> bytes{ reinterpret_cast<const std::byte *>( content.constData() ),
+                                                static_cast<std::size_t>( content.size() ) };
+
+        const std::optional<musichien::domain::SampledNote> note =
+          musichien::domain::sampledNoteFromWave( bytes, ROOT_MIDI_NUMBERS.at( noteIndex ) );
+
+        if( note.has_value() )
+        {
+            instrument.addNote( *note );
+        }
+    }
+
+    return instrument;
+}
+
+// The instruments the game plays with, in the order they are offered.
+constexpr std::array<const char *, 3> INSTRUMENT_NAMES{ "piano", "guitare", "saxo" };
+
 }    // namespace
 
 int main( int p_argumentCount, char * p_arguments[] )
@@ -107,6 +157,25 @@ int main( int p_argumentCount, char * p_arguments[] )
     // What the application remembers about its player. A small settings file, on the device: the package
     // cannot reach the network, so nothing about him ever leaves the phone.
     musichien::infrastructure::QSettingsPlayerLevelStore playerLevelStore;
+
+    // The sampled instruments, embedded in the resources. From here on they are the sound of the EXERCISES; the
+    // synthesiser keeps the mistake cue, which must not be beautiful, and stays the fallback if a sample is
+    // missing.
+    std::vector<musichien::domain::SampledInstrument> instruments;
+
+    for( const char * instrumentName : INSTRUMENT_NAMES )
+    {
+        musichien::domain::SampledInstrument instrument = loadInstrument( QString::fromLatin1( instrumentName ) );
+
+        if( !instrument.isEmpty() )
+        {
+            instruments.push_back( std::move( instrument ) );
+        }
+    }
+
+    std::cerr << "Musichien: " << instruments.size() << " sampled instrument(s)\n";
+
+    notePlayer.useInstruments( std::move( instruments ) );
 
     // Opening the output now, rather than at the first note, means a machine without a sound card is
     // reported at start up instead of silently refusing to play in the middle of an exercise.

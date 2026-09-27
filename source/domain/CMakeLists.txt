@@ -22,6 +22,8 @@ musichienFunction_AddLibrary(domain
     audio/NotePlayerFake.h
     audio/ToneSynthesizer.h
     audio/ToneSynthesizer.cpp
+    audio/SampledInstrument.h
+    audio/SampledInstrument.cpp
 
     # The exercise loop, as pure rules: no sound, no clock, no screen
     exercise/AnswerGrid.h
