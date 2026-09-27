@@ -49,6 +49,9 @@ public:
     void playNote( const domain::Note & p_note ) override;
     void playMelody( std::span<const domain::Note> p_notes, std::chrono::milliseconds p_gap ) override;
     void playChord( std::span<const domain::Note> p_notes ) override;
+
+    // The sustained chord: the same notes, held for the given duration, so the beating between them can be counted.
+    void playChordFor( std::span<const domain::Note> p_notes, std::chrono::milliseconds p_duration ) override;
     void playMistakeCue() override;
 
     // Le clic de menu : un accuse de reception, pas une reponse.
@@ -79,10 +82,11 @@ public:
     // colour. The day the player chooses his instrument explicitly, this becomes a preference - the drawing here
     // is what makes the variety exist in the meantime.
     //
-    // Passing an empty list is legal and means "no samples". p_sineEnabled asks for the PURE SINE as an additional
-    // timbre: it joins the drawing, so an exercise can be heard with nothing but the fundamental. With no samples and
-    // no sine, the synthesiser (the struck string) plays everything.
-    void useInstruments( std::vector<domain::SampledInstrument> p_instruments, bool p_sineEnabled );
+    // Passing an empty list is legal and means "no samples". p_waveforms lists the PURE WAVEFORMS (sine, sawtooth,
+    // square) that join the drawing as additional timbres, so an exercise can be heard with a controlled spectrum.
+    // With no samples and no waveform, the synthesiser (the struck string) plays everything.
+    void useInstruments( std::vector<domain::SampledInstrument> p_instruments,
+                         std::vector<domain::Waveform> p_waveforms );
 
     [[nodiscard]] std::chrono::milliseconds noteDuration() const override;
 
@@ -136,10 +140,10 @@ private:
     // The sampled instruments, empty when there are none.
     std::vector<domain::SampledInstrument> m_instruments;
 
-    // True when the pure sine joins the drawing.
-    bool m_sineEnabled{ false };
+    // The pure waveforms that join the drawing, empty when there are none.
+    std::vector<domain::Waveform> m_waveforms;
 
-    // The drawn timbre: an index into m_instruments, or m_instruments.size() for the sine.
+    // The drawn timbre: an index into m_instruments, or m_instruments.size() + a waveform index.
     std::size_t m_instrumentIndex{ 0 };
 
     // What was played last, which is how "the same question" is recognised.

@@ -377,20 +377,46 @@ std::vector<float> ToneSynthesizer::renderMelody( std::span<const Note> p_notes,
     return melodySamples;
 }
 
-std::vector<float> ToneSynthesizer::renderSineNote( const Note & p_note,
+// One sample of a pure waveform at a given phase (a fraction of a cycle, 0 to 1).
+//
+// The three spectra are the POINT: the sine has no harmonic, the sawtooth has every harmonic falling as 1/n, the
+// square only the odd ones. They are the honest tools for hearing a temperament, because nothing else is in the way.
+[[nodiscard]] float waveformSample( Waveform p_waveform, double p_phase ) noexcept
+{
+    const double cycle = p_phase - std::floor( p_phase );
+
+    switch( p_waveform )
+    {
+        case Waveform::Sine:
+            return static_cast<float>( std::sin( 2.0 * std::numbers::pi * cycle ) );
+
+        case Waveform::Sawtooth:
+            return static_cast<float>( ( 2.0 * cycle ) - 1.0 );
+
+        case Waveform::Square:
+            return ( cycle < 0.5 ) ? 1.0F : -1.0F;
+    }
+
+    return 0.0F;
+}
+
+std::vector<float> ToneSynthesizer::renderWaveNote( const Note & p_note,
+                                                    Waveform p_waveform,
                                                     std::chrono::milliseconds p_duration,
                                                     TuningContext p_tuning ) const
 {
-    return renderSineNoteAt( p_note,
+    return renderWaveNoteAt( p_note,
                              frequencyFor( p_note,
                                            p_note,
                                            p_tuning.temperament,
                                            p_tuning.referencePitchHz ),
+                             p_waveform,
                              p_duration );
 }
 
-std::vector<float> ToneSynthesizer::renderSineNoteAt( const Note & p_note,
+std::vector<float> ToneSynthesizer::renderWaveNoteAt( const Note & p_note,
                                                       double p_frequencyHz,
+                                                      Waveform p_waveform,
                                                       std::chrono::milliseconds p_duration ) const
 {
     const std::size_t sampleCount = sampleCountFor( p_duration );
@@ -402,16 +428,16 @@ std::vector<float> ToneSynthesizer::renderSineNoteAt( const Note & p_note,
         return samples;
     }
 
-    const double angularFrequency =
-      ( 2.0 * std::numbers::pi * p_frequencyHz ) / static_cast<double>( m_sampleRate );
+    const double cyclesPerSample = p_frequencyHz / static_cast<double>( m_sampleRate );
 
     for( const std::size_t sampleIndex : std::views::iota( std::size_t{ 0 }, sampleCount ) )
     {
         samples.at( sampleIndex ) =
-          static_cast<float>( std::sin( angularFrequency * static_cast<double>( sampleIndex ) ) );
+          waveformSample( p_waveform, cyclesPerSample * static_cast<double>( sampleIndex ) );
     }
 
-    // No hammer: the sine starts with a short fade to remove the click, and ends with the same release as every note.
+    // No hammer: the waveform starts with a short fade to remove the click, and ends with the same release as every
+    // note. The sawtooth and the square are discontinuous, so the fade is what keeps the attack from clicking.
     applyEnvelope( samples, STRIKE_ATTACK_DURATION, RELEASE_DURATION );
 
     normaliseOnsetEnergyTo( samples, TARGET_RMS_AMPLITUDE, NOTE_ONSET_DURATION );
@@ -419,7 +445,8 @@ std::vector<float> ToneSynthesizer::renderSineNoteAt( const Note & p_note,
     return samples;
 }
 
-std::vector<float> ToneSynthesizer::renderSineChord( std::span<const Note> p_notes,
+std::vector<float> ToneSynthesizer::renderWaveChord( std::span<const Note> p_notes,
+                                                     Waveform p_waveform,
                                                      std::chrono::milliseconds p_duration,
                                                      TuningContext p_tuning ) const
 {
@@ -436,8 +463,8 @@ std::vector<float> ToneSynthesizer::renderSineChord( std::span<const Note> p_not
 
     for( const Note & note : p_notes )
     {
-        const std::vector<float> noteSamples =
-          renderSineNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_duration );
+        const std::vector<float> noteSamples = renderWaveNoteAt(
+          note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_waveform, p_duration );
 
         std::ranges::transform( noteSamples, mixedSamples, mixedSamples.begin(), std::plus<>{} );
     }
@@ -447,7 +474,8 @@ std::vector<float> ToneSynthesizer::renderSineChord( std::span<const Note> p_not
     return mixedSamples;
 }
 
-std::vector<float> ToneSynthesizer::renderSineMelody( std::span<const Note> p_notes,
+std::vector<float> ToneSynthesizer::renderWaveMelody( std::span<const Note> p_notes,
+                                                      Waveform p_waveform,
                                                       std::chrono::milliseconds p_noteDuration,
                                                       std::chrono::milliseconds p_gap,
                                                       TuningContext p_tuning ) const
@@ -467,8 +495,8 @@ std::vector<float> ToneSynthesizer::renderSineMelody( std::span<const Note> p_no
 
     for( const Note & note : p_notes )
     {
-        const std::vector<float> noteSamples =
-          renderSineNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_noteDuration );
+        const std::vector<float> noteSamples = renderWaveNoteAt(
+          note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_waveform, p_noteDuration );
 
         melodySamples.insert( melodySamples.end(), noteSamples.begin(), noteSamples.end() );
 

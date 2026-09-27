@@ -65,6 +65,10 @@ public:
     // Plays a single note: the very first thing a beginner learns to recognise.
     Q_INVOKABLE void playSingleNote();
 
+    // Plays the interval as a SUSTAINED chord, six seconds long: long enough for the ear to count the beating
+    // between the two frequencies, which is exactly how a temperament difference becomes audible.
+    Q_INVOKABLE void playSustainedInterval( int p_semitones );
+
     // Stops every sound. Called when the screen is left: an audio stream left open on a phone drains
     // the battery.
     Q_INVOKABLE void stopPlayback();

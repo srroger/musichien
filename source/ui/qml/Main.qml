@@ -449,6 +449,16 @@ ApplicationWindow {
                     Layout.preferredHeight: 10
                 }
 
+                // Le bouton qui tient l'accord six secondes : c'est le temps qu'il faut a l'oreille pour compter les
+                // battements entre deux frequences, et donc pour ENTENDRE ce qu'un temperament change. Il rejoue
+                // l'intervalle entendu en dernier, les deux notes ensemble.
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    enabled: mainWindow.hasHeardInterval
+                    text: qsTr("Tenir 6 s (battements)")
+                    onClicked: IntervalController.playSustainedInterval(mainWindow.heardInterval.semitones)
+                }
+
                 Text {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true

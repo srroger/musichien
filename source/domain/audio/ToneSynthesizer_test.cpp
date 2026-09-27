@@ -448,7 +448,7 @@ TEST( ToneSynthesizerTest, the_sine_is_the_pure_fundamental )
     const Note note{ 69 };    // A4
 
     const std::vector<float> sine =
-      synthesizer.renderSineNote( note, std::chrono::milliseconds{ 1000 } );
+      synthesizer.renderWaveNote( note, Waveform::Sine, std::chrono::milliseconds{ 1000 } );
 
     EXPECT_NEAR( note.frequencyHz(),
                  measuredFrequency( sine, note.frequencyHz() ),
@@ -460,6 +460,33 @@ TEST( ToneSynthesizerTest, the_sine_is_the_pure_fundamental )
     const double secondHarmonicEnergy = energyAtFrequency( sine, note.frequencyHz() * 2.0 );
 
     EXPECT_GT( fundamentalEnergy, secondHarmonicEnergy * 1000.0 );
+}
+
+TEST( ToneSynthesizerTest, the_sawtooth_and_square_carry_the_harmonics_they_should )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const Note note{ 69 };    // A4
+
+    const std::vector<float> sawtooth =
+      synthesizer.renderWaveNote( note, Waveform::Sawtooth, std::chrono::milliseconds{ 1000 } );
+
+    const std::vector<float> square =
+      synthesizer.renderWaveNote( note, Waveform::Square, std::chrono::milliseconds{ 1000 } );
+
+    // The sawtooth has EVERY harmonic, including the second.
+    const double sawFundamental = energyAtFrequency( sawtooth, note.frequencyHz() );
+    const double sawSecond = energyAtFrequency( sawtooth, note.frequencyHz() * 2.0 );
+
+    EXPECT_GT( sawSecond, sawFundamental * 0.01 );
+
+    // The square has only the ODD harmonics: the second is missing, the third is strong.
+    const double squareFundamental = energyAtFrequency( square, note.frequencyHz() );
+    const double squareSecond = energyAtFrequency( square, note.frequencyHz() * 2.0 );
+    const double squareThird = energyAtFrequency( square, note.frequencyHz() * 3.0 );
+
+    EXPECT_LT( squareSecond, squareFundamental * 0.01 );
+    EXPECT_GT( squareThird, squareFundamental * 0.01 );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

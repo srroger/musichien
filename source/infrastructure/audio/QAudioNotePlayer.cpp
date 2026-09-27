@@ -244,11 +244,25 @@ void QAudioNotePlayer::playChord( std::span<const domain::Note> p_notes )
     playSamples( renderChordFor( p_notes, noteDuration() ) );
 }
 
-void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_instruments, bool p_sineEnabled )
+void QAudioNotePlayer::playChordFor( std::span<const domain::Note> p_notes,
+                                     std::chrono::milliseconds p_duration )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    playSamples( renderChordFor( p_notes, p_duration ) );
+}
+
+void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_instruments,
+                                       std::vector<domain::Waveform> p_waveforms )
 {
     m_instruments = std::move( p_instruments );
 
-    m_sineEnabled = p_sineEnabled;
+    m_waveforms = std::move( p_waveforms );
 
     m_instrumentIndex = 0;
 
@@ -257,7 +271,7 @@ void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_
 
 std::size_t QAudioNotePlayer::timbreIndexFor( std::span<const domain::Note> p_notes )
 {
-    const std::size_t timbreCount = m_instruments.size() + ( m_sineEnabled ? 1U : 0U );
+    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
 
     // The same question is the same NOTES, whatever order the melody played them in: a falling fifth and its
     // feedback chord share the same two notes. Comparing them as an ORDERED sequence would re-draw the instrument
@@ -282,7 +296,7 @@ std::vector<float> QAudioNotePlayer::renderNoteFor( std::span<const domain::Note
                                                     const domain::Note & p_note,
                                                     std::chrono::milliseconds p_duration )
 {
-    const std::size_t timbreCount = m_instruments.size() + ( m_sineEnabled ? 1U : 0U );
+    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
 
     if( timbreCount == 0 )
     {
@@ -296,13 +310,13 @@ std::vector<float> QAudioNotePlayer::renderNoteFor( std::span<const domain::Note
         return m_instruments.at( index ).renderNote( p_note, p_duration, m_audioFormat.sampleRate(), m_tuning );
     }
 
-    return m_synthesizer->renderSineNote( p_note, p_duration, m_tuning );
+    return m_synthesizer->renderWaveNote( p_note, m_waveforms.at( index - m_instruments.size() ), p_duration, m_tuning );
 }
 
 std::vector<float> QAudioNotePlayer::renderChordFor( std::span<const domain::Note> p_notes,
                                                      std::chrono::milliseconds p_duration )
 {
-    const std::size_t timbreCount = m_instruments.size() + ( m_sineEnabled ? 1U : 0U );
+    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
 
     if( timbreCount == 0 )
     {
@@ -316,14 +330,17 @@ std::vector<float> QAudioNotePlayer::renderChordFor( std::span<const domain::Not
         return m_instruments.at( index ).renderChord( p_notes, p_duration, m_audioFormat.sampleRate(), m_tuning );
     }
 
-    return m_synthesizer->renderSineChord( p_notes, p_duration, m_tuning );
+    return m_synthesizer->renderWaveChord( p_notes,
+                                           m_waveforms.at( index - m_instruments.size() ),
+                                           p_duration,
+                                           m_tuning );
 }
 
 std::vector<float> QAudioNotePlayer::renderMelodyFor( std::span<const domain::Note> p_notes,
                                                       std::chrono::milliseconds p_noteDuration,
                                                       std::chrono::milliseconds p_gap )
 {
-    const std::size_t timbreCount = m_instruments.size() + ( m_sineEnabled ? 1U : 0U );
+    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
 
     if( timbreCount == 0 )
     {
@@ -341,7 +358,11 @@ std::vector<float> QAudioNotePlayer::renderMelodyFor( std::span<const domain::No
                                                        m_tuning );
     }
 
-    return m_synthesizer->renderSineMelody( p_notes, p_noteDuration, p_gap, m_tuning );
+    return m_synthesizer->renderWaveMelody( p_notes,
+                                            m_waveforms.at( index - m_instruments.size() ),
+                                            p_noteDuration,
+                                            p_gap,
+                                            m_tuning );
 }
 
 void QAudioNotePlayer::playMistakeCue()

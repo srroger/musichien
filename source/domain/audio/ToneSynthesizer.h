@@ -42,6 +42,17 @@
 namespace musichien::domain
 {
 
+// The pure waveforms the synthesiser can render as instruments. Unlike the struck string, they carry a CONTROLLED
+// spectrum: the sine has no harmonic, the sawtooth has every harmonic (falling as 1/n), the square only the odd
+// ones. That is what makes them the honest tools for hearing a temperament - the beating of two simple spectra
+// leaves nothing else to listen to, and the ear can actually count it.
+enum class Waveform
+{
+    Sine,        // the fundamental only
+    Sawtooth,    // every harmonic, falling as 1/n
+    Square       // the odd harmonics only, falling as 1/n
+};
+
 class ToneSynthesizer
 {
 public:
@@ -137,18 +148,20 @@ public:
                                                    std::chrono::milliseconds p_gap,
                                                    TuningContext p_tuning = {} ) const;
 
-    // The SAME three calls, but for a PURE SINE wave: the fundamental only, no harmonics, no detuned strings. That is
-    // the sound an ear needs to judge a temperament - two pure frequencies beating against each other leave nothing
-    // else to listen to. A sine has no hammer either, so its attack is a short fade rather than a strike.
-    [[nodiscard]] std::vector<float> renderSineNote( const Note & p_note,
+    // The SAME three calls, but for a PURE WAVEFORM: a controlled spectrum instead of the struck string. See Waveform.
+    // No hammer either: the attack is a short fade rather than a strike.
+    [[nodiscard]] std::vector<float> renderWaveNote( const Note & p_note,
+                                                     Waveform p_waveform,
                                                      std::chrono::milliseconds p_duration,
                                                      TuningContext p_tuning = {} ) const;
 
-    [[nodiscard]] std::vector<float> renderSineChord( std::span<const Note> p_notes,
+    [[nodiscard]] std::vector<float> renderWaveChord( std::span<const Note> p_notes,
+                                                      Waveform p_waveform,
                                                       std::chrono::milliseconds p_duration,
                                                       TuningContext p_tuning = {} ) const;
 
-    [[nodiscard]] std::vector<float> renderSineMelody( std::span<const Note> p_notes,
+    [[nodiscard]] std::vector<float> renderWaveMelody( std::span<const Note> p_notes,
+                                                       Waveform p_waveform,
                                                        std::chrono::milliseconds p_noteDuration,
                                                        std::chrono::milliseconds p_gap,
                                                        TuningContext p_tuning = {} ) const;
@@ -160,9 +173,10 @@ private:
                                                    double p_frequencyHz,
                                                    std::chrono::milliseconds p_duration ) const;
 
-    // The pure-sine counterpart of renderNoteAt.
-    [[nodiscard]] std::vector<float> renderSineNoteAt( const Note & p_note,
+    // The pure-waveform counterpart of renderNoteAt.
+    [[nodiscard]] std::vector<float> renderWaveNoteAt( const Note & p_note,
                                                        double p_frequencyHz,
+                                                       Waveform p_waveform,
                                                        std::chrono::milliseconds p_duration ) const;
 
     // Adds ONE struck string to a buffer, without touching its level: mixing, enveloping and normalising

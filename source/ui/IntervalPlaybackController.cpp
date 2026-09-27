@@ -117,6 +117,20 @@ void IntervalPlaybackController::playSingleNote()
     setLastPlayedInterval( QVariantMap{} );
 }
 
+void IntervalPlaybackController::playSustainedInterval( int p_semitones )
+{
+    const domain::Note rootNote{ ROOT_MIDI_NUMBER };
+    const domain::Note upperNote = rootNote.transposedBy( p_semitones );
+
+    const std::array<domain::Note, 2> notes{ rootNote, upperNote };
+
+    // Six seconds, played TOGETHER: the two frequencies beat against each other, and the beating is what the ear
+    // uses to hear a temperament. A short chord does not give the ear time to count it.
+    m_notePlayer.playChordFor( notes, std::chrono::seconds{ 6 } );
+
+    setLastPlayedInterval( describeInterval( domain::intervalBetween( rootNote, upperNote ) ) );
+}
+
 void IntervalPlaybackController::stopPlayback()
 {
     m_notePlayer.stopAll();

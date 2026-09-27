@@ -40,17 +40,22 @@
 namespace musichien::domain
 {
 
-// The sampled instruments the game can play, and the ORDER they are loaded in.
+// The instruments the game can play, and the ORDER they are loaded in.
 //
 // That order is a contract, not a detail: a preference is stored as one flag per instrument, so an instrument
 // inserted in the middle would silently exchange the choices the player made. New instruments go LAST.
 //
-// The SINE is the one instrument that is not a sample: it is the pure fundamental, with no harmonics, and it exists
-// so that a change of temperament can be HEARD for what it is - two pure frequencies whose beating says whether an
-// interval is pure. It is offered in the same list, and rendered by the synthesiser, not by a recording.
-inline constexpr std::size_t INSTRUMENT_COUNT = 4;
+// The last three are NOT samples: they are the pure waveforms the synthesiser renders (see Waveform), offered so
+// that a change of temperament can be HEARD for what it is. They are listed here so that the settings screen offers
+// them exactly like a recording.
+inline constexpr std::size_t INSTRUMENT_COUNT = 6;
 
-inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{ "piano", "guitare", "saxo", "sinusoïdal" };
+inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{
+  "piano", "guitare", "saxo", "sinusoïdal", "dent de scie", "carré" };
+
+// The waveforms offered as instruments, in the same order as their names at the end of INSTRUMENT_NAMES. The adapter
+// maps the corresponding flags onto this list.
+inline constexpr std::array<Waveform, 3> WAVEFORM_INSTRUMENTS{ Waveform::Sine, Waveform::Sawtooth, Waveform::Square };
 
 // One recorded note: its samples, the note they were recorded at, and the rate they were recorded at.
 struct SampledNote

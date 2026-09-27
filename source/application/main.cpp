@@ -236,7 +236,7 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     std::cerr << "Musichien: " << instruments.size() << " sampled instrument(s)\n";
 
-    notePlayer.useInstruments( instruments, false );
+    notePlayer.useInstruments( instruments, {} );
 
     // Opening the output now, rather than at the first note, means a machine without a sound card is
     // reported at start up instead of silently refusing to play in the middle of an exercise.
@@ -322,11 +322,21 @@ int main( int p_argumentCount, char * p_arguments[] )
             }
         }
 
-        // The sine is the ONE instrument that is not a sample: it is the last flag, and it asks the adapter to
-        // render the pure fundamental instead of a recording.
-        const bool sineEnabled = ( enabled.size() > instruments.size() ) && enabled.at( instruments.size() );
+        // The waveforms are the instruments that are NOT samples: the flags after the sampled ones ask the adapter
+        // to render a pure spectrum (sine, sawtooth, square) instead of a recording.
+        std::vector<musichien::domain::Waveform> wantedWaveforms;
 
-        notePlayer.useInstruments( std::move( wantedInstruments ), sineEnabled );
+        for( std::size_t waveformIndex = 0; waveformIndex < musichien::domain::WAVEFORM_INSTRUMENTS.size(); ++waveformIndex )
+        {
+            const std::size_t flagIndex = instruments.size() + waveformIndex;
+
+            if( ( flagIndex >= enabled.size() ) || enabled.at( flagIndex ) )
+            {
+                wantedWaveforms.push_back( musichien::domain::WAVEFORM_INSTRUMENTS.at( waveformIndex ) );
+            }
+        }
+
+        notePlayer.useInstruments( std::move( wantedInstruments ), std::move( wantedWaveforms ) );
     };
 
     QObject::connect( &exerciseController,

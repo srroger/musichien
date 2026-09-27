@@ -43,6 +43,16 @@ public:
     // Plays the notes at the same time, the way a harmonic interval or a chord is heard.
     virtual void playChord( std::span<const Note> p_notes ) = 0;
 
+    // Plays the notes together for an EXPLICIT duration: the long, sustained chord that lets the ear count the
+    // beating between two frequencies - which is exactly how a temperament difference is heard. The regular
+    // playChord uses the natural note duration.
+    //
+    // A default body, like playTapCue: an adapter that has no use for a sustained chord keeps the natural duration.
+    virtual void playChordFor( std::span<const Note> p_notes, std::chrono::milliseconds p_duration )
+    {
+        playChord( p_notes );
+    }
+
     // Plays the short cue that marks a mistake.
     //
     // A cue is NOT an interval, and the domain says so here rather than leaving the distinction to the
