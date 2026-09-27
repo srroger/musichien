@@ -666,4 +666,16 @@ TEST( ExerciseSessionControllerTest, the_infinite_mode_has_no_lives )
     EXPECT_TRUE( controller.hasUnlimitedLives() );
 }
 
+TEST( ExerciseSessionControllerTest, the_survival_mode_keeps_its_lives )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
+
+    controller.startSurvivalSession();
+
+    // Le survival, c'est l'arcade avec des vies : on garde celles du niveau, et la partie finit quand elles
+    // tombent a zero.
+    EXPECT_FALSE( controller.hasUnlimitedLives() );
+}
+
 }    // namespace musichien::ui

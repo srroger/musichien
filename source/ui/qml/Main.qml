@@ -252,6 +252,14 @@ ApplicationWindow {
                     onClicked: ExerciseController.startInfiniteSession()
                 }
 
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 48
+                    text: qsTr("Survie")
+                    onClicked: ExerciseController.startSurvivalSession()
+                }
+
                 Item {
                     Layout.preferredHeight: 6
                 }
@@ -513,11 +521,13 @@ ApplicationWindow {
                     checked: modelData.enabled
                     onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
 
-                    // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre.
+                    // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre. Le leftPadding
+                    // remet le texte a droite de la case, sinon il se pose par-dessus l'indicateur.
                     contentItem: Text {
                         text: parent.text
                         color: "#e8dcff"
                         verticalAlignment: Text.AlignVCenter
+                        leftPadding: parent.indicator.width + parent.spacing
                         font.pixelSize: 15
                     }
 
@@ -535,9 +545,20 @@ ApplicationWindow {
                     text: parent.text
                     color: "#e8dcff"
                     verticalAlignment: Text.AlignVCenter
+                    leftPadding: parent.indicator.width + parent.spacing
                     font.pixelSize: 15
                 }
 
+            }
+
+            // Le compte a rebours, juste sous la case qui l'active : impossible de le manquer, et c'est la que le
+            // joueur le cherche.
+            Text {
+                Layout.fillWidth: true
+                color: "#8ef2b0"
+                font.pixelSize: 13
+                visible: ExerciseController.dailyReminderEnabled
+                text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
             }
 
             Button {

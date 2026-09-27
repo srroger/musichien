@@ -72,7 +72,17 @@ int ExerciseSessionController::questionNumber() const noexcept
 
 int ExerciseSessionController::questionCount() const noexcept
 {
-    return ( m_session != nullptr ) ? static_cast<int>( m_session->settings().questionCount ) : 0;
+    if( m_session == nullptr )
+    {
+        return 0;
+    }
+
+    // Le mode infini met le nombre de questions a la limite de size_t : le convertir en int le fait retomber sur
+    // -1, que l'ecran afficherait tel quel. On le traduit en une sentinelle propre, que l'ecran lit comme "sans
+    // fin".
+    const std::size_t total = m_session->settings().questionCount;
+
+    return ( total > static_cast<std::size_t>( std::numeric_limits<int>::max() ) ) ? -1 : static_cast<int>( total );
 }
 
 QVariantList ExerciseSessionController::gridPositions() const
@@ -395,6 +405,17 @@ void ExerciseSessionController::startInfiniteSession()
     // Le mode infini, c'est le mode qui ne s'arrete jamais : pas de vies, pas de fin, juste enchaner. Une erreur
     // coute du rythme - la serie retombe - mais jamais la partie.
     settings.lives = std::nullopt;
+    settings.questionCount = std::numeric_limits<std::size_t>::max();
+
+    beginSession( settings );
+}
+
+void ExerciseSessionController::startSurvivalSession()
+{
+    domain::SessionSettings settings = m_settings;
+
+    // Le survival, c'est l'arcade avec des vies : un nombre de questions sans fin, et la partie s'arrete quand les
+    // vies tombent a zero. Les vies restent donc celles du niveau, pas un retour en arriere vers "illimite".
     settings.questionCount = std::numeric_limits<std::size_t>::max();
 
     beginSession( settings );

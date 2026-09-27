@@ -194,7 +194,7 @@ Item {
                 Layout.fillWidth: true
 
                 Text {
-                    text: qsTr("%1 / %2").arg(ExerciseController.questionNumber).arg(ExerciseController.questionCount)
+                    text: ExerciseController.questionCount < 0 ? qsTr("%1 / ∞").arg(ExerciseController.questionNumber) : qsTr("%1 / %2").arg(ExerciseController.questionNumber).arg(ExerciseController.questionCount)
                     color: "#cbb8e8"
                     font.pixelSize: 15
                 }

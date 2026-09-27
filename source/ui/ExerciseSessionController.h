@@ -218,6 +218,9 @@ public:
     // not the game.
     Q_INVOKABLE void startInfiniteSession();
 
+    // Starts the survival mode: endless, but with lives - the game ends when they run out.
+    Q_INVOKABLE void startSurvivalSession();
+
     // The player asks to hear the interval again. Counted by the session, played here.
     Q_INVOKABLE void replay();
 
