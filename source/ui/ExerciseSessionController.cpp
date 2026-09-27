@@ -227,7 +227,7 @@ QVariantList ExerciseSessionController::instruments() const
         // A list shorter than the instruments this build knows about means "everything": a first run must sound
         // complete, not empty.
         instrument.insert( QStringLiteral( "enabled" ),
-                           ( index < m_enabledInstruments.size() ) ? m_enabledInstruments.at( index ) : true );
+                           std::cmp_less( index, m_enabledInstruments.size() ) ? m_enabledInstruments.at( index ) : true );
 
         instruments.append( instrument );
     }
@@ -244,7 +244,7 @@ void ExerciseSessionController::setInstrumentEnabled( int p_index, bool p_isEnab
         return;
     }
 
-    if( static_cast<std::size_t>( p_index ) >= domain::INSTRUMENT_COUNT )
+    if( std::cmp_greater_equal( p_index, domain::INSTRUMENT_COUNT ) )
     {
         return;
     }

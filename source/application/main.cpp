@@ -239,11 +239,11 @@ int main( int p_argumentCount, char * p_arguments[] )
     // moteur, donc trois notes feraient déjà deux secondes. L'arpège viendra le jour où la durée d'une note
     // deviendra un réglage.
     {
-        const std::array<musichien::domain::Note, 3> GREETING_CHORD{ musichien::domain::Note{ 72 },
-                                                                     musichien::domain::Note{ 76 },
-                                                                     musichien::domain::Note{ 79 } };
+        const std::array<musichien::domain::Note, 3> greetingChord{ musichien::domain::Note{ 72 },
+                                                                    musichien::domain::Note{ 76 },
+                                                                    musichien::domain::Note{ 79 } };
 
-        notePlayer.playChord( GREETING_CHORD );
+        notePlayer.playChord( greetingChord );
     }
 
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
