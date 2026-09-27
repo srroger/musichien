@@ -126,12 +126,12 @@ public:
     [[nodiscard]] int questionKind() const noexcept;
 
     // The name the player gave himself, empty before the first time he writes one.
-    QString playerName() const;
+    [[nodiscard]] QString playerName() const;
 
     void setPlayerName( const QString & p_name );
 
     // Experience earned across every session, remembered between launches.
-    int totalExperience() const;
+    [[nodiscard]] int totalExperience() const;
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
