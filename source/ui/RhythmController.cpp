@@ -15,9 +15,9 @@ constexpr int MAXIMUM_BPM = 300;
 constexpr int MINIMUM_BEATS_PER_BAR = 1;
 constexpr int MAXIMUM_BEATS_PER_BAR = 12;
 
-// Two taps define a tempo when the gap between them is a believable beat: at least 200 ms (300 bpm) and at most
-// two seconds (30 bpm).
-constexpr std::int64_t MINIMUM_TAP_INTERVAL_MS = 200;
+// Two taps define a tempo when the gap between them is a believable beat. The ceiling is two seconds (30 bpm);
+// the floor is a tenth of a second (600 bpm) - a range wide enough for a slow exercise and for a fast drill.
+constexpr std::int64_t MINIMUM_TAP_INTERVAL_MS = 100;
 constexpr std::int64_t MAXIMUM_TAP_INTERVAL_MS = 2000;
 
 }    // namespace

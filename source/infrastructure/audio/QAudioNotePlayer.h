@@ -25,6 +25,7 @@
 #include <QAudioSink>
 #include <QIODevice>
 
+#include <array>
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -63,6 +64,14 @@ public:
 
     // Frappe un element de la batterie, rendu par la synthese.
     void playDrum( domain::Drum p_drum ) override;
+
+    // Les sons de batterie ECHANTILLONNES, dans l'ordre de domain::Drum. Une percussion qui a son echantillon est
+    // jouee telle quelle - une vraie peau, une vraie coque, une vraie baguette ; la synthese reste le repli, comme
+    // pour les notes.
+    void useDrumSamples( std::array<std::vector<float>, domain::DRUM_COUNT> p_samples );
+
+    // Les deux clics du metronome, echantillonnes eux aussi : deux blocs de bois. Vides, la synthese les remplace.
+    void useMetronomeClicks( std::vector<float> p_accented, std::vector<float> p_plain );
 
     // Le petit arpège de l'accueil : montant, ouvert, au piano, et VOLONTAIREMENT discret.
     //
@@ -181,6 +190,14 @@ private:
 
     // Created from the same real sample rate, so the drums are in tune with the notes.
     std::optional<domain::DrumSynthesizer> m_drumSynthesizer;
+
+    // One recorded sound per piece, in the order of domain::Drum. Empty when the samples could not be read, in which
+    // case the synthesiser plays.
+    std::array<std::vector<float>, domain::DRUM_COUNT> m_drumSamples;
+
+    // The two metronome clicks: the accented one, and the plain one. Empty when they could not be read.
+    std::vector<float> m_accentedClick;
+    std::vector<float> m_plainClick;
 
     // Equal temperament at 440 Hz until setTuning says otherwise.
     domain::TuningContext m_tuning;

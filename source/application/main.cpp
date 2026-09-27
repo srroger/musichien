@@ -32,6 +32,7 @@
 #include <QUrl>
 #include <QtQml>
 
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <memory>
@@ -182,6 +183,50 @@ constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
 // The instruments the game plays with, in the order they are offered.
 constexpr std::array<const char *, 3> INSTRUMENT_NAMES{ "piano", "guitare", "saxo" };
 
+// Reads one embedded wave file as mono samples.
+//
+// Empty when the file is missing or unreadable, which costs a sound and never the application: the synthesiser takes
+// over, exactly like it does for a missing instrument.
+[[nodiscard]] std::vector<float> loadSample( const char * p_fileName )
+{
+    QFile sampleFile{ QStringLiteral( ":/assets/soundfonts/%1.wav" ).arg( QString::fromLatin1( p_fileName ) ) };
+
+    if( !sampleFile.open( QIODevice::ReadOnly ) )
+    {
+        return {};
+    }
+
+    const QByteArray content = sampleFile.readAll();
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    const std::span<const std::byte> bytes{ reinterpret_cast<const std::byte *>( content.constData() ),
+                                            static_cast<std::size_t>( content.size() ) };
+
+    // La hauteur n'a aucune importance pour une percussion : seul l'echantillon compte.
+    const std::optional<musichien::domain::SampledNote> note = musichien::domain::sampledNoteFromWave( bytes, 0 );
+
+    return note.has_value() ? note->samples : std::vector<float>{};
+}
+
+// Les quatre sons de batterie, dans l'ordre de domain::Drum.
+//
+// Une percussion n'est PAS une note : elle ne se transpose pas, elle se joue telle quelle. Le fichier est donc lu pour
+// ses echantillons seulement.
+[[nodiscard]] std::array<std::vector<float>, musichien::domain::DRUM_COUNT> loadDrumSamples()
+{
+    constexpr std::array<const char *, musichien::domain::DRUM_COUNT> FILE_NAMES{
+      "drum_kick", "drum_snare", "drum_hihat", "drum_tom" };
+
+    std::array<std::vector<float>, musichien::domain::DRUM_COUNT> samples;
+
+    for( std::size_t index = 0; index < FILE_NAMES.size(); ++index )
+    {
+        samples.at( index ) = loadSample( FILE_NAMES.at( index ) );
+    }
+
+    return samples;
+}
+
 }    // namespace
 
 int main( int p_argumentCount, char * p_arguments[] )
@@ -240,6 +285,20 @@ int main( int p_argumentCount, char * p_arguments[] )
     }
 
     std::cerr << "Musichien: " << instruments.size() << " sampled instrument(s)\n";
+
+    // La batterie, rendue depuis la meme banque libre que les instruments : une vraie peau vaut mieux qu'une chute de
+    // sinus, et Roger l'a entendu tout de suite.
+    std::array<std::vector<float>, musichien::domain::DRUM_COUNT> drumSamples = loadDrumSamples();
+
+    const auto loadedDrumCount = static_cast<std::size_t>( std::ranges::count_if(
+      drumSamples, []( const std::vector<float> & p_samples ) { return !p_samples.empty(); } ) );
+
+    std::cerr << "Musichien: " << loadedDrumCount << " drum sample(s) read\n";
+
+    notePlayer.useDrumSamples( std::move( drumSamples ) );
+
+    // Les deux clics du metronome : deux blocs de bois, dans la meme banque libre.
+    notePlayer.useMetronomeClicks( loadSample( "drum_click_high" ), loadSample( "drum_click_low" ) );
 
     notePlayer.useInstruments( instruments, {} );
 

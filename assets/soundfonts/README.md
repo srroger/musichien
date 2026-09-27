@@ -13,6 +13,47 @@ d'erreur et le repli.
 **Quatorze fichiers, 2,5 s chacun, mono, 48 kHz, 16 bits signé — 3,4 Mo au total**, dans le format exact que
 le moteur audio ouvre déjà.
 
+## 🥁 La batterie et le métronome (même banque, même chaîne)
+
+| Son | Note MIDI (percussion) | Durée gardée | Fichier |
+|---|---|---|---|
+| **Grosse caisse** | 36 (Acoustic Bass Drum) | 0,9 s | `drum_kick.wav` |
+| **Caisse claire** | 38 (Acoustic Snare) | 0,9 s | `drum_snare.wav` |
+| **Charleston** | 42 (Closed Hi-Hat) | 0,30 s | `drum_hihat.wav` |
+| **Tom** | 47 (Low-Mid Tom) | 1,0 s | `drum_tom.wav` |
+| **Métronome — temps fort** | 76 (Hi Wood Block) | 0,12 s | `drum_click_high.wav` |
+| **Métronome — temps faibles** | 77 (Low Wood Block) | 0,12 s | `drum_click_low.wav` |
+
+**Six fichiers, environ 320 Ko.** La percussion est le seul endroit de la norme MIDI où **le numéro de note désigne
+un instrument** : elle se joue sur le canal 10, et elle **ne se transpose pas** (c'est pour ça que le lecteur les
+joue telles quelles, sans passer par l'échantillonneur).
+
+> [!note] Pourquoi la batterie est échantillonnée elle aussi
+> La première version était **synthétisée** — une chute de sinus pour la grosse caisse, du bruit façonné pour la caisse
+> claire. Roger l'a entendue tout de suite : « je les trouve un peu faible et un peu moche ». Et la raison est
+> exactement celle qui avait rendu les échantillons de piano nécessaires : une vraie percussion, c'est **une peau, une
+> coque et une baguette**, et aucune quantité d'arithmétique n'en fait un modèle. Le synthétiseur garde son rôle de
+> **repli** quand un fichier manque.
+
+> [!note] Pourquoi deux blocs de bois pour le métronome
+> Roger trouvait le temps fort bien, mais les autres « un peu moches ». Un **bloc de bois** est la sonorité du
+> métronome : courte, sans hauteur musicale qui traîne, et l'écart aigu/grave dit **où est le premier temps** sans
+> qu'on ait à compter.
+
+### Régénérer la batterie
+
+```bash
+# la banque (40 Mo, à jeter après usage : elle n'est PAS livrée)
+curl -sL -o /tmp/MuseScore_General.sf3 \
+  'https://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General/MuseScore_General.sf3'
+
+# les six fichiers, d'un coup : le script écrit le MIDI, appelle fluidsynth, et met en forme
+scripts/render_drum_samples.py /tmp/MuseScore_General.sf3
+```
+
+Le script est **dans le dépôt** (`scripts/render_drum_samples.py`), et pas seulement dans l'historique : un son dont
+on ne peut pas refaire la recette est un son qu'on ne pourra plus justifier dans deux ans.
+
 > [!note] Les trois instruments ne sont pas là pour faire joli
 > C'est le **4ᵉ axe du projet** qui commence : « pas seulement le piano ». Une oreille qui n'a entendu un
 > intervalle qu'au piano ne l'a pas entendu — chaque instrument a ses harmoniques, et donc sa **couleur**.

@@ -30,9 +30,19 @@ constexpr double SINK_VOLUME = 1.0;
 // float - small enough that the click stays in time, large enough that the stream does not starve.
 constexpr int SINK_BUFFER_BYTES = 16384;
 
-// A drum hit is a SHORT sound, where a note lasts: at equal peak it sounds far quieter. This is what puts it back at
-// the level of the rest, and Roger heard the lack of it immediately ("le volume de la batterie a l'air plutot faible").
-constexpr float DRUM_GAIN = 2.4F;
+// A drum hit is a SHORT sound, where a note lasts: at equal peak it sounds quieter. The samples are already normalised
+// by scripts/render_drum_samples.py, so this only puts them at the level of the rest - and NOT above, because the mixer
+// clamps, and a clamped kick is a distorted kick. That is what a first version of this constant got wrong.
+constexpr float DRUM_GAIN = 1.0F;
+
+// Le clic du metronome. Le premier temps doit s'entendre par-dessus tout le reste ; les autres doivent se faire oublier
+// assez pour qu'on n'entende que la pulsation.
+constexpr float ACCENTED_CLICK_GAIN = 1.0F;
+constexpr float PLAIN_CLICK_GAIN = 0.7F;
+
+// Le repli synthetise, quand les clics echantillonnes manquent.
+constexpr float FALLBACK_ACCENTED_CLICK_GAIN = 0.30F;
+constexpr float FALLBACK_PLAIN_CLICK_GAIN = 0.18F;
 
 }    // namespace
 
@@ -465,26 +475,31 @@ void QAudioNotePlayer::playMetronomeClick( bool p_accented )
 {
     ensureAudioOutputIsOpen();
 
+    const std::vector<float> & click = p_accented ? m_accentedClick : m_plainClick;
+
+    // Le bloc de bois d'abord : c'est la sonorite d'un metronome, et c'est ce qui remplace le timbre "un peu moche" que
+    // Roger a entendu sur les temps faibles.
+    if( !click.empty() )
+    {
+        mixSamples( click, p_accented ? ACCENTED_CLICK_GAIN : PLAIN_CLICK_GAIN );
+
+        return;
+    }
+
+    // Le repli : la synthese, avec l'ancien timbre.
     if( !m_synthesizer.has_value() )
     {
         return;
     }
 
-    // Un clic court, comme le clic de menu, mais avec un timbre propre au metronome : l'accent du premier temps est
-    // plus aigu et un peu plus fort, les autres temps plus graves et plus discrets.
     const domain::Note note{ p_accented ? 88 : 72 };
 
     std::vector<float> samples =
       m_synthesizer->renderNote( note, std::chrono::milliseconds{ 60 } );
 
-    constexpr float ACCENTED_GAIN = 0.30F;
-    constexpr float PLAIN_GAIN = 0.18F;
-
-    const float gain = p_accented ? ACCENTED_GAIN : PLAIN_GAIN;
-
     for( float & sample : samples )
     {
-        sample *= gain;
+        sample *= p_accented ? FALLBACK_ACCENTED_CLICK_GAIN : FALLBACK_PLAIN_CLICK_GAIN;
     }
 
     // MIXE et non remplace : le metronome doit s'entendre EN MEME TEMPS que la batterie. C'etait le bug - le clic
@@ -492,17 +507,37 @@ void QAudioNotePlayer::playMetronomeClick( bool p_accented )
     mixSamples( std::move( samples ) );
 }
 
+void QAudioNotePlayer::useDrumSamples( std::array<std::vector<float>, domain::DRUM_COUNT> p_samples )
+{
+    m_drumSamples = std::move( p_samples );
+}
+
+void QAudioNotePlayer::useMetronomeClicks( std::vector<float> p_accented, std::vector<float> p_plain )
+{
+    m_accentedClick = std::move( p_accented );
+    m_plainClick = std::move( p_plain );
+}
+
 void QAudioNotePlayer::playDrum( domain::Drum p_drum )
 {
     ensureAudioOutputIsOpen();
 
-    if( !m_drumSynthesizer.has_value() )
+    const auto index = static_cast<std::size_t>( p_drum );
+
+    // La vraie peau d'abord : c'est ce qui rend une batterie jouable a l'oreille.
+    if( ( index < m_drumSamples.size() ) && !m_drumSamples.at( index ).empty() )
     {
+        // MIXE, comme le metronome : un roulement de batterie, c'est des sons qui se chevauchent.
+        mixSamples( m_drumSamples.at( index ), DRUM_GAIN );
+
         return;
     }
 
-    // MIXE, comme le metronome : un roulement de batterie, c'est des sons qui se chevauchent.
-    mixSamples( m_drumSynthesizer->renderDrum( p_drum ), DRUM_GAIN );
+    // Le repli, quand un echantillon manque : la synthese. Un son moins beau vaut mieux que pas de son.
+    if( m_drumSynthesizer.has_value() )
+    {
+        mixSamples( m_drumSynthesizer->renderDrum( p_drum ), DRUM_GAIN );
+    }
 }
 
 void QAudioNotePlayer::playGreeting()
