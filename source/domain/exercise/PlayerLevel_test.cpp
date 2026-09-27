@@ -96,11 +96,44 @@ TEST( PlayerLevelTest, every_level_produces_a_playable_session )
 
         EXPECT_GE( settings.successesBeforeWidening, 1U );
 
+        // La meme chose pour les accords : une main vide, ou une seule couleur, ne poserait aucune question non plus.
+        EXPECT_GE( settings.startingChordQualityCount, 2U );
+        EXPECT_LE( settings.startingChordQualityCount, CHORD_QUALITY_COUNT );
+
         // And a level changes WHERE a player starts, never HOW the game is played: same ten questions, same
         // lives, same scoring.
         EXPECT_EQ( SessionSettings{}.questionCount, settings.questionCount );
         EXPECT_EQ( SessionSettings{}.lives, settings.lives );
     }
+}
+
+TEST( PlayerLevelTest, a_higher_level_opens_the_chords_wider )
+{
+    // Roger, apres avoir joue : « pour les accords, ca commence avec majeur mineur quelle que soit la difficulte. Il
+    // faudrait que les accords disponibles soient directement nombreux si on augmente la difficulte. Majeur mineur
+    // c'est pour les debutants. »
+    //
+    // Le niveau decide donc la main d'accords comme il decide la palette d'intervalles : un joueur qui se declare
+    // "a l'aise" n'a pas a gagner les suspendues une par une.
+    constexpr std::array<std::size_t, PLAYER_LEVEL_COUNT> EXPECTED_HAND_SIZE{ 2, 4, 6, 9, CHORD_QUALITY_COUNT };
+
+    std::size_t previous = 0;
+
+    for( std::size_t index = 0; index < PLAYER_LEVEL_COUNT; ++index )
+    {
+        const SessionSettings settings = sessionSettingsFor( playerLevelFromIndex( index ) );
+
+        EXPECT_EQ( EXPECTED_HAND_SIZE.at( index ), settings.startingChordQualityCount ) << "niveau " << index;
+
+        // Et la main ne se referme jamais en montant de niveau : c'est ce qui rend la progression lisible, et ce qui
+        // empeche un niveau mal regle de retirer des accords a quelqu'un.
+        EXPECT_GT( settings.startingChordQualityCount, previous ) << "niveau " << index;
+
+        previous = settings.startingChordQualityCount;
+    }
+
+    // Le debutant a exactement les deux couleurs de base : c'est la que les distinguer EST l'exercice.
+    EXPECT_EQ( 2U, sessionSettingsFor( PlayerLevel::Beginner ).startingChordQualityCount );
 }
 
 TEST( PlayerLevelTest, an_unknown_level_is_the_beginner_one )

@@ -32,15 +32,28 @@ struct ExpectedChord
 const std::vector<ExpectedChord> & expectedChords()
 {
     static const std::vector<ExpectedChord> chords{
+      // Les six triades : deux couleurs de base, deux suspendues, deux tendues.
       { ChordQuality::Major, { 0, 4, 7 } },
       { ChordQuality::Minor, { 0, 3, 7 } },
       { ChordQuality::Sus4, { 0, 5, 7 } },
       { ChordQuality::Sus2, { 0, 2, 7 } },
       { ChordQuality::Diminished, { 0, 3, 6 } },
       { ChordQuality::Augmented, { 0, 4, 8 } },
+
+      // Les trois septiemes que l'oreille rencontre partout.
       { ChordQuality::DominantSeventh, { 0, 4, 7, 10 } },
       { ChordQuality::MajorSeventh, { 0, 4, 7, 11 } },
       { ChordQuality::MinorSeventh, { 0, 3, 7, 10 } },
+
+      // Puis les couleurs plus riches, ou un seul demi-ton separe parfois deux accords.
+      { ChordQuality::Sixth, { 0, 4, 7, 9 } },
+      { ChordQuality::HalfDiminished, { 0, 3, 6, 10 } },
+      { ChordQuality::DiminishedSeventh, { 0, 3, 6, 9 } },
+      { ChordQuality::MinorMajorSeventh, { 0, 3, 7, 11 } },
+
+      // Et les deux qui sortent de l'octave - dont la seule du jeu a porter CINQ notes.
+      { ChordQuality::Add9, { 0, 4, 7, 14 } },
+      { ChordQuality::Ninth, { 0, 4, 7, 10, 14 } },
     };
 
     return chords;
@@ -85,22 +98,24 @@ TEST( ChordTest, every_chord_starts_on_its_root_and_goes_up )
     }
 }
 
-TEST( ChordTest, a_triad_has_three_notes_and_a_seventh_has_four )
+TEST( ChordTest, the_number_of_notes_goes_from_three_to_five_and_never_beyond )
 {
     for( const ChordQuality quality : chordLearningOrder() )
     {
-        const std::size_t expected = chordIntervals( quality ).size();
+        const std::size_t notes = chordNoteCount( quality );
 
-        EXPECT_EQ( expected, chordNoteCount( quality ) );
+        EXPECT_EQ( chordIntervals( quality ).size(), notes );
 
-        // Trois ou quatre en tout et pour tout : les accords du jeu sont ceux-la, et un accord a deux ou a six notes
-        // voudrait dire que la liste des intervalles a ete mal ecrite.
-        EXPECT_TRUE( ( expected == 3 ) || ( expected == 4 ) ) << chordQualityName( quality );
+        // Trois au minimum - c'est ce qui fait un accord - et cinq au maximum : la neuvieme est la seule du jeu a en
+        // avoir cinq, et au-dela l'oreille ne compte plus les notes, elle entend une masse.
+        EXPECT_GE( notes, 3U ) << chordQualityName( quality );
+        EXPECT_LE( notes, 5U ) << chordQualityName( quality );
     }
 
-    // Et les septiemes sont bien celles a quatre notes, comme la progression le promet.
+    // Les trois reperes du parcours : la triade, la septieme, et la seule a cinq notes.
     EXPECT_EQ( 3U, chordNoteCount( ChordQuality::Major ) );
     EXPECT_EQ( 4U, chordNoteCount( ChordQuality::DominantSeventh ) );
+    EXPECT_EQ( 5U, chordNoteCount( ChordQuality::Ninth ) );
 }
 
 TEST( ChordTest, the_learning_order_holds_every_quality_exactly_once )

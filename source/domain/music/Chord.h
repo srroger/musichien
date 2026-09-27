@@ -40,19 +40,42 @@ namespace musichien::domain
 // grand veut dire un accord plus difficile. Changer l'ordre, c'est changer la difficulte de tout le monde.
 enum class ChordQuality : std::size_t
 {
+    // Les deux couleurs de base : tout le reste se compare a elles.
     Major = 0,
     Minor = 1,
+
+    // Les suspendues : la tierce est REMPLACEE, donc une seule chose a entendre.
     Sus4 = 2,
     Sus2 = 3,
+
+    // Les deux tendues : la quinte est serree ou elargie, et c'est ce qui s'entend.
     Diminished = 4,
     Augmented = 5,
+
+    // Les trois septiemes que l'oreille rencontre partout, de la plus frequente a la plus douce.
     DominantSeventh = 6,
     MajorSeventh = 7,
-    MinorSeventh = 8
+    MinorSeventh = 8,
+
+    // Les couleurs plus riches, une fois les neuf premieres en place. La sixte est ici parce qu'elle se confond avec
+    // la septieme majeure - un seul demi-ton les separe, et c'est exactement l'exercice.
+    Sixth = 9,
+
+    // Le demi-diminu et le diminue 7 : les deux accords de la famille tendue, a quatre notes.
+    HalfDiminished = 10,
+    DiminishedSeventh = 11,
+
+    // Le mineur-majeur : la tierce mineure et la septieme majeure ensemble, l'accord le plus etrange du lot.
+    MinorMajorSeventh = 12,
+
+    // Et les deux dernieres, qui sortent de l'octave : la neuvieme AJOUTEE, puis la neuvieme complete - cinq notes,
+    // et la seule du jeu a en avoir cinq.
+    Add9 = 13,
+    Ninth = 14
 };
 
 // Combien de qualites le domaine connait, ce qu'un ecran a besoin de savoir pour proposer une liste complete.
-inline constexpr std::size_t CHORD_QUALITY_COUNT = 9;
+inline constexpr std::size_t CHORD_QUALITY_COUNT = 15;
 
 // La tonique est TOUJOURS la premiere note jouee, et c'est une convention du projet : la note de reference s'entend
 // d'abord, comme la tonique d'un intervalle. Elle vaut zero demi-ton, par definition.

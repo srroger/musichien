@@ -216,6 +216,9 @@ Item {
             // La question de rythme
             // -------------------------------------------------------------------------------------------------
             // La question d'accord
+            // Un accord se reconnait a sa COULEUR : les notes sont plaquees, et l'ecran n'offre qu'une poignee de noms.
+            // Pas de cercle des quintes ici - une qualite d'accord n'a pas d'angle sur un cercle - et l'ordre des
+            // boutons suit l'ordre d'apprentissage, donc il ne bouge jamais d'une question a l'autre.
 
             anchors.fill: parent
             anchors.margins: 16
@@ -748,37 +751,44 @@ Item {
 
             }
 
-            // Un accord se reconnait a sa COULEUR : les notes sont plaquees, et l'ecran n'offre qu'une poignee de noms.
-            // Pas de cercle des quintes ici - une qualite d'accord n'a pas d'angle sur un cercle - et l'ordre des
-            // boutons suit l'ordre d'apprentissage, donc il ne bouge jamais d'une question a l'autre.
+            // Le tout DEFILE : un joueur de haut niveau peut avoir QUINZE couleurs a l'ecran (les six triades, les
+            // trois septiemes, la sixte, le demi-diminu, le diminue 7, le mineur-majeur, add9 et la neuvieme), et une
+            // grille qui depasse l'ecran cacherait des reponses - ce qui rendrait la question impossible, pas dure.
             // -------------------------------------------------------------------------------------------------
-            GridLayout {
+            ScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: ExerciseController.isChordQuestion
-                columns: 2
-                rowSpacing: 10
-                columnSpacing: 10
+                clip: true
 
-                Repeater {
-                    model: ExerciseController.chordChoices
+                GridLayout {
+                    width: parent.width
+                    columns: 2
+                    rowSpacing: 10
+                    columnSpacing: 10
 
-                    delegate: Button {
-                        required property var modelData
-                        // La bonne reponse est mise en avant QUAND ELLE EST CONNUE, jamais avant : un bouton qui se
-                        // signalerait tout seul donnerait la reponse.
-                        readonly property bool isTheAnswer: ExerciseController.heardChord.quality === modelData.quality
+                    Repeater {
+                        model: ExerciseController.chordChoices
 
-                        Layout.fillWidth: true
-                        height: 64
-                        highlighted: isTheAnswer && ExerciseController.isFeedbackVisible
-                        enabled: ExerciseController.isAsking
-                        // Le nombre de notes est affiche : c'est ce qui separe une triade d'une septieme, et c'est la
-                        // premiere chose que l'oreille attrape.
-                        text: modelData.noteCount === 4 ? qsTr("%1 — 4 notes").arg(modelData.name) : qsTr("%1 — 3 notes").arg(modelData.name)
-                        // L'index de la qualite voyage tel quel : l'ecran affiche un nom, et renvoie l'index de ce
-                        // qu'il a affiche. Il ne nomme rien lui-meme.
-                        onClicked: ExerciseController.answerChord(modelData.quality)
+                        delegate: Button {
+                            required property var modelData
+                            // La bonne reponse est mise en avant QUAND ELLE EST CONNUE, jamais avant : un bouton qui se
+                            // signalerait tout seul donnerait la reponse.
+                            readonly property bool isTheAnswer: ExerciseController.heardChord.quality === modelData.quality
+
+                            Layout.fillWidth: true
+                            height: 56
+                            highlighted: isTheAnswer && ExerciseController.isFeedbackVisible
+                            enabled: ExerciseController.isAsking
+                            // Le nombre de notes est affiche : c'est ce qui separe une triade d'une septieme, et c'est
+                            // la premiere chose que l'oreille attrape. Le libelle est generique, parce que le domaine
+                            // en connait de trois a cinq notes et que l'ecran n'a pas a tenir une liste a jour.
+                            text: qsTr("%1 — %2 notes").arg(modelData.name).arg(modelData.noteCount)
+                            // L'index de la qualite voyage tel quel : l'ecran affiche un nom, et renvoie l'index de ce
+                            // qu'il a affiche. Il ne nomme rien lui-meme.
+                            onClicked: ExerciseController.answerChord(modelData.quality)
+                        }
+
                     }
 
                 }

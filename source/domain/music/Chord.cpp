@@ -22,11 +22,34 @@ constexpr std::array<std::int32_t, 3> AUGMENTED_INTERVALS{ 0, 4, 8 };
 constexpr std::array<std::int32_t, 4> DOMINANT_SEVENTH_INTERVALS{ 0, 4, 7, 10 };
 constexpr std::array<std::int32_t, 4> MAJOR_SEVENTH_INTERVALS{ 0, 4, 7, 11 };
 constexpr std::array<std::int32_t, 4> MINOR_SEVENTH_INTERVALS{ 0, 3, 7, 10 };
+constexpr std::array<std::int32_t, 4> SIXTH_INTERVALS{ 0, 4, 7, 9 };
+constexpr std::array<std::int32_t, 4> HALF_DIMINISHED_INTERVALS{ 0, 3, 6, 10 };
+constexpr std::array<std::int32_t, 4> DIMINISHED_SEVENTH_INTERVALS{ 0, 3, 6, 9 };
+constexpr std::array<std::int32_t, 4> MINOR_MAJOR_SEVENTH_INTERVALS{ 0, 3, 7, 11 };
+
+// La neuvieme AJOUTEE garde ses trois notes de base et gagne une seconde une octave plus haut ; la neuvieme complete
+// garde aussi la septieme mineure. C'est la difference entre "C add9" et "C9", et l'oreille l'entend.
+constexpr std::array<std::int32_t, 4> ADD9_INTERVALS{ 0, 4, 7, 14 };
+constexpr std::array<std::int32_t, 5> NINTH_INTERVALS{ 0, 4, 7, 10, 14 };
 
 // L'ordre d'apprentissage, et il repete l'ordre de l'enumeration : la liste est ecrite pour etre LUE (et pour qu'un
 // test puisse verifier que les deux ne divergent pas).
 constexpr std::array<ChordQuality, CHORD_QUALITY_COUNT> LEARNING_ORDER{
-  ChordQuality::Major, ChordQuality::Minor, ChordQuality::Sus4, ChordQuality::Sus2, ChordQuality::Diminished, ChordQuality::Augmented, ChordQuality::DominantSeventh, ChordQuality::MajorSeventh, ChordQuality::MinorSeventh };
+  ChordQuality::Major,
+  ChordQuality::Minor,
+  ChordQuality::Sus4,
+  ChordQuality::Sus2,
+  ChordQuality::Diminished,
+  ChordQuality::Augmented,
+  ChordQuality::DominantSeventh,
+  ChordQuality::MajorSeventh,
+  ChordQuality::MinorSeventh,
+  ChordQuality::Sixth,
+  ChordQuality::HalfDiminished,
+  ChordQuality::DiminishedSeventh,
+  ChordQuality::MinorMajorSeventh,
+  ChordQuality::Add9,
+  ChordQuality::Ninth };
 
 }    // namespace
 
@@ -60,6 +83,24 @@ std::span<const std::int32_t> chordIntervals( ChordQuality p_quality ) noexcept
 
         case ChordQuality::MinorSeventh:
             return MINOR_SEVENTH_INTERVALS;
+
+        case ChordQuality::Sixth:
+            return SIXTH_INTERVALS;
+
+        case ChordQuality::HalfDiminished:
+            return HALF_DIMINISHED_INTERVALS;
+
+        case ChordQuality::DiminishedSeventh:
+            return DIMINISHED_SEVENTH_INTERVALS;
+
+        case ChordQuality::MinorMajorSeventh:
+            return MINOR_MAJOR_SEVENTH_INTERVALS;
+
+        case ChordQuality::Add9:
+            return ADD9_INTERVALS;
+
+        case ChordQuality::Ninth:
+            return NINTH_INTERVALS;
     }
 
     // Aucune qualite ne tombe ici - l'enumeration est couverte en entier - mais une fonction qui rend un span ne peut
@@ -102,6 +143,24 @@ std::string_view chordQualityName( ChordQuality p_quality ) noexcept
 
         case ChordQuality::MinorSeventh:
             return "Minor seventh";
+
+        case ChordQuality::Sixth:
+            return "Sixth";
+
+        case ChordQuality::HalfDiminished:
+            return "Half-diminished";
+
+        case ChordQuality::DiminishedSeventh:
+            return "Diminished seventh";
+
+        case ChordQuality::MinorMajorSeventh:
+            return "Minor-major seventh";
+
+        case ChordQuality::Add9:
+            return "Added ninth";
+
+        case ChordQuality::Ninth:
+            return "Ninth";
     }
 
     return "Major";
@@ -138,6 +197,26 @@ std::string_view chordQualitySymbolSuffix( ChordQuality p_quality ) noexcept
 
         case ChordQuality::MinorSeventh:
             return "m7";
+
+        case ChordQuality::Sixth:
+            return "6";
+
+        case ChordQuality::HalfDiminished:
+            // Le symbole que les musiciens ecrivent vraiment : deux noms pour le meme accord, et c'est celui-la qui
+            // tient sur une partition.
+            return "m7b5";
+
+        case ChordQuality::DiminishedSeventh:
+            return "dim7";
+
+        case ChordQuality::MinorMajorSeventh:
+            return "mMaj7";
+
+        case ChordQuality::Add9:
+            return "add9";
+
+        case ChordQuality::Ninth:
+            return "9";
     }
 
     return "";

@@ -30,12 +30,20 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             // Two intervals, and a new one every three successes: the first session must be a success.
             settings.startingPaletteSize = 2;
             settings.successesBeforeWidening = 3;
+
+            // Two chords as well: major and minor, the reference colour and its shadow. This is the level where
+            // telling one from the other IS the exercise.
+            settings.startingChordQualityCount = 2;
             break;
 
         case PlayerLevel::Fluent:
             // The obvious colours, and the palette widens twice as fast.
             settings.startingPaletteSize = 5;
             settings.successesBeforeWidening = 2;
+
+            // The four triads a musician meets first: major, minor, and the two suspended ones, where the third is
+            // REPLACED rather than moved. Someone who already hears intervals does not need a two-colour diet.
+            settings.startingChordQualityCount = 4;
             break;
 
         case PlayerLevel::Advanced:
@@ -48,6 +56,10 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             // A wider grid, so that a player who knows every interval is not handed the answer by a grid of
             // six. Clamped by the palette, which holds twelve.
             settings.choiceCount = 8;
+
+            // Les six triades, tendues comprises : diminue et augmente entrent ici, ou l'oreille sait deja entendre
+            // une quinte serree ou elargie.
+            settings.startingChordQualityCount = 6;
             break;
 
         case PlayerLevel::BeyondTheOctave:
@@ -59,6 +71,11 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             settings.startingPaletteSize = 18;
             settings.successesBeforeWidening = 2;
             settings.choiceCount = 8;
+
+            // Et les TROIS septiemes, la famille la plus entendue de toutes : la septieme de dominante, dont l'oreille
+            // attrape la tension sans savoir la nommer, puis la majeure et la mineure, qui n'en different que d'une
+            // note. Six triades plus trois septiemes : neuf couleurs, et les accords a QUATRE notes sont arrives.
+            settings.startingChordQualityCount = 9;
             break;
 
         case PlayerLevel::Master:
@@ -78,6 +95,10 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
 
             // Aucune aide : ni l'indice qui souffle, ni le bouton qui donne la reponse.
             settings.aidsAllowed = false;
+
+            // Et TOUTES les couleurs d'accord, comme les intervalles : le mode qui mesure ne cache rien. Le joueur
+            // entend un accord et il le nomme sur un clavier complet, sans qu'aucune couleur ne soit arrivee apres lui.
+            settings.startingChordQualityCount = CHORD_QUALITY_COUNT;
             break;
     }
 

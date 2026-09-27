@@ -2,6 +2,7 @@
 #include "ui/ExerciseSessionController.h"
 
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QGuiApplication>
 #include <QJSValue>
@@ -102,11 +103,13 @@ namespace
     settings.startingPaletteSize = domain::SUPPORTED_INTERVAL_COUNT;
     settings.choiceCount = domain::SUPPORTED_INTERVAL_COUNT;
 
-    // Et RIEN d'autre : ni chant, ni rythme, ni mode guide. L'ecran charge ici est celui de la grille, et une question
-    // d'un autre genre - tiree une fois sur cinq - n'aurait aucun bouton de cercle a chercher.
+    // Et RIEN d'autre : ni chant, ni rythme, ni accords, ni mode guide. L'ecran charge ici est celui de la GRILLE, et
+    // une question d'un autre genre - tiree une fois sur cinq - n'aurait aucun bouton de cercle a chercher. C'est
+    // exactement ce qui rendait ces tests intermittents, et le diagnostic est sans appel quand il arrive : "choix (0)".
     settings.singQuestionShare = 0;
     settings.directionQuestionShare = 0;
     settings.rhythmQuestionShare = 0;
+    settings.chordQuestionShare = 0;
 
     return settings;
 }
@@ -392,6 +395,53 @@ struct LoadedScreen
     return nullptr;
 }
 
+// Attend qu'un bouton portant ce texte existe vraiment, et rend vrai quand c'est le cas.
+//
+// POURQUOI CETTE ATTENTE, et pas une lecture immediate : QML construit les delegues d'un Repeater au fil de la boucle
+// d'evenements, et un ecran plus charge met plus longtemps a les produire. Lire l'arbre juste apres create() marche
+// presque toujours... et echoue une fois sur sept - ce qui a rendu ce test non deterministe le jour ou la page a gagne
+// deux zones de plus. Un test qui echoue au hasard n'apprend rien : il apprend a etre relance.
+//
+// Le plafond, lui, est ce qui garde l'echec honnete : un bouton qui n'arrive JAMAIS fait echouer le test au lieu de
+// l'endormir.
+[[nodiscard]] bool waitForButton( QQuickItem & p_screen, const QString & p_text, int p_timeoutMs = 2000 )
+{
+    QElapsedTimer clock;
+    clock.start();
+
+    while( clock.elapsed() < p_timeoutMs )
+    {
+        if( buttonWithText( p_screen, p_text ) != nullptr )
+        {
+            return true;
+        }
+
+        QEventLoop settling;
+
+        QTimer::singleShot( 10, &settling, &QEventLoop::quit );
+
+        settling.exec();
+    }
+
+    return false;
+}
+
+// Les identifiants des choix de la session en cours, a plat : ce que ce fichier affiche quand une attente echoue.
+// Sans cela, « P1 n'est pas affiche » ne dit pas si l'ecran a oublie de le dessiner ou si le domaine ne l'a jamais
+// propose - et les deux pannes n'ont rien a voir.
+[[nodiscard]] std::string identifiersOfChoices()
+{
+    std::string identifiers;
+
+    for( const QVariant & choice : wholeMapController().choices() )
+    {
+        identifiers += choice.toMap().value( "identifier" ).toString().toStdString();
+        identifiers += ' ';
+    }
+
+    return identifiers;
+}
+
 }    // namespace
 
 TEST( ExerciseScreenTest, the_screen_is_built_and_shows_every_choice )
@@ -412,7 +462,7 @@ TEST( ExerciseScreenTest, the_screen_is_built_and_shows_every_choice )
         // Le vrai sujet : tout ce que la session propose doit se retrouver ECRIT sur l'ecran. Une place restee vide
         // par erreur, un intervalle ecrase par un autre de sa classe, un Repeater qui ne produit rien - chacun de
         // ces silences se voit ici.
-        EXPECT_NE( nullptr, buttonWithText( *screen.item, identifier ) )
+        EXPECT_TRUE( waitForButton( *screen.item, identifier ) )
           << "l'intervalle " << identifier.toStdString() << " n'est pas affiche. QML : " << qmlMessagesAsText()
           << " | positions : " << wholeMapController().gridPositions().size()
           << " choix : " << wholeMapController().choices().size() << " | " << screenReport( *screen.item );
@@ -432,8 +482,11 @@ TEST( ExerciseScreenTest, the_three_octaves_of_a_note_are_all_on_the_screen )
     {
         const QString identifier = QString::fromStdString( domain::Interval{ semitones }.identifier() );
 
-        EXPECT_NE( nullptr, buttonWithText( *screen.item, identifier ) )
-          << "la place de l'unisson a perdu " << identifier.toStdString() << ". QML : " << qmlMessagesAsText();
+        EXPECT_TRUE( waitForButton( *screen.item, identifier ) )
+          << "la place de l'unisson a perdu " << identifier.toStdString() << ". QML : " << qmlMessagesAsText()
+          << " | positions : " << wholeMapController().gridPositions().size()
+          << " choix (" << wholeMapController().choices().size() << ") : " << identifiersOfChoices()
+          << " | " << screenReport( *screen.item );
     }
 
     // Et les trois sont bien la meme place du cercle : c'est ce qui fait qu'un joueur peut les comparer.
