@@ -39,6 +39,11 @@ musichienFunction_AddLibrary(domain
     exercise/HintBook.h
     exercise/HintBook.cpp
 
+    # The loading-screen anecdotes, content of the same kind, and the streak rank
+    exercise/AnecdoteBook.h
+    exercise/AnecdoteBook.cpp
+    exercise/Rank.h
+
     # What the player already knows, and where the answer is remembered
     exercise/PlayerLevel.h
     exercise/PlayerLevel.cpp
@@ -61,6 +66,7 @@ if(MUSICHIEN_BUILD_TESTING)
         music/Interval_test.cpp
         audio/ToneSynthesizer_test.cpp
         exercise/AnswerGrid_test.cpp
+        exercise/AnecdoteBook_test.cpp
         exercise/ExerciseSession_test.cpp
         exercise/HintBook_test.cpp
         exercise/LearningOrder_test.cpp

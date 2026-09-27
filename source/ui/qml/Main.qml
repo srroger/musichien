@@ -97,6 +97,9 @@ ApplicationWindow {
         return qsTr("%1 octaves plus haut").arg(p_octaveSpan);
     }
 
+    // Une anecdote par ouverture, comme les ecrans de chargement d'autrefois : un petit texte qui change et qui
+    // donne a lire. Tiree au hasard dans le fichier de contenu, jamais ecrite en dur ici.
+    Component.onCompleted: ExerciseController.refreshAnecdote()
     width: 420
     height: 820
     minimumWidth: 320
@@ -439,6 +442,19 @@ ApplicationWindow {
 
                 Item {
                     Layout.preferredHeight: 16
+                }
+
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#8a77ad"
+                    font.pixelSize: 13
+                    font.italic: true
+                    wrapMode: Text.WordWrap
+                    visible: ExerciseController.anecdoteText !== ""
+                    text: ExerciseController.anecdoteText
                 }
 
                 Text {

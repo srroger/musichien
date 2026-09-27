@@ -28,6 +28,7 @@ constexpr int NO_LIFE_LIMIT = -1;
 ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_notePlayer,
                                                       domain::SessionSettings p_settings,
                                                       domain::HintBook p_hintBook,
+                                                      domain::AnecdoteBook p_anecdoteBook,
                                                       VibrationCallback p_vibrate,
                                                       domain::PlayerPreferences * p_levelStore,
                                                       QObject * p_parent )
@@ -35,6 +36,7 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
   , m_notePlayer{ p_notePlayer }
   , m_settings{ p_settings }
   , m_hintBook{ std::move( p_hintBook ) }
+  , m_anecdoteBook{ std::move( p_anecdoteBook ) }
   , m_vibrate{ std::move( p_vibrate ) }
   , m_levelStore{ p_levelStore }
 {
@@ -584,6 +586,51 @@ void ExerciseSessionController::continueToNextQuestion()
 
     emit scoreChanged();
     emit sessionChanged();
+}
+
+int ExerciseSessionController::rank() const noexcept
+{
+    return ( m_session != nullptr ) ? static_cast<int>( domain::rankForStreak( m_session->score().streak() ) ) : 0;
+}
+
+QString ExerciseSessionController::rankLabel() const
+{
+    const domain::Rank rank = ( m_session != nullptr ) ? domain::rankForStreak( m_session->score().streak() )
+                                                       : domain::Rank::D;
+
+    switch( rank )
+    {
+        case domain::Rank::SSS:
+            return QStringLiteral( "SSS" );
+        case domain::Rank::SS:
+            return QStringLiteral( "SS" );
+        case domain::Rank::S:
+            return QStringLiteral( "S" );
+        case domain::Rank::A:
+            return QStringLiteral( "A" );
+        case domain::Rank::B:
+            return QStringLiteral( "B" );
+        case domain::Rank::C:
+            return QStringLiteral( "C" );
+        case domain::Rank::D:
+            return QStringLiteral( "D" );
+    }
+
+    return QStringLiteral( "D" );
+}
+
+QString ExerciseSessionController::anecdoteText() const
+{
+    return m_anecdoteText;
+}
+
+void ExerciseSessionController::refreshAnecdote()
+{
+    const std::optional<domain::Anecdote> anecdote = m_anecdoteBook.random( m_anecdoteRandomEngine );
+
+    m_anecdoteText = anecdote.has_value() ? QString::fromStdString( anecdote->text ) : QString{};
+
+    emit anecdoteChanged();
 }
 
 void ExerciseSessionController::stopPlayback()

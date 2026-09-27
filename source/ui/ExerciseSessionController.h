@@ -22,10 +22,12 @@
 
 #include "domain/audio/NotePlayer.h"
 #include "domain/audio/SampledInstrument.h"
+#include "domain/exercise/AnecdoteBook.h"
 #include "domain/exercise/AnswerGrid.h"
 #include "domain/exercise/ExerciseSession.h"
 #include "domain/exercise/HintBook.h"
 #include "domain/exercise/PlayerPreferences.h"
+#include "domain/exercise/Rank.h"
 
 #include <QObject>
 #include <QString>
@@ -109,6 +111,13 @@ class ExerciseSessionController final : public QObject
 
     Q_PROPERTY( int experience READ experience NOTIFY scoreChanged )
     Q_PROPERTY( int streak READ streak NOTIFY scoreChanged )
+
+    // The rank of the streak, from D up to SSS - a game feel of its own, displayed and never decided by the screen.
+    Q_PROPERTY( int rank READ rank NOTIFY scoreChanged )
+    Q_PROPERTY( QString rankLabel READ rankLabel NOTIFY scoreChanged )
+
+    // A loading-screen anecdote, refreshed on demand. Empty when the content file has nothing to say.
+    Q_PROPERTY( QString anecdoteText READ anecdoteText NOTIFY anecdoteChanged )
     Q_PROPERTY( int lives READ lives NOTIFY scoreChanged )
     Q_PROPERTY( bool hasUnlimitedLives READ hasUnlimitedLives NOTIFY scoreChanged )
 
@@ -159,6 +168,16 @@ public:
 
     // The developer button that fires a reminder right now, to check the plumbing.
     Q_INVOKABLE void testReminder();
+
+    // The rank of the current streak, as an index and as its display label.
+    [[nodiscard]] int rank() const noexcept;
+
+    [[nodiscard]] QString rankLabel() const;
+
+    // The anecdote currently shown, and a way to draw a new one.
+    [[nodiscard]] QString anecdoteText() const;
+
+    Q_INVOKABLE void refreshAnecdote();
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
@@ -169,6 +188,7 @@ public:
     explicit ExerciseSessionController( domain::NotePlayer & p_notePlayer,
                                         domain::SessionSettings p_settings = {},
                                         domain::HintBook p_hintBook = {},
+                                        domain::AnecdoteBook p_anecdoteBook = {},
                                         VibrationCallback p_vibrate = {},
                                         domain::PlayerPreferences * p_levelStore = nullptr,
                                         QObject * p_parent = nullptr );
@@ -271,6 +291,9 @@ signals:
     // The player has just pressed the "test the notification" button.
     void testReminderRequested();
 
+    // A new anecdote was drawn.
+    void anecdoteChanged();
+
 private:
     // Rebuilds the list of choices from the question being asked, and only then notifies. Called
     // whenever the question changes AND whenever the grid closes in after a mistake.
@@ -299,6 +322,13 @@ private:
 
     // The memory hooks, owned here rather than referenced: see the constructor.
     domain::HintBook m_hintBook;
+
+    // The loading-screen anecdotes, content of the same kind, and the engine that draws them.
+    domain::AnecdoteBook m_anecdoteBook;
+
+    std::mt19937 m_anecdoteRandomEngine{ std::random_device{}() };
+
+    QString m_anecdoteText;
 
     // Empty when the device cannot vibrate.
     VibrationCallback m_vibrate;

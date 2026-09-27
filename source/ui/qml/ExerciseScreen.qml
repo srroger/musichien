@@ -211,6 +211,17 @@ Item {
                     font.bold: true
                 }
 
+                // Le rang de la serie, facon Devil May Cry : un grade qui monte avec l'enchainement, affiche en
+                // grand et en couleur. Il ne dit rien d'autre que "tu enchaines", et c'est exactement ce qu'il doit
+                // dire.
+                Text {
+                    visible: ExerciseController.streak >= 2
+                    text: ExerciseController.rankLabel
+                    color: "#ff5e8a"
+                    font.pixelSize: 22
+                    font.bold: true
+                }
+
                 Item {
                     Layout.preferredWidth: 10
                 }

@@ -1,5 +1,7 @@
 #include "domain/exercise/SessionScore.h"
 
+#include "domain/exercise/Rank.h"
+
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -210,6 +212,21 @@ TEST( SessionScoreTest, a_question_answered_on_the_second_try_does_not_count_as_
     // right, not about eventually getting there.
     EXPECT_EQ( 0, score.firstTrySuccessCount() );
     EXPECT_FALSE( score.hasEarnedStar() );
+}
+
+TEST( SessionScoreTest, the_rank_climbs_with_the_streak )
+{
+    // Le rang, facon Devil May Cry : il monte avec la serie, et il est la REGLE elle-meme - aucune serie n'a un
+    // rang ambigu.
+    EXPECT_EQ( Rank::D, rankForStreak( 0 ) );
+    EXPECT_EQ( Rank::D, rankForStreak( 1 ) );
+    EXPECT_EQ( Rank::C, rankForStreak( 2 ) );
+    EXPECT_EQ( Rank::B, rankForStreak( 4 ) );
+    EXPECT_EQ( Rank::A, rankForStreak( 6 ) );
+    EXPECT_EQ( Rank::S, rankForStreak( 8 ) );
+    EXPECT_EQ( Rank::SS, rankForStreak( 10 ) );
+    EXPECT_EQ( Rank::SSS, rankForStreak( 13 ) );
+    EXPECT_EQ( Rank::SSS, rankForStreak( 100 ) );
 }
 
 }    // namespace musichien::domain

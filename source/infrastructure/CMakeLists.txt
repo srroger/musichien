@@ -15,6 +15,8 @@ musichienFunction_AddLibrary(infrastructure
     audio/QAudioNotePlayer.cpp
     content/JsonHintBook.h
     content/JsonHintBook.cpp
+    content/JsonAnecdoteBook.h
+    content/JsonAnecdoteBook.cpp
     haptics/DeviceHaptics.h
     haptics/DeviceHaptics.cpp
     notifications/NotificationScheduler.h

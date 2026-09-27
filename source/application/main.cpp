@@ -6,6 +6,7 @@
 // =====================================================================================================================
 
 #include "infrastructure/audio/QAudioNotePlayer.h"
+#include "infrastructure/content/JsonAnecdoteBook.h"
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
 #ifdef Q_OS_ANDROID
@@ -50,6 +51,8 @@ constexpr int QML_MODULE_MINOR_VERSION = 0;
 // declared in resources.qrc: one path to remember, identical on the desktop and on the phone.
 constexpr const char * INTERVAL_HINTS_RESOURCE = ":/assets/content/interval-hints.json";
 
+constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
+
 // Reads the memory hints from the resources.
 //
 // The file is opened HERE and not inside the reader: understanding JSON is the infrastructure's job,
@@ -76,6 +79,29 @@ constexpr const char * INTERVAL_HINTS_RESOURCE = ":/assets/content/interval-hint
     std::cerr << "Musichien: " << hintBook.hintCount() << " interval hints read\n";
 
     return hintBook;
+}
+
+// Reads the loading-screen anecdotes, the Morrowind-style little texts. Same contract as the hints: a missing or
+// broken file costs the anecdotes, never the application.
+[[nodiscard]] musichien::domain::AnecdoteBook loadAnecdoteBook()
+{
+    QFile contentFile{ QString::fromUtf8( ANECDOTES_RESOURCE ) };
+
+    if( !contentFile.open( QIODevice::ReadOnly ) )
+    {
+        std::cerr << "Musichien: the anecdotes are missing from the resources.\n";
+
+        return {};
+    }
+
+    const QByteArray content = contentFile.readAll();
+
+    musichien::domain::AnecdoteBook book = musichien::infrastructure::readAnecdoteBook(
+      std::string_view{ content.constData(), static_cast<std::size_t>( content.size() ) } );
+
+    std::cerr << "Musichien: " << book.count() << " anecdotes read\n";
+
+    return book;
 }
 
 // Reads ONE sampled instrument from the embedded wave files.
@@ -207,6 +233,7 @@ int main( int p_argumentCount, char * p_arguments[] )
     musichien::ui::ExerciseSessionController exerciseController{ notePlayer,
                                                                  {},
                                                                  loadHintBook(),
+                                                                 loadAnecdoteBook(),
                                                                  musichien::infrastructure::vibrateForMistake,
                                                                  &playerLevelStore };
 

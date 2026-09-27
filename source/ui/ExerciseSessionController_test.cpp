@@ -290,6 +290,7 @@ TEST( ExerciseSessionControllerTest, a_wrong_answer_is_heard_as_a_cue_and_felt )
     ExerciseSessionController controller{ notePlayer,
                                           ascendingOnlySettings(),
                                           {},
+                                          {},
                                           [&vibrationCount] { ++vibrationCount; } };
 
     controller.startSession();
@@ -307,6 +308,7 @@ TEST( ExerciseSessionControllerTest, a_correct_answer_neither_sounds_the_cue_nor
 
     ExerciseSessionController controller{ notePlayer,
                                           ascendingOnlySettings(),
+                                          {},
                                           {},
                                           [&vibrationCount] { ++vibrationCount; } };
 
@@ -408,7 +410,7 @@ TEST( ExerciseSessionControllerTest, a_level_decides_where_the_sessions_start )
     domain::NotePlayerFake notePlayer;
     domain::PlayerPreferencesFake levelStore;
 
-    ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
     // Nothing chosen yet, and that is a question to ask - not a default to assume.
     EXPECT_FALSE( controller.hasChosenLevel() );
@@ -436,7 +438,7 @@ TEST( ExerciseSessionControllerTest, a_remembered_level_is_there_at_start_up )
     levelStore.storeLevel( domain::PlayerLevel::Advanced );
 
     // No choosePlayerLevel call at all: the application opens on what it remembers.
-    ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
     EXPECT_TRUE( controller.hasChosenLevel() );
     EXPECT_EQ( static_cast<int>( domain::PlayerLevel::Advanced ), controller.playerLevel() );
@@ -447,7 +449,7 @@ TEST( ExerciseSessionControllerTest, a_level_changes_the_palette_and_nothing_els
     domain::NotePlayerFake notePlayer;
     domain::PlayerPreferencesFake levelStore;
 
-    ExerciseSessionController controller{ notePlayer, {}, {}, {}, &levelStore };
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
     controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Beginner ) );
     controller.startSession();
@@ -637,7 +639,7 @@ TEST( ExerciseSessionControllerTest, the_session_experience_joins_the_profile_to
 
     settings.questionCount = 2;
 
-    ExerciseSessionController controller{ notePlayer, settings, {}, {}, &store };
+    ExerciseSessionController controller{ notePlayer, settings, {}, {}, {}, &store };
 
     controller.startSession();
 
