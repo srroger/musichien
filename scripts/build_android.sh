@@ -479,4 +479,11 @@ echo "   package : ${PACKAGE_FILE}"
 echo "   launch  : adb shell am start -n ${ANDROID_PACKAGE_NAME}/org.qtproject.qt.android.bindings.QtActivity"
 echo "====================================================================================================="
 
+# Un son, une fois l'APK installe.
+#
+# Pourquoi ici plutot que dans la reponse de l'assistant : le build part en ARRIERE-PLAN, et l'assistant ne
+# l'attend plus (attendre 75 s un build qui en prend 40 est de la latence pure). Il faut donc un autre signal,
+# et le seul qui marche quand l'humain est parti faire autre chose est sonore. Voir AGENTS.md, section 1.
+paplay /usr/share/sounds/freedesktop/stereo/complete.oga 2>/dev/null || true
+
 

@@ -136,6 +136,79 @@ ApplicationWindow {
         source: "qrc:/assets/fonts/NotoMusic-Regular.ttf"
     }
 
+    // Un ComboBox aux couleurs du jeu.
+    //
+    // Pourquoi un composant : le style Material peint la CASE sur fond clair ET la LISTE ouverte sur fond blanc.
+    // Regler seulement `background` ne suffit donc pas - un texte clair sur une liste blanche reste illisible. Il
+    // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
+    //
+    // Un composant inline plutot qu'un fichier : il n'est utile qu'ici, et il evite de dupliquer trois fois le meme
+    // style pour les trois listes de la page.
+    component DarkComboBox: ComboBox {
+        id: combo
+
+        Layout.fillWidth: true
+
+        contentItem: Text {
+            text: combo.displayText
+            color: "#ffffff"
+            verticalAlignment: Text.AlignVCenter
+            leftPadding: 10
+        }
+
+        delegate: ItemDelegate {
+            width: combo.width
+
+            contentItem: Text {
+                text: modelData
+                color: "#e8dcff"
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            // La ligne survolee : sans ca, on ne sait pas ce qu'on est en train de choisir.
+            background: Rectangle {
+                color: combo.highlightedIndex === index ? "#3a1f5c" : "transparent"
+            }
+
+        }
+
+        background: Rectangle {
+            color: "#1b1035"
+            radius: 8
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        popup: Popup {
+            y: combo.height - 1
+            width: combo.width
+            implicitHeight: Math.min(contentItem.implicitHeight, 240)
+            padding: 1
+
+            contentItem: ListView {
+                clip: true
+                implicitHeight: contentHeight
+                currentIndex: combo.highlightedIndex
+                // Le modele n'est lu que quand la liste est ouverte : c'est le motif du style d'origine, et il
+                // evite de construire les lignes d'une liste que personne ne regarde.
+                model: combo.popup.visible ? combo.delegateModel : null
+
+                ScrollIndicator.vertical: ScrollIndicator {
+                }
+
+            }
+
+            background: Rectangle {
+                color: "#241442"
+                radius: 8
+                border.width: 1
+                border.color: "#5c4a80"
+            }
+
+        }
+
+    }
+
     Rectangle {
         // The loop itself, and the only thing the player ever sees of it: the bench below is a tool for
         // building the project, this is the game.
@@ -556,7 +629,7 @@ ApplicationWindow {
                 id: settingsColumn
 
                 width: settingsScroll.availableWidth
-                spacing: 5
+                spacing: 3
 
                 Text {
                     Layout.fillWidth: true
@@ -573,6 +646,9 @@ ApplicationWindow {
                         required property var modelData
 
                         Layout.fillWidth: true
+                        // Material reserve une cible tactile de 48 dp : dans une LIGNE de liste, c'est deux fois trop.
+                        // Un Layout n'obéit qu'a Layout.preferredHeight, jamais a `height`.
+                        Layout.preferredHeight: 34
                         text: modelData.name
                         checked: modelData.enabled
                         onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
@@ -593,6 +669,7 @@ ApplicationWindow {
 
                 CheckBox {
                     Layout.fillWidth: true
+                    Layout.preferredHeight: 34
                     text: qsTr("Un rappel chaque jour")
                     checked: ExerciseController.dailyReminderEnabled
                     onClicked: ExerciseController.setDailyReminderEnabled(checked)
@@ -633,37 +710,10 @@ ApplicationWindow {
                         text: qsTr("Accordage")
                     }
 
-                    ComboBox {
-                        Layout.fillWidth: true
+                    DarkComboBox {
                         model: ExerciseController.temperaments
                         currentIndex: ExerciseController.temperament
                         onActivated: ExerciseController.setTemperament(index)
-
-                        contentItem: Text {
-                            text: parent.displayText
-                            color: "#ffffff"
-                            verticalAlignment: Text.AlignVCenter
-                            leftPadding: 10
-                        }
-
-                        delegate: ItemDelegate {
-                            width: parent.width
-
-                            contentItem: Text {
-                                text: modelData
-                                color: "#e8dcff"
-                                verticalAlignment: Text.AlignVCenter
-                            }
-
-                        }
-
-                        background: Rectangle {
-                            color: "#1b1035"
-                            radius: 8
-                            border.width: 1
-                            border.color: "#5c4a80"
-                        }
-
                     }
 
                     Text {
@@ -689,37 +739,10 @@ ApplicationWindow {
                             text: qsTr("Note de référence")
                         }
 
-                        ComboBox {
-                            Layout.fillWidth: true
+                        DarkComboBox {
                             model: ExerciseController.tuningRoots
                             currentIndex: ExerciseController.tuningRoot
                             onActivated: ExerciseController.setTuningRoot(index)
-
-                            contentItem: Text {
-                                text: parent.displayText
-                                color: "#ffffff"
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: 10
-                            }
-
-                            delegate: ItemDelegate {
-                                width: parent.width
-
-                                contentItem: Text {
-                                    text: modelData
-                                    color: "#e8dcff"
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                            }
-
-                            background: Rectangle {
-                                color: "#1b1035"
-                                radius: 8
-                                border.width: 1
-                                border.color: "#5c4a80"
-                            }
-
                         }
 
                     }
@@ -740,6 +763,7 @@ ApplicationWindow {
 
                         SpinBox {
                             Layout.preferredWidth: 150
+                            Layout.preferredHeight: 32
                             Layout.alignment: Qt.AlignLeft
                             from: 400
                             to: 480
@@ -761,7 +785,7 @@ ApplicationWindow {
 
                             background: Rectangle {
                                 color: "#1b1035"
-                                radius: 8
+                                radius: 4
                                 border.width: 1
                                 border.color: "#5c4a80"
                             }
@@ -804,37 +828,10 @@ ApplicationWindow {
                             text: qsTr("Le micro")
                         }
 
-                        ComboBox {
-                            Layout.fillWidth: true
+                        DarkComboBox {
                             model: MicrophoneController.inputDeviceNames
                             currentIndex: MicrophoneController.currentDeviceIndex
                             onActivated: MicrophoneController.selectDevice(index)
-
-                            contentItem: Text {
-                                text: parent.displayText
-                                color: "#ffffff"
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: 10
-                            }
-
-                            delegate: ItemDelegate {
-                                width: parent.width
-
-                                contentItem: Text {
-                                    text: modelData
-                                    color: "#e8dcff"
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                            }
-
-                            background: Rectangle {
-                                color: "#1b1035"
-                                radius: 8
-                                border.width: 1
-                                border.color: "#5c4a80"
-                            }
-
                         }
 
                         // La portee miniature : cinq lignes, une boule qui suit la hauteur. Le ratio est logarithmique,
