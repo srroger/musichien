@@ -342,6 +342,11 @@ Item {
                 Repeater {
                     // UN SEUL Repeater, et PLAT : une entree par bouton, chacune sachant sa place, son rang dans
                     // la case, et le nombre de ses voisines.
+                    // Combien d'octaves l'intervalle est au-dessus du simple : zero pour une seconde, un pour
+                    // une neuvieme, deux pour une quinzieme. C'est CE nombre, et non le rang dans la case, qui
+                    // decide de la TAILLE - parce que c'est lui qui dit la distance.
+                    // ...et de combien le composes s'en ecarte : juste assez pour TOUCHER son simple, en allant
+                    // vers le centre du cercle.
 
                     // C'est la reponse a deux choses a la fois. D'abord une demande de Roger : les composes
                     // restent COLLES a leur simple, parce qu'une seconde majeure et une neuvieme majeure sont la
@@ -355,24 +360,30 @@ Item {
 
                         required property var modelData
                         required property int index
-                        // Deux constantes de la pile, ecrites ici parce qu'elles decrivent cet ecran et rien
-                        // d'autre : l'ecart entre deux boutons d'une meme case, et la hauteur d'un bouton.
-                        readonly property real stackSpacing: 3
-                        readonly property int stackSize: (gridButton.modelData.stackSize > 0) ? gridButton.modelData.stackSize : 1
-                        readonly property real buttonHeight: (circleBoard.slotHeight - ((gridButton.stackSize - 1) * stackSpacing)) / gridButton.stackSize
+                        // Roger : "des petits cercles supplementaires, un peu plus petits a chaque octave de
+                        // distance". Et il a raison, la carte y gagne ce qui lui manquait : au mode ou tout est en
+                        // jeu, un accord entier ressemble maintenant a une case avec ses satellites au lieu d'une
+                        // pile de pastilles ou plus personne ne lit rien.
+                        readonly property real octaveSpan: (gridButton.modelData.octaveSpan > 0) ? gridButton.modelData.octaveSpan : 0
+                        // Le simple garde la case entiere ; chaque octave au-dessus perd un tiers de ce qui reste.
+                        readonly property real buttonSize: circleBoard.slotWidth / (1 + (0.34 * octaveSpan))
                         // Moins quatre-vingt-dix degres, c'est midi : la place zero du cercle est le do, et le do se
                         // met en haut. Le sens des aiguilles d'une montre donne ensuite sol, re, la, mi, si -
                         // l'ordre du cercle, tel qu'il s'enseigne.
-                        readonly property real slotAngleRadians: (-90 + 30 * gridButton.modelData.slot) * Math.PI / 180
-                        // La pile est CENTREE sur le point du cercle, comme le serait une colonne : une case a un
-                        // intervalle, une case a trois et une case vide se ressemblent alors assez pour qu'on lise
-                        // la carte d'un seul coup d'oeil.
-                        readonly property real stackOffset: (((gridButton.modelData.stackIndex > 0) ? gridButton.modelData.stackIndex : 0) - ((gridButton.stackSize - 1) / 2)) * (buttonHeight + stackSpacing)
+                        readonly property real slotAngleRadians: (-90 + (30 * gridButton.modelData.slot)) * Math.PI / 180
+                        // Le centre de la case sur le cercle...
+                        readonly property real slotCentreX: (circleBoard.width / 2) + (circleBoard.ringRadius * Math.cos(slotAngleRadians))
+                        readonly property real slotCentreY: (circleBoard.height / 2) + (circleBoard.ringRadius * Math.sin(slotAngleRadians))
+                        // C'est pour cela que le simple d'une case n'est PAS au centre du cercle des quintes : il
+                        // reste sur sa place, et ses composes viennent vers l'interieur. Rien n'est place au hasard,
+                        // et un composes colle a son simple est exactement ce qu'il est en musique - la meme couleur,
+                        // un peu plus loin.
+                        readonly property real satelliteOffset: (circleBoard.slotWidth - buttonSize) / 2
 
-                        x: (circleBoard.width / 2) + (circleBoard.ringRadius * Math.cos(slotAngleRadians)) - (width / 2)
-                        y: (circleBoard.height / 2) + (circleBoard.ringRadius * Math.sin(slotAngleRadians)) - (height / 2) + stackOffset
-                        width: circleBoard.slotWidth
-                        height: buttonHeight
+                        x: slotCentreX - (width / 2) - (satelliteOffset * Math.cos(slotAngleRadians))
+                        y: slotCentreY - (height / 2) - (satelliteOffset * Math.sin(slotAngleRadians))
+                        width: buttonSize
+                        height: buttonSize
 
                         // Une case vide reste DANS le cercle : meme place, meme taille, un simple anneau. Le joueur
                         // voit donc ou l'intervalle viendra, et sa progression a une forme.
@@ -394,7 +405,7 @@ Item {
 
                             anchors.fill: parent
                             visible: !gridButton.modelData.isEmpty
-                            text: gridButton.modelData.identifier === undefined ? "uid=" + gridButton.index : gridButton.modelData.identifier
+                            text: gridButton.modelData.isEmpty ? "" : String(gridButton.modelData.identifier)
                             highlighted: exerciseScreen.hasAnswered && !gridButton.modelData.isEmpty && (exerciseScreen.answeredInterval.semitones === gridButton.modelData.semitones)
                             onClicked: ExerciseController.answer(gridButton.modelData.semitones)
                             scale: intervalButton.down ? 0.9 : 1
@@ -427,10 +438,11 @@ Item {
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 color: "#2b1b47"
-                                // La hauteur lue est CELLE DU CALCUL, pas celle du bouton : un bouton qui s'ajuste
-                                // a son propre contenu et un contenu qui s'ajuste au bouton font une boucle de
-                                // liaison, et QML la signale - sainement - a chaque image.
-                                font.pixelSize: Math.max(9, Math.min(14, gridButton.buttonHeight * 0.45)) || 12
+                                // La taille lue est CELLE DU CALCUL, pas celle du bouton : un bouton qui s'ajuste a
+                                // son propre contenu et un contenu qui s'ajuste au bouton font une boucle de liaison,
+                                // et QML la signale - sainement - a chaque image. Le Math.max protege le cas ou la
+                                // case n'est pas encore mesuree : une taille NaN ne se peint pas du tout.
+                                font.pixelSize: Math.max(8, Math.round(gridButton.buttonSize * 0.42))
                                 font.bold: true
                             }
 
