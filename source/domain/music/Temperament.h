@@ -39,6 +39,17 @@ enum class Temperament
 // the enum can never drift apart.
 inline constexpr std::array<std::string_view, 3> TEMPERAMENT_NAMES{ "Tempéré", "Pythagoricien", "Juste" };
 
+// The tuning a note is HEARD in: which temperament, and at what diapason. This is the context that travels from the
+// settings screen down to the audio layer, so that the sound follows the choice.
+//
+// The ROOT is deliberately NOT here: it is the note an interval is heard FROM, and the audio layer always knows it -
+// it is the first note it plays. A context is a global choice; a root is a property of the question.
+struct TuningContext
+{
+    Temperament temperament{ Temperament::Equal };
+    double referencePitchHz{ REFERENCE_FREQUENCY_HZ };
+};
+
 // Frequency of a note, HEARD IN THE CONTEXT of a root note.
 //
 // Equal temperament ignores the root - that is the whole point of it - and the first branch says so. The others are

@@ -129,7 +129,21 @@ std::size_t ToneSynthesizer::sampleCountFor( std::chrono::milliseconds p_duratio
 }
 
 std::vector<float> ToneSynthesizer::renderNote( const Note & p_note,
-                                                std::chrono::milliseconds p_duration ) const
+                                                std::chrono::milliseconds p_duration,
+                                                TuningContext p_tuning ) const
+{
+    // A note on its own is heard FROM itself: its root is the note. Equal temperament ignores the root anyway.
+    return renderNoteAt( p_note,
+                         frequencyFor( p_note,
+                                       p_note,
+                                       p_tuning.temperament,
+                                       p_tuning.referencePitchHz ),
+                         p_duration );
+}
+
+std::vector<float> ToneSynthesizer::renderNoteAt( const Note & p_note,
+                                                  double p_frequencyHz,
+                                                  std::chrono::milliseconds p_duration ) const
 {
     const std::size_t sampleCount = sampleCountFor( p_duration );
 
@@ -140,7 +154,7 @@ std::vector<float> ToneSynthesizer::renderNote( const Note & p_note,
         return samples;
     }
 
-    const double frequency = p_note.frequencyHz();
+    const double frequency = p_frequencyHz;
 
     // The strings of the note, tuned a hair apart around the true frequency.
     //
@@ -294,7 +308,8 @@ void ToneSynthesizer::mixStruckStringInto( std::span<float> p_samples,
 }
 
 std::vector<float> ToneSynthesizer::renderChord( std::span<const Note> p_notes,
-                                                 std::chrono::milliseconds p_duration ) const
+                                                 std::chrono::milliseconds p_duration,
+                                                 TuningContext p_tuning ) const
 {
     const std::size_t sampleCount = sampleCountFor( p_duration );
 
@@ -305,11 +320,16 @@ std::vector<float> ToneSynthesizer::renderChord( std::span<const Note> p_notes,
         return mixedSamples;
     }
 
+    // The chord is heard FROM its first note: in a non-equal temperament, that first note is what gives every other
+    // note of the chord its meaning.
+    const Note root = p_notes.front();
+
     // Every note is rendered on its own and then added. Mixing this way keeps the code readable, and
     // a defect in one voice cannot stay invisible because another voice masked it.
     for( const Note & note : p_notes )
     {
-        const std::vector<float> noteSamples = renderNote( note, p_duration );
+        const std::vector<float> noteSamples =
+          renderNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_duration );
 
         std::ranges::transform( noteSamples, mixedSamples, mixedSamples.begin(), std::plus<>{} );
     }
@@ -325,17 +345,27 @@ std::vector<float> ToneSynthesizer::renderChord( std::span<const Note> p_notes,
 
 std::vector<float> ToneSynthesizer::renderMelody( std::span<const Note> p_notes,
                                                   std::chrono::milliseconds p_noteDuration,
-                                                  std::chrono::milliseconds p_gap ) const
+                                                  std::chrono::milliseconds p_gap,
+                                                  TuningContext p_tuning ) const
 {
     std::vector<float> melodySamples;
+
+    if( p_notes.empty() )
+    {
+        return melodySamples;
+    }
 
     const std::size_t gapSampleCount = sampleCountFor( p_gap );
 
     melodySamples.reserve( p_notes.size() * ( sampleCountFor( p_noteDuration ) + gapSampleCount ) );
 
+    // A melody is heard FROM its first note, exactly like a chord: the interval is built on the root it starts on.
+    const Note root = p_notes.front();
+
     for( const Note & note : p_notes )
     {
-        const std::vector<float> noteSamples = renderNote( note, p_noteDuration );
+        const std::vector<float> noteSamples =
+          renderNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_noteDuration );
 
         melodySamples.insert( melodySamples.end(), noteSamples.begin(), noteSamples.end() );
 

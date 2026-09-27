@@ -67,6 +67,10 @@ public:
 
     void stopAll() override;
 
+    // The tuning every following note is heard in. The root is always the FIRST note of what is played, which is
+    // exactly what the domain's frequencyFor expects: an interval is heard FROM its first note.
+    void setTuning( domain::TuningContext p_tuning ) override;
+
     // The sampled instruments, when there are any. They become the sound of the EXERCISES - a real piano, a real
     // guitar, a real saxophone - while the synthesiser keeps the mistake cue, which must not be beautiful.
     //
@@ -126,6 +130,9 @@ private:
     std::mt19937 m_instrumentRandomEngine{ std::random_device{}() };
 
     std::optional<domain::ToneSynthesizer> m_synthesizer;
+
+    // Equal temperament at 440 Hz until setTuning says otherwise.
+    domain::TuningContext m_tuning;
 
     QAudioFormat m_audioFormat;
     std::vector<float> m_currentSamples;

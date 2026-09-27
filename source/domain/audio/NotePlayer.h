@@ -14,6 +14,7 @@
 // =====================================================================================================================
 
 #include "domain/music/Note.h"
+#include "domain/music/Temperament.h"
 
 #include <chrono>
 #include <span>
@@ -56,6 +57,13 @@ public:
     // test qui ne s'intéresse pas au clic n'a rien à écrire non plus. Le feedback d'un bouton ne mérite pas
     // d'obliger tous les adaptateurs du projet à répondre.
     virtual void playTapCue() {}
+
+    // The tuning every following note is heard in, until it is called again. Equal temperament and a 440 Hz diapason
+    // are the defaults, which is exactly what a NotePlayer that never receives this call keeps doing.
+    //
+    // A default body, like playTapCue: a test that only counts the notes played has no tuning to care about, and
+    // must not be forced to write one.
+    virtual void setTuning( TuningContext p_tuning ) { (void)p_tuning; }
 
     // Stops everything immediately. Called when the screen is left or the application goes to the
     // background: an audio stream left open on a phone is a battery drain and a bug.

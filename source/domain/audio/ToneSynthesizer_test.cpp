@@ -386,6 +386,61 @@ TEST( ToneSynthesizerTest, an_octave_higher_sounds_exactly_twice_as_high )
     EXPECT_NEAR( 2.0, upperFrequency / lowerFrequency, 0.01 );
 }
 
+TEST( ToneSynthesizerTest, a_note_follows_the_chosen_diapason )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const Note referenceNote{ 69 };    // A4
+
+    // A diapason of 442 scales every frequency by 442/440, and the synthesiser must follow it: a tuner is only
+    // useful if the sound it plays is at the diapason it claims.
+    const TuningContext sharpDiapason{ Temperament::Equal, 442.0 };
+
+    const std::vector<float> samples =
+      synthesizer.renderNote( referenceNote, std::chrono::milliseconds{ 1000 }, sharpDiapason );
+
+    const double expectedFrequency = referenceNote.frequencyHz() * ( 442.0 / 440.0 );
+
+    EXPECT_NEAR( expectedFrequency,
+                 measuredFrequency( samples, expectedFrequency ),
+                 expectedFrequency * 0.0025 );
+}
+
+TEST( ToneSynthesizerTest, a_pythagorean_fifth_is_pure_in_a_melody )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const Note root{ 60 };     // C4
+    const Note fifth{ 67 };    // G4
+
+    constexpr std::chrono::milliseconds noteDuration{ 500 };
+    constexpr std::chrono::milliseconds gap{ 100 };
+
+    const TuningContext pythagorean{ Temperament::Pythagorean, 440.0 };
+
+    const std::vector<Note> melody{ root, fifth };
+
+    const std::vector<float> melodySamples = synthesizer.renderMelody( melody, noteDuration, gap, pythagorean );
+
+    // The second note starts after the first note and its gap.
+    const std::size_t secondNoteStart = synthesizer.sampleCountFor( noteDuration ) + synthesizer.sampleCountFor( gap );
+
+    const std::span<const float> allSamples = melodySamples;
+
+    const std::span<const float> secondNote = allSamples.subspan( secondNoteStart );
+
+    const double rootFrequency = frequencyFor( root, root, Temperament::Pythagorean, 440.0 );
+    const double fifthFrequency = frequencyFor( fifth, root, Temperament::Pythagorean, 440.0 );
+
+    // A Pythagorean fifth is a chain of pure fifths: 3/2, not the tempered 2^(7/12). The synthesiser must play
+    // what the temperament says, otherwise the setting is a lie the ear can hear.
+    EXPECT_NEAR( 3.0 / 2.0, fifthFrequency / rootFrequency, 1e-9 );
+
+    EXPECT_NEAR( fifthFrequency,
+                 measuredFrequency( secondNote, fifthFrequency ),
+                 fifthFrequency * 0.0025 );
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Degenerate cases must not crash and must not produce noise
 // ---------------------------------------------------------------------------------------------------------------------

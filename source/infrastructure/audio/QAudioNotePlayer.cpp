@@ -200,6 +200,11 @@ void QAudioNotePlayer::stopAll()
     m_audioOutputDevice = nullptr;
 }
 
+void QAudioNotePlayer::setTuning( domain::TuningContext p_tuning )
+{
+    m_tuning = p_tuning;
+}
+
 void QAudioNotePlayer::playNote( const domain::Note & p_note )
 {
     ensureAudioOutputIsOpen();
@@ -215,12 +220,13 @@ void QAudioNotePlayer::playNote( const domain::Note & p_note )
 
         playSamples( instrumentFor( notes ).renderNote( p_note,
                                                         noteDuration(),
-                                                        m_audioFormat.sampleRate() ) );
+                                                        m_audioFormat.sampleRate(),
+                                                        m_tuning ) );
 
         return;
     }
 
-    playSamples( m_synthesizer->renderNote( p_note, noteDuration() ) );
+    playSamples( m_synthesizer->renderNote( p_note, noteDuration(), m_tuning ) );
 }
 
 void QAudioNotePlayer::playMelody( std::span<const domain::Note> p_notes,
@@ -238,12 +244,13 @@ void QAudioNotePlayer::playMelody( std::span<const domain::Note> p_notes,
         playSamples( instrumentFor( p_notes ).renderMelody( p_notes,
                                                             noteDuration(),
                                                             p_gap,
-                                                            m_audioFormat.sampleRate() ) );
+                                                            m_audioFormat.sampleRate(),
+                                                            m_tuning ) );
 
         return;
     }
 
-    playSamples( m_synthesizer->renderMelody( p_notes, noteDuration(), p_gap ) );
+    playSamples( m_synthesizer->renderMelody( p_notes, noteDuration(), p_gap, m_tuning ) );
 }
 
 void QAudioNotePlayer::playChord( std::span<const domain::Note> p_notes )
@@ -259,12 +266,13 @@ void QAudioNotePlayer::playChord( std::span<const domain::Note> p_notes )
     {
         playSamples( instrumentFor( p_notes ).renderChord( p_notes,
                                                            noteDuration(),
-                                                           m_audioFormat.sampleRate() ) );
+                                                           m_audioFormat.sampleRate(),
+                                                           m_tuning ) );
 
         return;
     }
 
-    playSamples( m_synthesizer->renderChord( p_notes, noteDuration() ) );
+    playSamples( m_synthesizer->renderChord( p_notes, noteDuration(), m_tuning ) );
 }
 
 void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_instruments )
@@ -368,11 +376,12 @@ void QAudioNotePlayer::playGreeting()
         samples = m_instruments.front().renderMelody( greetingNotes,
                                                       noteDuration(),
                                                       GREETING_GAP,
-                                                      m_audioFormat.sampleRate() );
+                                                      m_audioFormat.sampleRate(),
+                                                      m_tuning );
     }
     else
     {
-        samples = m_synthesizer->renderMelody( greetingNotes, noteDuration(), GREETING_GAP );
+        samples = m_synthesizer->renderMelody( greetingNotes, noteDuration(), GREETING_GAP, m_tuning );
     }
 
     // Et surtout, DISCRET. C'est le volume qui répond au vrai reproche : au niveau des exercices, une

@@ -32,6 +32,7 @@
 // =====================================================================================================================
 
 #include "domain/music/Note.h"
+#include "domain/music/Temperament.h"
 
 #include <chrono>
 #include <cstdint>
@@ -121,18 +122,28 @@ public:
 
     // A single note.
     [[nodiscard]] std::vector<float> renderNote( const Note & p_note,
-                                                 std::chrono::milliseconds p_duration ) const;
+                                                 std::chrono::milliseconds p_duration,
+                                                 TuningContext p_tuning = {} ) const;
 
-    // Several notes sounded at the same time: a harmonic interval, a chord.
+    // Several notes sounded at the same time: a harmonic interval, a chord. The tuning's root is the FIRST note,
+    // which is the note the interval is heard from.
     [[nodiscard]] std::vector<float> renderChord( std::span<const Note> p_notes,
-                                                  std::chrono::milliseconds p_duration ) const;
+                                                  std::chrono::milliseconds p_duration,
+                                                  TuningContext p_tuning = {} ) const;
 
-    // Several notes sounded one after another, separated by silence: a melodic interval, a scale.
+    // Several notes sounded one after another, separated by silence: a melodic interval, a scale. Root as above.
     [[nodiscard]] std::vector<float> renderMelody( std::span<const Note> p_notes,
                                                    std::chrono::milliseconds p_noteDuration,
-                                                   std::chrono::milliseconds p_gap ) const;
+                                                   std::chrono::milliseconds p_gap,
+                                                   TuningContext p_tuning = {} ) const;
 
 private:
+    // One note at an EXPLICIT frequency. The frequency is computed by the caller - which alone knows the root - and
+    // this method only does the arithmetic of a struck string at that frequency.
+    [[nodiscard]] std::vector<float> renderNoteAt( const Note & p_note,
+                                                   double p_frequencyHz,
+                                                   std::chrono::milliseconds p_duration ) const;
+
     // Adds ONE struck string to a buffer, without touching its level: mixing, enveloping and normalising
     // belong to the caller, which is the only one that knows how many strings are playing.
     //

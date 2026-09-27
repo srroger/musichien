@@ -331,6 +331,23 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     playWantedInstruments();
 
+    // Le réglage descend jusqu'à la couche audio, et il descend à CHAQUE changement : basculer le tempérament ou le
+    // diapason s'entend à la note suivante, pas au prochain lancement. La TONIQUE n'en fait pas partie - la couche
+    // audio connaît toujours la sienne (la première note qu'elle joue) ; seul l'accordeur a besoin d'une tonique à lui.
+    const auto applyTuning = [&playerLevelStore, &notePlayer]() {
+        notePlayer.setTuning( { playerLevelStore.storedTemperament(), playerLevelStore.storedReferencePitch() } );
+    };
+
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::temperamentChanged,
+                      applyTuning );
+
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::referencePitchChanged,
+                      applyTuning );
+
+    applyTuning();
+
     // Le rappel quotidien. Le port cache la plateforme : sur le bureau, rien ne se planifie ; sur Android, une
     // vraie notification sera posee. Ce que l'application sait, c'est qu'une case a ete cochee, et elle demande au
     // port de s'en occuper.
