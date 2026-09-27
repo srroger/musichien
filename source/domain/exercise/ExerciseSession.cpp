@@ -189,7 +189,7 @@ QuestionKind ExerciseSession::drawKind()
 
 bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p_answer )
 {
-    m_lastAnswer = std::move( p_answer );
+    m_lastAnswer = p_answer;
     m_lastAnswerWasCorrect = p_isCorrect;
 
     if( p_isCorrect )

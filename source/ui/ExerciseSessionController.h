@@ -118,7 +118,7 @@ class ExerciseSessionController final : public QObject
 public:
     // Ce que la question en cours demande : nommer un intervalle, ou dire dans quel sens il a ete joue. La valeur
     // est celle du domaine, transposee en entier pour le QML.
-    int questionKind() const noexcept;
+    [[nodiscard]] int questionKind() const noexcept;
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
