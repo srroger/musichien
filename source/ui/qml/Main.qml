@@ -180,7 +180,6 @@ ApplicationWindow {
                 Flow {
                     Layout.preferredWidth: mainWindow.buttonWidth
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
 
                     Repeater {
