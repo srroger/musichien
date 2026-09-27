@@ -55,9 +55,11 @@ private:
     // enough to feel responsive and long enough to ignore a crack of the voice or a slide on the way.
     static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 250;
 
-    // How far a reading may drift while still counting as the SAME note. Half a semitone is the ear's own line
-    // between "the same note, slightly off" and "another note".
-    static constexpr double SAME_NOTE_SEMITONES = 0.5;
+    // How fast the tracked pitch follows a reading. 0.3 keeps 70% of the previous estimate at every reading: slow
+    // enough to absorb noise, fast enough to follow a real change of note. The tracked pitch is then ROUNDED to the
+    // nearest note, which is what gives the tolerance: a reading must move the average half a semitone before the
+    // note changes.
+    static constexpr double TRACKING_ALPHA = 0.3;
 
     Reading m_reading;
 
@@ -65,6 +67,10 @@ private:
     std::int32_t m_heldMidiNumber{ 0 };
 
     std::int32_t m_heldMilliseconds{ 0 };
+
+    // The tracked pitch, smoothed across readings. This is what absorbs the noise: a single reading never decides a
+    // note, the average of the last few does. 0.0 means "not tracking yet".
+    double m_trackedMidi{ 0.0 };
 };
 
 }    // namespace musichien::domain

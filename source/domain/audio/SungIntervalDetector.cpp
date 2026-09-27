@@ -12,6 +12,7 @@ void SungIntervalDetector::reset() noexcept
     m_reading = Reading{};
     m_heldMidiNumber = 0;
     m_heldMilliseconds = 0;
+    m_trackedMidi = 0.0;
 }
 
 void SungIntervalDetector::update( double p_frequencyHz,
@@ -25,8 +26,8 @@ void SungIntervalDetector::update( double p_frequencyHz,
         return;
     }
 
-    // Silence breaks the hold, but does NOT erase the note already accepted: taking a breath in the middle of an
-    // exercise must not cost the first note.
+    // Silence interrupts the hold, but does NOT erase the note already accepted, nor the tracked pitch: taking a
+    // breath in the middle of an exercise must not cost the first note.
     if( ( p_frequencyHz <= 0.0 ) || ( p_referencePitchHz <= 0.0 ) )
     {
         m_heldMidiNumber = 0;
@@ -47,15 +48,28 @@ void SungIntervalDetector::update( double p_frequencyHz,
         return;
     }
 
-    // Still the same note? Then the hold continues. Otherwise a new hold starts, from zero: a note that was brushed
-    // on the way to another one never had time to count.
-    const bool sameNote = ( m_heldMidiNumber != 0 )
-                          && ( std::abs( midiNumber - static_cast<double>( m_heldMidiNumber ) ) < SAME_NOTE_SEMITONES );
-
-    if( !sameNote )
+    if( m_heldMidiNumber == 0 )
     {
+        // First reading, or a fresh start after a breath: the tracking resumes on this pitch.
+        m_trackedMidi = midiNumber;
         m_heldMidiNumber = static_cast<std::int32_t>( std::lround( midiNumber ) );
         m_heldMilliseconds = 0;
+    }
+    else
+    {
+        // The tracking: the VOICE wobbles, the tracked pitch must not. No single reading decides a note - the
+        // average of the last few does, which is what absorbs the noise and the instability Roger heard.
+        m_trackedMidi += ( midiNumber - m_trackedMidi ) * TRACKING_ALPHA;
+
+        // The note is the tracked pitch, rounded. Rounding is the tolerance itself: the average has to move half a
+        // semitone before the note changes, so a wobble around a note never reads as two notes.
+        const auto note = static_cast<std::int32_t>( std::lround( m_trackedMidi ) );
+
+        if( note != m_heldMidiNumber )
+        {
+            m_heldMidiNumber = note;
+            m_heldMilliseconds = 0;
+        }
     }
 
     m_heldMilliseconds += p_elapsedMilliseconds;

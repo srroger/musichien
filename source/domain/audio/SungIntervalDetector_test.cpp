@@ -52,7 +52,7 @@ TEST( SungIntervalDetectorTest, a_held_note_becomes_the_first_one )
 {
     SungIntervalDetector detector;
 
-    hold( detector, frequencyOf( 69 ), 300 );    // A4
+    hold( detector, frequencyOf( 69 ), 600 );    // A4
 
     EXPECT_EQ( 69, detector.reading().firstMidiNumber );
     EXPECT_FALSE( detector.reading().hasInterval() );
@@ -67,12 +67,30 @@ TEST( SungIntervalDetectorTest, a_note_held_too_briefly_does_not_count )
     EXPECT_EQ( 0, detector.reading().firstMidiNumber );
 }
 
+TEST( SungIntervalDetectorTest, a_wobbling_voice_still_counts_as_one_note )
+{
+    SungIntervalDetector detector;
+
+    // Un vibrato de plus ou moins 0,4 demi-ton autour de 69 : c'est la MEME note, pas deux.
+    for( std::int32_t elapsed = 0; elapsed < 600; elapsed += FRAME_MILLISECONDS )
+    {
+        const bool high = ( ( elapsed / FRAME_MILLISECONDS ) % 2 ) == 0;
+        const double midi = 69.0 + ( high ? 0.4 : -0.4 );
+        const double wobbling = frequencyOf( 69 ) * std::pow( 2.0, ( midi - 69.0 ) / 12.0 );
+
+        detector.update( wobbling, REFERENCE_PITCH_HZ, FRAME_MILLISECONDS );
+    }
+
+    EXPECT_EQ( 69, detector.reading().firstMidiNumber );
+    EXPECT_FALSE( detector.reading().hasInterval() );
+}
+
 TEST( SungIntervalDetectorTest, two_held_notes_give_the_interval )
 {
     SungIntervalDetector detector;
 
-    hold( detector, frequencyOf( 69 ), 300 );    // A4
-    hold( detector, frequencyOf( 76 ), 300 );    // E5
+    hold( detector, frequencyOf( 69 ), 600 );    // A4
+    hold( detector, frequencyOf( 76 ), 600 );    // E5
 
     ASSERT_TRUE( detector.reading().hasInterval() );
     EXPECT_EQ( 7, detector.reading().semitones() );    // une quinte, montante
@@ -82,8 +100,8 @@ TEST( SungIntervalDetectorTest, a_falling_interval_is_negative )
 {
     SungIntervalDetector detector;
 
-    hold( detector, frequencyOf( 76 ), 300 );
-    hold( detector, frequencyOf( 69 ), 300 );
+    hold( detector, frequencyOf( 76 ), 600 );
+    hold( detector, frequencyOf( 69 ), 600 );
 
     ASSERT_TRUE( detector.reading().hasInterval() );
     EXPECT_EQ( -7, detector.reading().semitones() );
@@ -93,9 +111,9 @@ TEST( SungIntervalDetectorTest, a_note_only_brushed_on_the_way_does_not_count )
 {
     SungIntervalDetector detector;
 
-    hold( detector, frequencyOf( 69 ), 300 );
+    hold( detector, frequencyOf( 69 ), 600 );
     hold( detector, frequencyOf( 72 ), 80 );    // passe trop vite pour etre une note voulue
-    hold( detector, frequencyOf( 76 ), 300 );
+    hold( detector, frequencyOf( 76 ), 600 );
 
     ASSERT_TRUE( detector.reading().hasInterval() );
     EXPECT_EQ( 7, detector.reading().semitones() );
@@ -105,9 +123,9 @@ TEST( SungIntervalDetectorTest, a_breath_between_the_two_notes_keeps_the_first )
 {
     SungIntervalDetector detector;
 
-    hold( detector, frequencyOf( 69 ), 300 );
+    hold( detector, frequencyOf( 69 ), 600 );
     hold( detector, 0.0, 200 );                  // le chanteur reprend son souffle
-    hold( detector, frequencyOf( 64 ), 300 );    // E4
+    hold( detector, frequencyOf( 64 ), 600 );    // E4
 
     ASSERT_TRUE( detector.reading().hasInterval() );
     EXPECT_EQ( -5, detector.reading().semitones() );
@@ -117,9 +135,9 @@ TEST( SungIntervalDetectorTest, the_answer_does_not_move_once_it_is_found )
 {
     SungIntervalDetector detector;
 
-    hold( detector, frequencyOf( 69 ), 300 );
-    hold( detector, frequencyOf( 76 ), 300 );
-    hold( detector, frequencyOf( 81 ), 300 );    // le chanteur continue : la reponse est deja donnee
+    hold( detector, frequencyOf( 69 ), 600 );
+    hold( detector, frequencyOf( 76 ), 600 );
+    hold( detector, frequencyOf( 81 ), 600 );    // le chanteur continue : la reponse est deja donnee
 
     EXPECT_EQ( 7, detector.reading().semitones() );
 }
@@ -128,8 +146,8 @@ TEST( SungIntervalDetectorTest, a_reset_asks_for_a_new_answer )
 {
     SungIntervalDetector detector;
 
-    hold( detector, frequencyOf( 69 ), 300 );
-    hold( detector, frequencyOf( 76 ), 300 );
+    hold( detector, frequencyOf( 69 ), 600 );
+    hold( detector, frequencyOf( 76 ), 600 );
 
     detector.reset();
 
