@@ -13,8 +13,9 @@
 musichienFunction_AddLibrary(infrastructure
     audio/QAudioNotePlayer.h
     audio/QAudioNotePlayer.cpp
-    audio/PitchDetector.h
     audio/NullPitchDetector.h
+    audio/QAudioPitchDetector.h
+    audio/QAudioPitchDetector.cpp
     content/JsonHintBook.h
     content/JsonHintBook.cpp
     content/JsonAnecdoteBook.h

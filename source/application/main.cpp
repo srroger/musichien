@@ -6,6 +6,7 @@
 // =====================================================================================================================
 
 #include "infrastructure/audio/QAudioNotePlayer.h"
+#include "infrastructure/audio/QAudioPitchDetector.h"
 #include "infrastructure/content/JsonAnecdoteBook.h"
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
@@ -18,9 +19,12 @@
 #include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
+#include "ui/MicrophoneController.h"
 
+#include <QAudioDevice>
 #include <QFile>
 #include <QGuiApplication>
+#include <QMediaDevices>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QUrl>
@@ -28,6 +32,7 @@
 
 #include <array>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -241,6 +246,35 @@ int main( int p_argumentCount, char * p_arguments[] )
                                                                  anecdoteBook,
                                                                  musichien::infrastructure::vibrateForMistake,
                                                                  &playerLevelStore };
+
+    // Le micro. Le view model ne connait que le port PitchDetector : la vraie implementation (QAudioSource + YIN)
+    // est construite ICI, dans la couche de câblage, et livrée par la factory à chaque changement de périphérique.
+    // C'est ce qui permet au réglage de lister et de choisir le micro sans que le view model voie Qt Multimedia.
+    const QList<QAudioDevice> inputDevices = QMediaDevices::audioInputs();
+
+    QStringList inputDeviceNames;
+
+    for( const QAudioDevice & device : inputDevices )
+    {
+        inputDeviceNames << device.description();
+    }
+
+    musichien::ui::MicrophoneController microphoneController{
+      inputDeviceNames,
+      [inputDevices]( int p_deviceIndex ) -> std::unique_ptr<musichien::domain::PitchDetector> {
+          if( p_deviceIndex < 0 || p_deviceIndex >= inputDevices.size() )
+          {
+              return {};
+          }
+
+          return std::make_unique<musichien::infrastructure::QAudioPitchDetector>( inputDevices.at( p_deviceIndex ) );
+      } };
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "MicrophoneController",
+                                  &microphoneController );
 
     // What the player WANTS to hear. The filtering happens HERE, in the wiring layer, which is what keeps the
     // audio adapter from having to know anything about preferences - and it happens again on every change, so

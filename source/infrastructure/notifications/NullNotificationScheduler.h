@@ -10,7 +10,7 @@ namespace musichien::infrastructure
 class NullNotificationScheduler final : public NotificationScheduler
 {
 public:
-    void scheduleDailyReminder( int p_hour, int p_minute, std::string_view ) override
+    void scheduleDailyReminder( int p_hour, int p_minute, std::string_view p_content ) override
     {
     }
 

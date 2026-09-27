@@ -54,6 +54,14 @@
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+      The singing exercise reads the microphone through Qt Multimedia. RECORD_AUDIO is a RUNTIME permission on
+      Android: the declaration below only makes the dialog possible, and the application asks for it with
+      QCoreApplication::requestPermission at the exact moment the player starts the microphone test - never at
+      launch, never for nothing. Refusing it simply means "no singing exercise", nothing else.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- %%INSERT_FEATURES -->
 
     <supports-screens

@@ -20,6 +20,7 @@ musichienFunction_AddLibrary(domain
     # Audio, expressed as a port: the domain says WHAT it needs, never HOW it is done
     audio/NotePlayer.h
     audio/NotePlayerFake.h
+    audio/PitchDetector.h
     audio/ToneSynthesizer.h
     audio/ToneSynthesizer.cpp
     audio/SampledInstrument.h

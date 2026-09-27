@@ -580,6 +580,123 @@ ApplicationWindow {
                 text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
             }
 
+            // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
+            // miniature au rythme de la voix - c'est l'affichage qu'aura la question chantee, expose ici d'abord.
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.topMargin: 10
+                color: "#2a1a46"
+                radius: 8
+                border.width: 1
+                border.color: "#5c4a80"
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 10
+
+                    Text {
+                        Layout.fillWidth: true
+                        color: "#e8dcff"
+                        font.pixelSize: 14
+                        font.bold: true
+                        text: qsTr("Le micro")
+                    }
+
+                    ComboBox {
+                        Layout.fillWidth: true
+                        model: MicrophoneController.inputDeviceNames
+                        currentIndex: MicrophoneController.currentDeviceIndex
+                        onActivated: MicrophoneController.selectDevice(index)
+
+                        contentItem: Text {
+                            text: parent.displayText
+                            color: "#ffffff"
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: 10
+                        }
+
+                        delegate: ItemDelegate {
+                            width: parent.width
+
+                            contentItem: Text {
+                                text: modelData
+                                color: "#e8dcff"
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                        }
+
+                        background: Rectangle {
+                            color: "#1b1035"
+                            radius: 8
+                            border.width: 1
+                            border.color: "#5c4a80"
+                        }
+
+                    }
+
+                    // La portee miniature : cinq lignes, une boule qui suit la hauteur. Le ratio est logarithmique,
+                    // donc la boule monte d'une octave pour un doublement de frequence, comme une vraie note.
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 90
+
+                        Repeater {
+                            model: 5
+
+                            delegate: Rectangle {
+                                required property int index
+
+                                x: 0
+                                y: parent.height * (0.15 + index * 0.175)
+                                width: parent.width
+                                height: 1
+                                color: "#5c4a80"
+                            }
+
+                        }
+
+                        Rectangle {
+                            id: pitchBall
+
+                            width: 18
+                            height: 18
+                            radius: 9
+                            color: MicrophoneController.isListening ? "#8ef2b0" : "#5c4a80"
+                            x: parent.width / 2 - width / 2
+                            y: parent.height * (1 - MicrophoneController.detectedPitchRatio) - height / 2
+
+                            Behavior on y {
+                                NumberAnimation {
+                                    duration: 60
+                                    easing.type: Easing.OutQuad
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        color: "#8ef2b0"
+                        font.pixelSize: 15
+                        font.bold: true
+                        text: MicrophoneController.detectedNoteLabel
+                    }
+
+                    Button {
+                        Layout.alignment: Qt.AlignRight
+                        text: MicrophoneController.isListening ? qsTr("Arrêter") : qsTr("Tester le micro")
+                        onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
+                    }
+
+                }
+
+            }
+
             Button {
                 Layout.alignment: Qt.AlignRight
                 text: qsTr("Fermer")
