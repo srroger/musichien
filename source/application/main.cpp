@@ -353,7 +353,9 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     QObject::connect( &exerciseController,
                       &musichien::ui::ExerciseSessionController::testReminderRequested,
-                      [&notificationScheduler]() { notificationScheduler.showReminderNow(); } );
+                      [&notificationScheduler, &anecdoteBook]() {
+                          notificationScheduler.showReminderNow( reminderContentFor( anecdoteBook ) );
+                      } );
 
     applyReminder();
 

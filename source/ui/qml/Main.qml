@@ -592,6 +592,65 @@ ApplicationWindow {
                     text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
                 }
 
+                // L'accordage. Le tempere egal est la reference, et il reste le defaut : c'est ce sur quoi la musique
+                // autour de nous est construite. Les anciens ne prennent leur sens qu'autour d'une tonique, et le
+                // texte le dit plutot que de laisser croire a un simple bouton de plus.
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    spacing: 6
+
+                    Text {
+                        Layout.fillWidth: true
+                        color: "#e8dcff"
+                        font.pixelSize: 14
+                        font.bold: true
+                        text: qsTr("Accordage")
+                    }
+
+                    ComboBox {
+                        Layout.fillWidth: true
+                        model: ExerciseController.temperaments
+                        currentIndex: ExerciseController.temperament
+                        onActivated: ExerciseController.setTemperament(index)
+
+                        contentItem: Text {
+                            text: parent.displayText
+                            color: "#ffffff"
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: 10
+                        }
+
+                        delegate: ItemDelegate {
+                            width: parent.width
+
+                            contentItem: Text {
+                                text: modelData
+                                color: "#e8dcff"
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                        }
+
+                        background: Rectangle {
+                            color: "#1b1035"
+                            radius: 8
+                            border.width: 1
+                            border.color: "#5c4a80"
+                        }
+
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        color: "#8a77ad"
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Le tempéré est la référence. Les autres sonnent plus juste par endroits, et faux ailleurs.")
+                    }
+
+                }
+
                 // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
                 // miniature au rythme de la voix - c'est l'affichage qu'aura la question chantee, expose ici d'abord.
                 Rectangle {

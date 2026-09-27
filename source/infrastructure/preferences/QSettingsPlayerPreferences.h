@@ -53,6 +53,10 @@ public:
     [[nodiscard]] bool dailyReminderEnabled() const override;
 
     void storeDailyReminderEnabled( bool p_enabled ) override;
+
+    [[nodiscard]] domain::Temperament storedTemperament() const override;
+
+    void storeTemperament( domain::Temperament p_temperament ) override;
 };
 
 }    // namespace musichien::infrastructure

@@ -15,6 +15,7 @@
 // =====================================================================================================================
 
 #include "domain/exercise/PlayerLevel.h"
+#include "domain/music/Temperament.h"
 
 #include <cstdint>
 #include <optional>
@@ -91,6 +92,17 @@ public:
     [[nodiscard]] virtual bool dailyReminderEnabled() const = 0;
 
     virtual void storeDailyReminderEnabled( bool p_enabled ) = 0;
+
+    // The TUNING the player wants to hear, and the root it is heard from.
+    //
+    // Equal temperament is the default and the reference: it is what the music around us is built on, and what an ear
+    // must learn first. The older temperaments - a chain of pure fifths, or small whole-number ratios - are an
+    // exploration, and they are only MEANINGFUL with a root note: the same interval does not sound the same in C and
+    // in F#. A setting is justified when two reasonable people want different things; here, one wants the reference
+    // and the other wants to hear what "just" means.
+    [[nodiscard]] virtual Temperament storedTemperament() const = 0;
+
+    virtual void storeTemperament( Temperament p_temperament ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -131,6 +143,10 @@ public:
 
     void storeDailyReminderEnabled( bool p_enabled ) override { m_dailyReminderEnabled = p_enabled; }
 
+    [[nodiscard]] Temperament storedTemperament() const override { return m_temperament; }
+
+    void storeTemperament( Temperament p_temperament ) override { m_temperament = p_temperament; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -145,6 +161,8 @@ private:
     std::int64_t m_starCount{ 0 };
 
     bool m_dailyReminderEnabled{ false };
+
+    Temperament m_temperament{ Temperament::Equal };
 };
 
 }    // namespace musichien::domain

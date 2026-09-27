@@ -33,6 +33,9 @@ constexpr const char * STARS_KEY = "player/stars";
 // The daily reminder.
 constexpr const char * REMINDER_KEY = "player/reminder";
 
+// The tuning. Stored as the enum's own number, and read back through a range check.
+constexpr const char * TEMPERAMENT_KEY = "player/temperament";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -149,6 +152,27 @@ void QSettingsPlayerPreferences::storeDailyReminderEnabled( bool p_enabled )
     QSettings settings;
 
     settings.setValue( REMINDER_KEY, p_enabled );
+}
+
+domain::Temperament QSettingsPlayerPreferences::storedTemperament() const
+{
+    // Read as an UNSIGNED number: a settings file is a text file a player can open, and a negative value he typed
+    // there must fall back to the reference, not wrap around into the last temperament of the list.
+    const auto stored = QSettings{}.value( TEMPERAMENT_KEY, 0U ).toUInt();
+
+    if( stored >= domain::TEMPERAMENT_NAMES.size() )
+    {
+        return domain::Temperament::Equal;
+    }
+
+    return static_cast<domain::Temperament>( stored );
+}
+
+void QSettingsPlayerPreferences::storeTemperament( domain::Temperament p_temperament )
+{
+    QSettings settings;
+
+    settings.setValue( TEMPERAMENT_KEY, static_cast<int>( p_temperament ) );
 }
 
 }    // namespace musichien::infrastructure

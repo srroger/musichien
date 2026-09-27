@@ -136,6 +136,11 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( int reminderHour READ reminderHour CONSTANT )
     Q_PROPERTY( int reminderMinute READ reminderMinute CONSTANT )
 
+    // L'accordage. Le tempere egal d'abord, et les anciens pour le plaisir d'entendre ce que "juste" veut dire.
+    // La liste des noms vient du domaine, donc elle ne peut pas deriver de l'enumeration.
+    Q_PROPERTY( int temperament READ temperament NOTIFY temperamentChanged )
+    Q_PROPERTY( QVariantList temperaments READ temperaments CONSTANT )
+
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
 
@@ -168,6 +173,13 @@ public:
 
     // The developer button that fires a reminder right now, to check the plumbing.
     Q_INVOKABLE void testReminder();
+
+    // The tuning, as the index of the domain's enumeration, and the names a screen can show.
+    [[nodiscard]] int temperament() const;
+
+    Q_INVOKABLE void setTemperament( int p_index );
+
+    [[nodiscard]] QVariantList temperaments() const;
 
     // The rank of the current streak, as an index and as its display label.
     [[nodiscard]] int rank() const noexcept;
@@ -287,6 +299,9 @@ signals:
 
     // The player has just turned the daily reminder on or off.
     void dailyReminderChanged();
+
+    // The player has just changed the tuning.
+    void temperamentChanged();
 
     // The player has just pressed the "test the notification" button.
     void testReminderRequested();

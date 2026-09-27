@@ -18,7 +18,7 @@ public:
     {
     }
 
-    void showReminderNow() override
+    void showReminderNow( std::string_view p_content ) override
     {
     }
 };

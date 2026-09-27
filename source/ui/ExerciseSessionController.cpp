@@ -1,6 +1,7 @@
 #include "ui/ExerciseSessionController.h"
 
 #include "domain/music/Interval.h"
+#include "domain/music/Temperament.h"
 #include "ui/IntervalDescription.h"
 
 #include <QString>
@@ -9,6 +10,8 @@
 #include <limits>
 #include <optional>
 #include <random>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace musichien::ui
@@ -726,6 +729,46 @@ void ExerciseSessionController::setDailyReminderEnabled( bool p_enabled )
     m_levelStore->storeDailyReminderEnabled( p_enabled );
 
     emit dailyReminderChanged();
+}
+
+int ExerciseSessionController::temperament() const
+{
+    return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->storedTemperament() ) : 0;
+}
+
+void ExerciseSessionController::setTemperament( int p_index )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    if( p_index < 0 )
+    {
+        return;
+    }
+
+    if( static_cast<std::size_t>( p_index ) >= domain::TEMPERAMENT_NAMES.size() )
+    {
+        return;
+    }
+
+    m_levelStore->storeTemperament( static_cast<domain::Temperament>( p_index ) );
+
+    emit temperamentChanged();
+}
+
+// A Q_PROPERTY READ must be a member function, even when it reads nothing from the object.
+QVariantList ExerciseSessionController::temperaments() const    // NOLINT(readability-convert-member-functions-to-static)
+{
+    QVariantList names;
+
+    for( const std::string_view name : domain::TEMPERAMENT_NAMES )
+    {
+        names.append( QString::fromStdString( std::string{ name } ) );
+    }
+
+    return names;
 }
 
 int ExerciseSessionController::reminderHour() const noexcept    // NOLINT(readability-convert-member-functions-to-static)
