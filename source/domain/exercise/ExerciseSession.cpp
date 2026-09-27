@@ -175,14 +175,6 @@ bool ExerciseSession::answerDirection( IntervalDirection p_direction )
 
 QuestionKind ExerciseSession::drawKind()
 {
-    if( m_consecutiveErrors >= 2 )
-    {
-        // Deux erreurs de suite, et la question suivante devient "ca monte ou ca descend ?" : une question plus
-        // petite, a laquelle le joueur sait encore repondre, et qui le remet en selle. De l'aide qui ne dit pas
-        // son nom, arrivee au moment ou elle compte.
-        return QuestionKind::Direction;
-    }
-
     if( m_settings.directionQuestionShare <= 0 )
     {
         // The guided mode is OFF by default: the original game is what a fresh session asks.
@@ -223,6 +215,14 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
     ++m_currentQuestion.wrongAttemptCount;
 
     ++m_consecutiveErrors;
+
+    if( ( m_consecutiveErrors >= 2 ) && ( m_currentQuestion.direction != IntervalDirection::Harmonic ) )
+    {
+        // Deux erreurs de suite : la question EN COURS bascule en mode guide, comme un indice. Le joueur n'a plus
+        // qu'a dire si ca monte ou ca descend - une question plus petite, a laquelle il sait encore repondre. Un
+        // intervalle harmonique n'a ni monte ni descend, donc il reste tel quel.
+        m_currentQuestion.kind = QuestionKind::Direction;
+    }
 
     m_score.registerError();
 

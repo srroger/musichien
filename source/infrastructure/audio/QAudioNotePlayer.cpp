@@ -278,7 +278,12 @@ void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_
 
 const domain::SampledInstrument & QAudioNotePlayer::instrumentFor( std::span<const domain::Note> p_notes )
 {
-    const bool sameQuestion = ( p_notes.size() == m_lastPlayedNotes.size() ) && std::equal( p_notes.begin(), p_notes.end(), m_lastPlayedNotes.begin() );
+    // The same question is the same NOTES, whatever order the melody played them in: a falling fifth and its
+    // feedback chord share the same two notes. Comparing them as an ORDERED sequence would re-draw the instrument
+    // between the melody and the chord - the guitar turning into a saxophone in front of the player, which is
+    // exactly the bug Roger saw.
+    const bool sameQuestion = ( p_notes.size() == m_lastPlayedNotes.size() )
+                              && std::is_permutation( p_notes.begin(), p_notes.end(), m_lastPlayedNotes.begin() );
 
     if( !sameQuestion )
     {

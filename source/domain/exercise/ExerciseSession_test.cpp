@@ -563,19 +563,23 @@ TEST( ExerciseSessionTest, a_guided_question_asks_the_direction_and_takes_a_dire
     EXPECT_FALSE( namedSession.answerDirection( IntervalDirection::Ascending ) );
 }
 
-TEST( ExerciseSessionTest, two_mistakes_turn_the_next_question_guided )
+TEST( ExerciseSessionTest, two_mistakes_turn_the_question_in_progress_guided )
 {
-    ExerciseSession session{ TEST_SEED, unlimitedLivesSettings() };
+    SessionSettings settings = unlimitedLivesSettings();
 
-    // Deux erreurs sur la meme question...
+    // Une direction forcee : le basculement guide n'a pas de sens sur un intervalle harmonique, donc le test pin
+    // la question en montant.
+    settings.ascendingShare = 100;
+    settings.descendingShare = 0;
+    settings.harmonicShare = 0;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    // Deux erreurs sur la question en cours...
     answerWrongly( session );
     answerWrongly( session );
 
-    // ...une bonne reponse pour en sortir...
-    answerCorrectly( session );
-    session.advance();
-
-    // ...et la question suivante est guidee, sans qu'aucun reglage ne l'ait demande.
+    // ...et c'est CETTE question, pas la suivante, qui devient guidee - comme un indice.
     EXPECT_EQ( QuestionKind::Direction, session.currentQuestion().kind );
 }
 

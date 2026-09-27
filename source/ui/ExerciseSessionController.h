@@ -138,7 +138,7 @@ public:
     // The name the player gave himself, empty before the first time he writes one.
     [[nodiscard]] QString playerName() const;
 
-    void setPlayerName( const QString & p_name );
+    Q_INVOKABLE void setPlayerName( const QString & p_name );
 
     // Experience earned across every session, remembered between launches.
     [[nodiscard]] int totalExperience() const;
@@ -151,7 +151,7 @@ public:
     // Whether the daily reminder is on, remembered between launches.
     [[nodiscard]] bool dailyReminderEnabled() const;
 
-    void setDailyReminderEnabled( bool p_enabled );
+    Q_INVOKABLE void setDailyReminderEnabled( bool p_enabled );
 
     [[nodiscard]] int reminderHour() const noexcept;
 
