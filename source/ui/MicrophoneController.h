@@ -65,6 +65,11 @@ class MicrophoneController final : public QObject
     // 0 tant que rien n'a ete chante, 1 quand l'intervalle est juste, 2 quand il ne l'est pas.
     Q_PROPERTY( int sungVerdict READ sungVerdict NOTIFY sungIntervalChanged )
 
+    // Le feedback de tenue : la premiere note a-t-elle ete validee, et ou en est la barre de stabilite (0..1). C'est
+    // ce qui dit au chanteur si sa note TIENT ou si elle glisse.
+    Q_PROPERTY( bool hasFirstNote READ hasFirstNote NOTIFY sungIntervalChanged )
+    Q_PROPERTY( double sungStability READ sungStability NOTIFY sungIntervalChanged )
+
     // La session : une petite serie de questions chantees, avec un score. La fin de session est affichee quand
     // singingSessionOver devient vrai.
     Q_PROPERTY( int singingQuestionIndex READ singingQuestionIndex NOTIFY singingQuestionChanged )
@@ -133,6 +138,8 @@ public:
     [[nodiscard]] bool hasSungInterval() const { return m_sungIntervalDetector.reading().hasInterval(); }
     [[nodiscard]] int sungSemitones() const { return m_sungIntervalDetector.reading().semitones(); }
     [[nodiscard]] int sungVerdict() const;
+    [[nodiscard]] bool hasFirstNote() const { return m_sungIntervalDetector.reading().firstMidiNumber != 0; }
+    [[nodiscard]] double sungStability() const { return m_sungIntervalDetector.stabilityFraction(); }
 
 signals:
     void currentDeviceIndexChanged();

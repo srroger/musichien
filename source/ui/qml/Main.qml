@@ -903,6 +903,31 @@ ApplicationWindow {
                 StaffBall {
                 }
 
+                // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
+                // C'est le feedback qui dit au chanteur si sa note TIENT ou si elle glisse.
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 8
+                    radius: 4
+                    color: "#1b1035"
+
+                    Rectangle {
+                        height: 8
+                        radius: 4
+                        color: "#8ef2b0"
+                        width: parent.width * MicrophoneController.sungStability
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#cbb8e8"
+                    font.pixelSize: 13
+                    text: MicrophoneController.hasSungInterval ? qsTr("Deux notes entendues.") : (MicrophoneController.hasFirstNote ? qsTr("Première note tenue — maintenant la deuxième") : qsTr("Tiens la première note…"))
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8

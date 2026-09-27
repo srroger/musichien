@@ -17,6 +17,7 @@
 // reference frequency.
 // =====================================================================================================================
 
+#include <algorithm>
 #include <cstdint>
 
 namespace musichien::domain
@@ -50,17 +51,28 @@ public:
 
     [[nodiscard]] const Reading & reading() const noexcept { return m_reading; }
 
+    // The note being held right now (0 when nothing is), and how far its hold has gone towards validation. The
+    // controller turns this into the little STABILITY BAR: the player must see whether his note is holding or
+    // slipping, otherwise "nothing happens" is the only feedback a voice gets.
+    [[nodiscard]] std::int32_t heldMidiNumber() const noexcept { return m_heldMidiNumber; }
+
+    [[nodiscard]] double stabilityFraction() const noexcept
+    {
+        return std::min( 1.0,
+                         static_cast<double>( m_heldMilliseconds ) / static_cast<double>( MINIMUM_HOLD_MILLISECONDS ) );
+    }
+
 private:
     // How long a note must be held before it counts as the note the singer MEANT. Long on purpose: a whole second
-    // and a bit means a wobble, a breath or a slide never reads as a note - the voice gets the time it needs, and
-    // the result feels smooth rather than twitchy.
-    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 1200;
+    // means a wobble, a breath or a slide never reads as a note - the voice gets the time it needs, and the result
+    // feels smooth rather than twitchy.
+    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 1000;
 
-    // How fast the tracked pitch follows a reading. 0.3 keeps 70% of the previous estimate at every reading: slow
-    // enough to absorb noise, fast enough to follow a real change of note. The tracked pitch is then ROUNDED to the
-    // nearest note, which is what gives the tolerance: a reading must move the average half a semitone before the
-    // note changes.
-    static constexpr double TRACKING_ALPHA = 0.3;
+    // How fast the tracked pitch follows a reading. 0.15 keeps 85% of the previous estimate at every reading: slow
+    // enough to absorb a singing voice's vibrato and wobble, fast enough to follow a real change of note. The tracked
+    // pitch is then ROUNDED to the nearest note, which is what gives the tolerance: a reading must move the average
+    // half a semitone before the note changes.
+    static constexpr double TRACKING_ALPHA = 0.15;
 
     Reading m_reading;
 
