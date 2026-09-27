@@ -1,17 +1,24 @@
-# Échantillons de piano
+# Échantillons d'instruments
 
-Cinq notes de **vrai piano**, enregistrées puis rendues sous forme d'échantillons. Elles remplaceront la
-synthèse numérique pour les exercices — la synthèse reste pour le bruit d'erreur et le repli.
+Des notes de **vrai piano**, de **vraie guitare** et de **vrai saxophone**, rendues une fois pour toutes depuis
+une banque libre. Elles remplaceront la synthèse numérique pour les exercices — la synthèse reste pour le bruit
+d'erreur et le repli.
 
-| Fichier | Note | Durée | Taille |
-|---|---|---|---|
-| `piano_c2.wav` | do 2 (MIDI 36) | 2,5 s | 240 Ko |
-| `piano_c3.wav` | do 3 (MIDI 48) | 2,5 s | 240 Ko |
-| `piano_c4.wav` | do 4 (MIDI 60) | 2,5 s | 240 Ko |
-| `piano_c5.wav` | do 5 (MIDI 72) | 2,5 s | 240 Ko |
-| `piano_c6.wav` | do 6 (MIDI 84) | 2,5 s | 240 Ko |
+| Instrument | Notes | Fichiers |
+|---|---|---|
+| **Piano** | do 2 à do 6 (MIDI 36, 48, 60, 72, 84) | `piano_c2…c6.wav` |
+| **Guitare** (nylon) | do 2 à do 6 | `guitare_c2…c6.wav` |
+| **Saxophone** (alto) | do 2 à do 5 — **pas de do 6** : un sax alto s'arrête au la aigu, et la banque refuse la note | `saxo_c2…c5.wav` |
 
-**Total : 1,2 Mo**, mono, 48 kHz, 16 bits signé — le format exact que le moteur audio ouvre déjà.
+**Quatorze fichiers, 2,5 s chacun, mono, 48 kHz, 16 bits signé — 3,4 Mo au total**, dans le format exact que
+le moteur audio ouvre déjà.
+
+> [!note] Les trois instruments ne sont pas là pour faire joli
+> C'est le **4ᵉ axe du projet** qui commence : « pas seulement le piano ». Une oreille qui n'a entendu un
+> intervalle qu'au piano ne l'a pas entendu — chaque instrument a ses harmoniques, et donc sa **couleur**.
+> Le saxophone est le plus utile des trois pour ça : son timbre est **riche et impair**, et la même quinte y
+> sonne tout autrement qu'au piano.
+
 
 ---
 
