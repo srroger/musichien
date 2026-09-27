@@ -41,8 +41,8 @@ constexpr double HIGHEST_VISIBLE_HZ = 1200.0;
 // Turns a frequency into a human label: the closest note name, then the rounded hertz. Silence is an em-dash, not a
 // note, and a pitch outside the MIDI range is reported honestly as a number.
 // The note a frequency is closest to: the MIDI number that rounds to the nearest semitone. Nothing when there is no
-// pitch at all, or when the pitch falls outside the playable range.
-[[nodiscard]] std::optional<domain::Note> nearestNoteFor( double p_frequencyHz )
+// pitch at all, or when the pitch falls outside the playable range. The diapason decides where A4 sits.
+[[nodiscard]] std::optional<domain::Note> nearestNoteFor( double p_frequencyHz, double p_referencePitchHz )
 {
     if( p_frequencyHz <= 0.0 )
     {
@@ -50,7 +50,7 @@ constexpr double HIGHEST_VISIBLE_HZ = 1200.0;
     }
 
     const double semitonesFromA4 = std::round( static_cast<double>( domain::SEMITONES_PER_OCTAVE )
-                                               * std::log2( p_frequencyHz / domain::REFERENCE_FREQUENCY_HZ ) );
+                                               * std::log2( p_frequencyHz / p_referencePitchHz ) );
 
     const auto midiNumber = static_cast<std::int32_t>( domain::REFERENCE_MIDI_NUMBER + semitonesFromA4 );
 
@@ -91,14 +91,14 @@ constexpr double OFF_CENTS = 20.0;
     return 2;
 }
 
-[[nodiscard]] QString noteLabelFor( double p_frequencyHz )
+[[nodiscard]] QString noteLabelFor( double p_frequencyHz, double p_referencePitchHz )
 {
     if( p_frequencyHz <= 0.0 )
     {
         return QStringLiteral( "\u2014" );
     }
 
-    const std::optional<domain::Note> note = nearestNoteFor( p_frequencyHz );
+    const std::optional<domain::Note> note = nearestNoteFor( p_frequencyHz, p_referencePitchHz );
 
     if( !note.has_value() )
     {
@@ -202,26 +202,29 @@ void MicrophoneController::ensureDetector()
 void MicrophoneController::onPitch( float p_frequencyHz )
 {
     m_detectedFrequencyHz = static_cast<double>( p_frequencyHz );
+
+    const double referencePitch = ( m_preferences != nullptr ) ? m_preferences->storedReferencePitch() : 440.0;
+
     m_detectedPitchRatio = pitchRatioFor( m_detectedFrequencyHz );
-    m_detectedNoteLabel = noteLabelFor( m_detectedFrequencyHz );
+    m_detectedNoteLabel = noteLabelFor( m_detectedFrequencyHz, referencePitch );
 
     // The continuous MIDI position of the voice: 69 is A4, 69.5 is halfway to the next note. The staff draws the
     // ball from this, so that a note sung perfectly in tune lands exactly on its line or space.
     m_detectedMidi = m_detectedFrequencyHz > 0.0
                        ? static_cast<double>( domain::REFERENCE_MIDI_NUMBER )
                            + ( static_cast<double>( domain::SEMITONES_PER_OCTAVE )
-                               * std::log2( m_detectedFrequencyHz / domain::REFERENCE_FREQUENCY_HZ ) )
+                               * std::log2( m_detectedFrequencyHz / referencePitch ) )
                        : 0.0;
 
     // The tuner part: how far the voice is from the note it is closest to. This is what makes the page useful
     // outside the game - checking a guitar string, or hearing how flat yesterday's cold left the voice.
-    const std::optional<domain::Note> nearest = nearestNoteFor( m_detectedFrequencyHz );
+    const std::optional<domain::Note> nearest = nearestNoteFor( m_detectedFrequencyHz, referencePitch );
 
     if( nearest.has_value() )
     {
-        // The tuner honours the chosen tuning. In equal temperament the reference is the note itself; in the others
-        // it depends on the root - and this is the SAME calculation the audio layer will use to play intervals, so
-        // the tuner and the game will never disagree.
+        // The tuner honours the chosen tuning AND the chosen diapason. In equal temperament the reference is the note
+        // itself; in the others it depends on the root - and this is the SAME calculation the audio layer will use to
+        // play intervals, so the tuner and the game will never disagree.
         const domain::Temperament temperament = ( m_preferences != nullptr )
                                                   ? m_preferences->storedTemperament()
                                                   : domain::Temperament::Equal;
@@ -230,7 +233,7 @@ void MicrophoneController::onPitch( float p_frequencyHz )
                                                                : domain::Note{ 60 };
 
         m_detectedCents = domain::centsBetween( m_detectedFrequencyHz,
-                                                domain::frequencyFor( *nearest, root, temperament ) );
+                                                domain::frequencyFor( *nearest, root, temperament, referencePitch ) );
     }
     else
     {

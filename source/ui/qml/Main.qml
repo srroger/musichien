@@ -82,15 +82,16 @@ ApplicationWindow {
         return "#f2848e";
     }
 
-    // Position verticale d'une note sur la portee, en clef de Sol : 64 (E4) sur la ligne du bas, 77 (F5) sur la
-    // ligne du haut. Un demi-ton fait la moitie d'un pas de gamme, donc la boule glisse exactement sur les lignes et
-    // les interlignes - un Do juste tombe pile sur son interligne.
+    // Position verticale d'une note sur la portee, en clef de Sol : 64 (E4) sur la ligne du bas. La boule se replie a
+    // l'octave : une note qui monte au-dessus de la portee repart d'en bas, comme une ligne qui se reboucle - jamais
+    // d'effet de mur.
     function staffY(p_midi) {
         if (p_midi <= 0)
             return 0.5;
 
-        var t = (p_midi - 64) / 13;
-        return Math.max(0, Math.min(1, t));
+        var relative = p_midi - 64;
+        relative -= Math.floor(relative / 12) * 12;
+        return relative / 12;
     }
 
     // Plays the interval at a given distance, then reveals the feedback.
@@ -139,6 +140,13 @@ ApplicationWindow {
     // Leaving the screen must never leave an audio stream open: on a phone that is a battery drain,
     // and a bug. The view model was given a method for exactly this call.
     onClosing: IntervalController.stopPlayback()
+
+    // La police musicale, embarquee dans les ressources : les polices Android par defaut n'ont pas la clef de Sol.
+    FontLoader {
+        id: musicFont
+
+        source: "qrc:/assets/fonts/NotoMusic-Regular.ttf"
+    }
 
     Rectangle {
         // The loop itself, and the only thing the player ever sees of it: the bench below is a tool for
@@ -728,6 +736,51 @@ ApplicationWindow {
 
                     }
 
+                    // Le diapason. 440 par defaut, mais beaucoup d'instruments a vent sont construits un peu plus
+                    // haut pour sonner plus brillant : le regler, c'est accorder l'accordeur sur eux.
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.topMargin: 4
+                        spacing: 6
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#e8dcff"
+                            font.pixelSize: 13
+                            text: qsTr("La de référence (diapason)")
+                        }
+
+                        SpinBox {
+                            Layout.fillWidth: true
+                            from: 400
+                            to: 480
+                            stepSize: 1
+                            editable: true
+                            value: ExerciseController.referencePitch
+                            onValueModified: ExerciseController.setReferencePitch(value)
+
+                            contentItem: TextInput {
+                                text: parent.textFromValue(parent.value, parent.locale)
+                                color: "#ffffff"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                font.pixelSize: 15
+                                validator: parent.validator
+                                inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                readOnly: !parent.editable
+                            }
+
+                            background: Rectangle {
+                                color: "#1b1035"
+                                radius: 8
+                                border.width: 1
+                                border.color: "#5c4a80"
+                            }
+
+                        }
+
+                    }
+
                 }
 
                 // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
@@ -809,6 +862,7 @@ ApplicationWindow {
                                 text: "\uD834\uDD1E"
                                 color: "#cbb8e8"
                                 font.pixelSize: 40
+                                font.family: musicFont.name
                             }
 
                             Repeater {

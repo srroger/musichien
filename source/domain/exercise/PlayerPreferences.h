@@ -111,6 +111,13 @@ public:
     [[nodiscard]] virtual Note storedTuningRoot() const = 0;
 
     virtual void storeTuningRoot( Note p_root ) = 0;
+
+    // The A4 diapason, in hertz. 440 is the modern reference, but whole families of instruments are built sharper on
+    // purpose - wind instruments, to sound brighter - and a tuner that cannot follow them is a tuner that only tunes
+    // pianos. Stored as a plain number.
+    [[nodiscard]] virtual double storedReferencePitch() const = 0;
+
+    virtual void storeReferencePitch( double p_hertz ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -159,6 +166,10 @@ public:
 
     void storeTuningRoot( Note p_root ) override { m_tuningRoot = p_root; }
 
+    [[nodiscard]] double storedReferencePitch() const override { return m_referencePitch; }
+
+    void storeReferencePitch( double p_hertz ) override { m_referencePitch = p_hertz; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -177,6 +188,8 @@ private:
     Temperament m_temperament{ Temperament::Equal };
 
     Note m_tuningRoot{ 60 };
+
+    double m_referencePitch{ 440.0 };
 };
 
 }    // namespace musichien::domain

@@ -806,6 +806,29 @@ QVariantList ExerciseSessionController::tuningRoots() const    // NOLINT(readabi
     return names;
 }
 
+double ExerciseSessionController::referencePitch() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedReferencePitch() : 440.0;
+}
+
+void ExerciseSessionController::setReferencePitch( double p_hertz )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    // A diapason outside this band is a typo, not a tuning: it is refused rather than stored.
+    if( p_hertz < 400.0 || p_hertz > 480.0 )
+    {
+        return;
+    }
+
+    m_levelStore->storeReferencePitch( p_hertz );
+
+    emit referencePitchChanged();
+}
+
 int ExerciseSessionController::reminderHour() const noexcept    // NOLINT(readability-convert-member-functions-to-static)
 {
     return 19;

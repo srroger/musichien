@@ -721,6 +721,16 @@ TEST( ExerciseSessionControllerTest, the_tuning_is_remembered_and_stays_in_range
     controller.setTuningRoot( 99 );
 
     EXPECT_EQ( 7, controller.tuningRoot() );
+
+    // The diapason is remembered too, and a value that makes no sense is refused.
+    controller.setReferencePitch( 442.0 );
+
+    EXPECT_EQ( 442.0, controller.referencePitch() );
+    EXPECT_EQ( 442.0, levelStore.storedReferencePitch() );
+
+    controller.setReferencePitch( 999.0 );
+
+    EXPECT_EQ( 442.0, controller.referencePitch() );
 }
 
 }    // namespace musichien::ui

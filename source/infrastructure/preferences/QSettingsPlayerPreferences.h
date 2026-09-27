@@ -61,6 +61,10 @@ public:
     [[nodiscard]] domain::Note storedTuningRoot() const override;
 
     void storeTuningRoot( domain::Note p_root ) override;
+
+    [[nodiscard]] double storedReferencePitch() const override;
+
+    void storeReferencePitch( double p_hertz ) override;
 };
 
 }    // namespace musichien::infrastructure

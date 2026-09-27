@@ -143,4 +143,17 @@ TEST( TemperamentTest, a_tuner_can_show_what_the_temperaments_change )
     EXPECT_NEAR( 1.955, centsBetween( pureFifth, temperedFifth ), 0.01 );
 }
 
+TEST( TemperamentTest, the_diapason_scales_every_frequency )
+{
+    // A4 at 442 instead of 440 scales every frequency by the same ratio, whatever the temperament.
+    const double sharp = frequencyFor( ROOT, ROOT, Temperament::Equal, 442.0 );
+
+    EXPECT_NEAR( ROOT.frequencyHz() * ( 442.0 / 440.0 ), sharp, TOLERANCE );
+
+    // And the intervals are untouched: a pure fifth is still 3/2, just heard from a sharper root.
+    const double fifth = frequencyFor( Note{ 67 }, ROOT, Temperament::Pythagorean, 442.0 );
+
+    EXPECT_NEAR( 3.0 / 2.0, fifth / sharp, TOLERANCE );
+}
+
 }    // namespace musichien::domain

@@ -68,11 +68,15 @@ constexpr std::array<double, 12> JUST_RATIOS{ 1.0,             // unison
 
 }    // namespace
 
-double frequencyFor( Note p_note, Note p_root, Temperament p_temperament ) noexcept
+double frequencyFor( Note p_note, Note p_root, Temperament p_temperament, double p_referencePitchHz ) noexcept
 {
+    // A diapason other than 440 scales every frequency by the same ratio: the temperament decides the RELATIVE
+    // intervals, the diapason decides the ABSOLUTE pitch.
+    const double diapasonScale = p_referencePitchHz / REFERENCE_FREQUENCY_HZ;
+
     if( p_temperament == Temperament::Equal )
     {
-        return p_note.frequencyHz();
+        return p_note.frequencyHz() * diapasonScale;
     }
 
     const int semitones = p_note.midiNumber() - p_root.midiNumber();
@@ -84,8 +88,8 @@ double frequencyFor( Note p_note, Note p_root, Temperament p_temperament ) noexc
                                    : JUST_RATIOS.at( static_cast<std::size_t>( withinOctave ) );
 
     // The root's own frequency stays the one of equal temperament: where A4 sits is a DIAPASON choice, not a
-    // temperament one - 440 Hz is the same note in every tuning.
-    return p_root.frequencyHz() * std::pow( 2.0, static_cast<double>( octaves ) ) * intervalRatio;
+    // temperament one - and that is exactly the scale above.
+    return p_root.frequencyHz() * diapasonScale * std::pow( 2.0, static_cast<double>( octaves ) ) * intervalRatio;
 }
 
 double centsBetween( double p_frequencyHz, double p_referenceHz ) noexcept

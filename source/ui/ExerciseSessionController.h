@@ -142,6 +142,7 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( QVariantList temperaments READ temperaments CONSTANT )
     Q_PROPERTY( int tuningRoot READ tuningRoot NOTIFY tuningRootChanged )
     Q_PROPERTY( QVariantList tuningRoots READ tuningRoots CONSTANT )
+    Q_PROPERTY( double referencePitch READ referencePitch NOTIFY referencePitchChanged )
 
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
@@ -190,6 +191,11 @@ public:
     Q_INVOKABLE void setTuningRoot( int p_index );
 
     [[nodiscard]] QVariantList tuningRoots() const;
+
+    // The A4 diapason, in hertz. 440 by default; some wind instruments want 442 or 444.
+    [[nodiscard]] double referencePitch() const;
+
+    Q_INVOKABLE void setReferencePitch( double p_hertz );
 
     // The rank of the current streak, as an index and as its display label.
     [[nodiscard]] int rank() const noexcept;
@@ -315,6 +321,9 @@ signals:
 
     // The player has just changed the root the tuning is heard from.
     void tuningRootChanged();
+
+    // The player has just changed the A4 diapason.
+    void referencePitchChanged();
 
     // The player has just pressed the "test the notification" button.
     void testReminderRequested();

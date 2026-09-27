@@ -39,6 +39,9 @@ constexpr const char * TEMPERAMENT_KEY = "player/temperament";
 // The root note of the tuning, as a MIDI number.
 constexpr const char * TUNING_ROOT_KEY = "player/tuning-root";
 
+// The A4 diapason, in hertz.
+constexpr const char * REFERENCE_PITCH_KEY = "player/reference-pitch";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -195,6 +198,26 @@ void QSettingsPlayerPreferences::storeTuningRoot( domain::Note p_root )
     QSettings settings;
 
     settings.setValue( TUNING_ROOT_KEY, p_root.midiNumber() );
+}
+
+double QSettingsPlayerPreferences::storedReferencePitch() const
+{
+    const double stored = QSettings{}.value( REFERENCE_PITCH_KEY, 440.0 ).toDouble();
+
+    // A settings file is a text file a player can open. A wildly out of range value falls back to the reference.
+    if( stored < 400.0 || stored > 480.0 )
+    {
+        return 440.0;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeReferencePitch( double p_hertz )
+{
+    QSettings settings;
+
+    settings.setValue( REFERENCE_PITCH_KEY, p_hertz );
 }
 
 }    // namespace musichien::infrastructure

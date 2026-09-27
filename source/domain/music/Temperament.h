@@ -43,7 +43,14 @@ inline constexpr std::array<std::string_view, 3> TEMPERAMENT_NAMES{ "Tempéré",
 //
 // Equal temperament ignores the root - that is the whole point of it - and the first branch says so. The others are
 // built from it: the fifth above the root is 3/2 for good, whatever the root is.
-[[nodiscard]] double frequencyFor( Note p_note, Note p_root, Temperament p_temperament ) noexcept;
+//
+// p_referencePitchHz is the A4 diapason, 440 Hz by default. Some instruments - wind ones in particular - are
+// deliberately tuned a little sharp to sound brighter, and the tuner must be able to follow them: every frequency
+// is simply scaled by reference / 440.
+[[nodiscard]] double frequencyFor( Note p_note,
+                                   Note p_root,
+                                   Temperament p_temperament,
+                                   double p_referencePitchHz = REFERENCE_FREQUENCY_HZ ) noexcept;
 
 // The distance between two frequencies, in CENTS. Twelve hundred cents make an octave, so the number is the same
 // size in every register - which is what an ear, and every tuner ever built, actually needs to judge a note.
