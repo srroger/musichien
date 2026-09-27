@@ -109,6 +109,30 @@ constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
     return book;
 }
 
+// Builds the reminder's content pool: every anecdote, one per line, so that the Android receiver can draw a
+// DIFFERENT one on each daily firing without the application running. An empty book falls back to the plain nudge.
+[[nodiscard]] std::string reminderContentFor( const musichien::domain::AnecdoteBook & p_anecdotes )
+{
+    std::string content;
+
+    for( const std::string & text : p_anecdotes.texts() )
+    {
+        if( !content.empty() )
+        {
+            content += '\n';
+        }
+
+        content += text;
+    }
+
+    if( content.empty() )
+    {
+        return "Une oreille, une minute : l'intervalle du jour t'attend.";
+    }
+
+    return content;
+}
+
 // Reads ONE sampled instrument from the embedded wave files.
 //
 // Five recorded notes an octave apart, and the sampler picks the closest one: that is enough for the whole
@@ -235,10 +259,10 @@ int main( int p_argumentCount, char * p_arguments[] )
     // The vibration is injected as a function rather than called from the view model, and the hint book
     // is handed over to be owned: one keeps Android out of the interface, the other keeps a reference to
     // somebody else's object out of it.
-    // Les anecdotes servent a deux endroits : l'accueil (une par ouverture) et le rappel quotidien (une par
-    // planification). Le livre est donc charge ici, passe au controleur par copie, et garde pour le rappel.
+    // Les anecdotes servent a deux endroits : l'accueil (une par ouverture) et le rappel quotidien (le livre entier,
+    // pour qu'une anecdote DIFFERENTE puisse tomber chaque jour). Le livre est donc charge ici, passe au controleur
+    // par copie, et garde pour le rappel.
     musichien::domain::AnecdoteBook anecdoteBook = loadAnecdoteBook();
-    std::mt19937 randomEngine{ std::random_device{}() };
 
     musichien::ui::ExerciseSessionController exerciseController{ notePlayer,
                                                                  {},
@@ -310,19 +334,12 @@ int main( int p_argumentCount, char * p_arguments[] )
     musichien::infrastructure::NullNotificationScheduler notificationScheduler;
 #endif
 
-    const auto applyReminder = [&exerciseController, &notificationScheduler, &anecdoteBook, &randomEngine]() {
+    const auto applyReminder = [&exerciseController, &notificationScheduler, &anecdoteBook]() {
         if( exerciseController.dailyReminderEnabled() )
         {
-            // Une anecdote differente a chaque fois que le joueur re-coche : c'est un contenu, pas un slogan fixe.
-            std::string content = "Une oreille, une minute : l'intervalle du jour t'attend.";
-            if( const auto anecdote = anecdoteBook.random( randomEngine ); anecdote.has_value() )
-            {
-                content = anecdote->text;
-            }
-
             notificationScheduler.scheduleDailyReminder( exerciseController.reminderHour(),
                                                          exerciseController.reminderMinute(),
-                                                         content );
+                                                         reminderContentFor( anecdoteBook ) );
         }
         else
         {

@@ -22,4 +22,17 @@ std::optional<Anecdote> AnecdoteBook::random( std::mt19937 & p_randomEngine ) co
     return m_anecdotes.at( distribution( p_randomEngine ) );
 }
 
+std::vector<std::string> AnecdoteBook::texts() const
+{
+    std::vector<std::string> result;
+    result.reserve( m_anecdotes.size() );
+
+    for( const Anecdote & anecdote : m_anecdotes )
+    {
+        result.push_back( anecdote.text );
+    }
+
+    return result;
+}
+
 }    // namespace musichien::domain

@@ -42,4 +42,18 @@ TEST( AnecdoteBookTest, a_book_draws_only_what_it_holds )
     EXPECT_EQ( 2U, book.count() );
 }
 
+TEST( AnecdoteBookTest, a_book_lists_every_text_it_holds )
+{
+    AnecdoteBook book;
+
+    book.add( AnecdoteKind::Acoustics, "une octave, une frequence doublee" );
+    book.add( AnecdoteKind::Tip, "chante avant de nommer" );
+
+    const std::vector<std::string> texts = book.texts();
+
+    ASSERT_EQ( 2U, texts.size() );
+    EXPECT_EQ( "une octave, une frequence doublee", texts.at( 0 ) );
+    EXPECT_EQ( "chante avant de nommer", texts.at( 1 ) );
+}
+
 }    // namespace musichien::domain

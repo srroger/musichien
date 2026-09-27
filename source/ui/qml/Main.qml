@@ -506,6 +506,7 @@ ApplicationWindow {
 
         anchors.centerIn: parent
         width: Math.min(mainWindow.width * 0.9, 420)
+        height: Math.min(mainWindow.height * 0.9, 600)
         modal: true
         padding: 16
 
@@ -518,30 +519,55 @@ ApplicationWindow {
             border.color: "#5c4a80"
         }
 
-        contentItem: ColumnLayout {
-            spacing: 8
+        contentItem: ScrollView {
+            id: settingsScroll
 
-            Text {
-                Layout.fillWidth: true
-                color: "#cbb8e8"
-                font.pixelSize: 14
-                wrapMode: Text.WordWrap
-                text: qsTr("Le tirage se fait au hasard parmi les instruments coches.")
-            }
+            clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-            Repeater {
-                model: ExerciseController.instruments
+            ColumnLayout {
+                width: settingsScroll.availableWidth
+                spacing: 8
 
-                delegate: CheckBox {
-                    required property var modelData
-
+                Text {
                     Layout.fillWidth: true
-                    text: modelData.name
-                    checked: modelData.enabled
-                    onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Le tirage se fait au hasard parmi les instruments coches.")
+                }
 
-                    // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre. Le leftPadding
-                    // remet le texte a droite de la case, sinon il se pose par-dessus l'indicateur.
+                Repeater {
+                    model: ExerciseController.instruments
+
+                    delegate: CheckBox {
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        text: modelData.name
+                        checked: modelData.enabled
+                        onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+
+                        // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre. Le leftPadding
+                        // remet le texte a droite de la case, sinon il se pose par-dessus l'indicateur.
+                        contentItem: Text {
+                            text: parent.text
+                            color: "#e8dcff"
+                            verticalAlignment: Text.AlignVCenter
+                            leftPadding: parent.indicator.width + parent.spacing
+                            font.pixelSize: 15
+                        }
+
+                    }
+
+                }
+
+                CheckBox {
+                    Layout.fillWidth: true
+                    text: qsTr("Un rappel chaque jour")
+                    checked: ExerciseController.dailyReminderEnabled
+                    onClicked: ExerciseController.setDailyReminderEnabled(checked)
+
                     contentItem: Text {
                         text: parent.text
                         color: "#e8dcff"
@@ -552,155 +578,139 @@ ApplicationWindow {
 
                 }
 
-            }
-
-            CheckBox {
-                Layout.fillWidth: true
-                text: qsTr("Un rappel chaque jour")
-                checked: ExerciseController.dailyReminderEnabled
-                onClicked: ExerciseController.setDailyReminderEnabled(checked)
-
-                contentItem: Text {
-                    text: parent.text
-                    color: "#e8dcff"
-                    verticalAlignment: Text.AlignVCenter
-                    leftPadding: parent.indicator.width + parent.spacing
-                    font.pixelSize: 15
+                // Le compte a rebours, juste sous la case qui l'active : impossible de le manquer, et c'est la que le
+                // joueur le cherche.
+                Text {
+                    Layout.fillWidth: true
+                    color: "#8ef2b0"
+                    font.pixelSize: 13
+                    visible: ExerciseController.dailyReminderEnabled
+                    text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
                 }
 
-            }
+                // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
+                // miniature au rythme de la voix - c'est l'affichage qu'aura la question chantee, expose ici d'abord.
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    color: "#2a1a46"
+                    radius: 8
+                    border.width: 1
+                    border.color: "#5c4a80"
 
-            // Le compte a rebours, juste sous la case qui l'active : impossible de le manquer, et c'est la que le
-            // joueur le cherche.
-            Text {
-                Layout.fillWidth: true
-                color: "#8ef2b0"
-                font.pixelSize: 13
-                visible: ExerciseController.dailyReminderEnabled
-                text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
-            }
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 10
 
-            // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
-            // miniature au rythme de la voix - c'est l'affichage qu'aura la question chantee, expose ici d'abord.
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.topMargin: 10
-                color: "#2a1a46"
-                radius: 8
-                border.width: 1
-                border.color: "#5c4a80"
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 10
-
-                    Text {
-                        Layout.fillWidth: true
-                        color: "#e8dcff"
-                        font.pixelSize: 14
-                        font.bold: true
-                        text: qsTr("Le micro")
-                    }
-
-                    ComboBox {
-                        Layout.fillWidth: true
-                        model: MicrophoneController.inputDeviceNames
-                        currentIndex: MicrophoneController.currentDeviceIndex
-                        onActivated: MicrophoneController.selectDevice(index)
-
-                        contentItem: Text {
-                            text: parent.displayText
-                            color: "#ffffff"
-                            verticalAlignment: Text.AlignVCenter
-                            leftPadding: 10
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#e8dcff"
+                            font.pixelSize: 14
+                            font.bold: true
+                            text: qsTr("Le micro")
                         }
 
-                        delegate: ItemDelegate {
-                            width: parent.width
+                        ComboBox {
+                            Layout.fillWidth: true
+                            model: MicrophoneController.inputDeviceNames
+                            currentIndex: MicrophoneController.currentDeviceIndex
+                            onActivated: MicrophoneController.selectDevice(index)
 
                             contentItem: Text {
-                                text: modelData
-                                color: "#e8dcff"
+                                text: parent.displayText
+                                color: "#ffffff"
                                 verticalAlignment: Text.AlignVCenter
+                                leftPadding: 10
                             }
 
-                        }
-
-                        background: Rectangle {
-                            color: "#1b1035"
-                            radius: 8
-                            border.width: 1
-                            border.color: "#5c4a80"
-                        }
-
-                    }
-
-                    // La portee miniature : cinq lignes, une boule qui suit la hauteur. Le ratio est logarithmique,
-                    // donc la boule monte d'une octave pour un doublement de frequence, comme une vraie note.
-                    Item {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 90
-
-                        Repeater {
-                            model: 5
-
-                            delegate: Rectangle {
-                                required property int index
-
-                                x: 0
-                                y: parent.height * (0.15 + index * 0.175)
+                            delegate: ItemDelegate {
                                 width: parent.width
-                                height: 1
-                                color: "#5c4a80"
+
+                                contentItem: Text {
+                                    text: modelData
+                                    color: "#e8dcff"
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                            }
+
+                            background: Rectangle {
+                                color: "#1b1035"
+                                radius: 8
+                                border.width: 1
+                                border.color: "#5c4a80"
                             }
 
                         }
 
-                        Rectangle {
-                            id: pitchBall
+                        // La portee miniature : cinq lignes, une boule qui suit la hauteur. Le ratio est logarithmique,
+                        // donc la boule monte d'une octave pour un doublement de frequence, comme une vraie note.
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 90
 
-                            width: 18
-                            height: 18
-                            radius: 9
-                            color: MicrophoneController.isListening ? "#8ef2b0" : "#5c4a80"
-                            x: parent.width / 2 - width / 2
-                            y: parent.height * (1 - MicrophoneController.detectedPitchRatio) - height / 2
+                            Repeater {
+                                model: 5
 
-                            Behavior on y {
-                                NumberAnimation {
-                                    duration: 60
-                                    easing.type: Easing.OutQuad
+                                delegate: Rectangle {
+                                    required property int index
+
+                                    x: 0
+                                    y: parent.height * (0.15 + index * 0.175)
+                                    width: parent.width
+                                    height: 1
+                                    color: "#5c4a80"
+                                }
+
+                            }
+
+                            Rectangle {
+                                id: pitchBall
+
+                                width: 18
+                                height: 18
+                                radius: 9
+                                color: MicrophoneController.isListening ? "#8ef2b0" : "#5c4a80"
+                                x: parent.width / 2 - width / 2
+                                y: parent.height * (1 - MicrophoneController.detectedPitchRatio) - height / 2
+
+                                Behavior on y {
+                                    NumberAnimation {
+                                        duration: 60
+                                        easing.type: Easing.OutQuad
+                                    }
+
                                 }
 
                             }
 
                         }
 
-                    }
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#8ef2b0"
+                            font.pixelSize: 15
+                            font.bold: true
+                            text: MicrophoneController.detectedNoteLabel
+                        }
 
-                    Text {
-                        Layout.fillWidth: true
-                        color: "#8ef2b0"
-                        font.pixelSize: 15
-                        font.bold: true
-                        text: MicrophoneController.detectedNoteLabel
-                    }
+                        Button {
+                            Layout.alignment: Qt.AlignRight
+                            text: MicrophoneController.isListening ? qsTr("Arrêter") : qsTr("Tester le micro")
+                            onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
+                        }
 
-                    Button {
-                        Layout.alignment: Qt.AlignRight
-                        text: MicrophoneController.isListening ? qsTr("Arrêter") : qsTr("Tester le micro")
-                        onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
                     }
 
                 }
 
-            }
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    text: qsTr("Fermer")
+                    onClicked: settingsDialog.close()
+                }
 
-            Button {
-                Layout.alignment: Qt.AlignRight
-                text: qsTr("Fermer")
-                onClicked: settingsDialog.close()
             }
 
         }

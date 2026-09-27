@@ -38,6 +38,10 @@ public:
     // holds no entropy source of its own.
     [[nodiscard]] std::optional<Anecdote> random( std::mt19937 & p_randomEngine ) const;
 
+    // Every anecdote's text, in book order. Used by the daily reminder, which must be able to draw a DIFFERENT
+    // anecdote on each firing without the application running.
+    [[nodiscard]] std::vector<std::string> texts() const;
+
     [[nodiscard]] std::size_t count() const noexcept { return m_anecdotes.size(); }
 
 private:
