@@ -88,4 +88,17 @@ double frequencyFor( Note p_note, Note p_root, Temperament p_temperament ) noexc
     return p_root.frequencyHz() * std::pow( 2.0, static_cast<double>( octaves ) ) * intervalRatio;
 }
 
+double centsBetween( double p_frequencyHz, double p_referenceHz ) noexcept
+{
+    // Silence is not a note that is too low: it is no note at all.
+    if( p_frequencyHz <= 0.0 || p_referenceHz <= 0.0 )
+    {
+        return 0.0;
+    }
+
+    constexpr double CENTS_PER_OCTAVE = 1200.0;
+
+    return CENTS_PER_OCTAVE * std::log2( p_frequencyHz / p_referenceHz );
+}
+
 }    // namespace musichien::domain

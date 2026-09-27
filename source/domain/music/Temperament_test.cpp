@@ -114,4 +114,33 @@ TEST( TemperamentTest, a_pure_fifth_is_not_the_tempered_one )
     EXPECT_NEAR( std::pow( 2.0, 7.0 / 12.0 ), tempered, TOLERANCE );
 }
 
+TEST( TemperamentTest, cents_measure_an_interval_the_same_way_in_every_register )
+{
+    // An octave is twelve hundred cents, whether it sits low or high: that is what makes cents useful.
+    EXPECT_NEAR( 1200.0, centsBetween( 880.0, 440.0 ), TOLERANCE );
+    EXPECT_NEAR( 1200.0, centsBetween( 55.0, 27.5 ), TOLERANCE );
+
+    // A semitone is a hundred cents, everywhere.
+    EXPECT_NEAR( 100.0, centsBetween( 440.0 * std::pow( 2.0, 1.0 / 12.0 ), 440.0 ), TOLERANCE );
+
+    // And the sign says which way: the first frequency being lower gives a negative number.
+    EXPECT_LT( centsBetween( 440.0, 450.0 ), 0.0 );
+}
+
+TEST( TemperamentTest, cents_of_silence_is_zero )
+{
+    EXPECT_DOUBLE_EQ( 0.0, centsBetween( 0.0, 440.0 ) );
+    EXPECT_DOUBLE_EQ( 0.0, centsBetween( 440.0, 0.0 ) );
+}
+
+TEST( TemperamentTest, a_tuner_can_show_what_the_temperaments_change )
+{
+    // The Pythagorean fifth against the tempered one: about two cents. It is very little, and it is EXACTLY what a
+    // tuner displays - which is the whole reason centsBetween exists.
+    const double temperedFifth = ROOT.frequencyHz() * std::pow( 2.0, 7.0 / 12.0 );
+    const double pureFifth = frequencyFor( Note{ 67 }, ROOT, Temperament::Pythagorean );
+
+    EXPECT_NEAR( 1.955, centsBetween( pureFifth, temperedFifth ), 0.01 );
+}
+
 }    // namespace musichien::domain

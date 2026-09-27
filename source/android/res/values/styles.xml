@@ -21,6 +21,15 @@
         <item name="android:navigationBarColor">@color/musichien_night</item>
 
         <!--
+            THE important one. Since Android 15 (API 35) - and this application targets 36 - the status bar colour
+            above is DEPRECATED AND IGNORED: the system draws the bars transparent and lets the window paint under
+            them. What shows through is then the WINDOW BACKGROUND, which defaults to WHITE - a white strip with
+            white icons on it, exactly what Roger saw. Painting the window in the game's own night blue is what makes
+            that strip disappear into the game instead of glaring.
+        -->
+        <item name="android:windowBackground">@color/musichien_night</item>
+
+        <!--
             'Light' in the name of these two means a LIGHT BACKGROUND with dark icons. False is therefore what
             asks for white icons, which is what a night blue bar needs. Both need API 23 and 27, and the
             project requires 28: no version guard is needed anywhere.

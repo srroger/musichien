@@ -66,6 +66,22 @@ ApplicationWindow {
         return hours + " h " + (rest < 10 ? "0" : "") + rest;
     }
 
+    // La couleur de l'accordeur : vert quand c'est juste, jaune quand c'est proche, rouge au-dela. Les SEUILS vivent
+    // dans le controleur - c'est un jugement musical - et l'ecran ne fait que les habiller.
+    function tuningColor() {
+        if (!MicrophoneController.isListening || MicrophoneController.detectedFrequencyHz <= 0)
+            return "#8a77ad";
+
+        var state = MicrophoneController.detectedTuningState;
+        if (state === 0)
+            return "#7ee8a2";
+
+        if (state === 1)
+            return "#f2d982";
+
+        return "#f2848e";
+    }
+
     // Plays the interval at a given distance, then reveals the feedback.
     // The distance is all this screen knows how to say about an interval: it never names one, never
     // decides whether one is simple or compound, and never builds one. It asks, then it displays what
@@ -111,6 +127,9 @@ ApplicationWindow {
     onClosing: IntervalController.stopPlayback()
 
     Rectangle {
+        // The loop itself, and the only thing the player ever sees of it: the bench below is a tool for
+        // building the project, this is the game.
+
         anchors.fill: parent
 
         ScrollView {
@@ -200,6 +219,9 @@ ApplicationWindow {
                 // The list comes from the view model, exactly as the answer grid does, so that a level added
                 // to the domain appears here without a line of QML changing.
                 // -----------------------------------------------------------------------------------------
+                // Le niveau. Un bloc CENTRE, deux par ligne, tous de la meme largeur : quatre options doivent se
+                // lire d'un coup d'oeil, et une grille reguliere fait ca mieux qu'un empilement de tailles
+                // differentes.
                 Text {
                     Layout.alignment: Qt.AlignHCenter
                     horizontalAlignment: Text.AlignHCenter
@@ -208,12 +230,12 @@ ApplicationWindow {
                     text: ExerciseController.hasChosenLevel ? qsTr("Ton niveau") : qsTr("Pour commencer : tu en es où ?")
                 }
 
-                // Sur DEUX lignes : quatre niveaux ne tiennent plus sur une seule, et un bouton qu on ne peut pas
-                // atteindre est un bouton qui n existe pas.
-                Flow {
-                    Layout.preferredWidth: mainWindow.buttonWidth
+                GridLayout {
                     Layout.alignment: Qt.AlignHCenter
-                    spacing: 8
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    columns: 2
+                    columnSpacing: 8
+                    rowSpacing: 8
 
                     Repeater {
                         model: ExerciseController.playerLevels
@@ -221,8 +243,10 @@ ApplicationWindow {
                         delegate: Button {
                             required property var modelData
 
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 44
                             text: modelData.name
-                            font.pixelSize: 13
+                            font.pixelSize: 14
                             // The chosen one stays marked, so that the screen never leaves any doubt about the
                             // level the next session will use.
                             highlighted: ExerciseController.playerLevel === modelData.index
@@ -237,23 +261,35 @@ ApplicationWindow {
                     Layout.preferredHeight: 6
                 }
 
+                // Options et Profil sur UNE ligne, a parts egales : deux portes de la meme rangee, plutot que deux
+                // boutons poses l'un sous l'autre.
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    spacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Options")
+                        onClicked: settingsDialog.open()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Profil")
+                        onClicked: profileDialog.open()
+                    }
+
+                }
+
+                Item {
+                    Layout.preferredHeight: 6
+                }
+
                 // The way into the loop. It sits above the bench on purpose: the bench is a tool for
                 // building the project, and playing is what the application is FOR.
-                Button {
-                    Layout.alignment: Qt.AlignHCenter
-                    visible: ExerciseController.instruments.length > 0
-                    text: qsTr("Instruments…")
-                    onClicked: settingsDialog.open()
-                }
-
-                // La page du joueur : le nom, le total, les etoiles. Assis a cote des instruments, parce que c'est
-                // la que l'on trouve ce qui est a soi.
-                Button {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: qsTr("Profil…")
-                    onClicked: profileDialog.open()
-                }
-
                 Button {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
@@ -263,53 +299,25 @@ ApplicationWindow {
                     onClicked: ExerciseController.startSession()
                 }
 
-                Button {
+                RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
-                    height: 48
-                    text: qsTr("Mode infini")
-                    onClicked: ExerciseController.startInfiniteSession()
-                }
+                    spacing: 8
 
-                Button {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: mainWindow.buttonWidth
-                    height: 48
-                    text: qsTr("Survie")
-                    onClicked: ExerciseController.startSurvivalSession()
-                }
-
-                Item {
-                    Layout.preferredHeight: 6
-                }
-
-                Button {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: mainWindow.buttonWidth
-                    height: 52
-                    text: qsTr("Écouter une note")
-                    onClicked: mainWindow.playAndShowFeedback(function() {
-                        IntervalController.playSingleNote();
-                    })
-                }
-
-                Button {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: mainWindow.buttonWidth
-                    height: 52
-                    text: qsTr("Quinte, deux notes")
-                    onClicked: mainWindow.playInterval(7)
-                }
-
-                Button {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: mainWindow.buttonWidth
-                    height: 52
-                    text: qsTr("Quinte, en accord")
-                    onClicked: {
-                        mainWindow.chooseListeningMode(true);
-                        mainWindow.playInterval(7);
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Mode infini")
+                        onClicked: ExerciseController.startInfiniteSession()
                     }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Survie")
+                        onClicked: ExerciseController.startSurvivalSession()
+                    }
+
                 }
 
                 Item {
@@ -475,13 +483,24 @@ ApplicationWindow {
 
         }
 
-        // The loop itself, and the only thing the player ever sees of it: the bench below is a tool for
-        // building the project, this is the game.
+        // The passage is a CROSS FADE rather than a switch, and it is short: Material motion asks for a change that
+        // is felt without being watched - 220 ms is the length of a breath, and the eye reads the arrival instead of
+        // the cut. The screen is only invisible once the fade is over, so it never eats a tap.
         ExerciseScreen {
             id: exerciseScreen
 
             anchors.fill: parent
-            visible: ExerciseController.running
+            visible: opacity > 0
+            opacity: ExerciseController.running ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 220
+                    easing.type: Easing.OutCubic
+                }
+
+            }
+
         }
 
         gradient: Gradient {
@@ -743,7 +762,7 @@ ApplicationWindow {
                                 width: 18
                                 height: 18
                                 radius: 9
-                                color: MicrophoneController.isListening ? "#8ef2b0" : "#5c4a80"
+                                color: mainWindow.tuningColor()
                                 x: parent.width / 2 - width / 2
                                 y: parent.height * (1 - MicrophoneController.detectedPitchRatio) - height / 2
 
@@ -759,12 +778,34 @@ ApplicationWindow {
 
                         }
 
-                        Text {
+                        // La note la plus proche, l'ecart en cents, et la couleur : c'est un ACCORDEUR, et il sert
+                        // aussi bien a verifier une guitare qu'a voir si la voix est juste.
+                        RowLayout {
                             Layout.fillWidth: true
-                            color: "#8ef2b0"
-                            font.pixelSize: 15
-                            font.bold: true
-                            text: MicrophoneController.detectedNoteLabel
+                            spacing: 10
+
+                            Text {
+                                Layout.fillWidth: true
+                                color: mainWindow.tuningColor()
+                                font.pixelSize: 16
+                                font.bold: true
+                                text: MicrophoneController.detectedNoteLabel
+                            }
+
+                            Text {
+                                Layout.alignment: Qt.AlignRight
+                                color: mainWindow.tuningColor()
+                                font.pixelSize: 15
+                                visible: MicrophoneController.detectedFrequencyHz > 0
+                                text: {
+                                    var cents = Math.round(MicrophoneController.detectedCents);
+                                    if (cents === 0)
+                                        return qsTr("juste");
+
+                                    return (cents > 0 ? "+" : "") + cents + qsTr(" cents");
+                                }
+                            }
+
                         }
 
                         Button {

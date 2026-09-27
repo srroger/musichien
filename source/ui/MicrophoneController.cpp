@@ -2,6 +2,7 @@
 
 #include "domain/audio/PitchDetector.h"
 #include "domain/music/Note.h"
+#include "domain/music/Temperament.h"
 
 #include <QCoreApplication>
 #include <QPermission>
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <utility>
 
 namespace musichien::ui
@@ -37,6 +39,57 @@ constexpr double HIGHEST_VISIBLE_HZ = 1200.0;
 
 // Turns a frequency into a human label: the closest note name, then the rounded hertz. Silence is an em-dash, not a
 // note, and a pitch outside the MIDI range is reported honestly as a number.
+// The note a frequency is closest to: the MIDI number that rounds to the nearest semitone. Nothing when there is no
+// pitch at all, or when the pitch falls outside the playable range.
+[[nodiscard]] std::optional<domain::Note> nearestNoteFor( double p_frequencyHz )
+{
+    if( p_frequencyHz <= 0.0 )
+    {
+        return std::nullopt;
+    }
+
+    const double semitonesFromA4 = std::round( static_cast<double>( domain::SEMITONES_PER_OCTAVE )
+                                               * std::log2( p_frequencyHz / domain::REFERENCE_FREQUENCY_HZ ) );
+
+    const auto midiNumber = static_cast<std::int32_t>( domain::REFERENCE_MIDI_NUMBER + semitonesFromA4 );
+
+    if( midiNumber < domain::Note::MINIMUM_MIDI_NUMBER || midiNumber > domain::Note::MAXIMUM_MIDI_NUMBER )
+    {
+        return std::nullopt;
+    }
+
+    return domain::Note{ midiNumber };
+}
+
+// How far from the nearest note counts as in tune. These are a tuner's usual bands, and they are generous on purpose:
+// five cents is the ear's own limit on a held note, twenty is audibly off while still being the right note.
+constexpr double IN_TUNE_CENTS = 5.0;
+constexpr double OFF_CENTS = 20.0;
+
+// 0 in tune, 1 close, 2 off. A screen turns this into a colour; the threshold itself is a musical judgement, so it
+// lives here rather than in the QML.
+[[nodiscard]] int tuningStateFor( bool p_hasPitch, double p_cents )
+{
+    if( !p_hasPitch )
+    {
+        return 0;
+    }
+
+    const double magnitude = std::abs( p_cents );
+
+    if( magnitude <= IN_TUNE_CENTS )
+    {
+        return 0;
+    }
+
+    if( magnitude <= OFF_CENTS )
+    {
+        return 1;
+    }
+
+    return 2;
+}
+
 [[nodiscard]] QString noteLabelFor( double p_frequencyHz )
 {
     if( p_frequencyHz <= 0.0 )
@@ -44,19 +97,14 @@ constexpr double HIGHEST_VISIBLE_HZ = 1200.0;
         return QStringLiteral( "\u2014" );
     }
 
-    const double semitonesFromA4 = std::round( static_cast<double>( domain::SEMITONES_PER_OCTAVE )
-                                               * std::log2( p_frequencyHz / domain::REFERENCE_FREQUENCY_HZ ) );
+    const std::optional<domain::Note> note = nearestNoteFor( p_frequencyHz );
 
-    const std::int32_t midiNumber = domain::REFERENCE_MIDI_NUMBER + static_cast<std::int32_t>( semitonesFromA4 );
-
-    if( midiNumber < domain::Note::MINIMUM_MIDI_NUMBER || midiNumber > domain::Note::MAXIMUM_MIDI_NUMBER )
+    if( !note.has_value() )
     {
         return QStringLiteral( "%1 Hz" ).arg( p_frequencyHz, 0, 'f', 0 );
     }
 
-    const domain::Note note{ midiNumber };
-
-    return QStringLiteral( "%1  %2 Hz" ).arg( QString::fromStdString( note.name() ) ).arg( p_frequencyHz, 0, 'f', 0 );
+    return QStringLiteral( "%1  %2 Hz" ).arg( QString::fromStdString( note->name() ) ).arg( p_frequencyHz, 0, 'f', 0 );
 }
 
 }    // namespace
@@ -151,9 +199,21 @@ void MicrophoneController::onPitch( float p_frequencyHz )
     m_detectedPitchRatio = pitchRatioFor( m_detectedFrequencyHz );
     m_detectedNoteLabel = noteLabelFor( m_detectedFrequencyHz );
 
+    // The tuner part: how far the voice is from the note it is closest to. This is what makes the page useful
+    // outside the game - checking a guitar string, or hearing how flat yesterday's cold left the voice.
+    const std::optional<domain::Note> nearest = nearestNoteFor( m_detectedFrequencyHz );
+
+    m_detectedCents = nearest.has_value()
+                        ? domain::centsBetween( m_detectedFrequencyHz, nearest->frequencyHz() )
+                        : 0.0;
+
+    m_detectedTuningState = tuningStateFor( nearest.has_value(), m_detectedCents );
+
     emit detectedFrequencyHzChanged();
     emit detectedPitchRatioChanged();
     emit detectedNoteLabelChanged();
+    emit detectedCentsChanged();
+    emit detectedTuningStateChanged();
 }
 
 }    // namespace musichien::ui

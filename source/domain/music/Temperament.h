@@ -45,4 +45,13 @@ inline constexpr std::array<std::string_view, 3> TEMPERAMENT_NAMES{ "Tempéré",
 // built from it: the fifth above the root is 3/2 for good, whatever the root is.
 [[nodiscard]] double frequencyFor( Note p_note, Note p_root, Temperament p_temperament ) noexcept;
 
+// The distance between two frequencies, in CENTS. Twelve hundred cents make an octave, so the number is the same
+// size in every register - which is what an ear, and every tuner ever built, actually needs to judge a note.
+//
+// A value of zero means the frequencies are identical. Positive means the first one is higher. The result is
+// deliberately NOT rounded here: how close is "in tune" is a judgement, and it belongs to the caller.
+//
+// Either frequency being zero or negative is silence, not a note, and gives back zero.
+[[nodiscard]] double centsBetween( double p_frequencyHz, double p_referenceHz ) noexcept;
+
 }    // namespace musichien::domain

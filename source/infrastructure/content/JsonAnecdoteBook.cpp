@@ -26,6 +26,11 @@ namespace
         return domain::AnecdoteKind::Tip;
     }
 
+    if( p_name == "coaching" )
+    {
+        return domain::AnecdoteKind::Coaching;
+    }
+
     if( p_name == "acoustique" )
     {
         return domain::AnecdoteKind::Acoustics;
