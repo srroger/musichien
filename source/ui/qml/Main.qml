@@ -332,6 +332,13 @@ ApplicationWindow {
                     Button {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
+                        text: qsTr("Rythme")
+                        onClicked: rhythmDialog.open()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
                         text: qsTr("Options")
                         onClicked: settingsDialog.open()
                     }
@@ -592,6 +599,9 @@ ApplicationWindow {
 
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            // La colonne ne doit jamais defiler de cote : rien ne depasse en largeur, et un leger mouvement
+            // horizontal quand on fait defiler vers le bas est un defaut, pas une liberte.
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
                 id: settingsColumn
@@ -1144,6 +1154,210 @@ ApplicationWindow {
 
         interval: 6000
         onTriggered: mainWindow.feedbackVisible = false
+    }
+
+    Dialog {
+        id: rhythmDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 420)
+        height: Math.min(mainWindow.height * 0.9, rhythmColumn.implicitHeight + 32)
+        modal: true
+        padding: 16
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        contentItem: ScrollView {
+            id: rhythmScroll
+
+            clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+            ColumnLayout {
+                id: rhythmColumn
+
+                width: rhythmScroll.availableWidth
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#e8dcff"
+                    font.pixelSize: 16
+                    font.bold: true
+                    text: qsTr("Rythme")
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        Text {
+                            color: "#8a77ad"
+                            font.pixelSize: 12
+                            text: qsTr("Tempo (bpm)")
+                        }
+
+                        SpinBox {
+                            Layout.preferredWidth: 130
+                            from: 30
+                            to: 300
+                            editable: true
+                            value: RhythmController.bpm
+                            onValueModified: RhythmController.setBpm(value)
+
+                            contentItem: TextInput {
+                                text: parent.textFromValue(parent.value, parent.locale)
+                                color: "#ffffff"
+                                horizontalAlignment: Text.AlignHCenter
+                                font.pixelSize: 15
+                                validator: parent.validator
+                                readOnly: !parent.editable
+                            }
+
+                            background: Rectangle {
+                                color: "#1b1035"
+                                radius: 4
+                                border.width: 1
+                                border.color: "#5c4a80"
+                            }
+
+                        }
+
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        Text {
+                            color: "#8a77ad"
+                            font.pixelSize: 12
+                            text: qsTr("Temps par mesure")
+                        }
+
+                        SpinBox {
+                            Layout.preferredWidth: 130
+                            from: 1
+                            to: 12
+                            editable: true
+                            value: RhythmController.beatsPerBar
+                            onValueModified: RhythmController.setBeatsPerBar(value)
+
+                            contentItem: TextInput {
+                                text: parent.textFromValue(parent.value, parent.locale)
+                                color: "#ffffff"
+                                horizontalAlignment: Text.AlignHCenter
+                                font.pixelSize: 15
+                                validator: parent.validator
+                                readOnly: !parent.editable
+                            }
+
+                            background: Rectangle {
+                                color: "#1b1035"
+                                radius: 4
+                                border.width: 1
+                                border.color: "#5c4a80"
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 90
+                    highlighted: RhythmController.lastQuality === 2
+                    text: RhythmController.isRunning ? qsTr("TAPE · temps %1").arg(RhythmController.beatInBar + 1) : qsTr("TAPE (tap tempo)")
+                    onClicked: RhythmController.tap()
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#8ef2b0"
+                    font.pixelSize: 14
+                    text: qsTr("Score %1 · série %2").arg(RhythmController.score).arg(RhythmController.combo)
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: RhythmController.isRunning ? qsTr("Arrêter") : qsTr("Démarrer")
+                        onClicked: RhythmController.isRunning ? RhythmController.stop() : RhythmController.start()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Fermer")
+                        onClicked: rhythmDialog.close()
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 6
+                    color: "#e8dcff"
+                    font.pixelSize: 14
+                    font.bold: true
+                    text: qsTr("Batterie")
+                }
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 2
+                    columnSpacing: 8
+                    rowSpacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 56
+                        text: qsTr("Grosse caisse")
+                        onClicked: RhythmController.playDrum(0)
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 56
+                        text: qsTr("Caisse claire")
+                        onClicked: RhythmController.playDrum(1)
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 56
+                        text: qsTr("Charleston")
+                        onClicked: RhythmController.playDrum(2)
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 56
+                        text: qsTr("Tom")
+                        onClicked: RhythmController.playDrum(3)
+                    }
+
+                }
+
+            }
+
+        }
+
     }
 
     // Un composant inline plutot qu'un fichier : il n'est utile qu'ici, et il evite de dupliquer trois fois le meme

@@ -21,6 +21,7 @@
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
 #include "ui/MicrophoneController.h"
+#include "ui/RhythmController.h"
 
 #include <QAudioDevice>
 #include <QFile>
@@ -215,6 +216,10 @@ int main( int p_argumentCount, char * p_arguments[] )
     // -------------------------------------------------------------------------------------------------------------
     musichien::infrastructure::QAudioNotePlayer notePlayer;
 
+    // Le metronome et le jeu de rythme. Un seul controleur pour les deux : le metronome qui bat est la meme boucle
+    // que le jeu, et un outil de musicien ne demande pas deux classes.
+    musichien::ui::RhythmController rhythmController{ notePlayer };
+
     // What the application remembers about its player. A small settings file, on the device: the package
     // cannot reach the network, so nothing about him ever leaves the phone.
     musichien::infrastructure::QSettingsPlayerPreferences playerLevelStore;
@@ -243,6 +248,20 @@ int main( int p_argumentCount, char * p_arguments[] )
     notePlayer.prepareAudioOutput();
 
     std::cerr << "Musichien: audio output is " << notePlayer.audioOutputDescription() << "\n";
+
+    // Un casque Bluetooth branche ou debranche change la liste des sorties : on rouvre la sortie sur le nouvel
+    // appareil par defaut, sinon le son resterait sur un peripherique mort. Les ENTREES, elles, ne peuvent pas etre
+    // rebranchees toutes seules : on avertit, et les reglages permettent de rechoisir le micro.
+    QMediaDevices mediaDevices;
+
+    QObject::connect( &mediaDevices, &QMediaDevices::audioOutputsChanged, &mediaDevices, [&notePlayer]() {
+        std::cerr << "Musichien: audio outputs changed, reopening the output.\n";
+        notePlayer.reopenAudioOutput();
+    } );
+
+    QObject::connect( &mediaDevices, &QMediaDevices::audioInputsChanged, &mediaDevices, []() {
+        std::cerr << "Musichien: audio inputs changed - reopen the settings to pick the new microphone.\n";
+    } );
 
     // The view model only receives the PORT, never the adapter: it could be handed the fake player of
     // the unit tests without a single line of it changing.
@@ -411,6 +430,12 @@ int main( int p_argumentCount, char * p_arguments[] )
                                   QML_MODULE_MINOR_VERSION,
                                   "ExerciseController",
                                   &exerciseController );
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "RhythmController",
+                                  &rhythmController );
 
     QQmlApplicationEngine qmlEngine;
 

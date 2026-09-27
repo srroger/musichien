@@ -47,6 +47,25 @@ void QAudioNotePlayer::prepareAudioOutput()
     ensureAudioOutputIsOpen();
 }
 
+void QAudioNotePlayer::reopenAudioOutput()
+{
+    stopAll();
+
+    // The sink and the two synthesisers were built for the OLD device's sample rate: they are discarded, and the
+    // next ensure opens whatever is now the default device and rebuilds them at its own rate.
+    m_audioSink.reset();
+    m_synthesizer.reset();
+    m_drumSynthesizer.reset();
+    m_outputDescription = "not opened yet";
+
+    ensureAudioOutputIsOpen();
+
+    if( !isAudioOutputAvailable() )
+    {
+        std::cerr << "Musichien: the audio device changed and no output could be opened. Playback stays silent until one appears.\n";
+    }
+}
+
 bool QAudioNotePlayer::isAudioOutputAvailable() const noexcept
 {
     return m_synthesizer.has_value();
@@ -116,6 +135,7 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
     // The synthesizer is created from the REAL sample rate of the device. This single line is what
     // keeps every note in tune.
     m_synthesizer.emplace( m_audioFormat.sampleRate() );
+    m_drumSynthesizer.emplace( m_audioFormat.sampleRate() );
 
     m_outputDescription = std::format( "{} ({} Hz, {} channel(s), sample format {})",
                                        outputDevice.description().toStdString(),
@@ -403,6 +423,47 @@ void QAudioNotePlayer::playTapCue()
     }
 
     playSamples( std::move( samples ) );
+}
+
+void QAudioNotePlayer::playMetronomeClick( bool p_accented )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // Un clic court, comme le clic de menu, mais avec un timbre propre au metronome : l'accent du premier temps est
+    // plus aigu et un peu plus fort, les autres temps plus graves et plus discrets.
+    const domain::Note note{ p_accented ? 88 : 72 };
+
+    std::vector<float> samples =
+      m_synthesizer->renderNote( note, std::chrono::milliseconds{ 60 } );
+
+    constexpr float ACCENTED_GAIN = 0.30F;
+    constexpr float PLAIN_GAIN = 0.18F;
+
+    const float gain = p_accented ? ACCENTED_GAIN : PLAIN_GAIN;
+
+    for( float & sample : samples )
+    {
+        sample *= gain;
+    }
+
+    playSamples( std::move( samples ) );
+}
+
+void QAudioNotePlayer::playDrum( domain::Drum p_drum )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_drumSynthesizer.has_value() )
+    {
+        return;
+    }
+
+    playSamples( m_drumSynthesizer->renderDrum( p_drum ) );
 }
 
 void QAudioNotePlayer::playGreeting()

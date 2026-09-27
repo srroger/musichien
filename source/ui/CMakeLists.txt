@@ -46,6 +46,8 @@ musichienFunction_AddLibrary(ui
     IntervalPlaybackController.cpp
     MicrophoneController.h
     MicrophoneController.cpp
+    RhythmController.h
+    RhythmController.cpp
 )
 
 target_link_libraries(musichien_ui PUBLIC

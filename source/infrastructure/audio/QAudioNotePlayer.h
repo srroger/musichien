@@ -57,6 +57,12 @@ public:
     // Le clic de menu : un accuse de reception, pas une reponse.
     void playTapCue() override;
 
+    // Le clic du metronome : accentue sur le premier temps d'une mesure.
+    void playMetronomeClick( bool p_accented ) override;
+
+    // Frappe un element de la batterie, rendu par la synthese.
+    void playDrum( domain::Drum p_drum ) override;
+
     // Le petit arpège de l'accueil : montant, ouvert, au piano, et VOLONTAIREMENT discret.
     //
     // Roger, après l'avoir entendu : "les sons d'introduction sont un peu forts... ça fait un peu bug, un peu
@@ -95,6 +101,11 @@ public:
     // A machine without a usable sound card must be diagnosed at start up, not the moment the player
     // taps a button in the middle of an exercise.
     void prepareAudioOutput();
+
+    // Reopens the audio output against whatever device is now default. Called when the operating system says the
+    // devices changed - a bluetooth headset plugged or removed - so that the sound follows the player instead of
+    // staying on a dead device.
+    void reopenAudioOutput();
 
     // False when no audio output could be opened.
 
@@ -152,6 +163,9 @@ private:
     std::mt19937 m_instrumentRandomEngine{ std::random_device{}() };
 
     std::optional<domain::ToneSynthesizer> m_synthesizer;
+
+    // Created from the same real sample rate, so the drums are in tune with the notes.
+    std::optional<domain::DrumSynthesizer> m_drumSynthesizer;
 
     // Equal temperament at 440 Hz until setTuning says otherwise.
     domain::TuningContext m_tuning;

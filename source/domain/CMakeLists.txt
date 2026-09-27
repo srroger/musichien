@@ -29,6 +29,8 @@ musichienFunction_AddLibrary(domain
     audio/ToneSynthesizer.cpp
     audio/SampledInstrument.h
     audio/SampledInstrument.cpp
+    audio/DrumSynthesizer.h
+    audio/DrumSynthesizer.cpp
 
     # Rhythm, as pure rules: the metronome's grid and the judgement of a tap, no clock and no sound
     rhythm/Rhythm.h
@@ -76,6 +78,7 @@ if(MUSICHIEN_BUILD_TESTING)
         music/Temperament_test.cpp
         audio/ToneSynthesizer_test.cpp
         audio/SungIntervalDetector_test.cpp
+        audio/DrumSynthesizer_test.cpp
         rhythm/Rhythm_test.cpp
         exercise/AnswerGrid_test.cpp
         exercise/AnecdoteBook_test.cpp
