@@ -101,6 +101,11 @@ QVariantList ExerciseSessionController::gridPositions() const
             position.insert( QStringLiteral( "semitones" ), description.value( QStringLiteral( "semitones" ) ) );
             position.insert( QStringLiteral( "identifier" ), description.value( QStringLiteral( "identifier" ) ) );
             position.insert( QStringLiteral( "name" ), description.value( QStringLiteral( "name" ) ) );
+
+            // La classe de l'intervalle, ET PAS SEULEMENT SA TAILLE : c'est elle qui porte la COULEUR d'une
+            // place. L'oublier donne un cercle tout gris - la carte perd d'un coup la moitie de ce qu'elle dit.
+            position.insert( QStringLiteral( "intervalClass" ),
+                             description.value( QStringLiteral( "intervalClass" ) ) );
         }
 
         positions.append( position );
