@@ -38,11 +38,16 @@ enum class PlayerLevel : std::size_t
     Fluent = 1,
 
     // Hears every simple interval, and wants the whole palette at once.
-    Advanced = 2
+    Advanced = 2,
+
+    // Wants the intervals BEYOND the octave as well: the ninth, the tenth, and the rest of the same colours
+    // heard one octave higher. The learning order puts them all at the end, so the palette of this level is the
+    // twelve simple intervals followed by the first compound ones.
+    BeyondTheOctave = 3
 };
 
 // How many levels there are, which is what a screen offering them needs to know.
-inline constexpr std::size_t PLAYER_LEVEL_COUNT = 3;
+inline constexpr std::size_t PLAYER_LEVEL_COUNT = 4;
 
 // The rules of a session for a player of this level.
 [[nodiscard]] SessionSettings sessionSettingsFor( PlayerLevel p_level );

@@ -22,7 +22,8 @@ namespace
 
 constexpr std::initializer_list<PlayerLevel> EVERY_LEVEL{ PlayerLevel::Beginner,
                                                           PlayerLevel::Fluent,
-                                                          PlayerLevel::Advanced };
+                                                          PlayerLevel::Advanced,
+                                                          PlayerLevel::BeyondTheOctave };
 
 }    // namespace
 
@@ -68,7 +69,7 @@ TEST( PlayerLevelTest, an_unknown_level_is_the_beginner_one )
 {
     // Reading a preference means reading a file a curious player can edit. A value that is not a level must
     // cost him a setting, never a crash on start up.
-    EXPECT_EQ( PlayerLevel::Beginner, playerLevelFromIndex( 3 ) );
+    EXPECT_EQ( PlayerLevel::BeyondTheOctave, playerLevelFromIndex( 3 ) );
     EXPECT_EQ( PlayerLevel::Beginner, playerLevelFromIndex( 99 ) );
 
     EXPECT_EQ( PlayerLevel::Advanced, playerLevelFromIndex( 2 ) );

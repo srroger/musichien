@@ -46,6 +46,17 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             // six. Clamped by the palette, which holds twelve.
             settings.choiceCount = 8;
             break;
+
+        case PlayerLevel::BeyondTheOctave:
+            // Les douze intervalles simples, PUIS les premiers composes : c'est ce que demande un joueur qui
+            // entend deja l'octave et veut savoir ce qu'il y a au-dessus.
+            //
+            // Les composes ne prennent pas de place nouvelle sur le cercle : ils se posent SUR la place de leur
+            // classe, en petit, ce qui est exactement ce qui rend les traits interessants.
+            settings.startingPaletteSize = 18;
+            settings.successesBeforeWidening = 2;
+            settings.choiceCount = 8;
+            break;
     }
 
     return settings;

@@ -238,6 +238,9 @@ QVariantList ExerciseSessionController::playerLevels()
 
             case domain::PlayerLevel::Advanced:
                 return ExerciseSessionController::tr( "Jusqu'à l'octave" );
+
+            case domain::PlayerLevel::BeyondTheOctave:
+                return ExerciseSessionController::tr( "Les composes" );
         }
 
         return QString{};
