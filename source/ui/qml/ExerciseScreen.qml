@@ -347,6 +347,9 @@ Item {
                     // decide de la TAILLE - parce que c'est lui qui dit la distance.
                     // ...et de combien le composes s'en ecarte : juste assez pour TOUCHER son simple, en allant
                     // vers le centre du cercle.
+                    // ...et la somme des poids de la case entiere.
+                    // C'est elle qui garantit qu'il n'y a JAMAIS de chevauchement : les ronds se partagent la
+                    // hauteur de la case dans cette proportion, donc la somme de leurs hauteurs vaut la case.
 
                     // C'est la reponse a deux choses a la fois. D'abord une demande de Roger : les composes
                     // restent COLLES a leur simple, parce qu'une seconde majeure et une neuvieme majeure sont la
@@ -360,28 +363,39 @@ Item {
 
                         required property var modelData
                         required property int index
-                        // Roger : "des petits cercles supplementaires, un peu plus petits a chaque octave de
-                        // distance". Et il a raison, la carte y gagne ce qui lui manquait : au mode ou tout est en
-                        // jeu, un accord entier ressemble maintenant a une case avec ses satellites au lieu d'une
-                        // pile de pastilles ou plus personne ne lit rien.
+                        // Combien d'octaves l'intervalle est au-dessus du simple : zero pour une seconde, un pour
+                        // une neuvieme, deux pour une quinzieme. C'est CE nombre qui decide de la taille, parce que
+                        // c'est lui qui dit la distance - Roger : "un peu plus petits a chaque octave de distance".
                         readonly property real octaveSpan: (gridButton.modelData.octaveSpan > 0) ? gridButton.modelData.octaveSpan : 0
-                        // Le simple garde la case entiere ; chaque octave au-dessus perd un tiers de ce qui reste.
-                        readonly property real buttonSize: circleBoard.slotWidth / (1 + (0.34 * octaveSpan))
+                        // Combien de boutons la case porte, et jamais zero.
+                        readonly property int stackSize: (gridButton.modelData.stackSize > 0) ? gridButton.modelData.stackSize : 1
+                        // Le POIDS du bouton : le simple pese un, chaque octave au-dessus un peu moins.
+                        readonly property real sizeWeight: 1 / (1 + (0.34 * octaveSpan))
+                        // Elle est volontairement MAJOREE - on additionne les poids des premiers rangs, qui sont les
+                        // plus lourds. Une case qui saute une octave obtient donc des ronds un peu plus petits que
+                        // necessaire, jamais plus grands. Se tromper dans ce sens ne coute rien ; se tromper dans
+                        // l'autre a coute une soiree a Roger, avec deux boutons l'un sur l'autre.
+                        readonly property real weightSum: {
+                            var total = 0;
+                            for (var rank = 0; rank < stackSize; ++rank) total += 1 / (1 + (0.34 * rank))
+                            return total;
+                        }
+                        // La hauteur du rond, et donc son diametre : des ronds, pas des pastilles.
+                        readonly property real buttonSize: circleBoard.slotHeight * sizeWeight / weightSum
+                        // Ou commence ce bouton dans la pile : la somme des hauteurs de ceux qui le precedent. Aucun
+                        // n'en recouvre un autre, et la pile reste calee sur le haut de la case.
+                        readonly property real stackOffset: {
+                            var above = 0;
+                            for (var rank = 0; rank < Math.max(0, gridButton.modelData.stackIndex); ++rank) above += circleBoard.slotHeight * (1 / (1 + (0.34 * rank))) / weightSum
+                            return above;
+                        }
                         // Moins quatre-vingt-dix degres, c'est midi : la place zero du cercle est le do, et le do se
                         // met en haut. Le sens des aiguilles d'une montre donne ensuite sol, re, la, mi, si -
                         // l'ordre du cercle, tel qu'il s'enseigne.
                         readonly property real slotAngleRadians: (-90 + (30 * gridButton.modelData.slot)) * Math.PI / 180
-                        // Le centre de la case sur le cercle...
-                        readonly property real slotCentreX: (circleBoard.width / 2) + (circleBoard.ringRadius * Math.cos(slotAngleRadians))
-                        readonly property real slotCentreY: (circleBoard.height / 2) + (circleBoard.ringRadius * Math.sin(slotAngleRadians))
-                        // C'est pour cela que le simple d'une case n'est PAS au centre du cercle des quintes : il
-                        // reste sur sa place, et ses composes viennent vers l'interieur. Rien n'est place au hasard,
-                        // et un composes colle a son simple est exactement ce qu'il est en musique - la meme couleur,
-                        // un peu plus loin.
-                        readonly property real satelliteOffset: (circleBoard.slotWidth - buttonSize) / 2
 
-                        x: slotCentreX - (width / 2) - (satelliteOffset * Math.cos(slotAngleRadians))
-                        y: slotCentreY - (height / 2) - (satelliteOffset * Math.sin(slotAngleRadians))
+                        x: (circleBoard.width / 2) + (circleBoard.ringRadius * Math.cos(slotAngleRadians)) - (width / 2)
+                        y: (circleBoard.height / 2) + (circleBoard.ringRadius * Math.sin(slotAngleRadians)) - (circleBoard.slotHeight / 2) + stackOffset
                         width: buttonSize
                         height: buttonSize
 

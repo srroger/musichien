@@ -4,9 +4,12 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QMap>
+#include <QPointF>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
+#include <QRectF>
+#include <QSizeF>
 #include <QString>
 #include <QStringList>
 #include <QTimer>
@@ -17,6 +20,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -149,6 +153,49 @@ namespace
     }
 
     return items;
+}
+
+// Le cercle des quintes : le parent du Repeater, et rien d'autre.
+[[nodiscard]] QQuickItem * circleBoardOf( QQuickItem & p_screen )
+{
+    for( QQuickItem * item : everyItem( p_screen ) )
+    {
+        if( QString::fromLatin1( item->metaObject()->className() ).contains( QStringLiteral( "Repeater" ) ) )
+        {
+            return item->parentItem();
+        }
+    }
+
+    return nullptr;
+}
+
+// Les boutons du cercle : ceux du board qui portent un texte, donc un identifiant d'intervalle.
+[[nodiscard]] std::vector<QQuickItem *> circleButtons( QQuickItem & p_screen )
+{
+    std::vector<QQuickItem *> buttons;
+
+    QQuickItem * board = circleBoardOf( p_screen );
+
+    if( board == nullptr )
+    {
+        return buttons;
+    }
+
+    for( QQuickItem * item : everyItem( *board ) )
+    {
+        if( item->property( "down" ).isValid() && !item->property( "text" ).toString().isEmpty() )
+        {
+            buttons.push_back( item );
+        }
+    }
+
+    return buttons;
+}
+
+// Le rectangle occupe par un item, dans le repere de la scene.
+[[nodiscard]] QRectF rectangleOf( QQuickItem & p_item )
+{
+    return QRectF{ p_item.mapToItem( nullptr, QPointF{ 0, 0 } ), QSizeF{ p_item.width(), p_item.height() } };
 }
 
 // Ce que QML a dit depuis le debut : la phrase exacte, quand une attente echoue.
@@ -358,6 +405,97 @@ TEST( ExerciseScreenTest, the_three_octaves_of_a_note_are_all_on_the_screen )
 
     EXPECT_EQ( unisonSlot, domain::circleOfFifthsSlot( domain::Interval{ 12 } ) );
     EXPECT_EQ( unisonSlot, domain::circleOfFifthsSlot( domain::Interval{ 24 } ) );
+}
+
+TEST( ExerciseScreenTest, no_two_intervals_of_the_same_place_ever_overlap )
+{
+    // Le defaut exact que Roger a trouve : deux intervalles d'une meme case se posaient l'un sur l'autre, et le
+    // bouton du dessous devenait impossible a toucher.
+    //
+    // Un chevauchement ne se voit pas dans un modele, ni dans un log, ni dans un test qui compte des items : il se
+    // voit dans des RECTANGLES. C'est donc cela qu'on compare, pour les boutons d'une meme place.
+    //
+    // Deux places VOISINES se touchent presque par construction - douze cases reparties sur un cercle - et ce n'est
+    // pas le sujet : ce sont deux boutons differents, a deux endroits differents, et l'oeil les distingue.
+    const LoadedScreen screen = loadExerciseScreen();
+
+    ASSERT_NE( nullptr, screen.item );
+
+    // Le cercle est dimensionne comme sur un telephone : sans taille, tous les boutons mesurent zero, et le test ne
+    // dirait rien du tout.
+    QQuickItem * board = circleBoardOf( *screen.item );
+
+    ASSERT_NE( nullptr, board ) << "le cercle des quintes est introuvable. " << screenReport( *screen.item );
+
+    board->setWidth( 328 );
+    board->setHeight( 328 );
+
+    QEventLoop settling;
+
+    QTimer::singleShot( 50, &settling, &QEventLoop::quit );
+
+    settling.exec();
+
+    const std::vector<QQuickItem *> buttons = circleButtons( *screen.item );
+
+    ASSERT_FALSE( buttons.empty() ) << "aucun bouton sur le cercle. " << screenReport( *screen.item );
+
+    // Les boutons rassembles par place.
+    std::map<int, std::vector<QQuickItem *>> buttonsPerSlot;
+
+    for( QQuickItem * button : buttons )
+    {
+        // Un bouton de taille nulle n'est pas un bouton : c'est le signe d'un calcul parti en NaN.
+        EXPECT_GT( button->width(), 0.0 ) << "le bouton " << button->property( "text" ).toString().toStdString() << " est de taille nulle";
+
+        // Le rassemblement se lit dans la GEOMETRIE, pas dans le modele : les boutons d'une meme place partagent
+        // leur centre, quel que soit leur rang dans la pile et quelle que soit leur taille. C'est plus court, et
+        // surtout cela ne depend pas de la facon dont QML transporte le modele - le modelData d'un delegue vit sur
+        // le delegue, pas sur le bouton, et s'y tromper rassemblait les douze places dans la meme case.
+        const QRectF rectangle = rectangleOf( *button );
+
+        const int place = qRound( ( rectangle.center().x() * 1000 ) + rectangle.center().y() );
+
+        buttonsPerSlot[place].push_back( button );
+    }
+
+    const auto places = buttonsPerSlot.size();
+
+    EXPECT_GE( places, 2U ) << "une seule place portent des intervalles : le test ne prouverait rien";
+
+    for( const auto & [slot, stacked] : buttonsPerSlot )
+    {
+        for( std::size_t left = 0; left < stacked.size(); ++left )
+        {
+            for( std::size_t right = left + 1; right < stacked.size(); ++right )
+            {
+                const QRectF first = rectangleOf( *stacked.at( left ) );
+                const QRectF second = rectangleOf( *stacked.at( right ) );
+
+                EXPECT_FALSE( first.intersects( second ) )
+                  << "place " << slot << " : '" << stacked.at( left )->property( "text" ).toString().toStdString()
+                  << "' et '" << stacked.at( right )->property( "text" ).toString().toStdString() << "' se recouvrent - "
+                  << first.x() << "," << first.y() << " " << first.width() << "x" << first.height() << " contre "
+                  << second.x() << "," << second.y() << " " << second.width() << "x" << second.height();
+            }
+        }
+    }
+
+    // Et les tailles sont DECROISSANTES avec la distance : le simple est le plus grand, la quinzieme la plus petite.
+    // C'est la demande de Roger, et c'est aussi ce qui rend la case lisible d'un coup d'oeil.
+    for( const auto & [slot, stacked] : buttonsPerSlot )
+    {
+        if( stacked.size() < 2 )
+        {
+            continue;
+        }
+
+        for( std::size_t rank = 1; rank < stacked.size(); ++rank )
+        {
+            EXPECT_LT( stacked.at( rank )->width(), stacked.at( rank - 1 )->width() )
+              << "place " << slot << " : le rang " << rank << " n'est pas plus petit que le precedent";
+        }
+    }
 }
 
 }    // namespace musichien::ui
