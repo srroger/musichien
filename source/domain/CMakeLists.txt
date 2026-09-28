@@ -21,6 +21,10 @@ musichienFunction_AddLibrary(domain
     music/Chord.h
     music/Chord.cpp
 
+    # L'arbre des accords : comment chaque couleur s'obtient d'une autre, en un geste
+    music/ChordTree.h
+    music/ChordTree.cpp
+
     # Audio, expressed as a port: the domain says WHAT it needs, never HOW it is done
     audio/NotePlayer.h
     audio/NotePlayerFake.h
@@ -94,6 +98,7 @@ if(MUSICHIEN_BUILD_TESTING)
         music/Interval_test.cpp
         music/Temperament_test.cpp
         music/Chord_test.cpp
+        music/ChordTree_test.cpp
         audio/ToneSynthesizer_test.cpp
         audio/SungIntervalDetector_test.cpp
         audio/DrumSynthesizer_test.cpp

@@ -1,12 +1,14 @@
 #include "ui/ExerciseSessionController.h"
 
 #include "domain/exercise/Weekend.h"
+#include "domain/music/ChordTree.h"
 #include "domain/music/Interval.h"
 #include "domain/music/Temperament.h"
 #include "domain/rhythm/RhythmPattern.h"
 #include "ui/IntervalDescription.h"
 #include "ui/MicrophoneController.h"
 
+#include <QColor>
 #include <QDate>
 #include <QString>
 
@@ -1975,9 +1977,83 @@ bool ExerciseSessionController::isWeekEnd() const
     return domain::isWeekEnd( QDate::currentDate().dayOfWeek() );
 }
 
+QVariantList ExerciseSessionController::chordTree() const
+{
+    QVariantList nodes;
+
+    // La tonique de la carte : un do. L'arbre est une CARTE et non une question - il montre la FORME des accords, et la
+    // tonique n'est la que pour rendre les noms lisibles. C'est aussi pour cela que les statistiques, elles, n'enregistrent
+    // que la couleur : c'est elle qu'on apprend, la tonique n'etant qu'un habillage.
+    const QString rootName = QString::fromStdString( domain::Note{ 60 }.pitchClassName() );
+
+    const std::span<const domain::ChordNode> tree = domain::chordTree();
+
+    for( const domain::ChordNode & node : tree )
+    {
+        QVariantMap described;
+
+        const std::string_view suffix = domain::chordQualitySymbolSuffix( node.quality );
+
+        described.insert( QStringLiteral( "quality" ), static_cast<int>( node.quality ) );
+
+        described.insert( QStringLiteral( "name" ),
+                          rootName + QString::fromUtf8( suffix.data(), static_cast<int>( suffix.size() ) ) );
+
+        // Les degres : « 1 3 5 », « 1 b3 5 b7 ». C'est CE QUI APPREND quelque chose.
+        described.insert( QStringLiteral( "degrees" ), QString::fromStdString( domain::chordDegreesLabel( node.quality ) ) );
+
+        described.insert( QStringLiteral( "mutation" ),
+                          QString::fromUtf8( node.mutation.data(), static_cast<int>( node.mutation.size() ) ) );
+
+        described.insert( QStringLiteral( "depth" ), node.depth );
+
+        described.insert( QStringLiteral( "isRoot" ), node.isRoot() );
+
+        // L'INDEX DU PARENT, et pas seulement sa couleur : l'ecran doit tracer un trait entre deux noeuds, et il lui faut
+        // deux positions. Chercher le parent lui-meme serait refaire ici un travail deja fait.
+        //
+        // La racine n'a pas de parent, et -1 le dit : c'est ce que l'ecran lit pour ne tracer AUCUN trait. Sans ce cas
+        // particulier, elle se trouverait elle-meme et se relierait a elle-meme.
+        int parentIndex = -1;
+
+        if( !node.isRoot() )
+        {
+            for( std::size_t index = 0; index < tree.size(); ++index )
+            {
+                if( tree.at( index ).quality == node.parent )
+                {
+                    parentIndex = static_cast<int>( index );
+
+                    break;
+                }
+            }
+        }
+
+        described.insert( QStringLiteral( "parentIndex" ), parentIndex );
+
+        nodes.append( described );
+    }
+
+    return nodes;
+}
+
 int ExerciseSessionController::chordQualityCount() const noexcept
 {
     return static_cast<int>( domain::CHORD_QUALITY_COUNT );
+}
+
+QString ExerciseSessionController::chordColourName( int p_quality ) const
+{
+    const int count = chordQualityCount();
+
+    // La teinte vient de la position dans l'ordre d'apprentissage, multipliee par 7 avant le modulo : 15 et 7 sont premiers
+    // entre eux, donc les quinze couleurs visitent les quinze teintes, et deux couleurs VOISINES n'en partagent jamais une.
+    // C'est ce qui fait qu'un majeur et un mineur ne se ressemblent pas, alors qu'ils se suivent dans la liste.
+    const double hue = static_cast<double>( ( p_quality * 7 ) % count ) / static_cast<double>( count );
+
+    // Une saturation moderee et une clarte elevee : le texte pose dessus est sombre, et c'est ce contraste qui rend le
+    // bouton lisible d'un coup d'oeil.
+    return QColor::fromHslF( hue, 0.45, 0.70 ).name();
 }
 
 bool ExerciseSessionController::isChordHintAvailable() const noexcept

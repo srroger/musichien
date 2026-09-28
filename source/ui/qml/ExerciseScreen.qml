@@ -33,6 +33,8 @@ Item {
     // Everything that moves is gathered here, because the whole screen shifts sideways during the shake.
     // La pause d'une question de rythme : la duree de la cellule, plus une respiration.
     // La couleur d'une COULEUR D'ACCORD, comme la couleur d'un intervalle : un code qui se lit avant le nom.
+    // La couleur d'une couleur d'accord vient du CONTROLEUR (chordColourName) : elle est la meme sur tous les ecrans, et
+    // elle le restera. Deux fichiers QML qui recalculeraient chacun leur teinte finiraient par en montrer deux differentes.
 
     id: exerciseScreen
 
@@ -62,15 +64,6 @@ Item {
             return "#9c8bc0";
 
         return Qt.hsla(p_interval.intervalClass / 12, 0.36, 0.76, 1);
-    }
-
-    // La teinte vient de la position dans l'ordre d'apprentissage, mais multipliee par 7 avant le modulo - 15 et 7 sont
-    // premiers entre eux, donc les quinze qualites visitent les quinze teintes, et deux qualites VOISINES n'en partagent
-    // jamais une. C'est ce qui fait qu'un majeur et un mineur ne se ressemblent pas, alors qu'ils se suivent.
-    function chordColour(p_quality) {
-        var count = ExerciseController.chordQualityCount;
-        var hue = ((p_quality * 7) % count) / count;
-        return Qt.hsla(hue, 0.45, 0.7, 1);
     }
 
     // What the verdict says. The NAME comes from the domain, the sentence is built here: the domain
@@ -874,7 +867,7 @@ Item {
                         // fond clair demande d'etre lu. Roger : « fond de couleurs avec texte en noir ».
                         background: Rectangle {
                             radius: 8
-                            color: exerciseScreen.chordColour(modelData.quality)
+                            color: ExerciseController.chordColourName(modelData.quality)
                             border.width: parent.highlighted ? 3 : 0
                             border.color: "#ffffff"
                             opacity: ExerciseController.isAsking ? 1 : 0.72

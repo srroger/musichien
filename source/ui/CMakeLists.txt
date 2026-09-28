@@ -57,6 +57,10 @@ target_link_libraries(musichien_ui PUBLIC
 
     Qt6::Core
     Qt6::Qml
+
+    # Qt6::Gui n'est pas la pour peindre : QColor y vit, et c'est lui qui donne a une couleur d'accord SA teinte, une
+    # seule fois pour tous les ecrans. Qt Quick le tire de toute facon, donc cela n'ajoute rien au paquet.
+    Qt6::Gui
 )
 
 # ---------------------------------------------------------------------------------------------------------------------

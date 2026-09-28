@@ -436,6 +436,14 @@ public:
     // une reponse fausse.
     Q_PROPERTY( bool isChordHintAvailable READ isChordHintAvailable NOTIFY questionChanged )
 
+    // L'ARBRE DES ACCORDS, pret a etre dessine : une entree par couleur, dans l'ordre de LECTURE (le parent avant ses
+    // enfants), avec son nom anglo-saxon, ses degres, sa profondeur et le geste qui la fait naitre.
+    //
+    // CONSTANT : l'arbre est de la theorie, il ne change pas d'une partie a l'autre.
+    Q_PROPERTY( QVariantList chordTree READ chordTree CONSTANT )
+
+    [[nodiscard]] QVariantList chordTree() const;
+
     // Le nombre de couleurs d'accord que le jeu connait.
     //
     // L'ecran s'en sert pour repartir ses teintes sur tout le cercle chromatique. Une constante ecrite a la main dans le
@@ -444,6 +452,13 @@ public:
     Q_PROPERTY( int chordQualityCount READ chordQualityCount CONSTANT )
 
     [[nodiscard]] int chordQualityCount() const noexcept;
+
+    // LA COULEUR d'une couleur d'accord, prete a peindre.
+    //
+    // Elle est calculee ICI plutot que dans un fichier QML, et c'est deliberé : deux ecrans qui recalculeraient chacun
+    // leur teinte finiraient par en montrer deux differentes, et un code couleur qui diverge n'apprend plus rien. C'est
+    // la meme raison qui fait que les noms viennent du domaine.
+    Q_INVOKABLE [[nodiscard]] QString chordColourName( int p_quality ) const;
 
     [[nodiscard]] bool isChordHintAvailable() const noexcept;
 

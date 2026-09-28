@@ -33,6 +33,12 @@ import QtQuick.Layouts
 
 ApplicationWindow {
     // Une part de question : un titre, une phrase qui dit ce que le reglage fait, et le nombre.
+    // =================================================================================================================
+    // L'ARBRE DES ACCORDS
+    // Roger : « une carte ou chaque accord est obtenu en modifiant un intervalle... ca rappelle les arbres de competences
+    // des RPG, et ca donne un ordre aux accords, on s'y retrouve mieux, et pour le cerveau c'est une meilleure
+    // representation ». Il a raison, et c'est la meilleure page pedagogique du jeu : quinze couleurs, quatorze gestes,
+    // une seule racine - au lieu de quinze noms a retenir.
 
     id: mainWindow
 
@@ -432,6 +438,16 @@ ApplicationWindow {
                         onClicked: profileDialog.open()
                     }
 
+                }
+
+                // L'ARBRE DES ACCORDS, sur sa propre ligne : c'est une CARTE qu'on consulte, pas un reglage, et Roger la
+                // veut accessible sans chercher. Elle merite mieux qu'une quatrieme case dans une rangee de trois.
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    Layout.preferredHeight: 46
+                    text: qsTr("L'arbre des accords")
+                    onClicked: chordTreeDialog.open()
                 }
 
                 Item {
@@ -1616,6 +1632,222 @@ ApplicationWindow {
                     Layout.alignment: Qt.AlignRight
                     text: qsTr("Fermer")
                     onClicked: profileDialog.close()
+                }
+
+            }
+
+        }
+
+    }
+
+    // L'ARBRE VIENT DU DOMAINE (ChordTree), qui dit qui descend de qui et par quel geste. Cet ecran ne fait que le
+    // DESSINER : la PROFONDEUR donne la colonne, le RANG dans la liste donne la ligne, et l'ordre de la liste - un
+    // parcours en profondeur - garantit qu'un enfant est toujours juste sous son parent.
+    // =================================================================================================================
+    Dialog {
+        id: chordTreeDialog
+
+        anchors.centerIn: parent
+        // Plein ecran : la carte est plus haute que large, et c'est une page qu'on lit, pas un message qu'on acquitte.
+        width: mainWindow.width
+        height: mainWindow.height
+        modal: true
+        padding: 8
+
+        background: Rectangle {
+            color: "#160d2b"
+        }
+
+        contentItem: ScrollView {
+            id: chordTreeScroll
+
+            clip: true
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+            ColumnLayout {
+                width: chordTreeScroll.availableWidth
+                spacing: 8
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#e8dcff"
+                    font.pixelSize: 18
+                    font.bold: true
+                    text: qsTr("L'arbre des accords")
+                }
+
+                // La phrase qui explique la page, en une ligne : un ecran qu'on ne comprend pas ne s'explore pas.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Chaque couleur s'obtient depuis celle du dessus en UN geste. Lis les gestes, et les quinze accords deviennent une seule histoire.")
+                }
+
+                Item {
+                    id: chordTreeBoard
+
+                    // Les mesures d'un noeud. La largeur suit l'ecran : trois colonnes doivent tenir cote a cote, et la
+                    // colonne la plus profonde est la troisieme.
+                    readonly property real columnGap: 16
+                    readonly property real nodeWidth: Math.min(120, (width - (3 * columnGap)) / 4)
+                    readonly property real nodeHeight: 40
+                    readonly property real rowGap: 6
+
+                    // La position d'un noeud : sa PROFONDEUR est sa colonne, son RANG est sa ligne.
+                    function nodeX(p_index) {
+                        return ExerciseController.chordTree[p_index].depth * (nodeWidth + columnGap);
+                    }
+
+                    function nodeY(p_index) {
+                        return p_index * (nodeHeight + rowGap);
+                    }
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: (ExerciseController.chordTree.length * (nodeHeight + rowGap)) + 8
+
+                    // Les LIENS d'abord : ils passent DERRIERE les noeuds, comme les branches d'un arbre passent derriere
+                    // ses feuilles. Un Canvas plutot qu'une pile de rectangles : trois segments par branche, en quinze
+                    // branches, cela ferait quarante-cinq rectangles a tenir a jour.
+                    Canvas {
+                        id: chordTreeLinks
+
+                        anchors.fill: parent
+                        onPaint: {
+                            var context = getContext("2d");
+                            context.reset();
+                            context.strokeStyle = "#4a3670";
+                            context.lineWidth = 2;
+                            var nodes = ExerciseController.chordTree;
+                            for (var index = 0; index < nodes.length; ++index) {
+                                var node = nodes[index];
+                                if (node.isRoot)
+                                    continue;
+
+                                var parent = node.parentIndex;
+                                var startX = chordTreeBoard.nodeX(parent) + chordTreeBoard.nodeWidth;
+                                var startY = chordTreeBoard.nodeY(parent) + (chordTreeBoard.nodeHeight / 2);
+                                var endX = chordTreeBoard.nodeX(index);
+                                var endY = chordTreeBoard.nodeY(index) + (chordTreeBoard.nodeHeight / 2);
+                                // Le coude : la branche descend le long d'une colonne invisible, entre les deux.
+                                var elbow = endX - (chordTreeBoard.columnGap / 2);
+                                context.beginPath();
+                                context.moveTo(startX, startY);
+                                context.lineTo(elbow, startY);
+                                context.lineTo(elbow, endY);
+                                context.lineTo(endX, endY);
+                                context.stroke();
+                            }
+                        }
+                    }
+
+                    // Puis les NOEUDS, poses PAR-DESSUS les branches.
+                    Repeater {
+                        model: ExerciseController.chordTree
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+
+                            x: chordTreeBoard.nodeX(index)
+                            y: chordTreeBoard.nodeY(index)
+                            width: chordTreeBoard.nodeWidth
+                            height: chordTreeBoard.nodeHeight
+                            radius: 8
+                            color: ExerciseController.chordColourName(modelData.quality)
+                            // La racine est CERNE de dore : c'est d'elle que tout part, et l'oeil doit le voir tout de suite.
+                            border.width: modelData.isRoot ? 3 : 0
+                            border.color: "#ffd479"
+
+                            ColumnLayout {
+                                anchors.centerIn: parent
+                                width: parent.width - 8
+                                spacing: 0
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignHCenter
+                                    color: "#2b1b47"
+                                    font.pixelSize: 15
+                                    font.bold: true
+                                    text: modelData.name
+                                }
+
+                                // LES DEGRES sous le nom : « Cm » et « 1 b3 5 ». C'est ce qui reste quand on a oublie
+                                // l'accord, et c'est exactement ce qu'on veut retenir.
+                                Text {
+                                    Layout.fillWidth: true
+                                    horizontalAlignment: Text.AlignHCenter
+                                    color: "#4a3670"
+                                    font.pixelSize: 10
+                                    text: modelData.degrees
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                // Les GESTES, en clair, sous la carte : l'arbre montre le CHEMIN, cette liste dit ce qu'on fait en le
+                // suivant. C'est la partie qui apprend quelque chose, et elle se lit comme une phrase.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    color: "#e8dcff"
+                    font.pixelSize: 15
+                    font.bold: true
+                    text: qsTr("Les quatorze gestes")
+                }
+
+                Repeater {
+                    model: ExerciseController.chordTree
+
+                    delegate: RowLayout {
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        spacing: 6
+                        visible: !modelData.isRoot
+
+                        Text {
+                            Layout.preferredWidth: 56
+                            color: "#ffffff"
+                            font.pixelSize: 13
+                            font.bold: true
+                            text: modelData.name
+                        }
+
+                        Text {
+                            color: "#8a77ad"
+                            font.pixelSize: 12
+                            text: qsTr("depuis %1").arg(ExerciseController.chordTree[modelData.parentIndex].name)
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            color: "#ffd479"
+                            font.pixelSize: 12
+                            wrapMode: Text.WordWrap
+                            text: "· " + modelData.mutation
+                        }
+
+                    }
+
+                }
+
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    Layout.topMargin: 8
+                    text: qsTr("Fermer")
+                    onClicked: chordTreeDialog.close()
                 }
 
             }

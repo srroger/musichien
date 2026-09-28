@@ -1490,4 +1490,50 @@ TEST( ExerciseSessionControllerTest, the_arpeggio_is_offered_even_when_nothing_c
     EXPECT_TRUE( controller.isChordArpeggioAvailable() );
 }
 
+TEST( ExerciseSessionControllerTest, the_chord_tree_is_ready_to_be_drawn )
+{
+    domain::NotePlayerFake notePlayer;
+
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+
+    const QVariantList tree = controller.chordTree();
+
+    // Quinze couleurs, comme le domaine : l'arbre est la CARTE de tout ce que le jeu sait jouer, et il ne doit pas en
+    // oublier une - ce serait une branche manquante sur un arbre de competences.
+    ASSERT_EQ( 15, tree.size() );
+
+    const QVariantMap root = tree.first().toMap();
+
+    EXPECT_TRUE( root.value( QStringLiteral( "isRoot" ) ).toBool() );
+    EXPECT_EQ( -1, root.value( QStringLiteral( "parentIndex" ) ).toInt() );
+    EXPECT_EQ( 0, root.value( QStringLiteral( "depth" ) ).toInt() );
+
+    // La racine est un do majeur : « C », et ses degres sont 1 3 5.
+    EXPECT_EQ( QStringLiteral( "C" ), root.value( QStringLiteral( "name" ) ).toString() );
+    EXPECT_EQ( QStringLiteral( "1 3 5" ), root.value( QStringLiteral( "degrees" ) ).toString() );
+
+    // Et le mineur, juste en dessous, s'appelle « Cm » : le nom anglo-saxon que Roger a demande, sur la carte comme sur les
+    // boutons.
+    EXPECT_EQ( QStringLiteral( "Cm" ), tree.at( 1 ).toMap().value( QStringLiteral( "name" ) ).toString() );
+
+    for( int index = 1; index < tree.size(); ++index )
+    {
+        const QVariantMap node = tree.at( index ).toMap();
+
+        // Chaque noeud sait de QUI il descend, et son parent vient AVANT lui : l'ecran trace un trait entre deux
+        // positions, il lui faut les deux - et une branche qui remonterait la liste ne se dessinerait pas.
+        EXPECT_GE( node.value( QStringLiteral( "parentIndex" ) ).toInt(), 0 );
+        EXPECT_LT( node.value( QStringLiteral( "parentIndex" ) ).toInt(), index );
+
+        // Et chaque noeud porte son geste et ses degres : ce sont eux qui apprennent quelque chose.
+        EXPECT_FALSE( node.value( QStringLiteral( "mutation" ) ).toString().isEmpty() );
+        EXPECT_FALSE( node.value( QStringLiteral( "degrees" ) ).toString().isEmpty() );
+    }
+
+    // La couleur vient du CONTROLEUR, pour que tous les ecrans peignent la meme : deux teintes differentes pour le meme
+    // accord, et le code couleur n'apprendrait plus rien.
+    EXPECT_FALSE( controller.chordColourName( 0 ).isEmpty() );
+    EXPECT_NE( controller.chordColourName( 0 ), controller.chordColourName( 1 ) );
+}
+
 }    // namespace musichien::ui
