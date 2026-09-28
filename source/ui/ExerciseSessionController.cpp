@@ -158,7 +158,12 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
 
     // La boucle de rythme. Le timer le plus precis que Qt offre, comme la page Rythme : le clic doit tomber ou
     // l'oreille l'attend, et un timer grossier fait tituber toute une mesure.
+    //
+    // Et SINGLE SHOT, comme celui de la page Rythme : un timer repetitif repart de l'instant ou il a tire, donc chaque
+    // temps joue un peu en retard decale tous les suivants, et la mesure part a la derive. Ici, chaque battement
+    // re-arme le suivant depuis le debut de la mesure (voir scheduleNextRhythmBeat).
     m_rhythmTimer.setTimerType( Qt::PreciseTimer );
+    m_rhythmTimer.setSingleShot( true );
 
     QObject::connect( &m_rhythmTimer, &QTimer::timeout, this, &ExerciseSessionController::onRhythmBeat );
 }
@@ -738,7 +743,11 @@ QVariantList ExerciseSessionController::rhythmHits() const
 
 int ExerciseSessionController::rhythmBeatInBar() const noexcept
 {
-    return m_rhythmBeatInBar;
+    const int beatsPerBar = rhythmBeatsPerBar();
+
+    // L'ecran place un curseur sur la mesure : il lui faut un temps REEL, jamais le signal de fin de mesure. Le modulo
+    // le lui garantit, meme apres un recalage de la grille qui aurait fait bondir l'index.
+    return ( beatsPerBar > 0 ) ? ( m_rhythmBeatIndex % beatsPerBar ) : 0;
 }
 
 bool ExerciseSessionController::isRhythmPlaying() const noexcept
@@ -1480,20 +1489,24 @@ void ExerciseSessionController::startRhythmQuestion()
     m_rhythmLastQuality = NO_RHYTHM_TAP;
     m_rhythmCoveredOnsets = 0;
 
-    beginRhythmListening();
-
     const double beatMs = domain::beatDurationMs( static_cast<double>( m_session->currentQuestion().bpm ) );
 
     if( beatMs <= 0.0 )
     {
         // Un tempo nul est un reglage fautif, pas une question a jouer : la question reste posee, la boucle ne bat
         // simplement pas. Le domaine refuse les frappes pour la meme raison, donc les deux disent la meme chose.
+        m_rhythmIsPlaying = false;
+        m_rhythmBeatIndex = 0;
+        m_rhythmTimer.stop();
+
         emit rhythmStateChanged();
 
         return;
     }
 
-    m_rhythmTimer.start( static_cast<int>( std::lround( beatMs ) ) );
+    // L'ecoute commence, et c'est ELLE qui arme le premier battement : le demarrage et la marche passent donc par le
+    // meme chemin, et il n'existe pas deux endroits qui planifient le temps.
+    beginRhythmListening();
 
     emit rhythmStateChanged();
 }
@@ -1501,7 +1514,7 @@ void ExerciseSessionController::startRhythmQuestion()
 void ExerciseSessionController::beginRhythmListening()
 {
     m_rhythmIsPlaying = false;
-    m_rhythmBeatInBar = 0;
+    m_rhythmBeatIndex = 0;
 
     // L'horloge repart ici : c'est le premier temps de la mesure d'ecoute. La reproduction repartira la sienne, parce
     // que la position d'une frappe se compte depuis le premier temps de la CELLULE, pas depuis le debut de la question.
@@ -1510,12 +1523,14 @@ void ExerciseSessionController::beginRhythmListening()
     // Le premier temps sonne tout de suite : une mesure qui attendrait un battement de timer pour commencer decalerait
     // tout ce qui suit.
     playRhythmHitsForBeat( 0 );
+
+    scheduleNextRhythmBeat();
 }
 
 void ExerciseSessionController::beginRhythmPlaying()
 {
     m_rhythmIsPlaying = true;
-    m_rhythmBeatInBar = 0;
+    m_rhythmBeatIndex = 0;
     m_rhythmClock.restart();
 
     // La tentative commence : l'ardoise affichee repart de zero, et la derniere frappe avec elle.
@@ -1528,6 +1543,8 @@ void ExerciseSessionController::beginRhythmPlaying()
     // Le clic du premier temps, tout de suite : c'est le repere que le joueur attend, et le retarder d'un battement
     // decalerait toute la mesure.
     m_notePlayer.playMetronomeClick( true );
+
+    scheduleNextRhythmBeat();
 }
 
 void ExerciseSessionController::finishRhythmLoop()
@@ -1570,7 +1587,24 @@ void ExerciseSessionController::stopRhythmLoop()
     m_rhythmTimer.stop();
 
     m_rhythmIsPlaying = false;
-    m_rhythmBeatInBar = 0;
+    m_rhythmBeatIndex = 0;
+}
+
+// Le temps suivant, vise depuis LE DEBUT DE LA MESURE - et non depuis le battement precedent.
+//
+// C'est la correction du 28 septembre 2026 : un timer repetitif repart de l'instant ou il a tire, donc chaque temps
+// joue un peu en retard decalait tous les suivants, et la mesure partait a la derive sous les doigts du joueur. La
+// decision elle-meme appartient au domaine (domain::planNextBeat), qui la rend PURE : un test sait donc dire, sans
+// attendre une seconde, qu'un battement en retard ne decale pas ceux qui suivent.
+void ExerciseSessionController::scheduleNextRhythmBeat()
+{
+    const domain::BeatSchedule schedule = domain::planNextBeat( static_cast<double>( rhythmBpm() ), static_cast<std::size_t>( m_rhythmBeatIndex ), static_cast<double>( m_rhythmClock.elapsed() ) );
+
+    // Le recalage eventuel de la grille - apres un reveil du telephone, par exemple - remonte par l'index : s'il
+    // depasse la mesure, le prochain battement est celui d'une NOUVELLE mesure, et onRhythmBeat basculera de phase.
+    m_rhythmBeatIndex = static_cast<int>( schedule.beatIndex );
+
+    m_rhythmTimer.start( static_cast<int>( std::lround( schedule.delayMs ) ) );
 }
 
 void ExerciseSessionController::onRhythmBeat()
@@ -1597,6 +1631,28 @@ void ExerciseSessionController::onRhythmBeat()
         return;
     }
 
+    // LA MESURE EST FINIE, ET CE BATTEMENT EST CELUI DE LA SUIVANTE.
+    //
+    // C'est ici que la phase bascule, et pas au dernier temps de la mesure : le premier temps de la reproduction tombe
+    // donc a l'instant ou l'ecoute aurait joue le sien. Basculer des le dernier temps joue faisait commencer chaque
+    // mesure un temps trop tot - un metronome qui boite, une fois par mesure.
+    if( m_rhythmBeatIndex >= beatsPerBar )
+    {
+        if( m_rhythmIsPlaying )
+        {
+            finishRhythmLoop();
+        }
+        else
+        {
+            // L'ecoute est finie : a toi. La reproduction redemarre sa propre grille, et arme son temps 0.
+            beginRhythmPlaying();
+
+            emit rhythmStateChanged();
+        }
+
+        return;
+    }
+
     // Ce qui sonne sur ce temps : la cellule pendant l'ecoute, la pulsation pendant la reproduction.
     //
     // Le clic est MUET pendant l'ecoute, et c'est un choix : le modele doit s'entendre seul, sinon une syncope se noie
@@ -1604,36 +1660,20 @@ void ExerciseSessionController::onRhythmBeat()
     // rejoue pas, sinon le joueur ne ferait que la suivre et il n'y aurait plus rien a reproduire.
     if( m_rhythmIsPlaying )
     {
-        m_notePlayer.playMetronomeClick( m_rhythmBeatInBar == 0 );
+        m_notePlayer.playMetronomeClick( m_rhythmBeatIndex == 0 );
     }
     else
     {
-        playRhythmHitsForBeat( m_rhythmBeatInBar );
+        playRhythmHitsForBeat( m_rhythmBeatIndex );
     }
 
-    ++m_rhythmBeatInBar;
+    ++m_rhythmBeatIndex;
 
-    if( m_rhythmBeatInBar < beatsPerBar )
-    {
-        emit rhythmStateChanged();
+    // Le temps suivant est arme ici, et depuis l'origine de la mesure : un battement joue en retard repart donc d'une
+    // echeance plus proche, au lieu d'ajouter son retard a toute la suite.
+    scheduleNextRhythmBeat();
 
-        return;
-    }
-
-    // La mesure est finie.
-    m_rhythmBeatInBar = 0;
-
-    if( !m_rhythmIsPlaying )
-    {
-        // L'ecoute est finie : a toi.
-        beginRhythmPlaying();
-
-        emit rhythmStateChanged();
-
-        return;
-    }
-
-    finishRhythmLoop();
+    emit rhythmStateChanged();
 }
 
 void ExerciseSessionController::playRhythmHitsForBeat( int p_beatInBar )

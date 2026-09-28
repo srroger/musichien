@@ -663,6 +663,11 @@ private:
     // Un temps de la boucle : ce qui sonne sur ce temps, puis l'avancement.
     void onRhythmBeat();
 
+    // Le battement suivant de la mesure, vise depuis LE DEBUT DE LA MESURE et non depuis le precedent : la mesure ne
+    // peut donc pas deriver, et le premier temps de chaque phase tombe toujours a sa place. La decision elle-meme
+    // appartient au domaine (domain::planNextBeat), ou elle est pure - et donc testee.
+    void scheduleNextRhythmBeat();
+
     // Les frappes de la cellule qui tombent dans le temps p_beatInBar. Les frappes decalees - les syncopes - partent
     // en differe, parce que c'est ce qu'est une syncope : une frappe ENTRE deux temps.
     void playRhythmHitsForBeat( int p_beatInBar );
@@ -756,8 +761,11 @@ private:
     QTimer m_rhythmTimer;
     QElapsedTimer m_rhythmClock;
 
-    // Le temps qui sonne, 0 = le premier de la mesure.
-    int m_rhythmBeatInBar{ 0 };
+    // Le temps a jouer dans la mesure, de 0 a beatsPerBar. La valeur beatsPerBar n'est pas un temps : c'est le signal
+    // que la mesure est finie et que la phase suivante commence. C'est ce qui fait tomber le premier temps de la
+    // reproduction PILE a l'instant ou l'ecoute aurait joue le sien, au lieu d'un temps trop tot - un demi-temps de
+    // decalage par mesure, que Roger entendait comme un metronome qui boite.
+    int m_rhythmBeatIndex{ 0 };
 
     // Vrai pendant la reproduction, faux pendant l'ecoute. C'est la seule chose que ce booleen decide, et c'est
     // beaucoup : ce qui sonne, et ce qui est juge.
