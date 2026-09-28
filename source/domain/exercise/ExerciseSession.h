@@ -37,6 +37,51 @@
 namespace musichien::domain
 {
 
+// Ce qu'une question demande au joueur.
+//
+// Le jeu d'origine demande le NOM d'un intervalle. Le mode guide demande la DIRECTION : l'intervalle est joue, et le
+// joueur dit seulement s'il monte ou s'il descend.
+//
+// La definition vit ICI, avant les reglages, parce qu'un PLAN de questions (le Bilan) s'exprime avec elle : un plan se
+// pose dans les reglages, et une enumeration utilisee par eux doit venir avant eux.
+enum class QuestionKind
+{
+    // Les valeurs sont EXPLICITES parce que l'interface les lit comme un nombre : la page compare questionKind a 0, 1,
+    // 2, 3 et 4, et une enumeration qui se renumerote toute seule deplacerait les ecrans sans que rien ne casse au build.
+    NamedInterval = 0,
+    Direction = 1,
+    Sing = 2,
+
+    // Reproduire une cellule rythmique : la cellule est ecoutee, puis le joueur la rejoue en tapant.
+    //
+    // Une question comme les autres, et c'est tout l'interet : elle est posee par la meme session, payee par le meme
+    // score, et coutee par les memes vies. Le rythme n'est pas une page a part, c'est une question de plus.
+    Rhythm = 3,
+
+    // Reconnaitre un accord : il est joue plaque, et le joueur dit de QUELLE COULEUR il est - majeur, mineur, et
+    // ensuite ce que la palette lui a appris.
+    //
+    // La question la plus simple du jeu a poser, et la plus difficile a repondre : un accord, c'est plusieurs notes,
+    // et l'oreille doit entendre leur RAPPORT plutot que les notes elles-memes.
+    Chord = 4
+};
+
+// Une question DECIDEE a l'avance : quel genre, quelle cible, dans quel sens.
+//
+// C'est ce qui permet a une session de suivre un PLAN plutot qu'un tirage, et c'est la seule chose dont le Bilan du
+// week-end a besoin : commencer par ce que le joueur reussit, puis attaquer ce qui lui resiste. Une partie ordinaire
+// laisse la liste vide et tire comme avant - le hasard reste le mode par defaut du jeu.
+struct QuestionTarget
+{
+    QuestionKind kind{ QuestionKind::NamedInterval };
+
+    // La cible, dans l'unite de son genre (voir QuestionRecord::target) : des demi-tons pour un intervalle, l'index
+    // d'une qualite pour un accord.
+    std::int32_t target{ 0 };
+
+    IntervalDirection direction{ IntervalDirection::Ascending };
+};
+
 // Everything that can be tuned in a session, in one place.
 //
 // These are RULES OF THE GAME, not constants of the code: they will end up in a data file, because
@@ -167,39 +212,18 @@ struct SessionSettings
     // l'ordre de chordLearningOrder() - les triades d'abord, les accords a quatre notes a la fin.
     std::size_t startingChordQualityCount{ 2 };
 
+    // Les questions a poser, dans l'ORDRE, quand la session doit suivre un plan.
+    //
+    // Vide pour une partie ordinaire : le tirage decide. Rempli pour un Bilan, ou l'ordre EST le sujet - du plus facile
+    // au plus difficile, et l'on finit par ce qui resiste.
+    std::vector<QuestionTarget> plannedQuestions;
+
     // Silence left between the two notes of a question, as heard.
     //
     // A musical value rather than a technical one: too short and the two notes sound like one glide,
     // too long and the first note is forgotten before the second one arrives. It lives here, with the
     // other rules, rather than in the screen, so that it can be tuned without touching the interface.
     std::chrono::milliseconds melodicGap{ 300 };
-};
-
-// What a question asks the player.
-//
-// The original game asks for the NAME of an interval. The guided mode asks for the DIRECTION: the interval is
-// played, and the player only has to say whether it went up or down - a smaller question, but the one a beginner
-// answers first.
-enum class QuestionKind
-{
-    // Les valeurs sont EXPLICITES parce que l'interface les lit comme un nombre : la page compare questionKind a 0, 1,
-    // 2 et 3, et une enumeration qui se renumerote toute seule deplacerait les ecrans sans que rien ne casse au build.
-    NamedInterval = 0,
-    Direction = 1,
-    Sing = 2,
-
-    // Reproduire une cellule rythmique : la cellule est ecoutee, puis le joueur la rejoue en tapant.
-    //
-    // Une question comme les autres, et c'est tout l'interet : elle est posee par la meme session, payee par le meme
-    // score, et coutee par les memes vies. Le rythme n'est pas une page a part, c'est une question de plus.
-    Rhythm = 3,
-
-    // Reconnaitre un accord : il est joue plaque, et le joueur dit de QUELLE COULEUR il est - majeur, mineur, et
-    // ensuite ce que la palette lui a appris.
-    //
-    // La question la plus simple du jeu a poser, et la plus difficile a repondre : un accord, c'est plusieurs notes,
-    // et l'oreille doit entendre leur RAPPORT plutot que les notes elles-memes.
-    Chord = 4
 };
 
 // A question, as the screen needs it.
@@ -396,6 +420,12 @@ private:
     // Remplit la part "accord" d'une question : quelle couleur, quelle tonique, et ce que le joueur peut repondre.
     void buildChordQuestion( Question & p_question );
 
+    // La question decidee pour ce rang, quand la session suit un plan.
+    //
+    // Rend un optional vide quand il n'y a pas de plan, ou quand le plan est epuise : la session reprend alors son
+    // tirage, ce qui lui permet de finir une partie ordinaire sans rien savoir des bilans.
+    [[nodiscard]] std::optional<QuestionTarget> plannedQuestionAt( std::size_t p_index ) const noexcept;
+
     // Une qualite d'accord de la palette, tiree au hasard.
     [[nodiscard]] ChordQuality drawChordQuality();
 
@@ -441,9 +471,13 @@ private:
     // initialises m_currentQuestion, so it must already exist.
     std::size_t m_consecutiveErrors{ 0 };
 
+    // Le rang de la question en cours. Declare AVANT m_currentQuestion, et l'ordre n'est pas decoratif non plus :
+    // buildQuestion() lit ce rang pour trouver la question PLANIFIEE, et il est appele pendant l'initialisation de
+    // m_currentQuestion. Un membre lu avant d'etre initialise ne vaut pas zero : il vaut n'importe quoi.
+    std::size_t m_questionNumber{ 1 };
+
     Question m_currentQuestion;
     SessionState m_state{ SessionState::Asking };
-    std::size_t m_questionNumber{ 1 };
     bool m_lastAnswerWasCorrect{ false };
     std::optional<Interval> m_lastAnswer;
 

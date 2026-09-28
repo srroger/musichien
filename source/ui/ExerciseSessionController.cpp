@@ -30,6 +30,13 @@ namespace
 // screen has to be able to tell the two apart.
 constexpr int NO_LIFE_LIMIT = -1;
 
+// Combien de questions FACILES ouvrent un bilan : assez pour se mettre en confiance, pas assez pour lasser.
+constexpr std::size_t REVIEW_EASY_QUESTION_COUNT = 3;
+
+// La periode qu'un bilan regarde. Trente jours : ce que le joueur a travaille recemment, et non sa vie entiere - un
+// exercice rate il y a six mois n'est plus une faiblesse, c'est un souvenir.
+constexpr int REVIEW_PERIOD_DAYS = 30;
+
 // La qualite d'une frappe, dans la convention de l'ecran : 0 = Miss, 1 = Good, 2 = Perfect.
 //
 // La page Rythme parle deja cette langue, et la question de rythme doit parler la MEME : deux ecrans qui
@@ -1800,6 +1807,131 @@ void ExerciseSessionController::recordCurrentQuestion( bool p_wasCorrect, bool p
     record.outcome = domain::outcomeOf( p_wasCorrect, p_wasRevealed, record.attemptCount );
 
     m_questionLog->append( record );
+}
+
+void ExerciseSessionController::startReviewSession()
+{
+    domain::SessionSettings settings = m_settings;
+
+    const std::vector<domain::QuestionTarget> plan = reviewPlan();
+
+    if( plan.empty() )
+    {
+        // Rien a reviser : pas de journal, ou trop peu de matiere pour construire un « facile puis difficile ». Le bilan
+        // devient alors une partie ordinaire, ce qui vaut mieux qu'un bouton qui refuse de s'ouvrir.
+        m_isReviewRunning = false;
+        m_reviewEasyQuestionCount = 0;
+
+        beginSession( settings );
+
+        return;
+    }
+
+    settings.plannedQuestions = plan;
+    settings.questionCount = plan.size();
+
+    // Un bilan ne se PERD pas : il se termine. Le joueur vient voir ou il en est, et rater trois questions de suite le
+    // renverrait chez lui avant la fin - exactement l'inverse d'un bilan.
+    settings.lives = std::nullopt;
+
+    // Et les aides restent : un bilan est un examen de passage, jamais un couperet.
+    settings.aidsAllowed = true;
+
+    // L'echauffement, c'est la premiere tranche du plan, bornee : au-dela, la difficulte commence - et c'est ce qui
+    // permet a l'encouragement d'arriver au bon moment.
+    m_reviewEasyQuestionCount = std::max<std::size_t>( 1, std::min( REVIEW_EASY_QUESTION_COUNT, plan.size() / 2 ) );
+    m_isReviewRunning = true;
+
+    beginSession( settings );
+}
+
+std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() const
+{
+    std::vector<domain::QuestionTarget> plan;
+
+    if( m_questionLog == nullptr )
+    {
+        return plan;
+    }
+
+    const auto since = std::chrono::system_clock::now() - ( std::chrono::hours{ 24 } * REVIEW_PERIOD_DAYS );
+
+    domain::StatisticsFilter filter;
+    filter.since = since;
+
+    const std::vector<domain::TargetStatistics> byTarget =
+      domain::statisticsByTarget( m_questionLog->since( since ), filter );
+
+    if( byTarget.size() < 4 )
+    {
+        // Moins de quatre cibles travaillees : il n'y a pas de « facile » et de « difficile » a opposer, seulement
+        // quelques exercices. Un bilan de deux questions n'apprendrait rien au joueur sur lui-meme.
+        return plan;
+    }
+
+    const auto toPlannedQuestion = []( const domain::TargetStatistics & p_target ) {
+        return domain::QuestionTarget{ p_target.kind, p_target.target, p_target.direction };
+    };
+
+    // D'ABORD ce qui va bien, du meilleur au moins bon : un bilan qui commencerait par un echec serait decourageant, et
+    // c'est l'autre sens que Roger a demande. Les cibles sont triees du PLUS FAIBLE au meilleur, donc on remonte la liste
+    // par la fin.
+    const std::size_t easyCount = std::min( REVIEW_EASY_QUESTION_COUNT, byTarget.size() / 2 );
+
+    for( std::size_t index = 0; index < easyCount; ++index )
+    {
+        plan.push_back( toPlannedQuestion( byTarget.at( byTarget.size() - 1 - index ) ) );
+    }
+
+    // PUIS ce qui resiste, du plus faible au moins faible - et sans reprendre ce qui a servi d'echauffement.
+    for( std::size_t index = easyCount; index + easyCount < byTarget.size(); ++index )
+    {
+        plan.push_back( toPlannedQuestion( byTarget.at( index ) ) );
+    }
+
+    return plan;
+}
+
+bool ExerciseSessionController::isCurrentQuestionAHardPart() const noexcept
+{
+    if( !m_isReviewRunning || ( m_session == nullptr ) )
+    {
+        return false;
+    }
+
+    // Le rang dans le plan : au-dela de l'echauffement, c'est ce qui resiste. Le controleeur a construit le plan dans cet
+    // ordre, donc il le sait - sans recroiser les statistiques a chaque question.
+    return m_session->questionNumber() > m_reviewEasyQuestionCount;
+}
+
+QString ExerciseSessionController::encouragementText() const
+{
+    if( !m_isReviewRunning || ( m_session == nullptr ) )
+    {
+        // Hors bilan, il n'y a rien a dire : un ecran qui parle pour ne rien dire devient un ecran qu'on n'ecoute plus, et
+        // le silence est ce qui donne du poids aux mots qui restent.
+        return QString{};
+    }
+
+    // Une reussite sur ce qui resistait : le mot juste, et il arrive au bon moment.
+    if( isFeedbackVisible() && m_session->wasLastAnswerCorrect() && isCurrentQuestionAHardPart() )
+    {
+        return tr( "Bravo ! C'est exactement ce qui te résistait." );
+    }
+
+    // Une serie : on le dit, parce qu'une serie se sent et se dit.
+    if( m_session->score().streak() >= 3 )
+    {
+        return tr( "Bien joué, ne lâche pas." );
+    }
+
+    // Et AVANT d'attaquer une difficulte connue, la prevenance : c'est le seul moment ou elle aide vraiment.
+    if( isAsking() && isCurrentQuestionAHardPart() )
+    {
+        return tr( "Là, tu attaques un exercice qui t'a résisté cette semaine. Prends ton temps." );
+    }
+
+    return QString{};
 }
 
 void ExerciseSessionController::playCurrentQuestionAsChord()

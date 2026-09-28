@@ -282,6 +282,19 @@ ApplicationWindow {
                     Layout.preferredHeight: 6
                 }
 
+                // Ou en est le joueur, en UNE ligne : c'est la premiere chose qu'un ecran d'accueil doit dire. Ces trois
+                // chiffres existaient deja, mais il fallait descendre dans les reglages pour les voir - et un accueil qui
+                // ne dit pas ou on en est n'est pas un accueil.
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: ExerciseController.totalExperience > 0 ? "#cbb8e8" : "#8a77ad"
+                    font.pixelSize: 13
+                    text: ExerciseController.totalExperience > 0 ? qsTr("%1 XP · %2 sessions · %3 ⭐").arg(ExerciseController.totalExperience).arg(ExerciseController.sessionCount).arg(ExerciseController.starCount) : qsTr("Ta première partie t'attend.")
+                }
+
                 // The way into the loop. It sits above the bench on purpose: the bench is a tool for
                 // building the project, and playing is what the application is FOR.
                 Button {
@@ -289,8 +302,29 @@ ApplicationWindow {
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 58
                     highlighted: true
-                    text: qsTr("Jouer")
+                    text: qsTr("▶ Jouer")
                     onClicked: ExerciseController.startSession()
+                }
+
+                // Le BILAN : une session dont les questions sont DECIDEES, du plus facile au plus difficile. Roger le veut
+                // disponible quand il veut ; l'ecran le mettra en avant le week-end.
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 46
+                    text: qsTr("★ Bilan")
+                    onClicked: ExerciseController.startReviewSession()
+                }
+
+                // Ce que le bilan est, en une phrase : un bouton dont on ne sait pas ce qu'il fait ne se clique pas.
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    text: qsTr("Un parcours qui commence par ce que tu réussis, et finit par ce qui te résiste.")
                 }
 
                 RowLayout {
@@ -941,7 +975,7 @@ ApplicationWindow {
 
                         Button {
                             Layout.alignment: Qt.AlignRight
-                            text: MicrophoneController.isListening ? qsTr("Arrêter") : qsTr("Tester le micro")
+                            text: MicrophoneController.isListening ? qsTr("■ Arrêter") : qsTr("♪ Tester le micro")
                             onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
                         }
 
@@ -1361,7 +1395,7 @@ ApplicationWindow {
 
                     Button {
                         Layout.fillWidth: true
-                        text: RhythmController.isRunning ? qsTr("Arrêter") : qsTr("Démarrer")
+                        text: RhythmController.isRunning ? qsTr("■ Arrêter") : qsTr("▶ Démarrer")
                         onClicked: RhythmController.isRunning ? RhythmController.stop() : RhythmController.start()
                     }
 

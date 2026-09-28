@@ -1259,4 +1259,130 @@ TEST( ExerciseSessionControllerTest, a_session_without_a_journal_still_plays )
     EXPECT_TRUE( controller.wasLastAnswerCorrect() );
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// Le Bilan
+//
+// Une session dont les questions sont DECIDEES, du plus facile au plus difficile. Le plan vient des STATISTIQUES : ce
+// fichier remplit donc un journal EN MEMOIRE, puis regarde ce que le bilan en fait.
+// ---------------------------------------------------------------------------------------------------------------------
+
+namespace
+{
+
+// Un journal qui a de la matiere : des cibles sues, et des cibles qui resistent.
+//
+// Les cibles sont des INTERVALLES : c'est le triple (genre, cible, direction) qui fait une cible, et six d'entre elles
+// suffisent a ce qu'un « facile puis difficile » ait un sens.
+void fillJournalWithWorkedTargets( domain::QuestionLogFake & p_log )
+{
+    const auto now = std::chrono::system_clock::now();
+
+    const auto add = [&p_log, &now]( std::int32_t p_semitones, bool p_correct, int p_count ) {
+        for( int index = 0; index < p_count; ++index )
+        {
+            domain::QuestionRecord record;
+
+            record.askedAt = now - std::chrono::hours{ 1 };
+            record.kind = domain::QuestionKind::NamedInterval;
+            record.target = p_semitones;
+            record.direction = domain::IntervalDirection::Ascending;
+            record.outcome = p_correct ? domain::QuestionOutcome::CorrectFirstTry : domain::QuestionOutcome::Failed;
+
+            p_log.append( record );
+        }
+    };
+
+    add( 12, true, 5 );
+    add( 7, true, 5 );
+    add( 4, true, 3 );
+
+    add( 2, false, 5 );
+    add( 6, false, 5 );
+    add( 11, false, 3 );
+}
+
+}    // namespace
+
+TEST( ExerciseSessionControllerTest, a_review_session_plans_its_questions )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    fillJournalWithWorkedTargets( log );
+
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    EXPECT_TRUE( controller.running() );
+    EXPECT_TRUE( controller.isReviewRunning() );
+
+    // Le bilan est FINI : ses questions sont decidees, donc son compte est celui du plan - et il ne se perd pas, puisqu'un
+    // bilan sans vies ne peut pas s'arreter au milieu.
+    EXPECT_GT( controller.questionCount(), 0 );
+    EXPECT_LT( controller.questionCount(), 10 );
+    EXPECT_TRUE( controller.hasUnlimitedLives() );
+}
+
+TEST( ExerciseSessionControllerTest, a_review_session_without_a_journal_is_an_ordinary_game )
+{
+    domain::NotePlayerFake notePlayer;
+
+    // Aucun journal : il n'y a rien a reviser. Le bilan devient une partie ordinaire plutot que de refuser de s'ouvrir -
+    // un bouton qui ne fait rien est pire qu'un bouton qui fait autre chose.
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+
+    controller.startReviewSession();
+
+    EXPECT_TRUE( controller.running() );
+    EXPECT_FALSE( controller.isReviewRunning() );
+    EXPECT_EQ( SESSION_QUESTION_COUNT, controller.questionCount() );
+}
+
+TEST( ExerciseSessionControllerTest, the_encouragement_speaks_only_during_a_review )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    fillJournalWithWorkedTargets( log );
+
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+    controller.setQuestionLog( &log );
+
+    // Une partie ordinaire ne dit RIEN : l'ecran reste silencieux, et c'est ce qui donne du poids aux mots du bilan.
+    controller.startSession();
+
+    EXPECT_TRUE( controller.encouragementText().isEmpty() );
+
+    controller.stopSession();
+    controller.startReviewSession();
+
+    // Le bilan, lui, parle - au minimum quand il attaque ce qui resiste.
+    bool spokeAtSomePoint = false;
+
+    for( int question = 0; question < controller.questionCount(); ++question )
+    {
+        if( !controller.encouragementText().isEmpty() )
+        {
+            spokeAtSomePoint = true;
+
+            break;
+        }
+
+        if( controller.isChordQuestion() )
+        {
+            controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
+        }
+        else
+        {
+            controller.answer( heardDistance( controller ) );
+        }
+
+        controller.continueToNextQuestion();
+    }
+
+    EXPECT_TRUE( spokeAtSomePoint ) << "le bilan n'a jamais encourage le joueur";
+}
+
 }    // namespace musichien::ui

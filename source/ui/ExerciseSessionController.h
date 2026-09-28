@@ -28,6 +28,7 @@
 #include "domain/exercise/HintBook.h"
 #include "domain/exercise/PlayerPreferences.h"
 #include "domain/exercise/QuestionLog.h"
+#include "domain/exercise/QuestionStatistics.h"
 #include "domain/exercise/Rank.h"
 
 #include <QElapsedTimer>
@@ -139,6 +140,10 @@ class ExerciseSessionController final : public QObject
     // Les couleurs que le joueur peut repondre, dans l'ordre ou elles ont ete apprises : l'ordre des boutons est donc
     // stable, et une couleur nouvelle s'ajoute a la fin.
     Q_PROPERTY( QVariantList chordChoices READ chordChoices NOTIFY questionChanged )
+
+    // Le bilan : l'ecran affiche son nom et son mot quand il tourne.
+    Q_PROPERTY( bool isReviewRunning READ isReviewRunning NOTIFY sessionChanged )
+    Q_PROPERTY( QString encouragementText READ encouragementText NOTIFY sessionChanged )
 
     // What the domain says about the interval that was asked, and about the one the player chose. The
     // screen reads names and identifiers, it composes neither.
@@ -427,6 +432,23 @@ public:
     // symbole : il renvoie l'index de ce qu'il a affiche.
     Q_INVOKABLE void answerChord( int p_quality );
 
+    // Le BILAN : une session dont les questions sont DECIDEES, du plus facile au plus difficile, et qui finit par ce qui
+    // resiste au joueur.
+    //
+    // C'est le rendez-vous de fin de semaine decrit par Roger : « un long questionnaire qui commence par les choses
+    // faciles puis les choses qu'il ne maitrise pas. Avec des petits mots d'encouragement ». Il peut le lancer quand il
+    // veut ; l'ecran le mettra en avant le week-end.
+    Q_INVOKABLE void startReviewSession();
+
+    // Vrai pendant un bilan : l'ecran sait alors que la session est differente, et peut le dire.
+    [[nodiscard]] bool isReviewRunning() const noexcept { return m_isReviewRunning; }
+
+    // Le mot du moment : un encouragement AVANT une difficulte connue, et apres une reussite sur ce qui resistait.
+    //
+    // Vide quand il n'y a rien a dire, et ce n'est pas un detail : un ecran qui parle pour ne rien dire devient un ecran
+    // qu'on n'ecoute plus. Le silence est ce qui donne du poids aux mots qui restent.
+    [[nodiscard]] QString encouragementText() const;
+
     // The microphone controller, injected so that a sung question can reach the voice. Null in the tests: a sung
     // question then cannot be answered, but nothing breaks.
     void setMicrophoneController( MicrophoneController * p_microphone );
@@ -587,6 +609,16 @@ private:
     // garde le domaine pur et le journal testable sans attendre une seconde.
     void recordCurrentQuestion( bool p_wasCorrect, bool p_wasRevealed );
 
+    // Les questions d'un BILAN, construites a partir des STATISTIQUES : ce que le joueur reussit d'abord, ce qui lui
+    // resiste ensuite. Vide quand il n'y a pas de journal, ou pas assez de matiere pour dire « facile puis difficile ».
+    [[nodiscard]] std::vector<domain::QuestionTarget> reviewPlan() const;
+
+    // La question en cours fait-elle partie de ce qui RESISTE au joueur ?
+    //
+    // Le plan est construit dans cet ordre, donc le controleeur le sait sans recroiser les statistiques a chaque
+    // question - et c'est ce qui rend l'encouragement possible au bon moment.
+    [[nodiscard]] bool isCurrentQuestionAHardPart() const noexcept;
+
     // Joue un accord : ses notes, plaquee. Le seul chemin par lequel un accord s'entend, que ce soit pour poser la
     // question ou pour la confirmer.
     void playChordNotes( const domain::Chord & p_chord );
@@ -618,6 +650,11 @@ private:
 
     // May be null too, et pour la meme raison : un journal absent coute des statistiques, jamais une partie.
     domain::QuestionLog * m_questionLog{ nullptr };
+
+    // Le bilan en cours, et le nombre de questions qui l'ont ouvert. Ces deux valeurs suffisent a dire au joueur ou il
+    // en est : l'echauffement est passe, ce qui suit est ce qui lui resiste.
+    bool m_isReviewRunning{ false };
+    std::size_t m_reviewEasyQuestionCount{ 0 };
 
     // Read once from the store, then kept here: the screen asks for it on every question, and a settings file
     // has no business being read that often.

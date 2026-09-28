@@ -1094,4 +1094,85 @@ TEST( ExerciseSessionTest, the_chord_share_decides_whether_an_accord_is_asked )
     EXPECT_TRUE( chordSession.isFinished() );
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// Le plan : une session qui suit un ORDRE decide
+//
+// C'est ce qui rend un Bilan possible : une suite qui commence par ce que le joueur reussit et finit par ce qui lui
+// resiste. Le domaine ne sait pas POURQUOI l'ordre est celui-la - il le suit, et c'est tout.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionTest, a_planned_session_asks_its_questions_in_order )
+{
+    SessionSettings settings = intervalOnlySettings();
+
+    settings.plannedQuestions = {
+      QuestionTarget{ QuestionKind::NamedInterval, 12, IntervalDirection::Ascending },
+      QuestionTarget{ QuestionKind::NamedInterval, 3, IntervalDirection::Descending },
+      QuestionTarget{ QuestionKind::Chord, static_cast<std::int32_t>( ChordQuality::Diminished ), IntervalDirection::Ascending },
+    };
+
+    settings.questionCount = settings.plannedQuestions.size();
+
+    // La palette et la main d'accords doivent contenir ce que le plan demande, sinon la grille ne pourrait pas offrir la
+    // bonne reponse - et un plan qui poserait une question sans sa reponse serait un piege.
+    settings.startingPaletteSize = SUPPORTED_INTERVAL_COUNT;
+    settings.startingChordQualityCount = CHORD_QUALITY_COUNT;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    // Question 1 : l'octave, montante.
+    EXPECT_EQ( QuestionKind::NamedInterval, session.currentQuestion().kind );
+    EXPECT_EQ( 12, session.currentQuestion().target.semitones() );
+    EXPECT_EQ( IntervalDirection::Ascending, session.currentQuestion().direction );
+
+    answerCorrectly( session );
+    session.advance();
+
+    // Question 2 : la tierce mineure, DESCENDANTE - le sens vient du plan, et non d'un tirage.
+    EXPECT_EQ( 3, session.currentQuestion().target.semitones() );
+    EXPECT_EQ( IntervalDirection::Descending, session.currentQuestion().direction );
+
+    answerCorrectly( session );
+    session.advance();
+
+    // Question 3 : un accord, et c'est bien celui que le plan a decide.
+    EXPECT_EQ( QuestionKind::Chord, session.currentQuestion().kind );
+    EXPECT_EQ( ChordQuality::Diminished, session.currentQuestion().chord.quality );
+
+    EXPECT_NE( session.currentQuestion().chordChoices.end(),
+               std::ranges::find( session.currentQuestion().chordChoices, ChordQuality::Diminished ) );
+
+    EXPECT_TRUE( session.answerChord( ChordQuality::Diminished ) );
+    session.advance();
+
+    EXPECT_TRUE( session.isFinished() );
+}
+
+TEST( ExerciseSessionTest, an_exhausted_plan_goes_back_to_drawing )
+{
+    SessionSettings settings = intervalOnlySettings();
+
+    settings.plannedQuestions = {
+      QuestionTarget{ QuestionKind::NamedInterval, 12, IntervalDirection::Ascending },
+    };
+
+    // PLUS de questions que le plan n'en porte : c'est le cas d'une session ordinaire qui aurait un plan, et celui d'un
+    // Bilan auquel on aurait ajoute des questions. La suite doit reprendre son tirage sans rien casser.
+    settings.questionCount = 4;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    EXPECT_EQ( 12, session.currentQuestion().target.semitones() );
+
+    answerCorrectly( session );
+    session.advance();
+
+    // Le plan est epuise : la question vient de la palette, comme dans n'importe quelle partie.
+    EXPECT_EQ( QuestionKind::NamedInterval, session.currentQuestion().kind );
+
+    const std::span<const Interval> palette = session.palette();
+
+    EXPECT_NE( palette.end(), std::ranges::find( palette, session.currentQuestion().target ) );
+}
+
 }    // namespace musichien::domain

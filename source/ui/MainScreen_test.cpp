@@ -167,9 +167,15 @@ TEST( MainScreenTest, the_main_screen_shows_its_main_actions )
 
     collectTexts( screen.get(), texts );
 
-    // La porte d'entree de l'application. Le test ne juge pas sa mise en page : il verifie qu'elle EXISTE, ce qui est
-    // exactement ce qu'un QML casse emporte avec lui.
-    EXPECT_TRUE( texts.contains( QStringLiteral( "Jouer" ) ) ) << "le bouton Jouer est absent de l'ecran principal";
+    // La porte d'entree de l'application. Le test cherche un MOT, et non un libelle exact : une icone peut s'ajouter
+    // devant, et ce fichier ne doit pas se casser a chaque retouche d'orthographe d'un bouton.
+    const auto hasTextContaining = [&texts]( const QString & p_word ) {
+        return std::ranges::any_of( texts, [&p_word]( const QString & p_text ) {
+            return p_text.contains( p_word );
+        } );
+    };
+
+    EXPECT_TRUE( hasTextContaining( QStringLiteral( "Jouer" ) ) ) << "le bouton Jouer est absent de l'ecran principal";
 
     // Et la page construit vraiment quelque chose : une vingtaine de textes, c'est le minimum d'une page de reglages
     // qui en compte des dizaines.

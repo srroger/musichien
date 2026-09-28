@@ -287,7 +287,7 @@ Item {
                     // as the answer buttons state theirs, and a discreet outline gives the tap somewhere to
                     // land.
                     flat: true
-                    text: qsTr("Quitter")
+                    text: qsTr("← Quitter")
                     onClicked: ExerciseController.stopSession()
 
                     background: Rectangle {
@@ -340,6 +340,22 @@ Item {
                     color: ExerciseController.wasLastAnswerCorrect ? "#8ef2b0" : "#ffd479"
                     font.pixelSize: 19
                     font.bold: true
+                }
+
+                // Le BILAN : son mot, sous le verdict. Vide hors bilan, et ce n'est pas un detail - un ecran qui parle pour
+                // ne rien dire devient un ecran qu'on n'ecoute plus, et le silence est ce qui donne du poids aux mots qui
+                // restent (voir encouragementText, cote controleeur).
+                Text {
+                    anchors.centerIn: parent
+                    width: parent.width
+                    Layout.topMargin: 6
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    visible: ExerciseController.encouragementText !== ""
+                    text: ExerciseController.encouragementText
+                    color: "#ffd479"
+                    font.pixelSize: 15
+                    font.italic: true
                 }
 
                 Text {
@@ -455,7 +471,7 @@ Item {
 
                     Button {
                         Layout.fillWidth: true
-                        text: qsTr("Écouter")
+                        text: qsTr("♪ Écouter")
                         onClicked: ExerciseController.listenToTarget()
                     }
 
@@ -804,7 +820,7 @@ Item {
                 Button {
                     Layout.fillWidth: true
                     height: 52
-                    text: qsTr("Écouter encore")
+                    text: qsTr("↻ Écouter encore")
                     enabled: ExerciseController.isAsking
                     onClicked: ExerciseController.replay()
                 }
@@ -818,7 +834,7 @@ Item {
                     highlighted: true
                     // Sur une question de rythme, la question ne se "revele" pas : elle se PASSE. Le meme bouton, le
                     // meme domaine (revealAnswer), et un mot qui dit ce que le joueur fait vraiment.
-                    text: ExerciseController.questionKind === 3 ? qsTr("Passer") : qsTr("Réponse")
+                    text: ExerciseController.questionKind === 3 ? qsTr("→ Passer") : qsTr("? Réponse")
                     onClicked: ExerciseController.revealAnswer()
                 }
 
@@ -899,14 +915,14 @@ Item {
                 Layout.fillWidth: true
                 height: 54
                 highlighted: true
-                text: qsTr("Rejouer")
+                text: qsTr("▶ Rejouer")
                 onClicked: ExerciseController.startSession()
             }
 
             Button {
                 Layout.fillWidth: true
                 height: 48
-                text: qsTr("Retour au banc")
+                text: qsTr("← Retour au banc")
                 onClicked: ExerciseController.stopSession()
             }
 
