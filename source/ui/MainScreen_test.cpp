@@ -3,6 +3,7 @@
 #include "ui/IntervalPlaybackController.h"
 #include "ui/MicrophoneController.h"
 #include "ui/RhythmController.h"
+#include "ui/StatisticsController.h"
 
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -86,11 +87,17 @@ void registerViewModels()
 
     static auto * microphoneController = new MicrophoneController{ QStringList{}, {}, nullptr, notePlayer };
 
+    // Le journal et la page de statistiques : la page de profil lit le premier a travers le second, et sans eux
+    // Main.qml ne se charge pas du tout.
+    static auto * questionLog = new domain::QuestionLogFake;
+    static auto * statisticsController = new StatisticsController{ *questionLog };
+
     static const bool REGISTERED = [] {
         qmlRegisterSingletonInstance( "Musichien", 1, 0, "ExerciseController", exerciseController );
         qmlRegisterSingletonInstance( "Musichien", 1, 0, "IntervalController", intervalController );
         qmlRegisterSingletonInstance( "Musichien", 1, 0, "RhythmController", rhythmController );
         qmlRegisterSingletonInstance( "Musichien", 1, 0, "MicrophoneController", microphoneController );
+        qmlRegisterSingletonInstance( "Musichien", 1, 0, "StatisticsController", statisticsController );
 
         return true;
     }();

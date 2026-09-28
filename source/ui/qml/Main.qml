@@ -24,6 +24,10 @@ import QtQuick.Controls.Material
 import QtQuick.Layouts
 
 ApplicationWindow {
+    // Une part de question : un titre, une phrase qui dit ce que le reglage fait, et le nombre.
+
+    id: mainWindow
+
     // Hides the explanatory text after a few seconds: enough time to read a name and a number, short
     // enough that the screen does not stay cluttered.
     // -------------------------------------------------------------------------------------------------
@@ -36,10 +40,10 @@ ApplicationWindow {
     // Regler seulement `background` ne suffit donc pas - un texte clair sur une liste blanche reste illisible. Il
     // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
     // Un champ numerique aux couleurs du jeu.
-    // Une part de question : un titre, une phrase qui dit ce que le reglage fait, et le nombre.
-
-    id: mainWindow
-
+    // Les couleurs des parts du camembert : un vert pour l'oreille, un bleu pour le sens, un dore pour le chant, un rose
+    // pour le rythme et un violet pour les accords. Elles sont choisies pour rester distinctes sur une nuit violette -
+    // un camembert ou deux parts se ressemblent ne dit rien.
+    readonly property var kindColours: ["#8ef2b0", "#7bb0ff", "#ffd479", "#ff8fb0", "#c9a0ff"]
     // Width shared by the standalone controls, so that they line up without each repeating the rule.
     readonly property real buttonWidth: Math.min(width * 0.82, 340)
     // What the domain said about the interval heard last, and whether there is anything to say at
@@ -48,6 +52,10 @@ ApplicationWindow {
     readonly property bool hasHeardInterval: heardInterval.identifier !== undefined && heardInterval.identifier !== ""
     // Local UI state: it belongs to the screen, not to the domain.
     property bool feedbackVisible: false
+
+    function kindColour(index) {
+        return kindColours[index % kindColours.length];
+    }
 
     // QML function parameters follow the p_ rule, exactly like in C++. Note that a function is passed
     // as a parameter here, which is what lets every button share this code without a string based
@@ -307,12 +315,28 @@ ApplicationWindow {
                 }
 
                 // Le BILAN : une session dont les questions sont DECIDEES, du plus facile au plus difficile. Roger le veut
-                // disponible quand il veut ; l'ecran le mettra en avant le week-end.
+                // disponible quand il veut ; l'ecran le met en avant le week-end, parce que c'est le moment ou l'on a le
+                // temps de le prendre.
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    visible: ExerciseController.isWeekEnd
+                    color: "#ffd479"
+                    font.pixelSize: 13
+                    text: qsTr("C'est le week-end : l'heure du bilan.")
+                }
+
                 Button {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 46
-                    text: qsTr("★ Bilan")
+                    // Dore le week-end : c'est la demande de Roger - « on pourra le rendre le bouton au dessus ou dore en
+                    // fin de semaine, pour lui dire de le faire ». La couleur suffit a le dire, et le bouton garde sa place
+                    // sous « Jouer » : c'est jouer qui doit rester la porte d'entree.
+                    highlighted: ExerciseController.isWeekEnd
+                    text: ExerciseController.isWeekEnd ? qsTr("★ Bilan de la semaine") : qsTr("★ Bilan")
                     onClicked: ExerciseController.startReviewSession()
                 }
 
@@ -1131,9 +1155,18 @@ ApplicationWindow {
         id: profileDialog
 
         anchors.centerIn: parent
-        width: Math.min(mainWindow.width * 0.9, 420)
+        width: Math.min(mainWindow.width * 0.96, 560)
+        // PLEIN ECRAN, ou presque : la page porte maintenant un histogramme, un camembert et une liste de points faibles,
+        // et un dialogue de 420 points de large n'a pas la place de les montrer. Roger a demande une « grosse page ».
+        height: mainWindow.height * 0.94
         modal: true
-        padding: 16
+        padding: 12
+        // Les statistiques se recalculent a l'OUVERTURE, et seulement la : rien n'est calcule tant que personne ne
+        // regarde, et personne ne regarde un profil en jouant.
+        onOpened: {
+            StatisticsController.refresh();
+            kindPie.requestPaint();
+        }
 
         background: Rectangle {
             color: "#241442"
@@ -1142,76 +1175,398 @@ ApplicationWindow {
             border.color: "#5c4a80"
         }
 
-        contentItem: ColumnLayout {
-            spacing: 10
+        // Le contenu DEFILE : la page est longue - un profil, six chiffres, un histogramme, un camembert et une liste de
+        // points faibles - et un ecran de telephone ne les montre pas d'un coup.
+        contentItem: ScrollView {
+            id: profileScroll
 
-            Text {
-                Layout.fillWidth: true
-                color: "#cbb8e8"
-                font.pixelSize: 16
-                text: qsTr("Ton profil")
-            }
+            clip: true
 
-            TextField {
-                Layout.fillWidth: true
-                placeholderText: qsTr("Ton nom…")
-                text: ExerciseController.playerName
-                onEditingFinished: ExerciseController.setPlayerName(text)
-                // Le style Material ne connait pas le bleu nuit derriere lui : le texte restait noir sur sombre.
-                // La couleur est donc dite ici, comme pour les autres boutons de l'application.
-                color: "#ffffff"
-                placeholderTextColor: "#7a6a9e"
+            ColumnLayout {
+                // -----------------------------------------------------------------------------------------------------
+                // LES STATISTIQUES
+                // Roger : « N'hesite pas a faire une grosse page statistique, rempli d'histogrammes, de temps de jeu,
+                // peut-etre meme des camemberts. »
+                // LE CAMEMBERT : ce que le joueur travaille vraiment, et ce qu'il delaisse sans le savoir.
 
-                background: Rectangle {
-                    color: "#2a1a46"
-                    radius: 8
-                    border.width: 1
-                    border.color: "#5c4a80"
+                width: profileScroll.availableWidth
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#cbb8e8"
+                    font.pixelSize: 16
+                    text: qsTr("Ton profil")
                 }
 
-            }
+                TextField {
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Ton nom…")
+                    text: ExerciseController.playerName
+                    onEditingFinished: ExerciseController.setPlayerName(text)
+                    // Le style Material ne connait pas le bleu nuit derriere lui : le texte restait noir sur sombre.
+                    // La couleur est donc dite ici, comme pour les autres boutons de l'application.
+                    color: "#ffffff"
+                    placeholderTextColor: "#7a6a9e"
 
-            Text {
-                Layout.fillWidth: true
-                color: "#ffffff"
-                font.pixelSize: 16
-                font.bold: true
-                text: qsTr("%1 XP").arg(ExerciseController.totalExperience)
-            }
+                    background: Rectangle {
+                        color: "#2a1a46"
+                        radius: 8
+                        border.width: 1
+                        border.color: "#5c4a80"
+                    }
 
-            Text {
-                Layout.fillWidth: true
-                color: "#cbb8e8"
-                font.pixelSize: 14
-                text: qsTr("%1 sessions · %2 étoiles").arg(ExerciseController.sessionCount).arg(ExerciseController.starCount)
-            }
+                }
 
-            Text {
-                Layout.fillWidth: true
-                color: "#8ef2b0"
-                font.pixelSize: 13
-                visible: ExerciseController.dailyReminderEnabled
-                text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
-            }
+                Text {
+                    Layout.fillWidth: true
+                    color: "#ffffff"
+                    font.pixelSize: 16
+                    font.bold: true
+                    text: qsTr("%1 XP").arg(ExerciseController.totalExperience)
+                }
 
-            Button {
-                Layout.alignment: Qt.AlignRight
-                text: qsTr("Tester la notification")
-                onClicked: ExerciseController.testReminder()
-            }
+                Text {
+                    Layout.fillWidth: true
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    text: qsTr("%1 sessions · %2 étoiles").arg(ExerciseController.sessionCount).arg(ExerciseController.starCount)
+                }
 
-            // Remet l'experience, les sessions et les etoiles a zero. Le nom et le niveau restent : ce sont des
-            // choix, pas un score. Aucune confirmation pour l'instant - l'application est en developpement.
-            Button {
-                Layout.alignment: Qt.AlignRight
-                text: qsTr("Remise à zéro du profil")
-                onClicked: ExerciseController.resetProfile()
-            }
+                // La FLAMME : les jours d'affilee. Elle ne s'affiche QUE s'il y en a une - « 0 jour d'affilee » serait une
+                // facon de dire au joueur qu'il n'a rien fait, et un profil n'est pas la pour ca.
+                Text {
+                    Layout.fillWidth: true
+                    visible: StatisticsController.playingDayStreak > 0
+                    color: "#ffd479"
+                    font.pixelSize: 14
+                    font.bold: true
+                    text: StatisticsController.playingDayStreak > 1 ? qsTr("🔥 %1 jours d'affilée !").arg(StatisticsController.playingDayStreak) : qsTr("🔥 C'est parti pour une série")
+                }
 
-            Button {
-                Layout.alignment: Qt.AlignRight
-                text: qsTr("Fermer")
-                onClicked: profileDialog.close()
+                // Tout vient du JOURNAL, et de lui seul : chaque question conclue y laisse une ligne, et cette page est ce
+                // que ces lignes racontent quand on les empile.
+                // -----------------------------------------------------------------------------------------------------
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 1
+                    Layout.topMargin: 8
+                    color: "#5c4a80"
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#e8dcff"
+                    font.pixelSize: 16
+                    font.bold: true
+                    text: qsTr("Statistiques")
+                }
+
+                // Sans journal, la page le DIT plutot que d'afficher des zeros : un ecran plein de « 0 % » n'informe pas, il
+                // decourage.
+                Text {
+                    Layout.fillWidth: true
+                    visible: !StatisticsController.hasHistory
+                    color: "#8a77ad"
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Rien à raconter pour l'instant : joue quelques questions et cette page se remplira toute seule.")
+                }
+
+                // LES POINTS FAIBLES ouvrent la page, et c'est volontaire : « tu rates les sixtes » est l'information sur
+                // laquelle le joueur peut agir ce soir, la ou « 72 % de reussite » se regarde et ne dit rien. C'est aussi ce
+                // qui nourrit le Bilan.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 8
+                    visible: StatisticsController.weakestTargets.length > 0
+                    color: "#e8dcff"
+                    font.pixelSize: 14
+                    font.bold: true
+                    text: qsTr("Ce qui te résiste")
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: StatisticsController.weakestTargets.length > 0
+                    spacing: 3
+
+                    Repeater {
+                        model: StatisticsController.weakestTargets
+
+                        delegate: RowLayout {
+                            required property var modelData
+
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                Layout.fillWidth: true
+                                color: "#e8dcff"
+                                font.pixelSize: 13
+                                elide: Text.ElideRight
+                                text: modelData.name
+                            }
+
+                            Text {
+                                color: "#8a77ad"
+                                font.pixelSize: 11
+                                text: qsTr("%1 fois").arg(modelData.questionCount)
+                            }
+
+                            Text {
+                                Layout.preferredWidth: 44
+                                horizontalAlignment: Text.AlignRight
+                                // Rouge sous la moitie, vert au-dessus : deux couleurs, et l'oeil sait ou regarder sans lire
+                                // un seul chiffre.
+                                color: modelData.successPercent < 50 ? "#ff8fb0" : "#8ef2b0"
+                                font.pixelSize: 13
+                                font.bold: true
+                                text: qsTr("%1 %").arg(modelData.successPercent)
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                // LES TROIS GRANDS CHIFFRES, et le deuxieme est le taux de reussite DU PREMIER COUP : il mesure le « su »
+                // plutot que le « trouve », et c'est le plus honnete des trois.
+                RowLayout {
+                    Layout.fillWidth: true
+                    visible: StatisticsController.hasHistory
+                    spacing: 6
+
+                    BigStat {
+                        Layout.fillWidth: true
+                        value: qsTr("%1 %").arg(StatisticsController.successPercent)
+                        valueColour: "#8ef2b0"
+                        label: qsTr("de réussite")
+                    }
+
+                    BigStat {
+                        Layout.fillWidth: true
+                        value: qsTr("%1 %").arg(StatisticsController.firstTryPercent)
+                        valueColour: "#ffd479"
+                        label: qsTr("du premier coup")
+                    }
+
+                    BigStat {
+                        Layout.fillWidth: true
+                        value: StatisticsController.questionCount
+                        label: qsTr("questions")
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    visible: StatisticsController.hasHistory
+                    color: "#cbb8e8"
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Temps de jeu : %1 en tout · %2 cette semaine").arg(StatisticsController.playTimeText).arg(StatisticsController.recentPlayTimeText)
+                }
+
+                // L'HISTOGRAMME des quatorze derniers jours. Une barre par jour : sa hauteur dit le nombre de questions, et sa
+                // partie verte dit ce qui a ete trouve. Un jour vide garde une barre minuscule - « je n'ai pas joue » est une
+                // information, et sans cette barre on ne verrait pas la difference entre un jour vide et un jour absent.
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 6
+                    Layout.preferredHeight: 84
+                    visible: StatisticsController.hasHistory
+                    spacing: 3
+
+                    Repeater {
+                        model: StatisticsController.lastDays
+
+                        delegate: ColumnLayout {
+                            required property var modelData
+
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+
+                                Rectangle {
+                                    anchors.bottom: parent.bottom
+                                    width: parent.width
+                                    height: parent.height * Math.max(modelData.heightRatio, 0.04)
+                                    radius: 2
+                                    color: modelData.isToday ? "#7b5cc4" : "#4a3670"
+                                }
+
+                                Rectangle {
+                                    anchors.bottom: parent.bottom
+                                    width: parent.width
+                                    // La part de REUSSITE, gardee d'une division par zero : un jour sans question n'a pas de
+                                    // taux, il a une barre vide.
+                                    height: modelData.questionCount > 0 ? parent.height * modelData.heightRatio * (modelData.correctCount / modelData.questionCount) : 0
+                                    radius: 2
+                                    color: "#8ef2b0"
+                                }
+
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignHCenter
+                                color: modelData.isToday ? "#ffffff" : "#8a77ad"
+                                font.pixelSize: 9
+                                font.bold: modelData.isToday
+                                text: modelData.dayOfMonth
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                // La LEGENDE de l'histogramme, sous les barres.
+                Text {
+                    Layout.fillWidth: true
+                    visible: StatisticsController.hasHistory
+                    color: "#8a77ad"
+                    font.pixelSize: 10
+                    text: qsTr("Les 14 derniers jours · vert : trouvé, violet : posé")
+                }
+
+                // Dessine au Canvas, qui fait partie de QtQuick depuis le premier jour : aucun module a deployer, aucune
+                // dependance a ajouter pour un dessin. Les ANGLES viennent du CONTROLEUR - les calculer ici, une fois pour la
+                // forme et une fois pour la legende, serait la meilleure facon de les faire diverger.
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    visible: StatisticsController.hasHistory && StatisticsController.kinds.length > 0
+                    spacing: 14
+
+                    Canvas {
+                        id: kindPie
+
+                        Layout.preferredWidth: 116
+                        Layout.preferredHeight: 116
+                        onPaint: {
+                            var context = getContext("2d");
+                            context.reset();
+                            var centerX = width / 2;
+                            var centerY = height / 2;
+                            var radius = Math.min(centerX, centerY) - 2;
+                            var parts = StatisticsController.kinds;
+                            for (var index = 0; index < parts.length; ++index) {
+                                var part = parts[index];
+                                var start = part.startAngle * Math.PI / 180;
+                                var end = (part.startAngle + part.sweepAngle) * Math.PI / 180;
+                                context.beginPath();
+                                context.moveTo(centerX, centerY);
+                                context.arc(centerX, centerY, radius, start, end);
+                                context.closePath();
+                                context.fillStyle = mainWindow.kindColour(index);
+                                context.fill();
+                            }
+                            // Le TROU du milieu : c'est ce qui en fait un beignet plutot qu'une tarte, et c'est la que le
+                            // nombre de questions se pose.
+                            context.beginPath();
+                            context.arc(centerX, centerY, radius * 0.55, 0, 2 * Math.PI);
+                            context.fillStyle = "#241442";
+                            context.fill();
+                        }
+
+                        // Un Canvas ne se repaint PAS tout seul : c'est le signal du controleeur qui le lui dit.
+                        Connections {
+                            function onStatisticsChanged() {
+                                kindPie.requestPaint();
+                            }
+
+                            target: StatisticsController
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            color: "#ffffff"
+                            font.pixelSize: 16
+                            font.bold: true
+                            text: StatisticsController.questionCount
+                        }
+
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        Repeater {
+                            model: StatisticsController.kinds
+
+                            delegate: RowLayout {
+                                required property var modelData
+                                required property int index
+
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                Rectangle {
+                                    Layout.preferredWidth: 10
+                                    Layout.preferredHeight: 10
+                                    radius: 2
+                                    color: mainWindow.kindColour(index)
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    color: "#e8dcff"
+                                    font.pixelSize: 12
+                                    text: modelData.name
+                                }
+
+                                Text {
+                                    color: "#8a77ad"
+                                    font.pixelSize: 12
+                                    text: qsTr("%1 %").arg(modelData.sharePercent)
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#8ef2b0"
+                    font.pixelSize: 13
+                    visible: ExerciseController.dailyReminderEnabled
+                    text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
+                }
+
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    text: qsTr("Tester la notification")
+                    onClicked: ExerciseController.testReminder()
+                }
+
+                // Remet l'experience, les sessions, les etoiles ET les statistiques a zero : un score efface qui garderait
+                // son journal continuerait de raconter une histoire que le joueur vient d'effacer. Le nom et le niveau
+                // restent : ce sont des choix, pas un score. Aucune confirmation pour l'instant - l'application est en
+                // developpement.
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    text: qsTr("Remise à zéro (score et statistiques)")
+                    onClicked: ExerciseController.resetProfile()
+                }
+
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    text: qsTr("Fermer")
+                    onClicked: profileDialog.close()
+                }
+
             }
 
         }
@@ -1454,6 +1809,36 @@ ApplicationWindow {
 
             }
 
+        }
+
+    }
+
+    // Un grand chiffre, avec ce qu'il veut dire. Trois par page suffisent : au-dela, on ne lit plus, on survole.
+    component BigStat: ColumnLayout {
+        id: bigStat
+
+        property string value: ""
+        property string label: ""
+        property color valueColour: "#ffffff"
+
+        spacing: 0
+
+        Text {
+            Layout.fillWidth: true
+            horizontalAlignment: Text.AlignHCenter
+            color: bigStat.valueColour
+            font.pixelSize: 24
+            font.bold: true
+            text: bigStat.value
+        }
+
+        Text {
+            Layout.fillWidth: true
+            horizontalAlignment: Text.AlignHCenter
+            color: "#8a77ad"
+            font.pixelSize: 11
+            wrapMode: Text.WordWrap
+            text: bigStat.label
         }
 
     }

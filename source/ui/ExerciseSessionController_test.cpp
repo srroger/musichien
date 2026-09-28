@@ -1385,4 +1385,98 @@ TEST( ExerciseSessionControllerTest, the_encouragement_speaks_only_during_a_revi
     EXPECT_TRUE( spokeAtSomePoint ) << "le bilan n'a jamais encourage le joueur";
 }
 
+TEST( ExerciseSessionControllerTest, resetting_the_profile_also_wipes_the_statistics )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+    domain::QuestionLogFake log;
+
+    storeIntervalOnlyShares( levelStore );
+    levelStore.storeChordQuestionShare( 100 );
+
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings(), {}, {}, {}, &levelStore };
+    controller.setQuestionLog( &log );
+
+    controller.startSession();
+    controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
+
+    ASSERT_EQ( 1U, log.size() );
+
+    controller.resetProfile();
+
+    // Un score a zero qui garderait son journal serait un demi-mensonge : la page de statistiques continuerait de
+    // raconter une histoire que le joueur vient effacer. Roger : « n'oublie pas que "Remise a zero" met a zero les
+    // statistiques aussi. »
+    EXPECT_EQ( 0U, log.size() );
+}
+
+TEST( ExerciseSessionControllerTest, the_chord_hint_removes_a_choice_from_the_screen )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings = chordOnlySettings();
+
+    // Six couleurs : il faut de quoi retirer un leurre. Avec deux couleurs - le niveau d'un debutant - la question se
+    // resoudrait au premier essai, et l'indice n'aurait rien a enlever.
+    settings.startingChordQualityCount = 6;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+
+    // Rien avant d'avoir essaye : l'indice attend un premier essai rate.
+    EXPECT_FALSE( controller.isChordHintAvailable() );
+
+    controller.answerChord( wrongChordChoice( controller ) );
+
+    // Une erreur ne change pas la question - elle se retente - et l'indice est desormais propose.
+    ASSERT_TRUE( controller.isAsking() );
+    EXPECT_TRUE( controller.isChordHintAvailable() );
+
+    const int choiceCountBefore = controller.chordChoices().size();
+
+    controller.useChordHint();
+
+    // L'ECRAN a une reponse en moins : la grille se relit depuis le domaine, donc retirer la reponse retire le bouton.
+    EXPECT_EQ( choiceCountBefore - 1, controller.chordChoices().size() );
+
+    // Et la bonne reponse est toujours proposee : un indice qui la retirerait rendrait la question impossible.
+    const int correctQuality = controller.heardChord().value( "quality" ).toInt();
+
+    bool correctChoiceIsStillOffered = false;
+
+    for( const QVariant & choice : controller.chordChoices() )
+    {
+        if( choice.toMap().value( "quality" ).toInt() == correctQuality )
+        {
+            correctChoiceIsStillOffered = true;
+        }
+    }
+
+    EXPECT_TRUE( correctChoiceIsStillOffered );
+
+    // Et la reponse reste juste : retirer un leurre ne change pas la question.
+    controller.answerChord( correctQuality );
+
+    EXPECT_TRUE( controller.wasLastAnswerCorrect() );
+}
+
+TEST( ExerciseSessionControllerTest, the_arpeggio_is_offered_even_when_nothing_can_be_removed )
+{
+    domain::NotePlayerFake notePlayer;
+
+    // DEUX couleurs, donc rien a retirer : c'est le niveau d'un debutant, et c'est exactement le cas ou l'arpege compte
+    // le plus.
+    domain::SessionSettings settings = chordOnlySettings();
+    settings.startingChordQualityCount = 2;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+    controller.answerChord( wrongChordChoice( controller ) );
+
+    EXPECT_FALSE( controller.isChordHintAvailable() );
+    EXPECT_TRUE( controller.isChordArpeggioAvailable() );
+}
+
 }    // namespace musichien::ui

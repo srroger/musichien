@@ -52,6 +52,14 @@ public:
 
     // Les questions conclues depuis p_since, de la plus ancienne a la plus recente.
     [[nodiscard]] virtual std::vector<QuestionRecord> since( std::chrono::system_clock::time_point p_since ) const = 0;
+
+    // Efface TOUT l'historique.
+    //
+    // C'est la seule operation destructrice du journal, et elle n'existe que parce que le joueur a le droit de repartir
+    // de zero : « Remise a zero » remet le score a zero, et un score sans ses statistiques serait un demi-mensonge. Le
+    // fichier n'est pas garde de cote : une remise a zero qui laisserait l'ancien journal quelque part ne serait pas une
+    // remise a zero.
+    virtual void clear() = 0;
 };
 
 // Un journal en memoire : les tests, et une application qui n'a nulle part ou ecrire.
@@ -76,6 +84,8 @@ public:
     }
 
     [[nodiscard]] const std::vector<QuestionRecord> & records() const noexcept { return m_records; }
+
+    void clear() override { m_records.clear(); }
 
     [[nodiscard]] std::size_t size() const noexcept { return m_records.size(); }
 

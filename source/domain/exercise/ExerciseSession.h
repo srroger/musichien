@@ -339,6 +339,40 @@ public:
     // True while the player is still allowed to hear the interval again.
     [[nodiscard]] bool canReplay() const noexcept { return m_state == SessionState::Asking; }
 
+    // -------------------------------------------------------------------------------------------------------------
+    // L'indice d'accord
+    //
+    // Roger : « pour la reconnaissance des accords, tu peux donner un indice quand tu rates une fois ? Du style
+    // retirer une mauvaise reponse ou rejouer l'accord, puis le jouer en arpege. »
+    //
+    // L'indice est DONNE par le domaine, et pas par l'ecran : c'est le domaine qui sait ce qui est juste, et un ecran
+    // qui deciderait ce qui est faux aurait la reponse au bout de la main.
+    // -------------------------------------------------------------------------------------------------------------
+
+    // Vrai quand retirer une mauvaise reponse a un sens : c'est une question d'ACCORD, les aides sont autorisees, le
+    // joueur a deja essaye au moins une fois, et il reste de quoi retirer.
+    //
+    // L'essai rate fait partie de la regle, et pas de l'ecran : un indice offert avant d'avoir essaye ne serait pas un
+    // indice, ce serait un raccourci.
+    [[nodiscard]] bool canRemoveOneWrongChordChoice() const noexcept;
+
+    // Vrai quand ecouter l'accord en ARPEGE a un sens : une question d'accord, des aides autorisees, et un essai deja
+    // rate.
+    //
+    // Distinct de canRemoveOneWrongChordChoice, et la difference compte pour un DEBUTANT : sa palette n'offre que deux
+    // couleurs, donc il n'y a jamais rien a retirer - mais entendre l'accord note a note lui reste precieux, et c'est
+    // meme a ce moment-la l'aide la plus utile.
+    [[nodiscard]] bool canHearChordAsArpeggio() const noexcept;
+
+    // Retire UNE mauvaise reponse de la question d'accord en cours, au HASARD parmi les fausses.
+    //
+    // Au hasard, et c'est important : retirer toujours la premiere de la palette apprendrait au joueur que le premier
+    // bouton est un mauvais choix, ce qui est une information fausse - et l'indice qui apprend quelque chose de faux
+    // n'aide personne.
+    //
+    // Rend false quand il n'y a rien a retirer. Ce n'est pas un echec : c'est une question qui n'a plus rien a cacher.
+    [[nodiscard]] bool removeOneWrongChordChoice();
+
     [[nodiscard]] bool wasLastAnswerCorrect() const noexcept { return m_lastAnswerWasCorrect; }
 
     // What the player answered last, when there is something to show.

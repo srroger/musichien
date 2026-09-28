@@ -178,4 +178,35 @@ TEST( JsonLinesQuestionLogTest, the_reading_filter_keeps_only_the_recent_questio
     EXPECT_EQ( 0U, log.since( secondsAfterEpoch( 6000 ) ).size() );
 }
 
+TEST( JsonLinesQuestionLogTest, a_clear_leaves_nothing_behind )
+{
+    QTemporaryDir directory;
+
+    ASSERT_TRUE( directory.isValid() );
+
+    const QString path = temporaryLogPath( directory );
+
+    JsonLinesQuestionLog log{ path };
+
+    log.append( recordOf( secondsAfterEpoch( 1000 ), domain::QuestionKind::NamedInterval, 7, domain::QuestionOutcome::Failed ) );
+
+    ASSERT_EQ( 1U, log.since( secondsAfterEpoch( 0 ) ).size() );
+
+    log.clear();
+
+    EXPECT_TRUE( log.since( secondsAfterEpoch( 0 ) ).empty() );
+
+    // Et le FICHIER n'est plus la : une remise a zero qui laisserait l'ancien journal derriere elle ne serait pas une
+    // remise a zero, et quelqu'un qui ouvre le dossier le verrait tout de suite.
+    EXPECT_FALSE( QFile::exists( path ) );
+
+    // Enfin, ecrire apres une remise a zero repart d'un journal PROPRE, et pas d'un fichier a moitie efface.
+    log.append( recordOf( secondsAfterEpoch( 2000 ), domain::QuestionKind::Chord, 1, domain::QuestionOutcome::CorrectFirstTry ) );
+
+    const std::vector<domain::QuestionRecord> records = log.since( secondsAfterEpoch( 0 ) );
+
+    ASSERT_EQ( 1U, records.size() );
+    EXPECT_EQ( domain::QuestionKind::Chord, records.at( 0 ).kind );
+}
+
 }    // namespace musichien::infrastructure

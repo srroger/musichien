@@ -595,6 +595,61 @@ void ExerciseSession::advance()
     m_state = SessionState::Asking;
 }
 
+bool ExerciseSession::canHearChordAsArpeggio() const noexcept
+{
+    return m_settings.aidsAllowed && ( m_state == SessionState::Asking )
+           && ( m_currentQuestion.kind == QuestionKind::Chord ) && ( m_currentQuestion.wrongAttemptCount >= 1 );
+}
+
+bool ExerciseSession::canRemoveOneWrongChordChoice() const noexcept
+{
+    // Une question d'ACCORD, et rien d'autre : retirer un intervalle faux serait un autre jeu, et personne ne l'a
+    // demande.
+    if( m_currentQuestion.kind != QuestionKind::Chord )
+    {
+        return false;
+    }
+
+    // Les aides doivent etre autorisees, le joueur doit avoir ESSAYE - c'est la demande de Roger, « quand tu rates une
+    // fois » - et il doit rester de quoi retirer : sous trois choix il n'y a plus que la bonne reponse et un leurre, et
+    // une question a deux boutons n'est plus une question.
+    return m_settings.aidsAllowed && ( m_state == SessionState::Asking ) && ( m_currentQuestion.wrongAttemptCount >= 1 )
+           && ( m_currentQuestion.chordChoices.size() > 2 );
+}
+
+bool ExerciseSession::removeOneWrongChordChoice()
+{
+    if( !canRemoveOneWrongChordChoice() )
+    {
+        return false;
+    }
+
+    // Les positions des leurres : tout ce qui n'est pas la bonne reponse.
+    std::vector<std::size_t> wrongChoices;
+
+    for( std::size_t index = 0; index < m_currentQuestion.chordChoices.size(); ++index )
+    {
+        if( m_currentQuestion.chordChoices.at( index ) != m_currentQuestion.chord.quality )
+        {
+            wrongChoices.push_back( index );
+        }
+    }
+
+    if( wrongChoices.empty() )
+    {
+        return false;
+    }
+
+    std::uniform_int_distribution<std::size_t> distribution{ 0, wrongChoices.size() - 1 };
+
+    const std::size_t chosen = wrongChoices.at( distribution( m_randomEngine ) );
+
+    m_currentQuestion.chordChoices.erase( m_currentQuestion.chordChoices.begin()
+                                          + static_cast<std::ptrdiff_t>( chosen ) );
+
+    return true;
+}
+
 bool ExerciseSession::isHintAvailable() const noexcept
 {
     // No condition on the state, on purpose: the hint is worth showing while the player is still

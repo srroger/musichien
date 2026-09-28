@@ -219,6 +219,10 @@ Item {
             // Un accord se reconnait a sa COULEUR : les notes sont plaquees, et l'ecran n'offre qu'une poignee de noms.
             // Pas de cercle des quintes ici - une qualite d'accord n'a pas d'angle sur un cercle - et l'ordre des
             // boutons suit l'ordre d'apprentissage, donc il ne bouge jamais d'une question a l'autre.
+            // -------------------------------------------------------------------------------------------------
+            // L'INDICE d'accord
+            // Roger : « pour la reconnaissance des accords, tu peux donner un indice quand tu rates une fois ? Du style
+            // retirer une mauvaise reponse ou rejouer l'accord, puis le jouer en arpege. »
 
             anchors.fill: parent
             anchors.margins: 16
@@ -806,6 +810,37 @@ Item {
                         onClicked: ExerciseController.answerChord(modelData.quality)
                     }
 
+                }
+
+            }
+
+            // Les deux aides apparaissent EN MEME TEMPS, et seulement quand le domaine dit qu'elles ont un sens - apres
+            // un premier essai rate. L'arpege est le meilleur des deux : il ne donne pas la reponse, il donne a entendre
+            // ce qui la constitue.
+            // -------------------------------------------------------------------------------------------------
+            RowLayout {
+                Layout.fillWidth: true
+                visible: ExerciseController.isChordHintAvailable || ExerciseController.isChordArpeggioAvailable
+                spacing: 10
+
+                Button {
+                    Layout.fillWidth: true
+                    height: 48
+                    visible: ExerciseController.isChordHintAvailable
+                    text: qsTr("Indice : une réponse en moins")
+                    enabled: ExerciseController.isAsking
+                    onClicked: ExerciseController.useChordHint()
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: 150
+                    height: 48
+                    // Visible des le premier essai rate, MEME quand il n'y a rien a retirer : avec deux couleurs, un
+                    // debutant n'a aucune reponse a eliminer, et c'est pourtant la que l'arpege lui apprend le plus.
+                    visible: ExerciseController.isChordArpeggioAvailable
+                    text: qsTr("♪ Arpège")
+                    onClicked: ExerciseController.playCurrentChordAsArpeggio()
                 }
 
             }

@@ -168,4 +168,46 @@ std::vector<TargetStatistics> statisticsByTarget( std::span<const QuestionRecord
     return byTarget;
 }
 
+std::chrono::seconds playTimeOf( std::span<const QuestionRecord> p_records, std::chrono::seconds p_idleGap )
+{
+    if( p_records.empty() )
+    {
+        return std::chrono::seconds{ 0 };
+    }
+
+    // Les instants, TRIES. Le journal est ecrit dans l'ordre, mais une fonction ne doit pas dependre de l'ordre de ce
+    // qu'on lui donne : un journal lu a l'envers produirait une duree negative, ce qui serait une drole de statistique.
+    std::vector<std::chrono::system_clock::time_point> instants;
+    instants.reserve( p_records.size() );
+
+    for( const QuestionRecord & record : p_records )
+    {
+        instants.push_back( record.askedAt );
+    }
+
+    std::ranges::sort( instants );
+
+    std::chrono::seconds total{ 0 };
+
+    auto blockStart = instants.front();
+    auto blockEnd = instants.front();
+
+    for( const auto instant : instants )
+    {
+        if( ( instant - blockEnd ) > p_idleGap )
+        {
+            // La pause est trop longue : le bloc est fini, on le compte, et un nouveau commence.
+            total += std::chrono::duration_cast<std::chrono::seconds>( blockEnd - blockStart ) + ASSUMED_QUESTION_DURATION;
+            blockStart = instant;
+        }
+
+        blockEnd = instant;
+    }
+
+    // Le dernier bloc compte aussi - et c'est meme le plus souvent le seul.
+    total += std::chrono::duration_cast<std::chrono::seconds>( blockEnd - blockStart ) + ASSUMED_QUESTION_DURATION;
+
+    return total;
+}
+
 }    // namespace musichien::domain

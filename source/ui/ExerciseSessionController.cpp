@@ -1,11 +1,13 @@
 #include "ui/ExerciseSessionController.h"
 
+#include "domain/exercise/Weekend.h"
 #include "domain/music/Interval.h"
 #include "domain/music/Temperament.h"
 #include "domain/rhythm/RhythmPattern.h"
 #include "ui/IntervalDescription.h"
 #include "ui/MicrophoneController.h"
 
+#include <QDate>
 #include <QString>
 
 #include <array>
@@ -29,6 +31,10 @@ namespace
 // A sentinel rather than zero, because zero lives IS a state - it means the session is over - and the
 // screen has to be able to tell the two apart.
 constexpr int NO_LIFE_LIMIT = -1;
+
+// L'ecart entre deux notes d'un arpege. Assez lent pour que l'oreille entende chaque note, assez court pour qu'on
+// reconnaisse encore l'accord d'ou elles viennent.
+constexpr std::chrono::milliseconds ARPEGGIO_NOTE_GAP{ 450 };
 
 // Combien de questions FACILES ouvrent un bilan : assez pour se mettre en confiance, pas assez pour lasser.
 constexpr std::size_t REVIEW_EASY_QUESTION_COUNT = 3;
@@ -1309,8 +1315,21 @@ void ExerciseSessionController::resetProfile()
     m_levelStore->storeSessionCount( 0 );
     m_levelStore->storeStarCount( 0 );
 
+    // ET LES STATISTIQUES AUSSI. Roger : « n'oublie pas que "Remise a zero" met a zero les statistiques aussi. » Un
+    // score remis a zero qui garderait son journal serait un demi-mensonge : la page de statistiques continuerait de
+    // raconter une histoire que le joueur vient effacer.
+    if( m_questionLog != nullptr )
+    {
+        m_questionLog->clear();
+    }
+
+    // Et un bilan en cours n'a plus de plan a suivre : la remise a zero le referme.
+    m_isReviewRunning = false;
+    m_reviewEasyQuestionCount = 0;
+
     emit totalExperienceChanged();
     emit sessionChanged();
+    emit statisticsChanged();
 }
 
 bool ExerciseSessionController::isBeginner() const noexcept
@@ -1932,6 +1951,48 @@ QString ExerciseSessionController::encouragementText() const
     }
 
     return QString{};
+}
+
+bool ExerciseSessionController::isWeekEnd() const
+{
+    // QDate::dayOfWeek() suit exactement la convention du domaine : 1 = lundi ... 7 = dimanche. Cette correspondance est
+    // verifiee par un test du domaine, et non par ce commentaire.
+    return domain::isWeekEnd( QDate::currentDate().dayOfWeek() );
+}
+
+bool ExerciseSessionController::isChordHintAvailable() const noexcept
+{
+    return ( m_session != nullptr ) && m_session->canRemoveOneWrongChordChoice();
+}
+
+bool ExerciseSessionController::isChordArpeggioAvailable() const noexcept
+{
+    return ( m_session != nullptr ) && m_session->canHearChordAsArpeggio();
+}
+
+void ExerciseSessionController::useChordHint()
+{
+    if( ( m_session == nullptr ) || !m_session->removeOneWrongChordChoice() )
+    {
+        return;
+    }
+
+    // L'ecran doit RELIRE la grille : une reponse retiree est une reponse qui disparait. La grille est reconstruite a
+    // chaque lecture depuis le domaine (voir chordChoices), donc le signal suffit - l'ecran ne garde aucune copie.
+    emit questionChanged();
+    emit sessionChanged();
+}
+
+void ExerciseSessionController::playCurrentChordAsArpeggio()
+{
+    if( ( m_session == nullptr ) || !isChordQuestion() )
+    {
+        return;
+    }
+
+    // Une note apres l'autre, et LENTEMENT : c'est tout l'interet de l'arpege - trop rapide, il redevient un accord, et
+    // l'indice ne montrerait plus rien.
+    m_notePlayer.playMelody( m_session->currentQuestion().chord.notes(), ARPEGGIO_NOTE_GAP );
 }
 
 void ExerciseSessionController::playCurrentQuestionAsChord()

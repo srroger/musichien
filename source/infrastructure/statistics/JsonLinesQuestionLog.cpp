@@ -91,6 +91,14 @@ void JsonLinesQuestionLog::append( const domain::QuestionRecord & p_record )
     file.write( "\n" );
 }
 
+void JsonLinesQuestionLog::clear()
+{
+    // On SUPPRIME le fichier au lieu de l'ecraser par une ligne vide : une remise a zero qui laisserait un fichier
+    // derriere elle serait une remise a zero qui n'en est pas une, et « l'historique repart de rien » doit etre vrai
+    // meme pour quelqu'un qui ouvre le dossier.
+    QFile::remove( m_filePath );
+}
+
 std::vector<domain::QuestionRecord> JsonLinesQuestionLog::since( std::chrono::system_clock::time_point p_since ) const
 {
     std::vector<domain::QuestionRecord> records;

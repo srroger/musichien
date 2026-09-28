@@ -89,6 +89,23 @@ struct StatisticsFilter
 // exercice personnalise sans lui faire dire n'importe quoi.
 inline constexpr std::size_t MINIMUM_OBSERVATIONS_FOR_A_WEAKNESS = 3;
 
+// Ce qu'une question fait perdre de temps, au minimum, quand elle est la seule de son bloc.
+//
+// Vingt secondes : le temps d'ecouter, de chercher, et de repondre. C'est une ESTIMATION, et elle est honnete de l'etre
+// - ce qui compte pour un joueur, c'est « trois heures ce mois-ci », jamais la seconde pres.
+inline constexpr std::chrono::seconds ASSUMED_QUESTION_DURATION{ 20 };
+
+// Combien de temps le joueur a-t-il joue ?
+//
+// Le journal ne stocke PAS de durees : il stocke des INSTANTS, et c'est suffisant. Une session est une suite de questions
+// rapprochees, et deux questions separees par une longue pause appartiennent a deux sessions - on additionne donc des
+// BLOCS, chaque bloc valant l'ecart entre sa premiere et sa derniere question, plus le temps de la derniere.
+//
+// p_idleGap est ce qui separe deux sessions : dix minutes par defaut. Le joueur peut poser son telephone au milieu d'une
+// partie pour repondre a un message sans que sa session se coupe en deux.
+[[nodiscard]] std::chrono::seconds playTimeOf( std::span<const QuestionRecord> p_records,
+                                               std::chrono::seconds p_idleGap = std::chrono::minutes{ 10 } );
+
 [[nodiscard]] QuestionStatistics computeStatistics( std::span<const QuestionRecord> p_records,
                                                     const StatisticsFilter & p_filter );
 

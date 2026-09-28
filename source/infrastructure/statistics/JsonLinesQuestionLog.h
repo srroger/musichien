@@ -47,6 +47,10 @@ public:
     [[nodiscard]] std::vector<domain::QuestionRecord> since(
       std::chrono::system_clock::time_point p_since ) const override;
 
+    // Efface le fichier. Un fichier absent n'est pas une erreur - effacer ce qui n'existe pas laisse exactement l'etat
+    // voulu : rien.
+    void clear() override;
+
     // Le chemin du fichier : l'application peut le montrer a un joueur curieux, et un test s'en sert pour ecrire dans
     // un dossier temporaire.
     [[nodiscard]] const QString & filePath() const noexcept { return m_filePath; }

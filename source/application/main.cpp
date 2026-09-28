@@ -23,6 +23,7 @@
 #include "ui/IntervalPlaybackController.h"
 #include "ui/MicrophoneController.h"
 #include "ui/RhythmController.h"
+#include "ui/StatisticsController.h"
 
 #include <QAudioDevice>
 #include <QDir>
@@ -360,6 +361,23 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     // Une question conclue est ecrite ici, une fois pour toutes les genres de question.
     exerciseController.setQuestionLog( &questionLog );
+
+    // La page de statistiques : elle LIT le meme journal, et ne l'ecrit jamais. Un seul journal, une seule verite - deux
+    // objets qui ecriraient le meme fichier finiraient par se contredire.
+    musichien::ui::StatisticsController statisticsController{ questionLog };
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "StatisticsController",
+                                  &statisticsController );
+
+    // Une remise a zero efface le journal : la page de statistiques doit alors oublier ce qu'elle avait calcule, sinon
+    // elle continuerait d'afficher l'histoire que le joueur vient d'effacer.
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::statisticsChanged,
+                      &statisticsController,
+                      &musichien::ui::StatisticsController::refresh );
 
     // Le micro. Le view model ne connait que le port PitchDetector : la vraie implementation (QAudioSource + YIN)
     // est construite ICI, dans la couche de câblage, et livrée par la factory à chaque changement de périphérique.

@@ -210,4 +210,38 @@ TEST( QuestionStatisticsTest, the_average_of_replays_is_not_rounded_to_an_intege
     EXPECT_DOUBLE_EQ( 1.5, statistics.averageReplays() );
 }
 
+TEST( QuestionStatisticsTest, the_play_time_adds_up_the_sessions_and_not_the_pauses )
+{
+    const auto start = daysAgo( 1 );
+
+    const auto recordAtSecond = [&start]( int p_seconds ) {
+        QuestionRecord record;
+
+        record.askedAt = start + std::chrono::seconds{ p_seconds };
+
+        return record;
+    };
+
+    // Une premiere session : trois questions en deux minutes.
+    const std::vector<QuestionRecord> records{
+      recordAtSecond( 0 ),
+      recordAtSecond( 60 ),
+      recordAtSecond( 120 ),
+      // ...une heure de pause, puis une question seule : c'est une AUTRE session.
+      recordAtSecond( 3720 ),
+    };
+
+    // La premiere session vaut deux minutes plus le temps de sa derniere question (140 s), et la seconde une seule
+    // question (20 s).
+    EXPECT_EQ( std::chrono::seconds{ 160 }, playTimeOf( records ) );
+
+    // L'ORDRE des lignes ne compte pas : un journal lu a l'envers ne doit pas produire une duree negative.
+    const std::vector<QuestionRecord> reversed{ records.at( 3 ), records.at( 2 ), records.at( 1 ), records.at( 0 ) };
+
+    EXPECT_EQ( std::chrono::seconds{ 160 }, playTimeOf( reversed ) );
+
+    // Et un journal vide ne dure pas longtemps.
+    EXPECT_EQ( std::chrono::seconds{ 0 }, playTimeOf( std::span<const QuestionRecord>{} ) );
+}
+
 }    // namespace musichien::domain

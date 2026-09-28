@@ -186,6 +186,17 @@ void answerChordCorrectly( ExerciseSession & p_session )
     p_session.answerChord( askedChordQuality( p_session ) );
 }
 
+// Une session d'accords avec de quoi RETIRER un leurre : six couleurs, la ou le niveau d'un debutant n'en offre que deux.
+//
+// Six, et pas quinze : il faut assez de leurres pour que l'indice ait un sens, et assez peu pour qu'un test se lise.
+[[nodiscard]] SessionSettings wideChordSettings()
+{
+    SessionSettings settings = chordOnlySettings();
+    settings.startingChordQualityCount = 6;
+
+    return settings;
+}
+
 }    // namespace
 
 TEST( ExerciseSessionTest, a_session_asks_its_first_question_immediately )
@@ -1173,6 +1184,72 @@ TEST( ExerciseSessionTest, an_exhausted_plan_goes_back_to_drawing )
     const std::span<const Interval> palette = session.palette();
 
     EXPECT_NE( palette.end(), std::ranges::find( palette, session.currentQuestion().target ) );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// L'indice d'accord
+//
+// Roger : « pour la reconnaissance des accords, tu peux donner un indice quand tu rates une fois ? Du style retirer une
+// mauvaise reponse ou rejouer l'accord, puis le jouer en arpege. »
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionTest, the_chord_hint_waits_for_a_first_failed_attempt )
+{
+    ExerciseSession session{ TEST_SEED, wideChordSettings() };
+
+    // Un indice offert AVANT d'avoir essaye ne serait pas un indice, ce serait un raccourci.
+    EXPECT_FALSE( session.canRemoveOneWrongChordChoice() );
+    EXPECT_FALSE( session.canHearChordAsArpeggio() );
+
+    session.answerChord( wrongChordAnswer( session ) );
+
+    // Une fois rate : les deux aides sont la.
+    EXPECT_TRUE( session.canRemoveOneWrongChordChoice() );
+    EXPECT_TRUE( session.canHearChordAsArpeggio() );
+}
+
+TEST( ExerciseSessionTest, removing_a_wrong_chord_choice_never_removes_the_right_one )
+{
+    ExerciseSession session{ TEST_SEED, wideChordSettings() };
+
+    session.answerChord( wrongChordAnswer( session ) );
+
+    const std::vector<ChordQuality> before = session.currentQuestion().chordChoices;
+
+    ASSERT_TRUE( session.removeOneWrongChordChoice() );
+
+    const std::vector<ChordQuality> after = session.currentQuestion().chordChoices;
+
+    EXPECT_EQ( before.size() - 1, after.size() );
+
+    // La BONNE reponse est toujours la : un indice qui retirerait la reponse rendrait la question impossible, ce qui est
+    // le contraire d'une aide.
+    EXPECT_NE( after.end(), std::ranges::find( after, askedChordQuality( session ) ) );
+
+    // Et celle qui est partie etait bien une fausse : tout ce qui reste etait deja dans la liste d'avant.
+    for( const ChordQuality quality : after )
+    {
+        EXPECT_NE( before.end(), std::ranges::find( before, quality ) );
+    }
+}
+
+TEST( ExerciseSessionTest, the_chord_hint_stops_when_only_a_hint_would_be_left )
+{
+    SessionSettings settings = chordOnlySettings();
+
+    // Une palette de DEUX couleurs : la bonne reponse et un leurre. Il n'y a rien a retirer, et le domaine doit le dire
+    // plutot que d'offrir un bouton qui ne ferait rien.
+    settings.startingChordQualityCount = 2;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    session.answerChord( wrongChordAnswer( session ) );
+
+    EXPECT_FALSE( session.canRemoveOneWrongChordChoice() );
+
+    // Mais l'ARPEGE reste disponible, et c'est la nuance qui compte : un debutant n'a rien a eliminer, et c'est
+    // precisement lui que l'accord note a note aide le plus.
+    EXPECT_TRUE( session.canHearChordAsArpeggio() );
 }
 
 }    // namespace musichien::domain

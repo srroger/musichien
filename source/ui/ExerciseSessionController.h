@@ -432,6 +432,36 @@ public:
     // symbole : il renvoie l'index de ce qu'il a affiche.
     Q_INVOKABLE void answerChord( int p_quality );
 
+    // Vrai quand il y a un indice a proposer : une question d'accord, des aides, un essai deja rate, et de quoi retirer
+    // une reponse fausse.
+    Q_PROPERTY( bool isChordHintAvailable READ isChordHintAvailable NOTIFY questionChanged )
+
+    [[nodiscard]] bool isChordHintAvailable() const noexcept;
+
+    // Vrai quand l'arpege a un sens. Separe du precedent, parce qu'un DEBUTANT n'a que deux couleurs d'accord : il n'a
+    // jamais rien a retirer, et l'arpege reste pourtant l'aide qui lui apprend le plus.
+    Q_PROPERTY( bool isChordArpeggioAvailable READ isChordArpeggioAvailable NOTIFY questionChanged )
+
+    [[nodiscard]] bool isChordArpeggioAvailable() const noexcept;
+
+    // L'INDICE : retire une mauvaise reponse de la grille d'accords. C'est la demande de Roger - « du style retirer une
+    // mauvaise reponse » - et la regle vit dans le DOMAINE : le controleeur ne fait que la brancher.
+    Q_INVOKABLE void useChordHint();
+
+    // Rejoue l'accord en ARPEGE : les notes l'une apres l'autre, au lieu de plaquees.
+    //
+    // C'est le second indice demande - « puis le jouer en arpege » - et le meilleur des deux : il ne donne pas la
+    // reponse, il donne a ENTENDRE ce qui la constitue.
+    Q_INVOKABLE void playCurrentChordAsArpeggio();
+
+    // Le week-end : c'est le moment du Bilan, et l'ecran s'en sert pour le mettre en avant.
+    //
+    // La regle vit dans le DOMAINE (Weekend.h) et elle y est TESTEE : un ecran qui redeciderait ici ce qu'est un week-end
+    // finirait par dire autre chose que le reste de l'application.
+    Q_PROPERTY( bool isWeekEnd READ isWeekEnd NOTIFY sessionChanged )
+
+    [[nodiscard]] bool isWeekEnd() const;
+
     // Le BILAN : une session dont les questions sont DECIDEES, du plus facile au plus difficile, et qui finit par ce qui
     // resiste au joueur.
     //
@@ -492,6 +522,13 @@ signals:
 
     // The experience total has just grown, after a session ended.
     void totalExperienceChanged();
+
+    // Le journal des questions conclues a ETE EFFACE : une remise a zero. La page de statistiques ecoute ce signal, sans
+    // quoi elle montrerait encore l'histoire d'avant.
+    //
+    // Rien n'est emis apres chaque question, et c'est deliberé : la page se rafraichit a son OUVERTURE, et relire tout le
+    // fichier a chaque question couterait cher pour une page que personne ne regarde a ce moment-la.
+    void statisticsChanged();
 
     // The player has just turned the daily reminder on or off.
     void dailyReminderChanged();
