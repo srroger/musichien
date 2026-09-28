@@ -131,6 +131,37 @@ TEST( SungIntervalDetectorTest, a_breath_between_the_two_notes_keeps_the_first )
     EXPECT_EQ( -5, detector.reading().semitones() );
 }
 
+TEST( SungIntervalDetectorTest, the_same_note_sung_again_is_a_unison )
+{
+    SungIntervalDetector detector;
+
+    // LA MEME NOTE, DEUX FOIS, avec un souffle entre les deux : c'est un unisson, et c'est un intervalle comme un autre.
+    //
+    // Roger a trouve ce bug sur son telephone : « quand c'est un unisson, la deuxieme note n'est pas validee ». La regle
+    // demandait une deuxieme note DIFFERENTE de la premiere, ce qui rendait l'unisson impossible a reussir - alors que
+    // c'est justement l'exercice ou l'oreille apprend a rester JUSTE.
+    hold( detector, frequencyOf( 69 ), 2000 );
+    hold( detector, 0.0, 200 );                   // le chanteur reprend son souffle...
+    hold( detector, frequencyOf( 69 ), 2000 );    // ...et reprend LA MEME note
+
+    ASSERT_TRUE( detector.reading().hasInterval() );
+    EXPECT_EQ( 0, detector.reading().semitones() );
+}
+
+TEST( SungIntervalDetectorTest, a_reading_that_merely_flickers_is_not_a_new_note )
+{
+    SungIntervalDetector detector;
+
+    // Le piege du correctif : une detection qui vacille un instant - un vibrato, une syllabe, une expiration - ne doit
+    // PAS transformer une note tenue en un unisson. Il faut un VRAI silence pour que la note compte comme reprise.
+    hold( detector, frequencyOf( 69 ), 2000 );
+    hold( detector, 0.0, 60 );    // moins de 150 ms : ce n'est pas une reprise
+    hold( detector, frequencyOf( 69 ), 2000 );
+
+    EXPECT_FALSE( detector.reading().hasInterval() );
+    EXPECT_EQ( 69, detector.reading().firstMidiNumber );
+}
+
 TEST( SungIntervalDetectorTest, the_answer_does_not_move_once_it_is_found )
 {
     SungIntervalDetector detector;

@@ -68,6 +68,17 @@ private:
     // feels smooth rather than twitchy.
     static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 1000;
 
+    // Combien de temps de silence fait une REPRISE.
+    //
+    // Roger a trouve le defaut sur son telephone : « quand c'est un unisson, la deuxieme note n'est pas validee ». La
+    // regle demandait une deuxieme note DIFFERENTE de la premiere, ce qui rendait l'unisson - un intervalle de zero
+    // demi-ton, et un exercice parfaitement juste - impossible a reussir.
+    //
+    // Une note REPRISE apres un vrai silence est une nouvelle note, meme si c'est la meme hauteur. Et le silence doit
+    // DURER : une detection qui vacille un instant, un vibrato, une syllabe, ne doit pas transformer une note tenue en
+    // deux notes.
+    static constexpr std::int32_t MINIMUM_SILENCE_MILLISECONDS = 150;
+
     // How fast the tracked pitch follows a reading. 0.15 keeps 85% of the previous estimate at every reading: slow
     // enough to absorb a singing voice's vibrato and wobble, fast enough to follow a real change of note. The tracked
     // pitch is then ROUNDED to the nearest note, which is what gives the tolerance: a reading must move the average
@@ -84,6 +95,12 @@ private:
     // The tracked pitch, smoothed across readings. This is what absorbs the noise: a single reading never decides a
     // note, the average of the last few does. 0.0 means "not tracking yet".
     double m_trackedMidi{ 0.0 };
+
+    // Le silence en cours, et s'il a ete assez long pour valoir une reprise. Voir MINIMUM_SILENCE_MILLISECONDS : c'est
+    // ce couple qui permet de chanter l'unisson sans qu'un vibrato passe pour deux notes.
+    std::int32_t m_silenceMilliseconds{ 0 };
+
+    bool m_voiceRestarted{ false };
 };
 
 }    // namespace musichien::domain
