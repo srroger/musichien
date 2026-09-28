@@ -9,6 +9,7 @@
 #include <QString>
 
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -636,6 +637,11 @@ void ExerciseSessionController::setMicrophoneController( MicrophoneController * 
     m_microphone = p_microphone;
 }
 
+void ExerciseSessionController::setQuestionLog( domain::QuestionLog * p_questionLog )
+{
+    m_questionLog = p_questionLog;
+}
+
 int ExerciseSessionController::questionKind() const noexcept
 {
     return ( m_session != nullptr ) ? static_cast<int>( m_session->currentQuestion().kind ) : 0;
@@ -873,6 +879,14 @@ void ExerciseSessionController::processAnswer( bool p_isCorrect )
         }
     }
 
+    // La question est CONCLUE quand elle est juste, ou quand la session s'arrete sur une derniere vie. Une mauvaise
+    // reponse qui laisse la question posee n'est PAS une question conclue : elle se retente, et seule la tentative
+    // finale merite une ligne - sinon le journal compterait trois fois la meme question pour une seule lecon.
+    if( p_isCorrect || m_session->isFinished() )
+    {
+        recordCurrentQuestion( p_isCorrect, false );
+    }
+
     announceSessionEndIfNeeded();
 
     emit scoreChanged();
@@ -887,6 +901,10 @@ void ExerciseSessionController::revealAnswer()
     }
 
     m_session->revealAnswer();
+
+    // Vue la reponse, et c'est une AIDE : le journal doit le dire ainsi. Un joueur qui demande la reponse n'est pas un
+    // joueur qui se trompe, et ses statistiques lui mentiraient s'il y apparaissait comme tel.
+    recordCurrentQuestion( false, true );
 
     refreshChoices();
 
@@ -1696,6 +1714,58 @@ void ExerciseSessionController::playChordNotes( const domain::Chord & p_chord )
     const std::vector<domain::Note> notes = p_chord.notes();
 
     m_notePlayer.playChord( notes );
+}
+
+void ExerciseSessionController::recordCurrentQuestion( bool p_wasCorrect, bool p_wasRevealed )
+{
+    if( ( m_questionLog == nullptr ) || ( m_session == nullptr ) )
+    {
+        // Aucun journal : l'application tourne sans statistiques, et c'est un mode valide. Un test, un appareil dont le
+        // disque est plein - dans tous les cas, le jeu continue.
+        return;
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    domain::QuestionRecord record;
+
+    // L'horloge est lue ICI, dans la couche qui a le droit de la lire. Le domaine recoit une date, il ne la demande
+    // jamais : c'est ce qui garde le domaine pur, et le journal testable sans attendre une seule seconde.
+    record.askedAt = std::chrono::system_clock::now();
+
+    record.kind = question.kind;
+
+    // Ce que la question DEMANDAIT, dans l'unite de son genre : le genre dit comment lire ce nombre. Une seule colonne
+    // pour trois unites, parce que c'est le genre - et non le nombre - qui porte le sens.
+    switch( question.kind )
+    {
+        case domain::QuestionKind::Rhythm:
+            record.target = static_cast<std::int32_t>( question.patternIndex );
+            break;
+
+        case domain::QuestionKind::Chord:
+            record.target = static_cast<std::int32_t>( question.chord.quality );
+            break;
+
+        case domain::QuestionKind::NamedInterval:
+        case domain::QuestionKind::Direction:
+        case domain::QuestionKind::Sing:
+            record.target = question.target.semitones();
+            break;
+    }
+
+    record.direction = question.direction;
+
+    // Le nombre d'essais : la bonne reponse donnee a l'essai numero un, c'est UN essai. Le domaine compte les erreurs,
+    // donc l'essai gagnant s'y ajoute - et c'est cette addition qui fait la difference entre « il sait » et « il a fini
+    // par trouver ».
+    record.attemptCount = question.wrongAttemptCount + 1;
+
+    record.replayCount = question.replayCount;
+
+    record.outcome = domain::outcomeOf( p_wasCorrect, p_wasRevealed, record.attemptCount );
+
+    m_questionLog->append( record );
 }
 
 void ExerciseSessionController::playCurrentQuestionAsChord()

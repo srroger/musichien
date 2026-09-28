@@ -50,6 +50,13 @@ musichienFunction_AddLibrary(domain
     exercise/ExerciseSession.h
     exercise/ExerciseSession.cpp
 
+    # Le journal des questions conclues, et ce qu'il permet de dire : la fondation des statistiques
+    exercise/QuestionRecord.h
+    exercise/QuestionRecord.cpp
+    exercise/QuestionLog.h
+    exercise/QuestionStatistics.h
+    exercise/QuestionStatistics.cpp
+
     # The memory hooks, as content the domain holds and the infrastructure fills
     exercise/HintBook.h
     exercise/HintBook.cpp
@@ -93,6 +100,7 @@ if(MUSICHIEN_BUILD_TESTING)
         exercise/LearningOrder_test.cpp
         exercise/PlayerLevel_test.cpp
         exercise/SessionScore_test.cpp
+        exercise/QuestionStatistics_test.cpp
     )
 
 endif()

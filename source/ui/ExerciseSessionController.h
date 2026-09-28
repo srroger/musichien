@@ -27,6 +27,7 @@
 #include "domain/exercise/ExerciseSession.h"
 #include "domain/exercise/HintBook.h"
 #include "domain/exercise/PlayerPreferences.h"
+#include "domain/exercise/QuestionLog.h"
 #include "domain/exercise/Rank.h"
 
 #include <QElapsedTimer>
@@ -424,6 +425,11 @@ public:
     // question then cannot be answered, but nothing breaks.
     void setMicrophoneController( MicrophoneController * p_microphone );
 
+    // Le journal des questions conclues, injecte par l'application comme le micro : ce controleur dit « enregistre
+    // ceci » sans savoir ou cela va. Null quand il n'y a nulle part ou ecrire - un test, ou un appareil ou l'ecriture
+    // echoue - et tout continue de fonctionner : des statistiques, pas une regle du jeu.
+    void setQuestionLog( domain::QuestionLog * p_questionLog );
+
     // The player asks for the answer, after the session said it may be revealed.
     Q_INVOKABLE void revealAnswer();
 
@@ -569,6 +575,12 @@ private:
     // Plays the same two notes TOGETHER, whatever direction the question was asked in.
     void playCurrentQuestionAsChord();
 
+    // Ecrit une ligne pour la question en cours, qui vient d'etre CONCLUE.
+    //
+    // L'horloge est lue ICI et nulle part ailleurs : le domaine recoit une date, il ne la demande jamais - c'est ce qui
+    // garde le domaine pur et le journal testable sans attendre une seconde.
+    void recordCurrentQuestion( bool p_wasCorrect, bool p_wasRevealed );
+
     // Joue un accord : ses notes, plaquee. Le seul chemin par lequel un accord s'entend, que ce soit pour poser la
     // question ou pour la confirmer.
     void playChordNotes( const domain::Chord & p_chord );
@@ -597,6 +609,9 @@ private:
 
     // May be null: a test, or an application that has nowhere to remember anything, must still run.
     domain::PlayerPreferences * m_levelStore{ nullptr };
+
+    // May be null too, et pour la meme raison : un journal absent coute des statistiques, jamais une partie.
+    domain::QuestionLog * m_questionLog{ nullptr };
 
     // Read once from the store, then kept here: the screen asks for it on every question, and a settings file
     // has no business being read that often.

@@ -102,6 +102,24 @@ void storeIntervalOnlyShares( domain::PlayerPreferencesFake & p_store )
     p_store.storeChordQuestionShare( 0 );
 }
 
+// Une couleur d'accord qui n'est PAS la bonne, prise parmi celles que le joueur peut repondre.
+[[nodiscard]] int wrongChordChoice( ExerciseSessionController & p_controller )
+{
+    const int correct = p_controller.heardChord().value( "quality" ).toInt();
+
+    for( const QVariant & choice : p_controller.chordChoices() )
+    {
+        const int quality = choice.toMap().value( "quality" ).toInt();
+
+        if( quality != correct )
+        {
+            return quality;
+        }
+    }
+
+    return correct;
+}
+
 // The interval the session just asked, as the screen reads it.
 [[nodiscard]] std::int32_t heardDistance( const ExerciseSessionController & p_controller )
 {
@@ -1125,6 +1143,120 @@ TEST( ExerciseSessionControllerTest, the_four_question_shares_are_remembered_and
 
     EXPECT_EQ( 0, controller.rhythmQuestionShare() );
     EXPECT_EQ( 0, levelStore.storedRhythmQuestionShare() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Le journal des questions conclues
+//
+// C'est la fondation des statistiques : une ligne par question CONCLUE, et rien de plus. Le journal est un port, donc ce
+// fichier y branche un journal EN MEMOIRE et regarde ce qui part - exactement ce que l'application fait avec un
+// fichier.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionControllerTest, a_concluded_question_is_written_to_the_journal )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+    controller.setQuestionLog( &log );
+
+    controller.startSession();
+
+    // Rien tant que la question n'est pas conclue : une question posee n'est pas encore une lecon.
+    EXPECT_EQ( 0U, log.size() );
+
+    const int correctQuality = controller.heardChord().value( "quality" ).toInt();
+
+    controller.answerChord( correctQuality );
+
+    ASSERT_EQ( 1U, log.size() );
+
+    const domain::QuestionRecord & record = log.records().front();
+
+    EXPECT_EQ( domain::QuestionKind::Chord, record.kind );
+    EXPECT_EQ( correctQuality, record.target );
+    EXPECT_EQ( domain::QuestionOutcome::CorrectFirstTry, record.outcome );
+    EXPECT_EQ( 1, record.attemptCount );
+}
+
+TEST( ExerciseSessionControllerTest, a_wrong_answer_that_leaves_the_question_open_writes_nothing )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    domain::SessionSettings settings = chordOnlySettings();
+    settings.lives = std::nullopt;    // pour que la question reste posee apres l'erreur
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startSession();
+
+    controller.answerChord( wrongChordChoice( controller ) );
+
+    // La question est TOUJOURS POSEE : elle se retente, et c'est la tentative finale qui compte. Ecrire ici ferait
+    // compter trois fois la meme question pour une seule lecon.
+    EXPECT_TRUE( controller.isAsking() );
+    EXPECT_EQ( 0U, log.size() );
+
+    controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
+
+    // Conclue au deuxieme essai : une ligne, et elle dit « trouve », pas « su ».
+    ASSERT_EQ( 1U, log.size() );
+    EXPECT_EQ( domain::QuestionOutcome::CorrectAfterRetries, log.records().front().outcome );
+    EXPECT_EQ( 2, log.records().front().attemptCount );
+}
+
+TEST( ExerciseSessionControllerTest, answering_twice_writes_one_line )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+    controller.setQuestionLog( &log );
+
+    controller.startSession();
+
+    const int correctQuality = controller.heardChord().value( "quality" ).toInt();
+
+    controller.answerChord( correctQuality );
+    controller.answerChord( correctQuality );    // refusee : la question est deja en feedback
+
+    EXPECT_EQ( 1U, log.size() );
+}
+
+TEST( ExerciseSessionControllerTest, a_revealed_question_is_recorded_as_help_not_as_a_mistake )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+    controller.setQuestionLog( &log );
+
+    controller.startSession();
+    controller.revealAnswer();
+
+    ASSERT_EQ( 1U, log.size() );
+
+    // Vue la reponse : ni une reussite, ni un echec. Un joueur qui demande la reponse n'est pas un joueur qui se
+    // trompe, et ses statistiques lui mentiraient s'il y apparaissait comme tel.
+    EXPECT_EQ( domain::QuestionOutcome::Revealed, log.records().front().outcome );
+}
+
+TEST( ExerciseSessionControllerTest, a_session_without_a_journal_still_plays )
+{
+    domain::NotePlayerFake notePlayer;
+
+    // AUCUN journal branche : c'est le cas d'un test, et celui d'un appareil dont le disque est plein. Le jeu doit
+    // fonctionner exactement pareil - des statistiques, pas une regle du jeu.
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+
+    controller.startSession();
+    controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
+
+    EXPECT_TRUE( controller.isFeedbackVisible() );
+    EXPECT_TRUE( controller.wasLastAnswerCorrect() );
 }
 
 }    // namespace musichien::ui

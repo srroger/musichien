@@ -17,6 +17,7 @@
 #    include "infrastructure/notifications/NullNotificationScheduler.h"
 #endif
 #include "infrastructure/preferences/QSettingsPlayerPreferences.h"
+#include "infrastructure/statistics/JsonLinesQuestionLog.h"
 #include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
@@ -24,11 +25,14 @@
 #include "ui/RhythmController.h"
 
 #include <QAudioDevice>
+#include <QDir>
 #include <QFile>
 #include <QGuiApplication>
 #include <QMediaDevices>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
+#include <QStandardPaths>
+#include <QString>
 #include <QUrl>
 #include <QtQml>
 
@@ -343,12 +347,30 @@ int main( int p_argumentCount, char * p_arguments[] )
     // par copie, et garde pour le rappel.
     musichien::domain::AnecdoteBook anecdoteBook = loadAnecdoteBook();
 
+    // Le journal des questions conclues : c'est la FONDATION des statistiques (note 25 du Vault), et il est cree AVANT
+    // le controleur qui va l'utiliser - un pointeur vers un objet deja detruit ne se voit pas tout de suite, et se voit
+    // tres mal.
+    //
+    // Le dossier vient de Qt, qui sait ou une application a le droit d'ecrire sur chaque plateforme. Il peut ne pas
+    // exister au premier lancement : QDir le cree, et si cela echoue le journal se taira sans que rien d'autre ne
+    // s'arrete.
+    const QString applicationDataDirectory = QStandardPaths::writableLocation( QStandardPaths::AppDataLocation );
+
+    QDir{}.mkpath( applicationDataDirectory );
+
+    // Le journal ECRIT, donc il n'est pas const : c'est un objet a part entiere, pas une constante de configuration.
+    musichien::infrastructure::JsonLinesQuestionLog questionLog{
+      applicationDataDirectory + QStringLiteral( "/questions.jsonl" ) };
+
     musichien::ui::ExerciseSessionController exerciseController{ notePlayer,
                                                                  {},
                                                                  loadHintBook(),
                                                                  anecdoteBook,
                                                                  musichien::infrastructure::vibrateForMistake,
                                                                  &playerLevelStore };
+
+    // Une question conclue est ecrite ici, une fois pour toutes les genres de question.
+    exerciseController.setQuestionLog( &questionLog );
 
     // Le micro. Le view model ne connait que le port PitchDetector : la vraie implementation (QAudioSource + YIN)
     // est construite ICI, dans la couche de câblage, et livrée par la factory à chaque changement de périphérique.
