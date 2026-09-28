@@ -902,15 +902,19 @@ Item {
                 }
 
                 Button {
+                    // Sur une question de rythme ou de CHANT, la question ne se "revele" pas : elle se PASSE. Le meme
+                    // bouton, le meme domaine (revealAnswer), et un mot qui dit ce que le joueur fait vraiment.
+
                     Layout.fillWidth: true
                     height: 52
                     // Appears only once the player has tried enough. Asking to be told is not a failure, and
                     // it is not offered before it is useful either.
                     visible: ExerciseController.isHelpAvailable
                     highlighted: true
-                    // Sur une question de rythme, la question ne se "revele" pas : elle se PASSE. Le meme bouton, le
-                    // meme domaine (revealAnswer), et un mot qui dit ce que le joueur fait vraiment.
-                    text: ExerciseController.questionKind === 3 ? qsTr("Passer") : qsTr("Réponse")
+                    // Le chant a besoin de ce bouton autant que le rythme, et pour une raison differente : on peut ne pas
+                    // etre en mesure de chanter - un endroit bruyant, une gorge prise, un micro qui ne suit pas. Sans
+                    // lui, la seule issue etait de rater la question, ce qui n'est pas la meme chose.
+                    text: (ExerciseController.questionKind === 3 || ExerciseController.questionKind === 2) ? qsTr("Passer") : qsTr("Réponse")
                     onClicked: ExerciseController.revealAnswer()
                 }
 
