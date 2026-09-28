@@ -1038,9 +1038,20 @@ TEST( ExerciseSessionControllerTest, the_chord_choices_and_the_accord_are_ready_
 
     const QVariantMap firstChoice = choices.first().toMap();
 
-    EXPECT_FALSE( firstChoice.value( "name" ).toString().isEmpty() );
     EXPECT_TRUE( firstChoice.contains( "quality" ) );
-    EXPECT_EQ( 3, firstChoice.value( "noteCount" ).toInt() );
+    EXPECT_FALSE( firstChoice.value( "name" ).toString().isEmpty() );
+
+    // LE NOM DU BOUTON est la notation anglo-saxonne : la tonique de la question, plus le suffixe de la couleur. « Maj »
+    // et « min » ont disparu, et avec eux le « · 3 » que Roger trouvait bizarre : un majeur ne s'annonce pas, donc son
+    // bouton dit juste la tonique - « C ».
+    const QString rootName = controller.heardChord().value( "rootName" ).toString();
+
+    EXPECT_EQ( rootName, firstChoice.value( "name" ).toString() );
+
+    // Et le mineur, juste a cote, ajoute son « m » : « Cm ».
+    const QVariantMap secondChoice = choices.at( 1 ).toMap();
+
+    EXPECT_EQ( rootName + QStringLiteral( "m" ), secondChoice.value( "name" ).toString() );
 
     // L'accord entendu est decrit pour l'ecran, symbole compris : "C" + "m" font "Cm", et l'ecran n'assemble rien.
     const QVariantMap heard = controller.heardChord();

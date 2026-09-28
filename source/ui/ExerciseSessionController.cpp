@@ -800,19 +800,34 @@ QVariantList ExerciseSessionController::chordChoices() const
         return choices;
     }
 
+    // LE NOM DE LA TONIQUE, une fois pour tous les boutons : « C », « F# », « Bb ».
+    //
+    // Elle vient du DOMAINE (Note::pitchClassName), comme tous les autres noms de l'application - l'ecran ne nomme rien
+    // lui-meme. Et la tonique est celle de la QUESTION : elle ne change pas d'un bouton a l'autre, donc seul le suffixe
+    // distingue les couleurs.
+    const QString rootName =
+      QString::fromStdString( domain::Note{ m_session->currentQuestion().chord.rootMidiNumber }.pitchClassName() );
+
     for( const domain::ChordQuality quality : m_session->currentQuestion().chordChoices )
     {
         QVariantMap described;
 
+        const std::string_view suffix = domain::chordQualitySymbolSuffix( quality );
+
         described.insert( QStringLiteral( "quality" ), static_cast<int>( quality ) );
 
-        // LE NOM COURT est ce que l'ecran affiche : "m7b5" tient dans un bouton de telephone, "Half-diminished" n'y
-        // tient pas, et une reponse coupee en deux n'est pas une reponse. Le nom complet reste donne par le verdict.
-        described.insert( QStringLiteral( "name" ), QString::fromUtf8( domain::chordQualityShortLabel( quality ).data(), static_cast<int>( domain::chordQualityShortLabel( quality ).size() ) ) );
+        // LE NOM DE L'ACCORD, en notation anglo-saxonne : « C », « Cm », « Csus4 », « C7 », « Cm7b5 ».
+        //
+        // C'est la notation des recueils et des vraies partitions, et Roger l'a demandee apres avoir vu « Maj · 3 » a
+        // l'ecran - « ce qui est tres bizarre comme notation ». Un musicien lit ca sans y penser, et le nombre de notes a
+        // disparu : il n'apprenait rien qu'un musicien ne sache deja.
+        described.insert( QStringLiteral( "name" ),
+                          rootName + QString::fromUtf8( suffix.data(), static_cast<int>( suffix.size() ) ) );
 
-        described.insert( QStringLiteral( "fullName" ), QString::fromUtf8( domain::chordQualityName( quality ).data(), static_cast<int>( domain::chordQualityName( quality ).size() ) ) );
-
-        described.insert( QStringLiteral( "noteCount" ), static_cast<int>( domain::chordNoteCount( quality ) ) );
+        // Le nom complet (« Half-diminished ») reste disponible : c'est lui que le verdict ecrit, la ou il y a la place.
+        described.insert( QStringLiteral( "fullName" ),
+                          QString::fromUtf8( domain::chordQualityName( quality ).data(),
+                                             static_cast<int>( domain::chordQualityName( quality ).size() ) ) );
 
         choices.append( described );
     }
@@ -1958,6 +1973,11 @@ bool ExerciseSessionController::isWeekEnd() const
     // QDate::dayOfWeek() suit exactement la convention du domaine : 1 = lundi ... 7 = dimanche. Cette correspondance est
     // verifiee par un test du domaine, et non par ce commentaire.
     return domain::isWeekEnd( QDate::currentDate().dayOfWeek() );
+}
+
+int ExerciseSessionController::chordQualityCount() const noexcept
+{
+    return static_cast<int>( domain::CHORD_QUALITY_COUNT );
 }
 
 bool ExerciseSessionController::isChordHintAvailable() const noexcept

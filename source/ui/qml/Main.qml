@@ -14,6 +14,14 @@
 // That last rule is why the buttons below are NOT written out one by one: the list comes from the
 // domain, so adding an interval to the domain makes a button appear here without a line of QML
 // changing. A screen that hard coded them would drift apart from the model it is supposed to show.
+// ---------------------------------------------------------------------------------------------------------------------
+// Pourquoi tant de « Layout.preferredWidth: 0 » et « Layout.minimumWidth: 0 » sur les textes replies
+// Parce qu'un Text replie rapporte la largeur de sa PLUS LONGUE LIGNE comme largeur minimale, et que QtQuick.Layouts la
+// respecte. Une phrase un peu longue elargissait donc le dialogue qui la contient - jusqu'a 489 points pour une vue de
+// 338 sur le telephone de Roger - et faisait apparaitre un DEFILEMENT HORIZONTAL dans une page qui n'avait rien a montrer
+// de plus a droite. Deux lignes suffisent a l'empecher : la largeur preferee ET la largeur minimale mises a zero, pour
+// que le texte se replie au lieu de pousser le mur.
+// Les deux vont toujours ENSEMBLE, et c'est le minimum qui compte : sans lui, la largeur preferee seule ne change rien.
 // =====================================================================================================================
 
 // The view models of the application, registered as singletons from main().
@@ -165,6 +173,10 @@ ApplicationWindow {
             id: scrollView
 
             anchors.fill: parent
+            // PAS de defilement horizontal, jamais : une page qui se decale de cote parce qu'un enfant est trop large est
+            // desagreable au doigt, et sur un telephone elle n'a rien a montrer de plus a droite. Le contenu est donc
+            // tenu de rentrer dans la largeur - s'il ne rentre pas, c'est le contenu qu'il faut retoucher, pas la vue.
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             // A session takes over the screen: the bench is not hidden, it is simply not what the
             // application is doing at that moment.
             visible: !ExerciseController.running
@@ -214,6 +226,8 @@ ApplicationWindow {
                 }
 
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     Layout.leftMargin: 24
@@ -228,6 +242,8 @@ ApplicationWindow {
                 // L'anecdote du chargement, sous le sous-titre : c'est la qu'elle se lit, et fillWidth + WordWrap
                 // borne sa largeur a celle de la page - sans cela un texte long pousse les boutons vers la droite.
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     Layout.leftMargin: 24
@@ -294,6 +310,8 @@ ApplicationWindow {
                 // chiffres existaient deja, mais il fallait descendre dans les reglages pour les voir - et un accueil qui
                 // ne dit pas ou on en est n'est pas un accueil.
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
@@ -318,6 +336,8 @@ ApplicationWindow {
                 // disponible quand il veut ; l'ecran le met en avant le week-end, parce que c'est le moment ou l'on a le
                 // temps de le prendre.
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
@@ -342,6 +362,8 @@ ApplicationWindow {
 
                 // Ce que le bilan est, en une phrase : un bouton dont on ne sait pas ce qu'il fait ne se clique pas.
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
@@ -434,6 +456,8 @@ ApplicationWindow {
                 }
 
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     Layout.leftMargin: 24
@@ -539,6 +563,8 @@ ApplicationWindow {
                 }
 
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     Layout.leftMargin: 20
@@ -553,6 +579,8 @@ ApplicationWindow {
                 }
 
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     Layout.leftMargin: 20
@@ -566,6 +594,8 @@ ApplicationWindow {
                 }
 
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     Layout.leftMargin: 20
@@ -659,8 +689,8 @@ ApplicationWindow {
 
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
-            // La colonne ne doit jamais defiler de cote : rien ne depasse en largeur, et un leger mouvement
-            // horizontal quand on fait defiler vers le bas est un defaut, pas une liberte.
+            // La colonne ne doit jamais defiler de cote : rien ne depasse en largeur, et un leger mouvement horizontal
+            // quand on fait defiler vers le bas est un defaut, pas une liberte.
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
@@ -673,6 +703,8 @@ ApplicationWindow {
                 spacing: 3
 
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.fillWidth: true
                     color: "#cbb8e8"
                     font.pixelSize: 14
@@ -769,6 +801,15 @@ ApplicationWindow {
                 // les notifications pour ne plus etre derange - exactement l'inverse du but.
                 Text {
                     Layout.fillWidth: true
+                    // La largeur PREFEREE est mise a zero, et ce n'est pas un caprice : un Text replie rapporte la
+                    // largeur de sa PLUS LONGUE LIGNE comme minimum, et QtQuick.Layouts la respecte - la phrase ci-dessous
+                    // elargissait donc tout le dialogue a 489 points pour une vue de 338, et faisait apparaitre un
+                    // defilement horizontal dans la page des reglages.
+                    Layout.preferredWidth: 0
+                    // Et le MINIMUM aussi : c'est lui qui bloquait. Par defaut, un item d'un layout a pour largeur
+                    // minimale son implicitWidth - donc un texte replie a pour minimum la largeur de sa plus longue
+                    // ligne, et il elargit le parent au lieu de se replier. Les deux lignes vont ensemble.
+                    Layout.minimumWidth: 0
                     visible: ExerciseController.dailyReminderEnabled
                     color: "#8a77ad"
                     font.pixelSize: 12
@@ -809,6 +850,8 @@ ApplicationWindow {
                     }
 
                     Text {
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
                         Layout.fillWidth: true
                         color: "#8a77ad"
                         font.pixelSize: 12
@@ -1040,6 +1083,7 @@ ApplicationWindow {
         contentItem: ScrollView {
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
                 id: singingColumn
@@ -1063,6 +1107,8 @@ ApplicationWindow {
                 }
 
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.fillWidth: true
                     Layout.topMargin: 4
                     horizontalAlignment: Text.AlignHCenter
@@ -1181,6 +1227,7 @@ ApplicationWindow {
             id: profileScroll
 
             clip: true
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
                 // -----------------------------------------------------------------------------------------------------
@@ -1265,6 +1312,8 @@ ApplicationWindow {
                 // Sans journal, la page le DIT plutot que d'afficher des zeros : un ecran plein de « 0 % » n'informe pas, il
                 // decourage.
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.fillWidth: true
                     visible: !StatisticsController.hasHistory
                     color: "#8a77ad"
@@ -1361,6 +1410,8 @@ ApplicationWindow {
                 }
 
                 Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.fillWidth: true
                     visible: StatisticsController.hasHistory
                     color: "#cbb8e8"
@@ -1547,7 +1598,7 @@ ApplicationWindow {
 
                 Button {
                     Layout.alignment: Qt.AlignRight
-                    text: qsTr("Tester la notification")
+                    text: qsTr("Tester le rappel")
                     onClicked: ExerciseController.testReminder()
                 }
 
@@ -1557,7 +1608,7 @@ ApplicationWindow {
                 // developpement.
                 Button {
                     Layout.alignment: Qt.AlignRight
-                    text: qsTr("Remise à zéro (score et statistiques)")
+                    text: qsTr("Remise à zéro complète")
                     onClicked: ExerciseController.resetProfile()
                 }
 
@@ -1719,6 +1770,8 @@ ApplicationWindow {
                     }
 
                     Text {
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
                         Layout.fillWidth: true
                         color: "#8a77ad"
                         font.pixelSize: 11
@@ -1833,6 +1886,8 @@ ApplicationWindow {
         }
 
         Text {
+            Layout.preferredWidth: 0
+            Layout.minimumWidth: 0
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             color: "#8a77ad"
@@ -1892,6 +1947,8 @@ ApplicationWindow {
         }
 
         Text {
+            Layout.preferredWidth: 0
+            Layout.minimumWidth: 0
             Layout.fillWidth: true
             color: "#8a77ad"
             font.pixelSize: 12
@@ -1914,8 +1971,16 @@ ApplicationWindow {
     // Un composant inline plutot qu'un fichier : il n'est utile qu'ici, et il evite de dupliquer trois fois le meme
     // style pour les trois listes de la page.
     component DarkComboBox: ComboBox {
+        // Un ComboBox ne doit JAMAIS prendre la largeur de son texte, et ces trois lignes sont la pour ca.
+
         id: combo
 
+        // QtQuick.Layouts respecte l'implicitWidth d'un item comme un MINIMUM : une seule entree longue - « Aucune entree
+        // audio detectee, verifie le profil de ta carte son » - elargissait donc tout le dialogue des reglages, bien plus
+        // large que l'ecran, et faisait apparaitre un defilement horizontal dont personne ne voulait. Le texte trop long
+        // est coupe, maintenant, au lieu de pousser le mur.
+        Layout.minimumWidth: 0
+        Layout.preferredWidth: 0
         Layout.fillWidth: true
 
         contentItem: Text {
@@ -1923,6 +1988,7 @@ ApplicationWindow {
             color: "#ffffff"
             verticalAlignment: Text.AlignVCenter
             leftPadding: 10
+            elide: Text.ElideRight
         }
 
         delegate: ItemDelegate {

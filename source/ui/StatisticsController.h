@@ -40,6 +40,25 @@ class StatisticsController final : public QObject
 {
     Q_OBJECT
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // Tout ce que l'ecran lit est declare ICI.
+    //
+    // Une methode C++ sans Q_PROPERTY n'existe PAS pour QML, et QML ne s'en plaint pas : il ecrit « undefined » et
+    // continue. C'est exactement ce qui est arrive la premiere fois que cette page a ete vue sur un telephone - des
+    // « undefined % » partout, et aucun histogramme - et c'est la raison pour laquelle ces lignes sont maintenant
+    // ecrites AVANT les methodes qu'elles exposent.
+    // -----------------------------------------------------------------------------------------------------------------
+    Q_PROPERTY( bool hasHistory READ hasHistory NOTIFY statisticsChanged )
+    Q_PROPERTY( int questionCount READ questionCount NOTIFY statisticsChanged )
+    Q_PROPERTY( int successPercent READ successPercent NOTIFY statisticsChanged )
+    Q_PROPERTY( int firstTryPercent READ firstTryPercent NOTIFY statisticsChanged )
+    Q_PROPERTY( int playingDayStreak READ playingDayStreak NOTIFY statisticsChanged )
+    Q_PROPERTY( QString playTimeText READ playTimeText NOTIFY statisticsChanged )
+    Q_PROPERTY( QString recentPlayTimeText READ recentPlayTimeText NOTIFY statisticsChanged )
+    Q_PROPERTY( QVariantList lastDays READ lastDays NOTIFY statisticsChanged )
+    Q_PROPERTY( QVariantList kinds READ kinds NOTIFY statisticsChanged )
+    Q_PROPERTY( QVariantList weakestTargets READ weakestTargets NOTIFY statisticsChanged )
+
 public:
     // Le journal est lu, jamais ecrit : cette page ne peut pas abimer ce qu'elle raconte.
     explicit StatisticsController( const domain::QuestionLog & p_log, QObject * p_parent = nullptr );

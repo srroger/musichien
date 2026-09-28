@@ -436,6 +436,15 @@ public:
     // une reponse fausse.
     Q_PROPERTY( bool isChordHintAvailable READ isChordHintAvailable NOTIFY questionChanged )
 
+    // Le nombre de couleurs d'accord que le jeu connait.
+    //
+    // L'ecran s'en sert pour repartir ses teintes sur tout le cercle chromatique. Une constante ecrite a la main dans le
+    // QML finirait par mentir le jour ou une qualite s'ajoute : c'est exactement le genre de nombre qui doit traverser la
+    // frontiere une seule fois, et dans ce sens-la.
+    Q_PROPERTY( int chordQualityCount READ chordQualityCount CONSTANT )
+
+    [[nodiscard]] int chordQualityCount() const noexcept;
+
     [[nodiscard]] bool isChordHintAvailable() const noexcept;
 
     // Vrai quand l'arpege a un sens. Separe du precedent, parce qu'un DEBUTANT n'a que deux couleurs d'accord : il n'a

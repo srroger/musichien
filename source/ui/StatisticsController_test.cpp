@@ -1,5 +1,6 @@
 #include "ui/StatisticsController.h"
 
+#include <QMetaProperty>
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
@@ -139,6 +140,49 @@ TEST( StatisticsControllerTest, a_target_seen_once_is_not_a_weakness )
 
     // Le NOM vient du domaine : la page ne nomme rien elle-meme, elle affiche ce qu'on lui donne.
     EXPECT_FALSE( weakness.value( QStringLiteral( "name" ) ).toString().isEmpty() );
+}
+
+TEST( StatisticsControllerTest, every_property_the_page_reads_is_exposed_to_qml )
+{
+    domain::QuestionLogFake log;
+
+    StatisticsController controller{ log };
+
+    controller.refresh();
+
+    // CE TEST EXISTE A CAUSE D'UN VRAI BUG : la page de statistiques a affiche « undefined % » et « undefined » partout
+    // sur le telephone de Roger, sans la moindre erreur ni le moindre avertissement. La cause etait simple et invisible :
+    // une methode C++ sans Q_PROPERTY n'existe PAS pour QML, et QML ne se plaint pas - il ecrit « undefined » et
+    // continue. Les tests de ce fichier, eux, appelaient les methodes en C++ : ils ne pouvaient pas le voir.
+    //
+    // Ce test interroge donc la METACLASSE, c'est-a-dire exactement ce que QML voit.
+    const QStringList properties{ QStringLiteral( "hasHistory" ),
+                                  QStringLiteral( "questionCount" ),
+                                  QStringLiteral( "successPercent" ),
+                                  QStringLiteral( "firstTryPercent" ),
+                                  QStringLiteral( "playingDayStreak" ),
+                                  QStringLiteral( "playTimeText" ),
+                                  QStringLiteral( "recentPlayTimeText" ),
+                                  QStringLiteral( "lastDays" ),
+                                  QStringLiteral( "kinds" ),
+                                  QStringLiteral( "weakestTargets" ) };
+
+    const QMetaObject * metaObject = controller.metaObject();
+
+    for( const QString & name : properties )
+    {
+        const int index = metaObject->indexOfProperty( name.toUtf8().constData() );
+
+        ASSERT_GE( index, 0 ) << name.toStdString() << " n'est pas exposee a QML";
+
+        // ET elle doit rendre une valeur VALIDE du premier coup : une propriete declaree mais qui rendrait un QVariant
+        // vide afficherait encore « undefined » a l'ecran.
+        EXPECT_TRUE( metaObject->property( index ).read( &controller ).isValid() ) << name.toStdString();
+    }
+
+    // Et ce que l'ecran APPELLE doit etre invocable depuis QML, pour la meme raison.
+    EXPECT_GE( metaObject->indexOfMethod( "refresh()" ), 0 );
+    EXPECT_GE( metaObject->indexOfSignal( "statisticsChanged()" ), 0 );
 }
 
 }    // namespace musichien::ui

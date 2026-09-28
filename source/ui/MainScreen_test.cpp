@@ -7,6 +7,7 @@
 
 #include <QCoreApplication>
 #include <QGuiApplication>
+#include <QMetaObject>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QString>
@@ -187,6 +188,129 @@ TEST( MainScreenTest, the_main_screen_shows_its_main_actions )
     // Et la page construit vraiment quelque chose : une vingtaine de textes, c'est le minimum d'une page de reglages
     // qui en compte des dizaines.
     EXPECT_GT( texts.size(), 20 ) << "l'ecran principal ne construit presque rien";
+}
+
+TEST( MainScreenTest, nothing_needs_to_scroll_sideways_on_a_phone )
+{
+    application();
+
+    QQmlEngine engine;
+
+    const std::unique_ptr<QObject> screen = loadMainScreen( engine );
+
+    ASSERT_NE( nullptr, screen.get() );
+
+    // La taille d'un telephone : un Pixel 7a, en points logiques. C'est la LARGEUR qui compte, et c'est pour elle que
+    // toutes les pages doivent tenir.
+    screen->setProperty( "width", 412.0 );
+    screen->setProperty( "height", 915.0 );
+
+    QCoreApplication::processEvents();
+
+    // Les dialogues sont FERMES au chargement : il faut les ouvrir pour mesurer ce qu'ils contiennent, sinon le test
+    // regarde des pages de largeur nulle et ne prouve rien.
+    //
+    // ET IL FAUT LEUR LAISSER LE TEMPS de se mettre en page : un dialogue qui vient de s'ouvrir n'a pas encore reparti
+    // ses enfants, et mesurer tout de suite donnerait leur largeur IMPLICITE - donc un faux positif sur chaque texte un
+    // peu long. C'est la lecon de ce test, apprise en le faisant mentir.
+    for( int pass = 0; pass < 6; ++pass )
+    {
+        if( pass == 0 )
+        {
+            const QList<QObject *> dialogs = screen->findChildren<QObject *>( QString{}, Qt::FindChildrenRecursively );
+
+            for( QObject * dialog : dialogs )
+            {
+                if( dialog->inherits( "QQuickDialog" ) )
+                {
+                    QMetaObject::invokeMethod( dialog, "open" );
+                }
+            }
+        }
+
+        QCoreApplication::processEvents();
+    }
+
+    // CE QUE ROGER A VU : « la page est trop large, du coup ca scroll aussi a l'horizontal, ce qui n'est pas agreable ».
+    // Un contenu plus large que sa vue est exactement ce symptome, et c'est mesurable sans connaitre le type des objets :
+    // un Flickable est le seul a porter un « contentWidth », donc le chercher par sa PROPRIETE marche pour tous les
+    // ScrollView du fichier, presents et futurs.
+    const QList<QObject *> items = screen->findChildren<QObject *>( QString{}, Qt::FindChildrenRecursively );
+
+    int flickableCount = 0;
+
+    for( QObject * item : items )
+    {
+        const QVariant contentWidth = item->property( "contentWidth" );
+
+        if( !contentWidth.isValid() )
+        {
+            continue;
+        }
+
+        // Un champ de saisie a le droit d'avoir un curseur un peu plus large que sa vue : c'est le seul depassement
+        // normal, et il ne se voit pas.
+        if( item->inherits( "QQuickTextInput" ) )
+        {
+            continue;
+        }
+
+        // Et on ne mesure que ce qui est AFFICHE. Un dialogue ferme - ou qu'un environnement sans ecran n'arrive pas a
+        // ouvrir - n'a pas encore reparti ses enfants : sa mesure serait leur largeur implicite, donc un faux positif sur
+        // chaque texte un peu long. Le test dit ce qu'il peut prouver, et rien de plus.
+        if( !item->property( "visible" ).toBool() )
+        {
+            continue;
+        }
+
+        ++flickableCount;
+
+        const double viewWidth = item->property( "width" ).toDouble();
+
+        // Une vue de largeur nulle n'a pas encore ete mise en page : sa mesure ne veut rien dire.
+        if( viewWidth <= 0.0 )
+        {
+            continue;
+        }
+
+        // La TOLERANCE est l'epaisseur d'une barre de defilement verticale - sept points - et elle est inevitable : une
+        // page qui defile verticalement reserve cette largeur, et la colonne de contenu est calculee avant que la barre
+        // apparaisse. Ces sept points sont caches sous la barre, et la barre HORIZONTALE est desactivee : rien ne bouge a
+        // l'ecran. Ce qui compte, c'est d'attraper les cent-cinquante points de trop, ceux qui se voyaient vraiment.
+        constexpr double SCROLLBAR_TOLERANCE = 10.0;
+
+        if( contentWidth.toDouble() > viewWidth + SCROLLBAR_TOLERANCE )
+        {
+            // Le TEXTE de l'objet est dans le message : c'est lui qui dit quel enfant est trop large, et sans lui il
+            // faudrait chercher a l'oeil dans un fichier de deux mille lignes.
+            const QString label = item->property( "text" ).toString().left( 60 );
+
+            // Et quand ce n'est pas un texte, on liste les ENFANTS trop larges : c'est l'un d'eux qui elargit la page, et
+            // un test qui dit « ca deborde » sans dire qui est un test qu'on n'ecoute pas.
+            QStringList culprits;
+
+            for( QObject * child : item->findChildren<QObject *>( QString{}, Qt::FindChildrenRecursively ) )
+            {
+                const QVariant childWidth = child->property( "width" );
+
+                if( childWidth.isValid() && ( childWidth.toDouble() > viewWidth + 1.0 ) && ( culprits.size() < 4 ) )
+                {
+                    const QString childText = child->property( "text" ).toString().left( 50 );
+
+                    culprits << QStringLiteral( "%1:%2(%3)" )
+                                  .arg( QString::fromUtf8( child->metaObject()->className() ) )
+                                  .arg( childWidth.toDouble() )
+                                  .arg( childText );
+                }
+            }
+
+            ADD_FAILURE() << item->metaObject()->className() << " fait " << contentWidth.toDouble() << " pour une vue de "
+                          << viewWidth << " — « " << label.toStdString() << " » — trop larges : "
+                          << culprits.join( QStringLiteral( ", " ) ).toStdString();
+        }
+    }
+
+    ASSERT_GT( flickableCount, 0 ) << "aucune page defilante trouvee : le test ne mesure rien";
 }
 
 }    // namespace musichien::ui
