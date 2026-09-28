@@ -49,18 +49,24 @@ Item {
 
     signal qualityChosen(int p_quality)
 
-    // Chaque noeud s'aligne sur SON PARENT, et n'est Ecarte que lorsque sa ligne est deja prise dans sa colonne : c'est
-    // ce qui fait tenir l'arbre en NEUF lignes au lieu de quinze, tout en gardant les branches visibles (la version
-    // « chaque colonne empilee toute seule » en faisait huit, mais ne montrait plus aucune branche du tout).
+    // Chaque noeud s'aligne sur SON PARENT, et n'est Ecarte que lorsque sa ligne est deja prise dans sa colonne. Deux
+    // regles d'ecart, et elles suffisent a rendre les branches visibles :
+    //   * un frere qui n'a pas de descendance est suivi une ligne plus bas ;
+    //   * un frere qui EN a une laisse une ligne vide, et la branche suivante ne commence jamais avant que la
+    //     precedente ait fini de descendre (d'ou le maximum des deux).
+    // C'est ce qui fait tenir l'arbre en DIX lignes au lieu de quinze, tout en montrant l'escalier des branches - la
+    // version « chaque colonne empilee toute seule » en faisait huit, mais ne montrait plus aucune branche du tout.
     function computeRows() {
         var nodes = ExerciseController.chordTree;
         var state = {
             "rows": [],
+            "ends": [],
             "children": []
         };
         for (var index = 0; index < nodes.length; ++index) {
             // -1 veut dire « pas encore pose », et c'est ce que lit rowIsFree.
             state.rows.push(-1);
+            state.ends.push(-1);
             state.children.push([]);
         }
         for (var index = 0; index < nodes.length; ++index) {
@@ -72,14 +78,13 @@ Item {
         return state.rows;
     }
 
-    // Pose un noeud, puis toute sa descendance. Rend la derniere ligne utilisee par ce sous-arbre.
+    // Pose un noeud, puis toute sa descendance. Rend la derniere ligne utilisee par ce sous-arbre - c'est elle qui
+    // dit a la branche suivante ou commencer.
     function placeSubtree(p_state, p_index, p_minimumRow) {
         var nodes = ExerciseController.chordTree;
         var node = nodes[p_index];
         var row = node.isRoot ? 0 : Math.max(p_minimumRow, p_state.rows[node.parentIndex]);
-        while (!rowIsFree(p_state, node.depth, row))
-            ++row;
-
+        while (!rowIsFree(p_state, node.depth, row))++row
         p_state.rows[p_index] = row;
         var end = row;
         for (var rank = 0; rank < p_state.children[p_index].length; ++rank) {
@@ -88,13 +93,17 @@ Item {
             var next = row;
             if (rank > 0) {
                 var brother = p_state.children[p_index][rank - 1];
-                // L'ECART : une ligne vide entre deux grandes branches. Il n'est pose qu'entre les enfants directs de la
-                // RACINE, la ou les branches se separent vraiment - un espace entre le Cm et le Csus4, aucun entre le
-                // Cdim et le Cm7 qui sont deux freres de la meme branche, exactement ce que Roger a demande.
-                next = p_state.rows[brother] + ((p_index === 0 && p_state.children[brother].length > 0) ? 2 : 1);
+                if (p_state.children[brother].length > 0)
+                    // L'ECART : une ligne vide entre deux branches, et jamais avant que la precedente ait fini de
+                    // descendre. Sans le maximum, le Cm7 remonterait a la hauteur du Cdim et les deux branches se
+                    // melangeraient ; avec lui, la fin du Cdim (donc ses deux enfants) reste un bloc lisible.
+                    next = Math.max(p_state.rows[brother] + 2, p_state.ends[brother]);
+                else
+                    next = p_state.rows[brother] + 1;
             }
             end = Math.max(end, placeSubtree(p_state, child, next));
         }
+        p_state.ends[p_index] = end;
         return end;
     }
 
