@@ -909,6 +909,9 @@ Item {
                     height: 52
                     // Appears only once the player has tried enough. Asking to be told is not a failure, and
                     // it is not offered before it is useful either.
+                    // Le bouton apparaît pour le rythme ET pour le chant, et le domaine decide quand :
+                    // une question chantée l'offre dès la première seconde, parce qu'on peut ne pas être en
+                    // mesure de chanter du tout.
                     visible: ExerciseController.isHelpAvailable
                     highlighted: true
                     // Le chant a besoin de ce bouton autant que le rythme, et pour une raison differente : on peut ne pas

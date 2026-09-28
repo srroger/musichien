@@ -729,9 +729,32 @@ TEST( ExerciseSessionTest, a_session_can_ask_to_sing_instead_of_naming )
     EXPECT_EQ( 1, session.score().streak() );
 }
 
-// ---------------------------------------------------------------------------------------------------------------------
-// Le rythme, comme question
-//
+TEST( ExerciseSessionTest, a_sung_question_can_be_passed_at_once )
+{
+    SessionSettings settings;
+    settings.singQuestionShare = 100;    // toute la session est chantee
+
+    ExerciseSession session{ 7, settings };
+
+    ASSERT_EQ( QuestionKind::Sing, session.currentQuestion().kind );
+
+    // On peut ne pas etre en mesure de chanter du tout : l'endroit est bruyant, la gorge est prise, le micro ne suit
+    // pas. La sortie est donc offerte TOUT DE SUITE - sans attendre une erreur, et sans qu'un mode doive l'autoriser.
+    // Demander au joueur de rater une question pour avoir le droit de la passer serait une cruaute gratuite.
+    EXPECT_TRUE( session.isHelpAvailable() );
+
+    const std::size_t helpedBefore = session.score().helpedQuestionCount();
+
+    session.revealAnswer();
+
+    // Passer coute quelque chose, et le domaine le dit : la question est comptee comme AIDEE, la serie retombe a zero,
+    // et la suite se joue sur un terrain plus sur. C'est ce qui distingue une porte d'une recompense - et c'est pour
+    // cela que le bouton peut etre offert tout de suite sans rien casser au jeu.
+    EXPECT_EQ( SessionState::Feedback, session.state() );
+    EXPECT_EQ( helpedBefore + 1, session.score().helpedQuestionCount() );
+    EXPECT_EQ( 0, session.score().streak() );
+}
+
 // Le rythme est entre dans la session comme un GENRE de question, au meme titre que le chant : la meme boucle, le meme
 // score, les memes vies. Tout ce qui suit se joue donc sans une seule seconde d'attente - consequence directe du fait
 // que le domaine ne mesure pas le temps : il RECOIT la position des frappes, et il les juge.

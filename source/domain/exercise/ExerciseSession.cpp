@@ -668,6 +668,16 @@ bool ExerciseSession::isHelpAvailable() const noexcept
     // Une question de rythme s'aide PLUS TOT qu'une question d'intervalle, et la difference est une regle du domaine
     // plutot qu'un caprice de l'ecran : voir wrongAttemptsBeforeRhythmHelp. Un intervalle se reecoute autant de fois
     // qu'on veut ; une cellule ne s'entend que pendant sa boucle d'ecoute.
+    //
+    // Le CHANT n'attend aucune tentative du tout, et il n'attend pas non plus qu'un mode donne le droit a l'aide :
+    // on peut ne pas etre en mesure de chanter - un endroit bruyant, une gorge prise, un micro qui ne suit pas. Faire
+    // rater une question pour decouvrir la sortie serait demander au joueur de rater pour avoir le droit de passer.
+    // Passer n'est d'ailleurs pas une aide ici, c'est une PORTE : elle coute une question, et le score le sait deja.
+    if( m_currentQuestion.kind == QuestionKind::Sing )
+    {
+        return m_state == SessionState::Asking;
+    }
+
     const std::int32_t attemptsBeforeHelp = ( m_currentQuestion.kind == QuestionKind::Rhythm )
                                               ? m_settings.wrongAttemptsBeforeRhythmHelp
                                               : m_settings.wrongAttemptsBeforeHelp;
