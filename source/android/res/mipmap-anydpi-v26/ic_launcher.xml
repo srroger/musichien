@@ -6,8 +6,8 @@
     calques pour cela : un fond qui remplit tout, et un premier plan qu'il peut recadrer et animer.
 
     Le premier plan est le chien, place dans la ZONE SURE (les deux tiers du centre) : c'est ce qui garantit qu'aucune
-    forme de lanceur ne lui coupe la tete. Le fond est le rose de l'illustration, pour qu'il n'y ait aucune couture
-    visible quand le systeme recadre.
+    forme de lanceur ne lui coupe la tete. Le fond est la nuit violette de l'accueil - et l'illustration a ete recolorie
+    dans cette meme nuit avant d'etre decoupee, pour qu'il n'y ait aucune couture visible quand le systeme recadre.
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/musichien_launcher_background" />

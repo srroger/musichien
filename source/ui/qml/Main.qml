@@ -217,10 +217,19 @@ ApplicationWindow {
                     Layout.preferredHeight: 28
                 }
 
-                Text {
+                // LE CHIEN, l'illustration et non plus un emoji. Roger : « tu avais mis une dog face comme image de
+                // presentation. Et je l'adore, mais c'est un peu impersonnel. » Un emoji ne dit rien de qui parle :
+                // c'est le meme chien sur tous les telephones du monde. Celui-ci est le notre, il porte sa guitare et
+                // la nuit violette, et c'est exactement l'icone du lanceur - l'application se reconnait d'un ecran a
+                // l'autre. Il vient des ressources Qt, comme tout le contenu : un seul chemin, sur le PC et sur le
+                // telephone.
+                Image {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "\uD83D\uDC36" // dog face
-                    font.pixelSize: 72
+                    Layout.preferredWidth: 164
+                    Layout.preferredHeight: 164
+                    source: "qrc:/assets/images/shiba-guitar.png"
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
                 }
 
                 Text {
@@ -1728,7 +1737,11 @@ ApplicationWindow {
                         Text {
                             color: "#8a77ad"
                             font.pixelSize: 12
-                            text: qsTr("depuis %1").arg(ExerciseController.chordTree[modelData.parentIndex].name)
+                            // Le noeud RACINE n'a pas de parent : il porte l'index -1, qui ne trouve rien, et QML le
+                            // signalait par un « Cannot read property 'name' of undefined » a chaque demarrage. La
+                            // ligne est bien masquee pour lui, mais un binding s'evalue MEME quand il ne se voit pas -
+                            // c'est la meme lecon que les textes replies qui elargissaient leur dialogue.
+                            text: modelData.isRoot ? "" : qsTr("depuis %1").arg(ExerciseController.chordTree[modelData.parentIndex].name)
                         }
 
                         Text {

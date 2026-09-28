@@ -9,8 +9,10 @@
     <color name="musichien_night">#FF1B1035</color>
 
     <!--
-        Le rose de l'illustration de l'icone (cuteShiba.jpg), PRELEVE dessus et non choisi a l'oeil : c'est ce qui
-        garantit qu'il n'y a aucune couture entre le fond de l'icone et le premier plan, que le lanceur recadre.
+        Le fond de l'icone, et c'est la MEME valeur que le haut du degrade de l'application : le chien flottait
+        jusqu'ici sur un rose vif qui n'appartenait a aucune page du jeu. Il est maintenant pose sur la nuit violette
+        de l'accueil, et l'illustration qui sert de source (cuteShiba.jpg) a ete recolorie a l'identique - le
+        lanceur recadre le premier plan, donc un fond qui ne correspondrait pas exactement laisserait une couture.
     -->
-    <color name="musichien_launcher_background">#FFCAEC</color>
+    <color name="musichien_launcher_background">#FF1B1035</color>
 </resources>

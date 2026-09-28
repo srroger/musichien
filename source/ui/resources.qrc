@@ -28,6 +28,11 @@
           le PC et le telephone.
         -->
         <file alias="assets/fonts/NotoMusic-Regular.ttf">../../assets/fonts/NotoMusic-Regular.ttf</file>
+        <!--
+          Le chien de l'application, en illustration. Il est lu par le meme chemin que les autres ressources de
+          contenu (:/assets/images/...), avec son alias : c'est ce qui garantit qu'il suit jusqu'au telephone.
+        -->
+        <file alias="assets/images/shiba-guitar.png">../../assets/images/shiba-guitar.png</file>
     <!--
       Les echantillons d instruments : meme motif que les fichiers de contenu, alias compris,
       pour que le chemin de ressource soit celui du disque sur le PC comme sur le telephone.
