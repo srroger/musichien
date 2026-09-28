@@ -2020,7 +2020,7 @@ QVariantList ExerciseSessionController::chordTree() const
         {
             for( std::size_t index = 0; index < tree.size(); ++index )
             {
-                if( tree.at( index ).quality == node.parent )
+                if( tree[index].quality == node.parent )
                 {
                     parentIndex = static_cast<int>( index );
 

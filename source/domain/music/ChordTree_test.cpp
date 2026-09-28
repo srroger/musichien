@@ -46,9 +46,11 @@ TEST( ChordTreeTest, every_chord_knows_its_degrees )
         EXPECT_EQ( 0, semitonesOfDegree( degrees.front() ) );
 
         // Et les degres montent : un accord se lit du grave vers l'aigu.
+        // Les crochets, et non .at() : la libc++ du NDK Android n'a pas encore span::at, et une ligne qui compile sur le
+        // bureau et pas sur le telephone est une ligne qui se decouvre au pire moment. L'index est borne par la boucle.
         for( std::size_t index = 1; index < degrees.size(); ++index )
         {
-            EXPECT_LT( semitonesOfDegree( degrees.at( index - 1 ) ), semitonesOfDegree( degrees.at( index ) ) )
+            EXPECT_LT( semitonesOfDegree( degrees[index - 1] ), semitonesOfDegree( degrees[index] ) )
               << chordQualityName( quality );
         }
     }
