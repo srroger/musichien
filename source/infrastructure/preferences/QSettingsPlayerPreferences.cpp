@@ -50,6 +50,11 @@ constexpr const char * SING_QUESTION_SHARE_KEY = "player/sing-question-share";
 constexpr const char * RHYTHM_QUESTION_SHARE_KEY = "player/rhythm-question-share";
 constexpr const char * CHORD_QUESTION_SHARE_KEY = "player/chord-question-share";
 
+// L'heure du rappel, en deux nombres separes : une heure et une minute se lisent dans un fichier de reglages plus
+// facilement qu'un instant encode, et un joueur curieux doit pouvoir comprendre ce qu'il lit.
+constexpr const char * REMINDER_HOUR_KEY = "player/reminder-hour";
+constexpr const char * REMINDER_MINUTE_KEY = "player/reminder-minute";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -166,6 +171,28 @@ void QSettingsPlayerPreferences::storeDailyReminderEnabled( bool p_enabled )
     QSettings settings;
 
     settings.setValue( REMINDER_KEY, p_enabled );
+}
+
+domain::ReminderMoment QSettingsPlayerPreferences::storedReminderMoment() const
+{
+    const QSettings settings;
+
+    const int hour = settings.value( REMINDER_HOUR_KEY, 19 ).toInt();
+    const int minute = settings.value( REMINDER_MINUTE_KEY, 0 ).toInt();
+
+    // Une heure impossible dans un fichier edite a la main est RAMENEE dans la journee plutot que refusee : le joueur
+    // garde son rappel, a l'heure la plus proche de ce qu'il a voulu dire.
+    return domain::clampedReminderMoment( domain::ReminderMoment{ hour, minute } );
+}
+
+void QSettingsPlayerPreferences::storeReminderMoment( domain::ReminderMoment p_moment )
+{
+    const domain::ReminderMoment moment = domain::clampedReminderMoment( p_moment );
+
+    QSettings settings;
+
+    settings.setValue( REMINDER_HOUR_KEY, moment.hour );
+    settings.setValue( REMINDER_MINUTE_KEY, moment.minute );
 }
 
 domain::Temperament QSettingsPlayerPreferences::storedTemperament() const

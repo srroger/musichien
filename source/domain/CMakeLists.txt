@@ -57,6 +57,9 @@ musichienFunction_AddLibrary(domain
     exercise/QuestionStatistics.h
     exercise/QuestionStatistics.cpp
 
+    # Quand l'application a le droit de se rappeler au joueur : une decision de design, testable
+    exercise/ReminderSchedule.h
+
     # The memory hooks, as content the domain holds and the infrastructure fills
     exercise/HintBook.h
     exercise/HintBook.cpp
@@ -101,6 +104,7 @@ if(MUSICHIEN_BUILD_TESTING)
         exercise/PlayerLevel_test.cpp
         exercise/SessionScore_test.cpp
         exercise/QuestionStatistics_test.cpp
+        exercise/ReminderSchedule_test.cpp
     )
 
 endif()

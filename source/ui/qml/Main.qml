@@ -35,6 +35,7 @@ ApplicationWindow {
     // Pourquoi un composant : le style Material peint la CASE sur fond clair ET la LISTE ouverte sur fond blanc.
     // Regler seulement `background` ne suffit donc pas - un texte clair sur une liste blanche reste illisible. Il
     // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
+    // Un champ numerique aux couleurs du jeu.
     // Une part de question : un titre, une phrase qui dit ce que le reglage fait, et le nombre.
 
     id: mainWindow
@@ -664,6 +665,57 @@ ApplicationWindow {
                         font.pixelSize: 13
                     }
 
+                }
+
+                // L'HEURE du rappel, juste sous la case qui l'active : celui qui vient de l'activer cherche aussitot
+                // QUAND il sonnera. Deux nombres plutot qu'un selecteur d'heure : c'est plus court a regler, et cela
+                // tient sur une ligne de telephone.
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    visible: ExerciseController.dailyReminderEnabled
+                    spacing: 6
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        text: qsTr("L'heure du rappel :")
+                    }
+
+                    DarkSpinBox {
+                        Layout.preferredWidth: 76
+                        from: 0
+                        to: 23
+                        value: ExerciseController.reminderHour
+                        onValueModified: ExerciseController.setReminderHour(value)
+                    }
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        text: "h"
+                    }
+
+                    DarkSpinBox {
+                        Layout.preferredWidth: 76
+                        from: 0
+                        to: 59
+                        stepSize: 5
+                        value: ExerciseController.reminderMinute
+                        onValueModified: ExerciseController.setReminderMinute(value)
+                    }
+
+                }
+
+                // Et les trois anecdotes, dites en clair : un joueur doit savoir ce qu'il va recevoir, sinon il coupera
+                // les notifications pour ne plus etre derange - exactement l'inverse du but.
+                Text {
+                    Layout.fillWidth: true
+                    visible: ExerciseController.dailyReminderEnabled
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Et trois anecdotes musicales dans la journée : le matin, le midi et le soir.")
                 }
 
                 // Le compte a rebours, juste sous la case qui l'active : impossible de le manquer, et c'est la que le
@@ -1372,6 +1424,33 @@ ApplicationWindow {
 
     }
 
+    // Material peint le champ sur fond clair avec un texte noir : illisible sur notre nuit violette, et c'est le meme
+    // defaut que celui deja corrige sur les ComboBox et sur le nom du profil. Il est donc corrige UNE fois, ici, et
+    // chaque reglage numerique de la page en herite.
+    component DarkSpinBox: SpinBox {
+        Layout.preferredHeight: 32
+        editable: true
+
+        contentItem: TextInput {
+            text: parent.textFromValue(parent.value, parent.locale)
+            color: "#ffffff"
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            font.pixelSize: 15
+            validator: parent.validator
+            inputMethodHints: Qt.ImhFormattedNumbersOnly
+            readOnly: !parent.editable
+        }
+
+        background: Rectangle {
+            color: "#1b1035"
+            radius: 4
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+    }
+
     // UNE seule definition pour les trois reglages - chant, rythme, accords - parce que trois copies identiques
     // finissent toujours par diverger, et parce que le prochain genre de question en aura une quatrieme a brancher.
     component QuestionShareSetting: ColumnLayout {
@@ -1401,35 +1480,14 @@ ApplicationWindow {
             text: questionShareSetting.hint
         }
 
-        SpinBox {
+        DarkSpinBox {
             Layout.preferredWidth: 150
-            Layout.preferredHeight: 32
             Layout.alignment: Qt.AlignLeft
             from: 0
             to: 100
             stepSize: 5
-            editable: true
             value: questionShareSetting.share
             onValueModified: questionShareSetting.shareEdited(value)
-
-            contentItem: TextInput {
-                text: parent.textFromValue(parent.value, parent.locale)
-                color: "#ffffff"
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                font.pixelSize: 15
-                validator: parent.validator
-                inputMethodHints: Qt.ImhFormattedNumbersOnly
-                readOnly: !parent.editable
-            }
-
-            background: Rectangle {
-                color: "#1b1035"
-                radius: 4
-                border.width: 1
-                border.color: "#5c4a80"
-            }
-
         }
 
     }

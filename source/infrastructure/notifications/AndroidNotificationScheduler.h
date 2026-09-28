@@ -2,6 +2,8 @@
 
 #include "infrastructure/notifications/NotificationScheduler.h"
 
+#include <span>
+
 namespace musichien::infrastructure
 {
 
@@ -10,9 +12,9 @@ namespace musichien::infrastructure
 class AndroidNotificationScheduler final : public NotificationScheduler
 {
 public:
-    void scheduleDailyReminder( int p_hour, int p_minute, std::string_view p_content ) override;
+    void scheduleDailyNotifications( std::span<const DailyNotification> p_notifications ) override;
 
-    void cancelReminder() override;
+    void cancelNotifications() override;
 
     void showReminderNow( std::string_view p_content ) override;
 };

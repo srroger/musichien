@@ -76,6 +76,7 @@ if(MUSICHIEN_BUILD_TESTING)
         RhythmController_test.cpp
         IntervalPlaybackController_test.cpp
         ExerciseScreen_test.cpp
+        MainScreen_test.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc
     )
 

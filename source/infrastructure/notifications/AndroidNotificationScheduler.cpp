@@ -4,6 +4,9 @@
 #include <QString>
 #include <QtCore/qcoreapplication_platform.h>
 
+#include <cstddef>
+#include <string>
+
 namespace musichien::infrastructure
 {
 
@@ -18,23 +21,36 @@ namespace
 
 }    // namespace
 
-void AndroidNotificationScheduler::scheduleDailyReminder( int p_hour, int p_minute, std::string_view p_content )
+void AndroidNotificationScheduler::scheduleDailyNotifications( std::span<const DailyNotification> p_notifications )
 {
-    const QJniObject content = QJniObject::fromString( QString::fromStdString( std::string( p_content ) ) );
+    // ON ANNULE TOUT D'ABORD, puis on reprogramme. Sans cela, une notification qui disparait de la liste - le rappel
+    // que le joueur vient d'eteindre - continuerait a sonner : une alarme Android n'a aucune raison de savoir qu'on ne
+    // l'a pas remise dans la liste.
+    cancelNotifications();
 
-    QJniObject::callStaticMethod<void>( "io/github/srroger/musichien/ReminderScheduler",
-                                        "scheduleDaily",
-                                        "(Landroid/content/Context;IILjava/lang/String;)V",
-                                        applicationContext().object(),
-                                        static_cast<jint>( p_hour ),
-                                        static_cast<jint>( p_minute ),
-                                        content.object() );
+    for( std::size_t slot = 0; slot < p_notifications.size(); ++slot )
+    {
+        const DailyNotification & notification = p_notifications[slot];
+
+        const QJniObject content = QJniObject::fromString( QString::fromStdString( notification.content ) );
+
+        // Le SLOT est le requestCode du PendingIntent cote Java : c'est lui qui permet a quatre notifications
+        // quotidiennes de coexister, la ou un requestCode fixe en aurait fait une seule.
+        QJniObject::callStaticMethod<void>( "io/github/srroger/musichien/ReminderScheduler",
+                                            "scheduleDaily",
+                                            "(Landroid/content/Context;IILjava/lang/String;I)V",
+                                            applicationContext().object(),
+                                            static_cast<jint>( notification.hour ),
+                                            static_cast<jint>( notification.minute ),
+                                            content.object(),
+                                            static_cast<jint>( slot ) );
+    }
 }
 
-void AndroidNotificationScheduler::cancelReminder()
+void AndroidNotificationScheduler::cancelNotifications()
 {
     QJniObject::callStaticMethod<void>( "io/github/srroger/musichien/ReminderScheduler",
-                                        "cancel",
+                                        "cancelAll",
                                         "(Landroid/content/Context;)V",
                                         applicationContext().object() );
 }

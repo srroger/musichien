@@ -15,6 +15,7 @@
 // =====================================================================================================================
 
 #include "domain/exercise/PlayerLevel.h"
+#include "domain/exercise/ReminderSchedule.h"
 #include "domain/music/Temperament.h"
 
 #include <cstdint>
@@ -92,6 +93,13 @@ public:
     [[nodiscard]] virtual bool dailyReminderEnabled() const = 0;
 
     virtual void storeDailyReminderEnabled( bool p_enabled ) = 0;
+
+    // A QUELLE HEURE le rappel arrive. L'activer ou non est juste au-dessus ; ici, c'est le moment de la journee, et
+    // cela se retient pour la meme raison : Roger a demande de pouvoir le choisir, et une heure qu'on choisit et qui
+    // s'oublie n'est pas un choix.
+    [[nodiscard]] virtual ReminderMoment storedReminderMoment() const = 0;
+
+    virtual void storeReminderMoment( ReminderMoment p_moment ) = 0;
 
     // The TUNING the player wants to hear, and the root it is heard from.
     //
@@ -181,6 +189,10 @@ public:
 
     void storeDailyReminderEnabled( bool p_enabled ) override { m_dailyReminderEnabled = p_enabled; }
 
+    [[nodiscard]] ReminderMoment storedReminderMoment() const override { return m_reminderMoment; }
+
+    void storeReminderMoment( ReminderMoment p_moment ) override { m_reminderMoment = p_moment; }
+
     [[nodiscard]] Temperament storedTemperament() const override { return m_temperament; }
 
     void storeTemperament( Temperament p_temperament ) override { m_temperament = p_temperament; }
@@ -219,6 +231,11 @@ private:
     std::int64_t m_starCount{ 0 };
 
     bool m_dailyReminderEnabled{ false };
+
+    // 19 h par defaut : apres le diner, quand la journee de travail est finie et qu'une partie de dix questions est
+    // encore possible. C'est le meme genre de choix que les trois moments d'anecdotes - une heure ou l'on est
+    // disponible, pas une heure ou l'on est occupe.
+    ReminderMoment m_reminderMoment{ 19, 0 };
 
     Temperament m_temperament{ Temperament::Equal };
 

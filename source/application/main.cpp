@@ -116,28 +116,17 @@ constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
     return book;
 }
 
-// Builds the reminder's content pool: every anecdote, one per line, so that the Android receiver can draw a
-// DIFFERENT one on each daily firing without the application running. An empty book falls back to the plain nudge.
-[[nodiscard]] std::string reminderContentFor( const musichien::domain::AnecdoteBook & p_anecdotes )
+// UNE anecdote au hasard, prete a devenir le texte d'une notification.
+//
+// UNE seule, et c'est tout le point : une notification qui contiendrait les vingt anecdotes du fichier ne serait pas une
+// notification, ce serait un mur de texte - et personne ne lit un mur de texte sur un ecran verrouille. La litterature
+// du fichier sert l'ecran d'accueil et l'ecran de fin de session ; ici, c'est une phrase qui doit tenir dans une bulle.
+[[nodiscard]] std::string randomAnecdoteText( const musichien::domain::AnecdoteBook & p_anecdotes,
+                                              std::mt19937 & p_randomEngine )
 {
-    std::string content;
+    const std::optional<musichien::domain::Anecdote> anecdote = p_anecdotes.random( p_randomEngine );
 
-    for( const std::string & text : p_anecdotes.texts() )
-    {
-        if( !content.empty() )
-        {
-            content += '\n';
-        }
-
-        content += text;
-    }
-
-    if( content.empty() )
-    {
-        return "Une oreille, une minute : l'intervalle du jour t'attend.";
-    }
-
-    return content;
+    return anecdote.has_value() ? anecdote->text : std::string{};
 }
 
 // Reads ONE sampled instrument from the embedded wave files.
@@ -467,39 +456,68 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     applyTuning();
 
-    // Le rappel quotidien. Le port cache la plateforme : sur le bureau, rien ne se planifie ; sur Android, une
-    // vraie notification sera posee. Ce que l'application sait, c'est qu'une case a ete cochee, et elle demande au
-    // port de s'en occuper.
+    // Le rappel quotidien. Le port cache la plateforme : sur le bureau, rien ne se planifie ; sur Android, de
+    // VRAIES notifications sont posees.
+    //
+    // QUATRE par jour, et c'est une demande de Roger : trois anecdotes - le matin, le midi, le soir - et le rappel
+    // d'entrainement a l'heure qu'il choisit. Le contenu du rappel est le livre entier, pour qu'une anecdote DIFFERENTE
+    // puisse tomber chaque jour ; celui des trois autres est tire ici, a chaque lancement, ce qui les fait changer d'une
+    // session a l'autre sans qu'aucune alarme n'ait besoin de reveiller l'application.
 #ifdef Q_OS_ANDROID
     musichien::infrastructure::AndroidNotificationScheduler notificationScheduler;
 #else
     musichien::infrastructure::NullNotificationScheduler notificationScheduler;
 #endif
 
-    const auto applyReminder = [&exerciseController, &notificationScheduler, &anecdoteBook]() {
-        if( exerciseController.dailyReminderEnabled() )
+    // Le moteur qui tire les anecdotes des notifications. Il vit le temps de l'application : deux lancements successifs
+    // n'ont aucune raison de raconter la meme chose.
+    std::mt19937 notificationRandomEngine{ std::random_device{}() };
+
+    const auto applyNotifications = [&exerciseController, &notificationScheduler, &anecdoteBook, &notificationRandomEngine]() {
+        if( !exerciseController.dailyReminderEnabled() )
         {
-            notificationScheduler.scheduleDailyReminder( exerciseController.reminderHour(),
-                                                         exerciseController.reminderMinute(),
-                                                         reminderContentFor( anecdoteBook ) );
+            notificationScheduler.cancelNotifications();
+
+            return;
         }
-        else
+
+        std::vector<musichien::infrastructure::NotificationScheduler::DailyNotification> notifications;
+
+        // Les trois anecdotes : leur moment vient du DOMAINE, leur texte du livre. Si le livre est vide, il n'y a rien a
+        // raconter - et une notification vide serait pire que pas de notification du tout.
+        for( const musichien::domain::ReminderMoment & moment : musichien::domain::ANECDOTE_REMINDER_MOMENTS )
         {
-            notificationScheduler.cancelReminder();
+            const std::string text = randomAnecdoteText( anecdoteBook, notificationRandomEngine );
+
+            if( text.empty() )
+            {
+                continue;
+            }
+
+            notifications.push_back( { moment.hour, moment.minute, text } );
         }
+
+        // Et le rappel d'entrainement, a l'heure que le joueur a choisie : il porte une anecdote lui aussi, parce que
+        // c'est ce qui donne envie d'ouvrir l'application. Un rappel qui dit « viens t'entrainer » se fait ignorer ;
+        // une chose drole a lire, non.
+        notifications.push_back( { exerciseController.reminderHour(),
+                                   exerciseController.reminderMinute(),
+                                   randomAnecdoteText( anecdoteBook, notificationRandomEngine ) } );
+
+        notificationScheduler.scheduleDailyNotifications( notifications );
     };
 
     QObject::connect( &exerciseController,
                       &musichien::ui::ExerciseSessionController::dailyReminderChanged,
-                      applyReminder );
+                      applyNotifications );
 
     QObject::connect( &exerciseController,
                       &musichien::ui::ExerciseSessionController::testReminderRequested,
-                      [&notificationScheduler, &anecdoteBook]() {
-                          notificationScheduler.showReminderNow( reminderContentFor( anecdoteBook ) );
+                      [&notificationScheduler, &anecdoteBook, &notificationRandomEngine]() {
+                          notificationScheduler.showReminderNow( randomAnecdoteText( anecdoteBook, notificationRandomEngine ) );
                       } );
 
-    applyReminder();
+    applyNotifications();
 
     // Bonjour. Un arpège montant de do, sol, do : une quinte et une octave, aucune tierce, donc rien
     // à comprendre - seulement quelque chose qui monte et qui flotte. Au piano, et très discret : c'est

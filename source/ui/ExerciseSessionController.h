@@ -196,9 +196,9 @@ class ExerciseSessionController final : public QObject
     // itself is not this object's job - the application wires the signal to the platform scheduler.
     Q_PROPERTY( bool dailyReminderEnabled READ dailyReminderEnabled WRITE setDailyReminderEnabled NOTIFY dailyReminderChanged )
 
-    // L'heure du rappel : une constante pour l'instant, lue par le compte a rebours de l'ecran.
-    Q_PROPERTY( int reminderHour READ reminderHour CONSTANT )
-    Q_PROPERTY( int reminderMinute READ reminderMinute CONSTANT )
+    // L'heure du rappel : un reglage du joueur, et il est modifiable - Roger l'a demande explicitement.
+    Q_PROPERTY( int reminderHour READ reminderHour WRITE setReminderHour NOTIFY dailyReminderChanged )
+    Q_PROPERTY( int reminderMinute READ reminderMinute WRITE setReminderMinute NOTIFY dailyReminderChanged )
 
     // L'accordage. Le tempere egal d'abord, et les anciens pour le plaisir d'entendre ce que "juste" veut dire.
     // La liste des noms vient du domaine, donc elle ne peut pas deriver de l'enumeration.
@@ -278,6 +278,12 @@ public:
     [[nodiscard]] int reminderHour() const noexcept;
 
     [[nodiscard]] int reminderMinute() const noexcept;
+
+    // L'heure du rappel, choisie par le joueur. La valeur est RAMENEE dans une journee plutot que refusee : un ecran qui
+    // se tromperait ne doit pas priver le joueur de son rappel.
+    Q_INVOKABLE void setReminderHour( int p_hour );
+
+    Q_INVOKABLE void setReminderMinute( int p_minute );
 
     // The developer button that fires a reminder right now, to check the plumbing.
     Q_INVOKABLE void testReminder();

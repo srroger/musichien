@@ -1311,14 +1311,48 @@ bool ExerciseSessionController::isBeginner() const noexcept
     return !m_playerLevel.has_value() || ( *m_playerLevel == domain::PlayerLevel::Beginner );
 }
 
-int ExerciseSessionController::reminderHour() const noexcept    // NOLINT(readability-convert-member-functions-to-static)
+int ExerciseSessionController::reminderHour() const noexcept
 {
-    return 19;
+    // Le profil porte l'heure ; sans profil - un test - on rend la meme valeur par defaut que le domaine, sinon l'un des
+    // deux finirait par mentir a l'ecran.
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedReminderMoment().hour : 19;
 }
 
-int ExerciseSessionController::reminderMinute() const noexcept    // NOLINT(readability-convert-member-functions-to-static)
+int ExerciseSessionController::reminderMinute() const noexcept
 {
-    return 0;
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedReminderMoment().minute : 0;
+}
+
+void ExerciseSessionController::setReminderHour( int p_hour )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    // On RAMENE l'heure dans une journee au lieu de la refuser, et le bornage vit dans le DOMAINE : c'est une regle, pas
+    // une precaution d'ecran. Un ecran qui se tromperait ne doit pas priver le joueur de son rappel.
+    const std::int32_t minute = m_levelStore->storedReminderMoment().minute;
+
+    m_levelStore->storeReminderMoment( domain::clampedReminderMoment( domain::ReminderMoment{ p_hour, minute } ) );
+
+    // Le signal est ce qui fait REPROGRAMMER l'application : une heure changee qui n'atteindrait pas les alarmes serait
+    // un reglage qui ne fait rien.
+    emit dailyReminderChanged();
+}
+
+void ExerciseSessionController::setReminderMinute( int p_minute )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    const std::int32_t hour = m_levelStore->storedReminderMoment().hour;
+
+    m_levelStore->storeReminderMoment( domain::clampedReminderMoment( domain::ReminderMoment{ hour, p_minute } ) );
+
+    emit dailyReminderChanged();
 }
 
 void ExerciseSessionController::testReminder()
