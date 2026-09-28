@@ -1,9 +1,11 @@
 #include "ui/IntervalPlaybackController.h"
 
 #include "domain/music/Interval.h"
+#include "domain/music/Temperament.h"
 #include "ui/IntervalDescription.h"
 
 #include <QString>
+#include <QStringList>
 
 #include <array>
 #include <chrono>
@@ -66,6 +68,45 @@ void IntervalPlaybackController::setHarmonicPlayback( bool p_harmonicPlayback )
     emit harmonicPlaybackChanged();
 }
 
+QString IntervalPlaybackController::playedFrequencies() const
+{
+    return m_playedFrequencies;
+}
+
+void IntervalPlaybackController::setTuning( domain::TuningContext p_tuning )
+{
+    m_tuning = p_tuning;
+}
+
+void IntervalPlaybackController::setPlayedFrequencies( std::span<const domain::Note> p_notes )
+{
+    if( p_notes.empty() )
+    {
+        m_playedFrequencies.clear();
+
+        emit playedFrequenciesChanged();
+
+        return;
+    }
+
+    const domain::Note root = p_notes.front();
+
+    QStringList parts;
+
+    for( const domain::Note & note : p_notes )
+    {
+        const double hz = domain::frequencyFor( note, root, m_tuning.temperament, m_tuning.referencePitchHz );
+
+        parts.append( QStringLiteral( "%1 · %2 Hz" )
+                        .arg( QString::fromStdString( note.name() ) )
+                        .arg( hz, 0, 'f', 2 ) );
+    }
+
+    m_playedFrequencies = parts.join( QStringLiteral( "  →  " ) );
+
+    emit playedFrequenciesChanged();
+}
+
 void IntervalPlaybackController::setLastPlayedInterval( QVariantMap p_description )
 {
     // Only notify when something actually changed: replaying the same interval must not make the
@@ -94,6 +135,8 @@ void IntervalPlaybackController::playAndDescribe( const domain::Note & p_rootNot
         m_notePlayer.playMelody( notes, MELODIC_GAP );
     }
 
+    setPlayedFrequencies( notes );
+
     // The interval is identified by the DOMAIN, and from the two notes that were ACTUALLY played
     // rather than from the distance that was asked for. Should the playable range ever clamp a note,
     // the name displayed would then follow what was really heard instead of quietly lying.
@@ -112,9 +155,27 @@ void IntervalPlaybackController::playSingleNote()
 {
     m_notePlayer.playNote( domain::Note{ ROOT_MIDI_NUMBER } );
 
+    setPlayedFrequencies( std::array<domain::Note, 1>{ domain::Note{ ROOT_MIDI_NUMBER } } );
+
     // A single note is not an interval: there is nothing to name. The empty description is what tells
     // the screen to fall back to its generic prompt.
     setLastPlayedInterval( QVariantMap{} );
+}
+
+void IntervalPlaybackController::playSustainedInterval( int p_semitones )
+{
+    const domain::Note rootNote{ ROOT_MIDI_NUMBER };
+    const domain::Note upperNote = rootNote.transposedBy( p_semitones );
+
+    const std::array<domain::Note, 2> notes{ rootNote, upperNote };
+
+    // Six seconds, played TOGETHER: the two frequencies beat against each other, and the beating is what the ear
+    // uses to hear a temperament. A short chord does not give the ear time to count it.
+    m_notePlayer.playChordFor( notes, std::chrono::seconds{ 6 } );
+
+    setPlayedFrequencies( notes );
+
+    setLastPlayedInterval( describeInterval( domain::intervalBetween( rootNote, upperNote ) ) );
 }
 
 void IntervalPlaybackController::stopPlayback()

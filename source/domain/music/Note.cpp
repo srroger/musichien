@@ -29,9 +29,12 @@ double Note::frequencyHz() const noexcept
 
 std::string Note::name() const
 {
-    const std::string_view pitchClassName = PITCH_CLASS_NAMES.at( static_cast<std::size_t>( pitchClassIndex() ) );
+    return std::format( "{}{}", pitchClassName(), octave() );
+}
 
-    return std::format( "{}{}", pitchClassName, octave() );
+std::string Note::pitchClassName() const
+{
+    return std::string{ PITCH_CLASS_NAMES.at( static_cast<std::size_t>( pitchClassIndex() ) ) };
 }
 
 Note Note::transposedBy( std::int32_t p_semitones ) const noexcept

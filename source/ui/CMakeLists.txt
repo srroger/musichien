@@ -46,6 +46,8 @@ musichienFunction_AddLibrary(ui
     IntervalPlaybackController.cpp
     MicrophoneController.h
     MicrophoneController.cpp
+    RhythmController.h
+    RhythmController.cpp
 )
 
 target_link_libraries(musichien_ui PUBLIC
@@ -71,6 +73,7 @@ if(MUSICHIEN_BUILD_TESTING)
     musichienFunction_AddTest(ui
         musichien_ui
         ExerciseSessionController_test.cpp
+        RhythmController_test.cpp
         IntervalPlaybackController_test.cpp
         ExerciseScreen_test.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc

@@ -1,11 +1,13 @@
 #include "domain/audio/ToneSynthesizer.h"
 
 #include "domain/audio/NotePlayerFake.h"
+#include "domain/audio/SampledInstrument.h"
 #include "domain/music/Note.h"
 
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <numbers>
@@ -386,6 +388,109 @@ TEST( ToneSynthesizerTest, an_octave_higher_sounds_exactly_twice_as_high )
     EXPECT_NEAR( 2.0, upperFrequency / lowerFrequency, 0.01 );
 }
 
+TEST( ToneSynthesizerTest, a_note_follows_the_chosen_diapason )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const Note referenceNote{ 69 };    // A4
+
+    // A diapason of 442 scales every frequency by 442/440, and the synthesiser must follow it: a tuner is only
+    // useful if the sound it plays is at the diapason it claims.
+    const TuningContext sharpDiapason{ Temperament::Equal, 442.0 };
+
+    const std::vector<float> samples =
+      synthesizer.renderNote( referenceNote, std::chrono::milliseconds{ 1000 }, sharpDiapason );
+
+    const double expectedFrequency = referenceNote.frequencyHz() * ( 442.0 / 440.0 );
+
+    EXPECT_NEAR( expectedFrequency,
+                 measuredFrequency( samples, expectedFrequency ),
+                 expectedFrequency * 0.0025 );
+}
+
+TEST( ToneSynthesizerTest, a_pythagorean_fifth_is_pure_in_a_melody )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const Note root{ 60 };     // C4
+    const Note fifth{ 67 };    // G4
+
+    constexpr std::chrono::milliseconds noteDuration{ 500 };
+    constexpr std::chrono::milliseconds gap{ 100 };
+
+    const TuningContext pythagorean{ Temperament::Pythagorean, 440.0 };
+
+    const std::vector<Note> melody{ root, fifth };
+
+    const std::vector<float> melodySamples = synthesizer.renderMelody( melody, noteDuration, gap, pythagorean );
+
+    // The second note starts after the first note and its gap.
+    const std::size_t secondNoteStart = synthesizer.sampleCountFor( noteDuration ) + synthesizer.sampleCountFor( gap );
+
+    const std::span<const float> allSamples = melodySamples;
+
+    const std::span<const float> secondNote = allSamples.subspan( secondNoteStart );
+
+    const double rootFrequency = frequencyFor( root, root, Temperament::Pythagorean, 440.0 );
+    const double fifthFrequency = frequencyFor( fifth, root, Temperament::Pythagorean, 440.0 );
+
+    // A Pythagorean fifth is a chain of pure fifths: 3/2, not the tempered 2^(7/12). The synthesiser must play
+    // what the temperament says, otherwise the setting is a lie the ear can hear.
+    EXPECT_NEAR( 3.0 / 2.0, fifthFrequency / rootFrequency, 1e-9 );
+
+    EXPECT_NEAR( fifthFrequency,
+                 measuredFrequency( secondNote, fifthFrequency ),
+                 fifthFrequency * 0.0025 );
+}
+
+TEST( ToneSynthesizerTest, the_sine_is_the_pure_fundamental )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const Note note{ 69 };    // A4
+
+    const std::vector<float> sine =
+      synthesizer.renderWaveNote( note, Waveform::Sine, std::chrono::milliseconds{ 1000 } );
+
+    EXPECT_NEAR( note.frequencyHz(),
+                 measuredFrequency( sine, note.frequencyHz() ),
+                 note.frequencyHz() * 0.0025 );
+
+    // A pure sine has its energy at the fundamental and NONE at the second harmonic: that is the whole point of the
+    // instrument, and what makes it the honest tool for hearing a temperament.
+    const double fundamentalEnergy = energyAtFrequency( sine, note.frequencyHz() );
+    const double secondHarmonicEnergy = energyAtFrequency( sine, note.frequencyHz() * 2.0 );
+
+    EXPECT_GT( fundamentalEnergy, secondHarmonicEnergy * 1000.0 );
+}
+
+TEST( ToneSynthesizerTest, the_sawtooth_and_square_carry_the_harmonics_they_should )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const Note note{ 69 };    // A4
+
+    const std::vector<float> sawtooth =
+      synthesizer.renderWaveNote( note, Waveform::Sawtooth, std::chrono::milliseconds{ 1000 } );
+
+    const std::vector<float> square =
+      synthesizer.renderWaveNote( note, Waveform::Square, std::chrono::milliseconds{ 1000 } );
+
+    // The sawtooth has EVERY harmonic, including the second.
+    const double sawFundamental = energyAtFrequency( sawtooth, note.frequencyHz() );
+    const double sawSecond = energyAtFrequency( sawtooth, note.frequencyHz() * 2.0 );
+
+    EXPECT_GT( sawSecond, sawFundamental * 0.01 );
+
+    // The square has only the ODD harmonics: the second is missing, the third is strong.
+    const double squareFundamental = energyAtFrequency( square, note.frequencyHz() );
+    const double squareSecond = energyAtFrequency( square, note.frequencyHz() * 2.0 );
+    const double squareThird = energyAtFrequency( square, note.frequencyHz() * 3.0 );
+
+    EXPECT_LT( squareSecond, squareFundamental * 0.01 );
+    EXPECT_GT( squareThird, squareFundamental * 0.01 );
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Degenerate cases must not crash and must not produce noise
 // ---------------------------------------------------------------------------------------------------------------------
@@ -518,6 +623,60 @@ TEST( ToneSynthesizerTest, the_mistake_cue_is_the_same_every_time )
     // asserted.
     EXPECT_EQ( synthesizer.renderMistakeCue( ToneSynthesizer::MISTAKE_CUE_DURATION ),
                synthesizer.renderMistakeCue( ToneSynthesizer::MISTAKE_CUE_DURATION ) );
+}
+
+TEST( SampledInstrumentTest, the_sampler_follows_the_temperament )
+{
+    // A synthetic C4: a pure sine at the equal-temperament frequency of C4. The sampler will transpose it by playing
+    // it faster or slower, and the temperament decides how far.
+    SampledNote recorded;
+    recorded.rootMidiNumber = 60;
+    recorded.sampleRate = TEST_SAMPLE_RATE;
+
+    const double c4Hz = Note{ 60 }.frequencyHz();
+
+    recorded.samples.reserve( static_cast<std::size_t>( TEST_SAMPLE_RATE ) );
+
+    for( const std::size_t sampleIndex : std::views::iota( std::size_t{ 0 }, static_cast<std::size_t>( TEST_SAMPLE_RATE ) ) )
+    {
+        recorded.samples.push_back( static_cast<float>(
+          std::sin( 2.0 * std::numbers::pi * c4Hz * static_cast<double>( sampleIndex ) / static_cast<double>( TEST_SAMPLE_RATE ) ) ) );
+    }
+
+    SampledInstrument instrument;
+    instrument.addNote( std::move( recorded ) );
+
+    // A fifth, played as a melody, in PYTHAGOREAN tuning: the second note (G4) must be 3/2 of C4, not the tempered
+    // 2^(7/12). That is the whole question the sampler must answer, and it answers it by reading the sample at the
+    // speed that reaches the temperament's frequency.
+    const std::vector<Note> melody{ Note{ 60 }, Note{ 67 } };
+
+    constexpr std::chrono::milliseconds noteDuration{ 500 };
+    constexpr std::chrono::milliseconds gap{ 100 };
+
+    const std::vector<float> pythagorean = instrument.renderMelody( melody,
+                                                                    noteDuration,
+                                                                    gap,
+                                                                    TEST_SAMPLE_RATE,
+                                                                    TuningContext{ Temperament::Pythagorean, 440.0 } );
+
+    const std::size_t noteSampleCount = static_cast<std::size_t>( TEST_SAMPLE_RATE ) / 2;    // 500 ms
+    const std::size_t gapSampleCount = static_cast<std::size_t>( TEST_SAMPLE_RATE ) / 10;    // 100 ms
+
+    const std::span<const float> allSamples = pythagorean;
+
+    const std::span<const float> secondNote = allSamples.subspan( noteSampleCount + gapSampleCount );
+
+    const double rootFrequency = frequencyFor( Note{ 60 }, Note{ 60 }, Temperament::Pythagorean, 440.0 );
+    const double fifthFrequency = frequencyFor( Note{ 67 }, Note{ 60 }, Temperament::Pythagorean, 440.0 );
+
+    // The rule the temperament states: a Pythagorean fifth is 3/2.
+    EXPECT_NEAR( 3.0 / 2.0, fifthFrequency / rootFrequency, 1e-9 );
+
+    // And the SAMPLER renders it at that frequency - not at the tempered one.
+    EXPECT_NEAR( fifthFrequency,
+                 measuredFrequency( secondNote, fifthFrequency ),
+                 fifthFrequency * 0.0025 );
 }
 
 }    // namespace musichien::domain

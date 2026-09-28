@@ -21,6 +21,7 @@
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
 #include "ui/MicrophoneController.h"
+#include "ui/RhythmController.h"
 
 #include <QAudioDevice>
 #include <QFile>
@@ -31,6 +32,7 @@
 #include <QUrl>
 #include <QtQml>
 
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <memory>
@@ -181,6 +183,50 @@ constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
 // The instruments the game plays with, in the order they are offered.
 constexpr std::array<const char *, 3> INSTRUMENT_NAMES{ "piano", "guitare", "saxo" };
 
+// Reads one embedded wave file as mono samples.
+//
+// Empty when the file is missing or unreadable, which costs a sound and never the application: the synthesiser takes
+// over, exactly like it does for a missing instrument.
+[[nodiscard]] std::vector<float> loadSample( const char * p_fileName )
+{
+    QFile sampleFile{ QStringLiteral( ":/assets/soundfonts/%1.wav" ).arg( QString::fromLatin1( p_fileName ) ) };
+
+    if( !sampleFile.open( QIODevice::ReadOnly ) )
+    {
+        return {};
+    }
+
+    const QByteArray content = sampleFile.readAll();
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    const std::span<const std::byte> bytes{ reinterpret_cast<const std::byte *>( content.constData() ),
+                                            static_cast<std::size_t>( content.size() ) };
+
+    // La hauteur n'a aucune importance pour une percussion : seul l'echantillon compte.
+    const std::optional<musichien::domain::SampledNote> note = musichien::domain::sampledNoteFromWave( bytes, 0 );
+
+    return note.has_value() ? note->samples : std::vector<float>{};
+}
+
+// Les quatre sons de batterie, dans l'ordre de domain::Drum.
+//
+// Une percussion n'est PAS une note : elle ne se transpose pas, elle se joue telle quelle. Le fichier est donc lu pour
+// ses echantillons seulement.
+[[nodiscard]] std::array<std::vector<float>, musichien::domain::DRUM_COUNT> loadDrumSamples()
+{
+    constexpr std::array<const char *, musichien::domain::DRUM_COUNT> FILE_NAMES{
+      "drum_kick", "drum_snare", "drum_hihat", "drum_tom" };
+
+    std::array<std::vector<float>, musichien::domain::DRUM_COUNT> samples;
+
+    for( std::size_t index = 0; index < FILE_NAMES.size(); ++index )
+    {
+        samples.at( index ) = loadSample( FILE_NAMES.at( index ) );
+    }
+
+    return samples;
+}
+
 }    // namespace
 
 int main( int p_argumentCount, char * p_arguments[] )
@@ -215,6 +261,10 @@ int main( int p_argumentCount, char * p_arguments[] )
     // -------------------------------------------------------------------------------------------------------------
     musichien::infrastructure::QAudioNotePlayer notePlayer;
 
+    // Le metronome et le jeu de rythme. Un seul controleur pour les deux : le metronome qui bat est la meme boucle
+    // que le jeu, et un outil de musicien ne demande pas deux classes.
+    musichien::ui::RhythmController rhythmController{ notePlayer };
+
     // What the application remembers about its player. A small settings file, on the device: the package
     // cannot reach the network, so nothing about him ever leaves the phone.
     musichien::infrastructure::QSettingsPlayerPreferences playerLevelStore;
@@ -236,13 +286,41 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     std::cerr << "Musichien: " << instruments.size() << " sampled instrument(s)\n";
 
-    notePlayer.useInstruments( instruments );
+    // La batterie, rendue depuis la meme banque libre que les instruments : une vraie peau vaut mieux qu'une chute de
+    // sinus, et Roger l'a entendu tout de suite.
+    std::array<std::vector<float>, musichien::domain::DRUM_COUNT> drumSamples = loadDrumSamples();
+
+    const auto loadedDrumCount = static_cast<std::size_t>( std::ranges::count_if(
+      drumSamples, []( const std::vector<float> & p_samples ) { return !p_samples.empty(); } ) );
+
+    std::cerr << "Musichien: " << loadedDrumCount << " drum sample(s) read\n";
+
+    notePlayer.useDrumSamples( std::move( drumSamples ) );
+
+    // Les deux clics du metronome : deux blocs de bois, dans la meme banque libre.
+    notePlayer.useMetronomeClicks( loadSample( "drum_click_high" ), loadSample( "drum_click_low" ) );
+
+    notePlayer.useInstruments( instruments, {} );
 
     // Opening the output now, rather than at the first note, means a machine without a sound card is
     // reported at start up instead of silently refusing to play in the middle of an exercise.
     notePlayer.prepareAudioOutput();
 
     std::cerr << "Musichien: audio output is " << notePlayer.audioOutputDescription() << "\n";
+
+    // Un casque Bluetooth branche ou debranche change la liste des sorties : on rouvre la sortie sur le nouvel
+    // appareil par defaut, sinon le son resterait sur un peripherique mort. Les ENTREES, elles, ne peuvent pas etre
+    // rebranchees toutes seules : on avertit, et les reglages permettent de rechoisir le micro.
+    QMediaDevices mediaDevices;
+
+    QObject::connect( &mediaDevices, &QMediaDevices::audioOutputsChanged, &mediaDevices, [&notePlayer]() {
+        std::cerr << "Musichien: audio outputs changed, reopening the output.\n";
+        notePlayer.reopenAudioOutput();
+    } );
+
+    QObject::connect( &mediaDevices, &QMediaDevices::audioInputsChanged, &mediaDevices, []() {
+        std::cerr << "Musichien: audio inputs changed - reopen the settings to pick the new microphone.\n";
+    } );
 
     // The view model only receives the PORT, never the adapter: it could be handed the fake player of
     // the unit tests without a single line of it changing.
@@ -322,7 +400,21 @@ int main( int p_argumentCount, char * p_arguments[] )
             }
         }
 
-        notePlayer.useInstruments( std::move( wantedInstruments ) );
+        // The waveforms are the instruments that are NOT samples: the flags after the sampled ones ask the adapter
+        // to render a pure spectrum (sine, sawtooth, square) instead of a recording.
+        std::vector<musichien::domain::Waveform> wantedWaveforms;
+
+        for( std::size_t waveformIndex = 0; waveformIndex < musichien::domain::WAVEFORM_INSTRUMENTS.size(); ++waveformIndex )
+        {
+            const std::size_t flagIndex = instruments.size() + waveformIndex;
+
+            if( ( flagIndex >= enabled.size() ) || enabled.at( flagIndex ) )
+            {
+                wantedWaveforms.push_back( musichien::domain::WAVEFORM_INSTRUMENTS.at( waveformIndex ) );
+            }
+        }
+
+        notePlayer.useInstruments( std::move( wantedInstruments ), std::move( wantedWaveforms ) );
     };
 
     QObject::connect( &exerciseController,
@@ -330,6 +422,28 @@ int main( int p_argumentCount, char * p_arguments[] )
                       playWantedInstruments );
 
     playWantedInstruments();
+
+    // Le réglage descend jusqu'à la couche audio, et il descend à CHAQUE changement : basculer le tempérament ou le
+    // diapason s'entend à la note suivante, pas au prochain lancement. La TONIQUE n'en fait pas partie - la couche
+    // audio connaît toujours la sienne (la première note qu'elle joue) ; seul l'accordeur a besoin d'une tonique à lui.
+    const auto applyTuning = [&playerLevelStore, &notePlayer, &intervalController]() {
+        const musichien::domain::TuningContext tuning{ playerLevelStore.storedTemperament(),
+                                                       playerLevelStore.storedReferencePitch() };
+
+        notePlayer.setTuning( tuning );
+
+        intervalController.setTuning( tuning );
+    };
+
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::temperamentChanged,
+                      applyTuning );
+
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::referencePitchChanged,
+                      applyTuning );
+
+    applyTuning();
 
     // Le rappel quotidien. Le port cache la plateforme : sur le bureau, rien ne se planifie ; sur Android, une
     // vraie notification sera posee. Ce que l'application sait, c'est qu'une case a ete cochee, et elle demande au
@@ -375,6 +489,12 @@ int main( int p_argumentCount, char * p_arguments[] )
                                   QML_MODULE_MINOR_VERSION,
                                   "ExerciseController",
                                   &exerciseController );
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "RhythmController",
+                                  &rhythmController );
 
     QQmlApplicationEngine qmlEngine;
 

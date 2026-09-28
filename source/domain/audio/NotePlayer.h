@@ -13,7 +13,9 @@
 // See docs/ARCHITECTURE.md.
 // =====================================================================================================================
 
+#include "domain/audio/DrumSynthesizer.h"
 #include "domain/music/Note.h"
+#include "domain/music/Temperament.h"
 
 #include <chrono>
 #include <span>
@@ -42,6 +44,16 @@ public:
     // Plays the notes at the same time, the way a harmonic interval or a chord is heard.
     virtual void playChord( std::span<const Note> p_notes ) = 0;
 
+    // Plays the notes together for an EXPLICIT duration: the long, sustained chord that lets the ear count the
+    // beating between two frequencies - which is exactly how a temperament difference is heard. The regular
+    // playChord uses the natural note duration.
+    //
+    // A default body, like playTapCue: an adapter that has no use for a sustained chord keeps the natural duration.
+    virtual void playChordFor( std::span<const Note> p_notes, std::chrono::milliseconds p_duration )
+    {
+        playChord( p_notes );
+    }
+
     // Plays the short cue that marks a mistake.
     //
     // A cue is NOT an interval, and the domain says so here rather than leaving the distinction to the
@@ -56,6 +68,27 @@ public:
     // test qui ne s'intéresse pas au clic n'a rien à écrire non plus. Le feedback d'un bouton ne mérite pas
     // d'obliger tous les adaptateurs du projet à répondre.
     virtual void playTapCue() {}
+
+    // Le clic du métronome : un temps simple, ou le PREMIER temps d'une mesure (accentué). Un corps par défaut, comme
+    // le clic de menu : un adaptateur sans métronome se contente du clic ordinaire.
+    virtual void playMetronomeClick( bool p_accented )
+    {
+        (void)p_accented;
+        playTapCue();
+    }
+
+    // Frappe un élément de la batterie. Un corps par défaut, comme le clic : un adaptateur sans batterie ne fait rien.
+    virtual void playDrum( Drum p_drum )
+    {
+        (void)p_drum;
+    }
+
+    // The tuning every following note is heard in, until it is called again. Equal temperament and a 440 Hz diapason
+    // are the defaults, which is exactly what a NotePlayer that never receives this call keeps doing.
+    //
+    // A default body, like playTapCue: a test that only counts the notes played has no tuning to care about, and
+    // must not be forced to write one.
+    virtual void setTuning( TuningContext p_tuning ) { (void)p_tuning; }
 
     // Stops everything immediately. Called when the screen is left or the application goes to the
     // background: an audio stream left open on a phone is a battery drain and a bug.

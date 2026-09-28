@@ -45,5 +45,19 @@
         <file alias="assets/soundfonts/saxo_c3.wav">../../assets/soundfonts/saxo_c3.wav</file>
         <file alias="assets/soundfonts/saxo_c4.wav">../../assets/soundfonts/saxo_c4.wav</file>
         <file alias="assets/soundfonts/saxo_c5.wav">../../assets/soundfonts/saxo_c5.wav</file>
+    <!--
+      Les sons de batterie : rendus depuis la meme banque libre, par scripts/render_drum_samples.py.
+      Une percussion n'est pas une note - elle ne se transpose pas - donc elle est jouee telle quelle.
+    -->
+        <file alias="assets/soundfonts/drum_kick.wav">../../assets/soundfonts/drum_kick.wav</file>
+        <file alias="assets/soundfonts/drum_snare.wav">../../assets/soundfonts/drum_snare.wav</file>
+        <file alias="assets/soundfonts/drum_hihat.wav">../../assets/soundfonts/drum_hihat.wav</file>
+        <file alias="assets/soundfonts/drum_tom.wav">../../assets/soundfonts/drum_tom.wav</file>
+    <!--
+      Les deux clics du metronome : deux blocs de bois. Roger trouvait les temps faibles "un peu moches" ; un bloc de
+      bois est la sonorite du metronome, et l'ecart aigu/grave dit ou est le premier temps sans qu'on ait a compter.
+    -->
+        <file alias="assets/soundfonts/drum_click_high.wav">../../assets/soundfonts/drum_click_high.wav</file>
+        <file alias="assets/soundfonts/drum_click_low.wav">../../assets/soundfonts/drum_click_low.wav</file>
     </qresource>
 </RCC>

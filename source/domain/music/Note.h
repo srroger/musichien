@@ -66,6 +66,10 @@ public:
     // The name is deliberately language neutral so that it never needs a translation.
     [[nodiscard]] std::string name() const;
 
+    // Le nom de la CLASSE de hauteur, sans l'octave : "C", "F#", "A". C'est ce qui s'ecrit dans le symbole d'un accord
+    // ("Cm", "F#7") et dans une liste de toniques - la ou "C4" serait une note plutot qu'un nom de couleur.
+    [[nodiscard]] std::string pitchClassName() const;
+
     // Transposes the note by a number of semitones. Used to build exercises.
     [[nodiscard]] Note transposedBy( std::int32_t p_semitones ) const noexcept;
 

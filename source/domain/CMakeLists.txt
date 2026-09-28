@@ -18,6 +18,8 @@ musichienFunction_AddLibrary(domain
     music/Temperament.cpp
     music/Interval.h
     music/Interval.cpp
+    music/Chord.h
+    music/Chord.cpp
 
     # Audio, expressed as a port: the domain says WHAT it needs, never HOW it is done
     audio/NotePlayer.h
@@ -29,6 +31,14 @@ musichienFunction_AddLibrary(domain
     audio/ToneSynthesizer.cpp
     audio/SampledInstrument.h
     audio/SampledInstrument.cpp
+    audio/DrumSynthesizer.h
+    audio/DrumSynthesizer.cpp
+
+    # Rhythm, as pure rules: the metronome's grid and the judgement of a tap, no clock and no sound
+    rhythm/Rhythm.h
+    rhythm/Rhythm.cpp
+    rhythm/RhythmPattern.h
+    rhythm/RhythmPattern.cpp
 
     # The exercise loop, as pure rules: no sound, no clock, no screen
     exercise/AnswerGrid.h
@@ -70,8 +80,12 @@ if(MUSICHIEN_BUILD_TESTING)
         musichien_domain
         music/Interval_test.cpp
         music/Temperament_test.cpp
+        music/Chord_test.cpp
         audio/ToneSynthesizer_test.cpp
         audio/SungIntervalDetector_test.cpp
+        audio/DrumSynthesizer_test.cpp
+        rhythm/Rhythm_test.cpp
+        rhythm/RhythmPattern_test.cpp
         exercise/AnswerGrid_test.cpp
         exercise/AnecdoteBook_test.cpp
         exercise/ExerciseSession_test.cpp

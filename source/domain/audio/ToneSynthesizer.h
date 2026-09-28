@@ -32,6 +32,7 @@
 // =====================================================================================================================
 
 #include "domain/music/Note.h"
+#include "domain/music/Temperament.h"
 
 #include <chrono>
 #include <cstdint>
@@ -40,6 +41,17 @@
 
 namespace musichien::domain
 {
+
+// The pure waveforms the synthesiser can render as instruments. Unlike the struck string, they carry a CONTROLLED
+// spectrum: the sine has no harmonic, the sawtooth has every harmonic (falling as 1/n), the square only the odd
+// ones. That is what makes them the honest tools for hearing a temperament - the beating of two simple spectra
+// leaves nothing else to listen to, and the ear can actually count it.
+enum class Waveform
+{
+    Sine,        // the fundamental only
+    Sawtooth,    // every harmonic, falling as 1/n
+    Square       // the odd harmonics only, falling as 1/n
+};
 
 class ToneSynthesizer
 {
@@ -121,18 +133,52 @@ public:
 
     // A single note.
     [[nodiscard]] std::vector<float> renderNote( const Note & p_note,
-                                                 std::chrono::milliseconds p_duration ) const;
+                                                 std::chrono::milliseconds p_duration,
+                                                 TuningContext p_tuning = {} ) const;
 
-    // Several notes sounded at the same time: a harmonic interval, a chord.
+    // Several notes sounded at the same time: a harmonic interval, a chord. The tuning's root is the FIRST note,
+    // which is the note the interval is heard from.
     [[nodiscard]] std::vector<float> renderChord( std::span<const Note> p_notes,
-                                                  std::chrono::milliseconds p_duration ) const;
+                                                  std::chrono::milliseconds p_duration,
+                                                  TuningContext p_tuning = {} ) const;
 
-    // Several notes sounded one after another, separated by silence: a melodic interval, a scale.
+    // Several notes sounded one after another, separated by silence: a melodic interval, a scale. Root as above.
     [[nodiscard]] std::vector<float> renderMelody( std::span<const Note> p_notes,
                                                    std::chrono::milliseconds p_noteDuration,
-                                                   std::chrono::milliseconds p_gap ) const;
+                                                   std::chrono::milliseconds p_gap,
+                                                   TuningContext p_tuning = {} ) const;
+
+    // The SAME three calls, but for a PURE WAVEFORM: a controlled spectrum instead of the struck string. See Waveform.
+    // No hammer either: the attack is a short fade rather than a strike.
+    [[nodiscard]] std::vector<float> renderWaveNote( const Note & p_note,
+                                                     Waveform p_waveform,
+                                                     std::chrono::milliseconds p_duration,
+                                                     TuningContext p_tuning = {} ) const;
+
+    [[nodiscard]] std::vector<float> renderWaveChord( std::span<const Note> p_notes,
+                                                      Waveform p_waveform,
+                                                      std::chrono::milliseconds p_duration,
+                                                      TuningContext p_tuning = {} ) const;
+
+    [[nodiscard]] std::vector<float> renderWaveMelody( std::span<const Note> p_notes,
+                                                       Waveform p_waveform,
+                                                       std::chrono::milliseconds p_noteDuration,
+                                                       std::chrono::milliseconds p_gap,
+                                                       TuningContext p_tuning = {} ) const;
 
 private:
+    // One note at an EXPLICIT frequency. The frequency is computed by the caller - which alone knows the root - and
+    // this method only does the arithmetic of a struck string at that frequency.
+    [[nodiscard]] std::vector<float> renderNoteAt( const Note & p_note,
+                                                   double p_frequencyHz,
+                                                   std::chrono::milliseconds p_duration ) const;
+
+    // The pure-waveform counterpart of renderNoteAt.
+    [[nodiscard]] std::vector<float> renderWaveNoteAt( const Note & p_note,
+                                                       double p_frequencyHz,
+                                                       Waveform p_waveform,
+                                                       std::chrono::milliseconds p_duration ) const;
+
     // Adds ONE struck string to a buffer, without touching its level: mixing, enveloping and normalising
     // belong to the caller, which is the only one that knows how many strings are playing.
     //

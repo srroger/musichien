@@ -245,9 +245,13 @@ void MicrophoneController::playSingingTarget()
         return;
     }
 
-    // Le mode DEBUTANT : on entend l'intervalle, puis on le chante. Le mode avance n'appelle simplement pas ceci.
-    const std::array<domain::Note, 2> notes{ domain::Note{ 60 },
-                                             domain::Note{ 60 + m_singingTargetSemitones } };
+    // La tonique de la cible est la note de reference du reglage : pour le tempere egal elle ne change rien, pour
+    // les autres elle donne son sens a l'intervalle. Meme source que l'accordeur, donc jamais en desaccord.
+    const std::int32_t rootMidi =
+      ( m_preferences != nullptr ) ? m_preferences->storedTuningRoot().midiNumber() : 60;
+
+    const std::array<domain::Note, 2> notes{ domain::Note{ rootMidi },
+                                             domain::Note{ rootMidi + m_singingTargetSemitones } };
 
     m_notePlayer->playMelody( notes, std::chrono::milliseconds{ 400 } );
 }

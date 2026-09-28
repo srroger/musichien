@@ -29,8 +29,10 @@
 #include "domain/exercise/PlayerPreferences.h"
 #include "domain/exercise/Rank.h"
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QString>
+#include <QTimer>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -77,6 +79,65 @@ class ExerciseSessionController final : public QObject
     // Ce que la question en cours demande : 0 pour nommer un intervalle, 1 pour dire dans quel sens il a ete joue.
     // C'est ce que l'ecran lit pour savoir s'il montre le cercle ou les deux boutons monte/descend.
     Q_PROPERTY( int questionKind READ questionKind NOTIFY questionChanged )
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // La question de rythme
+    //
+    // Ce que l'ecran affiche pour une cellule : de quoi la DESSINER (ses frappes), de quoi la SITUER (le tempo, la
+    // mesure), et ou en est la boucle. Aucune de ces valeurs n'est inventee ici : elles viennent du domaine, ou de
+    // l'horloge qui est le seul bien propre de ce controleeur.
+    // ---------------------------------------------------------------------------------------------------------------
+    Q_PROPERTY( bool isRhythmQuestion READ isRhythmQuestion NOTIFY questionChanged )
+
+    // Le nom de la cellule - "Binaire", "Valse"... Il vient du domaine, et l'ecran le montre tel quel.
+    Q_PROPERTY( QString rhythmPatternName READ rhythmPatternName NOTIFY questionChanged )
+
+    Q_PROPERTY( int rhythmBpm READ rhythmBpm NOTIFY questionChanged )
+    Q_PROPERTY( int rhythmBeatsPerBar READ rhythmBeatsPerBar NOTIFY questionChanged )
+
+    // Les frappes de la cellule, pretes a dessiner : 'beat' (en temps, depuis le debut de la boucle), 'accented'
+    // (frappee plus fort) et 'drum' (quel element est frappe).
+    Q_PROPERTY( QVariantList rhythmHits READ rhythmHits NOTIFY questionChanged )
+
+    // Le temps qui sonne, 0 = le premier. L'ecran le montre plus un, pour compter comme un musicien.
+    Q_PROPERTY( int rhythmBeatInBar READ rhythmBeatInBar NOTIFY rhythmStateChanged )
+
+    // Vrai pendant la REPRODUCTION : c'est le moment ou le doigt est juge. Faux pendant l'ecoute, ou une frappe sonne
+    // sans rien valoir - celui qui accompagne la cellule pendant qu'elle s'ecoute ne perd pas de vie.
+    Q_PROPERTY( bool isRhythmPlaying READ isRhythmPlaying NOTIFY rhythmStateChanged )
+
+    // La qualite de la derniere frappe : 0 = Miss, 1 = Good, 2 = Perfect, -1 = rien depuis le debut de la question.
+    // Meme convention que la page Rythme, pour que les deux ecrans parlent la meme langue.
+    Q_PROPERTY( int rhythmLastQuality READ rhythmLastQuality NOTIFY rhythmStateChanged )
+
+    // La derniere tentative, en frappes : combien de frappes de la cellule ont ete touchees, sur combien il y en
+    // avait. Lu AVANT que le domaine ne rende son verdict - c'est ce qui permet de dire "trois sur quatre".
+    Q_PROPERTY( int rhythmCoveredOnsets READ rhythmCoveredOnsets NOTIFY rhythmStateChanged )
+    Q_PROPERTY( int rhythmOnsetCount READ rhythmOnsetCount NOTIFY questionChanged )
+
+    // Combien de temps dure une mesure de la cellule, en millisecondes. L'ecran s'en sert pour laisser au feedback le
+    // temps de se faire entendre : une pause plus courte que la cellule couperait la cellule elle-meme.
+    Q_PROPERTY( int rhythmCellDurationMs READ rhythmCellDurationMs NOTIFY questionChanged )
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // La question d'accord
+    //
+    // L'accord entendu, et ce que le joueur a le droit de repondre. Deux listes, deux questions : une qualite d'accord
+    // n'est pas un intervalle, et le cercle des quintes n'a rien a y faire.
+    // ---------------------------------------------------------------------------------------------------------------
+    Q_PROPERTY( bool isChordQuestion READ isChordQuestion NOTIFY questionChanged )
+
+    // L'accord qui vient d'etre joue, pret a afficher : son nom ("Minor"), son symbole ("Cm") et sa tonique, deja
+    // ecrite avec son nom de note - l'ecran n'assemble rien.
+    Q_PROPERTY( QVariantMap heardChord READ heardChord NOTIFY sessionChanged )
+
+    // La couleur que le joueur a nommee, quand il y en a une : c'est ce qui permet au verdict de dire ce qui a ete
+    // repondu, et pas seulement ce qui a ete entendu.
+    Q_PROPERTY( QVariantMap answeredChord READ answeredChord NOTIFY sessionChanged )
+
+    // Les couleurs que le joueur peut repondre, dans l'ordre ou elles ont ete apprises : l'ordre des boutons est donc
+    // stable, et une couleur nouvelle s'ajoute a la fin.
+    Q_PROPERTY( QVariantList chordChoices READ chordChoices NOTIFY questionChanged )
 
     // What the domain says about the interval that was asked, and about the one the player chose. The
     // screen reads names and identifiers, it composes neither.
@@ -146,6 +207,15 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( QVariantList tuningRoots READ tuningRoots CONSTANT )
     Q_PROPERTY( double referencePitch READ referencePitch NOTIFY referencePitchChanged )
 
+    // How many questions in a hundred ask the player to SING, the rest asking him to name the interval. A rule the
+    // player can tune: from zero (no singing) to one hundred (nothing but singing).
+    Q_PROPERTY( int singQuestionShare READ singQuestionShare NOTIFY singQuestionShareChanged )
+
+    // Combien de questions sur cent portent sur le RYTHME, et combien sur les ACCORDS. Memes reglages, memes bornes,
+    // memes raisons : au-dela d'une part, on ne choisit plus ce qu'on travaille, on le subit.
+    Q_PROPERTY( int rhythmQuestionShare READ rhythmQuestionShare NOTIFY rhythmQuestionShareChanged )
+    Q_PROPERTY( int chordQuestionShare READ chordQuestionShare NOTIFY chordQuestionShareChanged )
+
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
 
@@ -153,6 +223,38 @@ public:
     // Ce que la question en cours demande : nommer un intervalle, ou dire dans quel sens il a ete joue. La valeur
     // est celle du domaine, transposee en entier pour le QML.
     [[nodiscard]] int questionKind() const noexcept;
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // La question de rythme
+    //
+    // Tout ce qui suit ne veut rien dire sur une question d'intervalle, et le dit : les valeurs sont vides ou nulles,
+    // jamais fausses. Un ecran qui les lit par erreur n'affiche rien plutot qu'un mensonge.
+    // ---------------------------------------------------------------------------------------------------------------
+    [[nodiscard]] bool isRhythmQuestion() const noexcept;
+
+    [[nodiscard]] QString rhythmPatternName() const;
+    [[nodiscard]] int rhythmBpm() const noexcept;
+    [[nodiscard]] int rhythmBeatsPerBar() const noexcept;
+    [[nodiscard]] QVariantList rhythmHits() const;
+
+    [[nodiscard]] int rhythmBeatInBar() const noexcept;
+    [[nodiscard]] bool isRhythmPlaying() const noexcept;
+    [[nodiscard]] int rhythmLastQuality() const noexcept;
+    [[nodiscard]] int rhythmCoveredOnsets() const noexcept;
+    [[nodiscard]] int rhythmOnsetCount() const noexcept;
+    [[nodiscard]] int rhythmCellDurationMs() const noexcept;
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // La question d'accord
+    //
+    // Tout ce qui suit ne dit rien sur une question d'intervalle, et le dit : des valeurs vides plutot que des valeurs
+    // fausses. Un ecran qui les lirait par erreur n'afficherait rien.
+    // ---------------------------------------------------------------------------------------------------------------
+    [[nodiscard]] bool isChordQuestion() const noexcept;
+
+    [[nodiscard]] QVariantMap heardChord() const;
+    [[nodiscard]] QVariantMap answeredChord() const;
+    [[nodiscard]] QVariantList chordChoices() const;
 
     // The name the player gave himself, empty before the first time he writes one.
     [[nodiscard]] QString playerName() const;
@@ -198,6 +300,29 @@ public:
     [[nodiscard]] double referencePitch() const;
 
     Q_INVOKABLE void setReferencePitch( double p_hertz );
+
+    // How many questions in a hundred ask the player to sing, remembered between launches.
+    [[nodiscard]] int singQuestionShare() const;
+
+    Q_INVOKABLE void setSingQuestionShare( int p_share );
+
+    // Combien de questions sur cent portent sur le rythme, et combien sur les accords. Meme contrat que le chant :
+    // borne a 0-100, memorise, et pris en compte par la session SUIVANTE.
+    [[nodiscard]] int rhythmQuestionShare() const;
+
+    Q_INVOKABLE void setRhythmQuestionShare( int p_share );
+
+    [[nodiscard]] int chordQuestionShare() const;
+
+    Q_INVOKABLE void setChordQuestionShare( int p_share );
+
+    // The player pressed "Écouter" on a sung question: play the target, and count it as a replay when the player is
+    // not a beginner - hearing the answer first is the easy way, and it costs experience.
+    Q_INVOKABLE void listenToTarget();
+
+    // Wipes the experience and the statistics of the profile: points, sessions and stars back to zero. The name and
+    // the level stay - they are choices, not a score.
+    Q_INVOKABLE void resetProfile();
 
     // The rank of the current streak, as an index and as its display label.
     [[nodiscard]] int rank() const noexcept;
@@ -284,6 +409,17 @@ public:
     // listened and compared the sung interval to the target.
     Q_INVOKABLE void answerSung( bool p_isCorrect );
 
+    // Le joueur a tape, sur la question de rythme en cours.
+    //
+    // C'est le controleeur qui MESURE - la position du doigt dans la cellule se compte depuis le premier temps de la
+    // boucle de reproduction - et le domaine qui JUGE. Une frappe pendant l'ECOUTE sonne et ne vaut rien : celui qui
+    // accompagne la cellule ne perd pas une vie pour l'avoir suivie.
+    Q_INVOKABLE void tapRhythm();
+
+    // Le joueur a nomme la couleur de l'accord, donnee comme l'index du domaine. L'ecran ne compose ni un nom ni un
+    // symbole : il renvoie l'index de ce qu'il a affiche.
+    Q_INVOKABLE void answerChord( int p_quality );
+
     // The microphone controller, injected so that a sung question can reach the voice. Null in the tests: a sung
     // question then cannot be answered, but nothing breaks.
     void setMicrophoneController( MicrophoneController * p_microphone );
@@ -335,8 +471,21 @@ signals:
     // The player has just changed the A4 diapason.
     void referencePitchChanged();
 
+    // The player has just changed how often questions ask him to sing.
+    void singQuestionShareChanged();
+
+    // Le joueur vient de changer la part du rythme, ou celle des accords.
+    void rhythmQuestionShareChanged();
+    void chordQuestionShareChanged();
+
     // The player has just pressed the "test the notification" button.
     void testReminderRequested();
+
+    // La boucle de rythme a avance : un temps de plus, un passage en reproduction, ou une frappe jugee.
+    //
+    // Un seul signal pour les trois, parce que c'est la MEME question de l'ecran - "ou en est-on ?" - et qu'un ecran
+    // qui les separerait devrait les reunir lui-meme pour se redessiner.
+    void rhythmStateChanged();
 
     // A new anecdote was drawn.
     void anecdoteChanged();
@@ -357,14 +506,76 @@ private:
     // Starts a session with these settings, drawing the seed in the interface layer where entropy belongs.
     void beginSession( domain::SessionSettings p_settings );
 
+    // Les reglages d'une session pour un niveau, en gardant ce qui n'appartient PAS au niveau - les parts de question,
+    // qui sont des reglages du joueur. Voir la definition, et le piege que cette methode ferme.
+    [[nodiscard]] domain::SessionSettings sessionSettingsForLevel( domain::PlayerLevel p_level ) const;
+
+    // Ce que le PROFIL decide des parts de question : combien de questions de chaque genre sur cent.
+    //
+    // Une seule fonction pour les trois, parce que c'est un seul reglage repete trois fois. Quand il n'y a pas de
+    // profil - un test, ou une application qui n'a nulle part ou ecrire - les reglages passes au constructeur restent
+    // en place, et rien n'est ecrase.
+    void applyStoredQuestionShares( domain::SessionSettings & p_settings ) const;
+
     // Adds the session's outcome - its experience, its count, its star - to the profile, once, when it ends.
     void persistSessionOutcome();
 
     // Plays the interval of the question being asked, from its own root note.
     void playCurrentQuestion();
 
+    // ---------------------------------------------------------------------------------------------------------------
+    // La boucle de rythme
+    //
+    // Une question de rythme se joue en DEUX mesures : une ou la cellule s'ecoute, une ou elle se reproduit. La boucle
+    // tourne ensuite toute seule, jusqu'a ce que la question soit juste, passee, ou finie - c'est ce qui evite au
+    // joueur d'avoir a relancer quoi que ce soit entre deux tentatives.
+    //
+    // Elle vit ici plutot que dans le domaine, et pour la meme raison que le reste : le domaine ne mesure pas le
+    // temps. C'est aussi pourquoi RhythmController ne s'en occupe pas : la page Rythme est un outil libre, cette
+    // boucle-ci appartient a une question.
+    // ---------------------------------------------------------------------------------------------------------------
+
+    // Demarre une question de rythme : l'ecoute commence, et la boucle tourne.
+    void startRhythmQuestion();
+
+    // La mesure d'ecoute : la cellule se joue, le doigt n'est pas juge.
+    void beginRhythmListening();
+
+    // La mesure de reproduction : le clic bat la pulsation, et chaque frappe est jugee.
+    void beginRhythmPlaying();
+
+    // La fin d'une mesure de reproduction : le domaine rend son verdict, et la boucle repart.
+    void finishRhythmLoop();
+
+    // Arrete la boucle et remet ses compteurs a zero.
+    void stopRhythmLoop();
+
+    // Un temps de la boucle : ce qui sonne sur ce temps, puis l'avancement.
+    void onRhythmBeat();
+
+    // Les frappes de la cellule qui tombent dans le temps p_beatInBar. Les frappes decalees - les syncopes - partent
+    // en differe, parce que c'est ce qu'est une syncope : une frappe ENTRE deux temps.
+    void playRhythmHitsForBeat( int p_beatInBar );
+
+    // La cellule en entier, une fois : c'est le feedback, et la confirmation d'une reponse juste.
+    void playRhythmModelOnce();
+
+    // Ou en est la cellule, en temps, depuis le premier temps de la reproduction.
+    [[nodiscard]] double rhythmPositionInBeats() const noexcept;
+
+    // Combien de frappes de la cellule ont ete touchees, dans la question en cours.
+    [[nodiscard]] int coveredOnsetCount() const noexcept;
+
     // Plays the same two notes TOGETHER, whatever direction the question was asked in.
     void playCurrentQuestionAsChord();
+
+    // Joue un accord : ses notes, plaquee. Le seul chemin par lequel un accord s'entend, que ce soit pour poser la
+    // question ou pour la confirmer.
+    void playChordNotes( const domain::Chord & p_chord );
+
+    // Whether the player still gets the answer played for him: a beginner hears the interval first, everyone else
+    // has to ask for it (and pays for the asking).
+    [[nodiscard]] bool isBeginner() const noexcept;
 
     domain::NotePlayer & m_notePlayer;
 
@@ -397,6 +608,32 @@ private:
 
     // Empty until a session starts: the bench is what the application shows before that.
     std::unique_ptr<domain::ExerciseSession> m_session;
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // La boucle de rythme
+    // ---------------------------------------------------------------------------------------------------------------
+
+    // Ce que vaut rhythmLastQuality quand rien n'a encore ete frappe. Distinct de 0, qui est un Miss : "je n'ai pas
+    // encore tape" et "j'ai tape a cote" sont deux choses differentes, et l'ecran les montre differemment.
+    static constexpr int NO_RHYTHM_TAP = -1;
+
+    QTimer m_rhythmTimer;
+    QElapsedTimer m_rhythmClock;
+
+    // Le temps qui sonne, 0 = le premier de la mesure.
+    int m_rhythmBeatInBar{ 0 };
+
+    // Vrai pendant la reproduction, faux pendant l'ecoute. C'est la seule chose que ce booleen decide, et c'est
+    // beaucoup : ce qui sonne, et ce qui est juge.
+    bool m_rhythmIsPlaying{ false };
+
+    // La qualite de la derniere frappe, dans la convention de l'ecran (0 = Miss, 1 = Good, 2 = Perfect). -1 tant que
+    // rien n'a ete frappe sur cette question, ce qui n'est pas la meme chose qu'un Miss.
+    int m_rhythmLastQuality{ NO_RHYTHM_TAP };
+
+    // Le detail de la derniere tentative. Il est lu AVANT que le domaine ne rende son verdict, parce que le domaine
+    // remet son ardoise a zero en jugeant - et l'ecran, lui, doit pouvoir dire "trois frappes sur quatre".
+    int m_rhythmCoveredOnsets{ 0 };
 
     // The microphone, for the sung questions. Null until the application wires it in; the tests leave it null.
     MicrophoneController * m_microphone{ nullptr };

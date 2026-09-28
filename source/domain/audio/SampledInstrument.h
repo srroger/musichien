@@ -40,13 +40,22 @@
 namespace musichien::domain
 {
 
-// The sampled instruments the game can play, and the ORDER they are loaded in.
+// The instruments the game can play, and the ORDER they are loaded in.
 //
 // That order is a contract, not a detail: a preference is stored as one flag per instrument, so an instrument
 // inserted in the middle would silently exchange the choices the player made. New instruments go LAST.
-inline constexpr std::size_t INSTRUMENT_COUNT = 3;
+//
+// The last three are NOT samples: they are the pure waveforms the synthesiser renders (see Waveform), offered so
+// that a change of temperament can be HEARD for what it is. They are listed here so that the settings screen offers
+// them exactly like a recording.
+inline constexpr std::size_t INSTRUMENT_COUNT = 6;
 
-inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{ "piano", "guitare", "saxo" };
+inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{
+  "piano", "guitare", "saxo", "sinusoïdal", "dent de scie", "carré" };
+
+// The waveforms offered as instruments, in the same order as their names at the end of INSTRUMENT_NAMES. The adapter
+// maps the corresponding flags onto this list.
+inline constexpr std::array<Waveform, 3> WAVEFORM_INSTRUMENTS{ Waveform::Sine, Waveform::Sawtooth, Waveform::Square };
 
 // One recorded note: its samples, the note they were recorded at, and the rate they were recorded at.
 struct SampledNote
@@ -79,23 +88,33 @@ public:
     [[nodiscard]] std::size_t noteCount() const noexcept { return m_notes.size(); }
 
     // A note, a chord, a melody: the same three calls ToneSynthesizer offers, so that the adapter above can use
-    // either one without knowing which.
+    // either one without knowing which. The tuning's root is the first note (or the note itself, for a single note).
     [[nodiscard]] std::vector<float> renderNote( const Note & p_note,
                                                  std::chrono::milliseconds p_duration,
-                                                 std::int32_t p_sampleRate ) const;
+                                                 std::int32_t p_sampleRate,
+                                                 TuningContext p_tuning = {} ) const;
 
     [[nodiscard]] std::vector<float> renderChord( std::span<const Note> p_notes,
                                                   std::chrono::milliseconds p_duration,
-                                                  std::int32_t p_sampleRate ) const;
+                                                  std::int32_t p_sampleRate,
+                                                  TuningContext p_tuning = {} ) const;
 
     [[nodiscard]] std::vector<float> renderMelody( std::span<const Note> p_notes,
                                                    std::chrono::milliseconds p_noteDuration,
                                                    std::chrono::milliseconds p_gap,
-                                                   std::int32_t p_sampleRate ) const;
+                                                   std::int32_t p_sampleRate,
+                                                   TuningContext p_tuning = {} ) const;
 
 private:
     // The recorded note closest to the one asked for: see the transposition in renderNote.
     [[nodiscard]] const SampledNote & closestNoteTo( const Note & p_note ) const;
+
+    // One note at an EXPLICIT frequency: the caller computed it from the tuning and the root, and this method only
+    // chooses the closest recording and plays it back at the speed that reaches that frequency.
+    [[nodiscard]] std::vector<float> renderNoteAt( const Note & p_note,
+                                                   double p_frequencyHz,
+                                                   std::chrono::milliseconds p_duration,
+                                                   std::int32_t p_sampleRate ) const;
 
     std::vector<SampledNote> m_notes;
 };

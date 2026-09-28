@@ -35,6 +35,7 @@ ApplicationWindow {
     // Pourquoi un composant : le style Material peint la CASE sur fond clair ET la LISTE ouverte sur fond blanc.
     // Regler seulement `background` ne suffit donc pas - un texte clair sur une liste blanche reste illisible. Il
     // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
+    // Une part de question : un titre, une phrase qui dit ce que le reglage fait, et le nombre.
 
     id: mainWindow
 
@@ -332,6 +333,13 @@ ApplicationWindow {
                     Button {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
+                        text: qsTr("Rythme")
+                        onClicked: rhythmDialog.open()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
                         text: qsTr("Options")
                         onClicked: settingsDialog.open()
                     }
@@ -447,6 +455,28 @@ ApplicationWindow {
 
                 Item {
                     Layout.preferredHeight: 10
+                }
+
+                // Le bouton qui tient l'accord six secondes : c'est le temps qu'il faut a l'oreille pour compter les
+                // battements entre deux frequences, et donc pour ENTENDRE ce qu'un temperament change. Il rejoue
+                // l'intervalle entendu en dernier, les deux notes ensemble.
+                Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    enabled: mainWindow.hasHeardInterval
+                    text: qsTr("Tenir 6 s (battements)")
+                    onClicked: IntervalController.playSustainedInterval(mainWindow.heardInterval.semitones)
+                }
+
+                // Les frequences EXACTES jouees, en hertz, telles que le temperament et le diapason les calculent.
+                // C'est ce qu'un accordeur externe doit retrouver - et ce qui prouve, chiffre a l'appui, qu'un
+                // changement de temperament est bien descendu jusqu'au son.
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    color: "#8ef2b0"
+                    font.pixelSize: 16
+                    font.bold: true
+                    visible: IntervalController.playedFrequencies !== ""
+                    text: IntervalController.playedFrequencies
                 }
 
                 Text {
@@ -570,8 +600,14 @@ ApplicationWindow {
 
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            // La colonne ne doit jamais defiler de cote : rien ne depasse en largeur, et un leger mouvement
+            // horizontal quand on fait defiler vers le bas est un defaut, pas une liberte.
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
+                // Les trois parts de question : combien de questions de chaque genre sur cent. Un reglage par genre,
+                // la meme mise en page pour les trois, et une seule definition - voir QuestionShareSetting.
+
                 id: settingsColumn
 
                 width: settingsScroll.availableWidth
@@ -740,6 +776,41 @@ ApplicationWindow {
 
                     }
 
+                }
+
+                // Le rythme et les accords sont arrives apres le chant, et ils se sont fait brancher sans une ligne
+                // de mise en page nouvelle : c'est exactement ce que le composant promettait.
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Chant")
+                    hint: qsTr("Part des questions chantées, en pour cent. 0 = jamais, 100 = tout chanter.")
+                    share: ExerciseController.singQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setSingQuestionShare(p_share);
+                    }
+                }
+
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Rythme")
+                    hint: qsTr("Part des questions de rythme, en pour cent. 0 = jamais, 100 = que du rythme.")
+                    share: ExerciseController.rhythmQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setRhythmQuestionShare(p_share);
+                    }
+                }
+
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Accords")
+                    hint: qsTr("Part des questions d'accords, en pour cent. 0 = jamais, 100 = que des accords.")
+                    share: ExerciseController.chordQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setChordQuestionShare(p_share);
+                    }
                 }
 
                 // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
@@ -1043,6 +1114,14 @@ ApplicationWindow {
                 onClicked: ExerciseController.testReminder()
             }
 
+            // Remet l'experience, les sessions et les etoiles a zero. Le nom et le niveau restent : ce sont des
+            // choix, pas un score. Aucune confirmation pour l'instant - l'application est en developpement.
+            Button {
+                Layout.alignment: Qt.AlignRight
+                text: qsTr("Remise à zéro du profil")
+                onClicked: ExerciseController.resetProfile()
+            }
+
             Button {
                 Layout.alignment: Qt.AlignRight
                 text: qsTr("Fermer")
@@ -1058,6 +1137,301 @@ ApplicationWindow {
 
         interval: 6000
         onTriggered: mainWindow.feedbackVisible = false
+    }
+
+    Dialog {
+        id: rhythmDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 420)
+        height: Math.min(mainWindow.height * 0.9, rhythmColumn.implicitHeight + 32)
+        modal: true
+        padding: 16
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        contentItem: ScrollView {
+            id: rhythmScroll
+
+            clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+            ColumnLayout {
+                id: rhythmColumn
+
+                width: rhythmScroll.availableWidth
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#e8dcff"
+                    font.pixelSize: 16
+                    font.bold: true
+                    text: qsTr("Rythme")
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        Text {
+                            color: "#8a77ad"
+                            font.pixelSize: 12
+                            text: qsTr("Tempo (bpm)")
+                        }
+
+                        SpinBox {
+                            Layout.preferredWidth: 130
+                            from: 1
+                            to: 300
+                            editable: true
+                            value: RhythmController.bpm
+                            onValueModified: RhythmController.setBpm(value)
+
+                            contentItem: TextInput {
+                                text: parent.textFromValue(parent.value, parent.locale)
+                                color: "#ffffff"
+                                horizontalAlignment: Text.AlignHCenter
+                                font.pixelSize: 15
+                                validator: parent.validator
+                                readOnly: !parent.editable
+                            }
+
+                            background: Rectangle {
+                                color: "#1b1035"
+                                radius: 4
+                                border.width: 1
+                                border.color: "#5c4a80"
+                            }
+
+                        }
+
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        Text {
+                            color: "#8a77ad"
+                            font.pixelSize: 12
+                            text: qsTr("Temps par mesure")
+                        }
+
+                        SpinBox {
+                            Layout.preferredWidth: 130
+                            from: 1
+                            to: 12
+                            editable: true
+                            value: RhythmController.beatsPerBar
+                            onValueModified: RhythmController.setBeatsPerBar(value)
+
+                            contentItem: TextInput {
+                                text: parent.textFromValue(parent.value, parent.locale)
+                                color: "#ffffff"
+                                horizontalAlignment: Text.AlignHCenter
+                                font.pixelSize: 15
+                                validator: parent.validator
+                                readOnly: !parent.editable
+                            }
+
+                            background: Rectangle {
+                                color: "#1b1035"
+                                radius: 4
+                                border.width: 1
+                                border.color: "#5c4a80"
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                // La cellule rythmique : le metronome seul, ou un cliche a reproduire. Le clic continue de battre la
+                // mesure par-dessus, pour que la pulsation reste le repere.
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 12
+                        text: qsTr("Rythmique à reproduire")
+                    }
+
+                    DarkComboBox {
+                        Layout.fillWidth: true
+                        model: RhythmController.patterns
+                        currentIndex: RhythmController.currentPattern
+                        onActivated: RhythmController.setCurrentPattern(index)
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        color: "#8a77ad"
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Lance le métronome : la rythmique boucle. Tape sur TAPE en même temps que les frappes.")
+                    }
+
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 90
+                    highlighted: RhythmController.lastQuality === 2
+                    text: RhythmController.isRunning ? qsTr("TAPE · temps %1").arg(RhythmController.beatInBar + 1) : qsTr("TAPE (tap tempo)")
+                    onClicked: RhythmController.tap()
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#8ef2b0"
+                    font.pixelSize: 14
+                    text: qsTr("Score %1 · série %2").arg(RhythmController.score).arg(RhythmController.combo)
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: RhythmController.isRunning ? qsTr("Arrêter") : qsTr("Démarrer")
+                        onClicked: RhythmController.isRunning ? RhythmController.stop() : RhythmController.start()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Fermer")
+                        onClicked: rhythmDialog.close()
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 6
+                    color: "#e8dcff"
+                    font.pixelSize: 14
+                    font.bold: true
+                    text: qsTr("Batterie")
+                }
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 2
+                    columnSpacing: 8
+                    rowSpacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 56
+                        text: qsTr("Grosse caisse")
+                        onClicked: RhythmController.playDrum(0)
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 56
+                        text: qsTr("Caisse claire")
+                        onClicked: RhythmController.playDrum(1)
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 56
+                        text: qsTr("Charleston")
+                        onClicked: RhythmController.playDrum(2)
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 56
+                        text: qsTr("Tom")
+                        onClicked: RhythmController.playDrum(3)
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    // UNE seule definition pour les trois reglages - chant, rythme, accords - parce que trois copies identiques
+    // finissent toujours par diverger, et parce que le prochain genre de question en aura une quatrieme a brancher.
+    component QuestionShareSetting: ColumnLayout {
+        id: questionShareSetting
+
+        property string title: ""
+        property string hint: ""
+        property int share: 0
+
+        signal shareEdited(real p_share)
+
+        spacing: 6
+
+        Text {
+            Layout.fillWidth: true
+            color: "#e8dcff"
+            font.pixelSize: 14
+            font.bold: true
+            text: questionShareSetting.title
+        }
+
+        Text {
+            Layout.fillWidth: true
+            color: "#8a77ad"
+            font.pixelSize: 12
+            wrapMode: Text.WordWrap
+            text: questionShareSetting.hint
+        }
+
+        SpinBox {
+            Layout.preferredWidth: 150
+            Layout.preferredHeight: 32
+            Layout.alignment: Qt.AlignLeft
+            from: 0
+            to: 100
+            stepSize: 5
+            editable: true
+            value: questionShareSetting.share
+            onValueModified: questionShareSetting.shareEdited(value)
+
+            contentItem: TextInput {
+                text: parent.textFromValue(parent.value, parent.locale)
+                color: "#ffffff"
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: 15
+                validator: parent.validator
+                inputMethodHints: Qt.ImhFormattedNumbersOnly
+                readOnly: !parent.editable
+            }
+
+            background: Rectangle {
+                color: "#1b1035"
+                radius: 4
+                border.width: 1
+                border.color: "#5c4a80"
+            }
+
+        }
+
     }
 
     // Un composant inline plutot qu'un fichier : il n'est utile qu'ici, et il evite de dupliquer trois fois le meme

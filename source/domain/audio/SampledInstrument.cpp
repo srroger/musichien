@@ -322,7 +322,23 @@ const SampledNote & SampledInstrument::closestNoteTo( const Note & p_note ) cons
 
 std::vector<float> SampledInstrument::renderNote( const Note & p_note,
                                                   std::chrono::milliseconds p_duration,
-                                                  std::int32_t p_sampleRate ) const
+                                                  std::int32_t p_sampleRate,
+                                                  TuningContext p_tuning ) const
+{
+    // A note on its own is heard FROM itself: its root is the note.
+    return renderNoteAt( p_note,
+                         frequencyFor( p_note,
+                                       p_note,
+                                       p_tuning.temperament,
+                                       p_tuning.referencePitchHz ),
+                         p_duration,
+                         p_sampleRate );
+}
+
+std::vector<float> SampledInstrument::renderNoteAt( const Note & p_note,
+                                                    double p_frequencyHz,
+                                                    std::chrono::milliseconds p_duration,
+                                                    std::int32_t p_sampleRate ) const
 {
     const auto exactSampleCount = ( static_cast<double>( p_duration.count() ) / 1000.0 ) * static_cast<double>( p_sampleRate );
 
@@ -339,12 +355,15 @@ std::vector<float> SampledInstrument::renderNote( const Note & p_note,
 
     // How fast the recording is played back, and there are two reasons in that ratio:
     //
-    //   * the DISTANCE to the recorded note - an octave up is twice the speed. The closest recording is never
-    //     more than three semitones away, which is what keeps the transposition inaudible;
+    //   * the DISTANCE between the target frequency and the recorded note's own frequency - an octave up is twice
+    //     the speed. The closest recording is never more than three semitones away, which is what keeps the
+    //     transposition inaudible. The recorded note's frequency is its EQUAL-temperament frequency: a real
+    //     recording is always made at the standard diapason, and the temperament only decides how far FROM that
+    //     frequency the target is;
     //   * the RATE of the recording against the rate of the OUTPUT, so that a 44.1 kHz sample still plays in tune
     //     on a 48 kHz output. Forgetting it would detune the instrument by a semitone and a half.
     const double playbackRatio =
-      std::pow( 2.0, static_cast<double>( p_note.midiNumber() - recordedNote.rootMidiNumber ) / 12.0 ) * ( static_cast<double>( recordedNote.sampleRate ) / static_cast<double>( p_sampleRate ) );
+      ( p_frequencyHz / Note{ recordedNote.rootMidiNumber }.frequencyHz() ) * ( static_cast<double>( recordedNote.sampleRate ) / static_cast<double>( p_sampleRate ) );
 
     for( std::size_t sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex )
     {
@@ -373,7 +392,8 @@ std::vector<float> SampledInstrument::renderNote( const Note & p_note,
 
 std::vector<float> SampledInstrument::renderChord( std::span<const Note> p_notes,
                                                    std::chrono::milliseconds p_duration,
-                                                   std::int32_t p_sampleRate ) const
+                                                   std::int32_t p_sampleRate,
+                                                   TuningContext p_tuning ) const
 {
     const auto exactSampleCount = ( static_cast<double>( p_duration.count() ) / 1000.0 ) * static_cast<double>( p_sampleRate );
 
@@ -384,9 +404,12 @@ std::vector<float> SampledInstrument::renderChord( std::span<const Note> p_notes
         return mixedSamples;
     }
 
+    const Note root = p_notes.front();
+
     for( const Note & note : p_notes )
     {
-        const std::vector<float> noteSamples = renderNote( note, p_duration, p_sampleRate );
+        const std::vector<float> noteSamples =
+          renderNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_duration, p_sampleRate );
 
         std::ranges::transform( noteSamples, mixedSamples, mixedSamples.begin(), std::plus<>{} );
     }
@@ -400,11 +423,12 @@ std::vector<float> SampledInstrument::renderChord( std::span<const Note> p_notes
 std::vector<float> SampledInstrument::renderMelody( std::span<const Note> p_notes,
                                                     std::chrono::milliseconds p_noteDuration,
                                                     std::chrono::milliseconds p_gap,
-                                                    std::int32_t p_sampleRate ) const
+                                                    std::int32_t p_sampleRate,
+                                                    TuningContext p_tuning ) const
 {
     std::vector<float> melodySamples;
 
-    if( p_sampleRate <= 0 )
+    if( ( p_sampleRate <= 0 ) || p_notes.empty() )
     {
         return melodySamples;
     }
@@ -413,9 +437,12 @@ std::vector<float> SampledInstrument::renderMelody( std::span<const Note> p_note
 
     const auto gapSampleCount = static_cast<std::size_t>( std::llround( exactGapSampleCount ) );
 
+    const Note root = p_notes.front();
+
     for( const Note & note : p_notes )
     {
-        const std::vector<float> noteSamples = renderNote( note, p_noteDuration, p_sampleRate );
+        const std::vector<float> noteSamples =
+          renderNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_noteDuration, p_sampleRate );
 
         melodySamples.insert( melodySamples.end(), noteSamples.begin(), noteSamples.end() );
 

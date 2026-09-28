@@ -31,6 +31,23 @@ namespace
 
 constexpr std::size_t SESSION_QUESTION_COUNT = 10;
 
+// Des questions d'intervalle, et RIEN d'autre : ni chant, ni rythme, ni mode guide.
+//
+// Les trois parts sont epinglees ENSEMBLE, et c'est le piege de ce fichier : une part laissee a sa valeur par defaut
+// fait echouer un test une fois sur cinq, et un test qui echoue au hasard n'apprend rien a personne. Le meme piege
+// existait deja pour le chant - voir l'en-tete.
+[[nodiscard]] domain::SessionSettings intervalOnlySettings()
+{
+    domain::SessionSettings settings;
+
+    settings.singQuestionShare = 0;
+    settings.directionQuestionShare = 0;
+    settings.rhythmQuestionShare = 0;
+    settings.chordQuestionShare = 0;
+
+    return settings;
+}
+
 // A session that ALWAYS goes up.
 //
 // The direction is drawn at random in a real session, so a test asserting "the question was heard as a
@@ -38,13 +55,51 @@ constexpr std::size_t SESSION_QUESTION_COUNT = 10;
 // to be ignored. Pinning the direction is what makes these tests precise instead of tolerant.
 [[nodiscard]] domain::SessionSettings ascendingOnlySettings()
 {
-    domain::SessionSettings settings;
+    domain::SessionSettings settings = intervalOnlySettings();
 
     settings.ascendingShare = 100;
     settings.descendingShare = 0;
     settings.harmonicShare = 0;
 
     return settings;
+}
+
+// Une session qui ne pose QUE des questions de rythme : la ou le rythme se teste, il n'y a pas de place pour un
+// intervalle tire au hasard.
+[[nodiscard]] domain::SessionSettings rhythmOnlySettings()
+{
+    domain::SessionSettings settings;
+
+    settings.singQuestionShare = 0;
+    settings.directionQuestionShare = 0;
+    settings.rhythmQuestionShare = 100;
+
+    return settings;
+}
+
+// Une session qui ne pose QUE des questions d'accords.
+[[nodiscard]] domain::SessionSettings chordOnlySettings()
+{
+    domain::SessionSettings settings;
+
+    settings.singQuestionShare = 0;
+    settings.directionQuestionShare = 0;
+    settings.rhythmQuestionShare = 0;
+    settings.chordQuestionShare = 100;
+
+    return settings;
+}
+
+// Un profil qui ne veut QUE des intervalles.
+//
+// Les quatre parts de question sont epinglees ENSEMBLE : une seule laissee a sa valeur par defaut - vingt - et le test
+// qui parle de la grille tombe sur une autre question une fois sur cinq. Le piege a coute cher une fois deja, et il
+// grandit a chaque genre de question nouveau.
+void storeIntervalOnlyShares( domain::PlayerPreferencesFake & p_store )
+{
+    p_store.storeSingQuestionShare( 0 );
+    p_store.storeRhythmQuestionShare( 0 );
+    p_store.storeChordQuestionShare( 0 );
 }
 
 // The interval the session just asked, as the screen reads it.
@@ -411,7 +466,11 @@ TEST( ExerciseSessionControllerTest, a_level_decides_where_the_sessions_start )
     domain::NotePlayerFake notePlayer;
     domain::PlayerPreferencesFake levelStore;
 
-    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+    // Ni chant ni rythme ni accords : ce test parle de la GRILLE, et une question d'un autre genre n'offre aucune grille
+    // a regarder. Sans cet epeinglage, il echouerait une fois sur cinq - et un test qui echoue au hasard ne dit rien.
+    storeIntervalOnlyShares( levelStore );
+
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, &levelStore };
 
     // Nothing chosen yet, and that is a question to ask - not a default to assume.
     EXPECT_FALSE( controller.hasChosenLevel() );
@@ -450,7 +509,10 @@ TEST( ExerciseSessionControllerTest, a_level_changes_the_palette_and_nothing_els
     domain::NotePlayerFake notePlayer;
     domain::PlayerPreferencesFake levelStore;
 
-    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+    // Meme epeinglage que ci-dessus, et pour la meme raison : le niveau relit les parts de question du profil.
+    storeIntervalOnlyShares( levelStore );
+
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, &levelStore };
 
     controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Beginner ) );
     controller.startSession();
@@ -640,6 +702,11 @@ TEST( ExerciseSessionControllerTest, the_session_experience_joins_the_profile_to
 
     settings.questionCount = 2;
 
+    // Ni chant, ni rythme, ni accords : le profil les relit tous, et ce test joue une session d'INTERVALLES jusqu'au
+    // bout. Sans cet epeinglage, il tomberait sur une question qui ne se repond pas au doigt, et la session finirait
+    // par epuisement des vies plutot que par ses deux questions.
+    storeIntervalOnlyShares( store );
+
     ExerciseSessionController controller{ notePlayer, settings, {}, {}, {}, &store };
 
     controller.startSession();
@@ -731,6 +798,325 @@ TEST( ExerciseSessionControllerTest, the_tuning_is_remembered_and_stays_in_range
     controller.setReferencePitch( 999.0 );
 
     EXPECT_EQ( 442.0, controller.referencePitch() );
+}
+
+TEST( ExerciseSessionControllerTest, the_sing_share_is_remembered_and_the_profile_can_be_reset )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    // Twenty per cent by default, and the share can be changed and remembered.
+    EXPECT_EQ( 20, controller.singQuestionShare() );
+
+    controller.setSingQuestionShare( 40 );
+
+    EXPECT_EQ( 40, controller.singQuestionShare() );
+    EXPECT_EQ( 40, levelStore.storedSingQuestionShare() );
+
+    // A value that makes no sense is refused.
+    controller.setSingQuestionShare( 150 );
+
+    EXPECT_EQ( 40, controller.singQuestionShare() );
+
+    // The profile: some history, then wiped clean.
+    levelStore.storeTotalExperience( 320 );
+    levelStore.storeSessionCount( 5 );
+    levelStore.storeStarCount( 2 );
+
+    EXPECT_EQ( 320, controller.totalExperience() );
+
+    controller.resetProfile();
+
+    EXPECT_EQ( 0, controller.totalExperience() );
+    EXPECT_EQ( 0, controller.sessionCount() );
+    EXPECT_EQ( 0, controller.starCount() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// La question de rythme, vue par l'ecran
+//
+// Le jugement lui-meme appartient au domaine, et il y est teste sans horloge : ici, on verifie ce que l'ECRAN peut lire
+// et entendre - qu'une cellule se fait ecouter avant d'etre reproduite, qu'une frappe s'entend, et qu'aucune de ces
+// proprietes ne ment sur une question d'intervalle.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionControllerTest, a_rhythm_question_is_heard_as_a_cell_and_not_as_an_interval )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
+
+    controller.startSession();
+
+    EXPECT_TRUE( controller.isRhythmQuestion() );
+    EXPECT_EQ( 3, controller.questionKind() );
+
+    // L'ecoute commence tout de suite : le premier temps de la cellule est frappe des l'ouverture de la question.
+    EXPECT_GT( notePlayer.drumCount(), 0 );
+
+    // Et AUCUN intervalle n'est joue : une question de rythme ne fait pas entendre de notes.
+    EXPECT_TRUE( notePlayer.playedMelodies().empty() );
+    EXPECT_TRUE( notePlayer.playedChords().empty() );
+}
+
+TEST( ExerciseSessionControllerTest, the_rhythm_properties_describe_the_cell_for_the_screen )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
+
+    controller.startSession();
+
+    // Le nom vient du domaine, et c'est celui d'une cellule du domaine.
+    EXPECT_FALSE( controller.rhythmPatternName().isEmpty() );
+
+    EXPECT_EQ( 90, controller.rhythmBpm() );
+    EXPECT_GT( controller.rhythmBeatsPerBar(), 0 );
+
+    // Une frappe a dessiner par frappe de la cellule, et rien de plus : l'ecran place ce qu'on lui donne.
+    EXPECT_GT( controller.rhythmOnsetCount(), 0 );
+    EXPECT_EQ( controller.rhythmOnsetCount(), controller.rhythmHits().size() );
+
+    const QVariantMap firstHit = controller.rhythmHits().first().toMap();
+
+    EXPECT_TRUE( firstHit.contains( "beat" ) );
+    EXPECT_TRUE( firstHit.contains( "accented" ) );
+    EXPECT_TRUE( firstHit.contains( "drum" ) );
+
+    // Une mesure dure ce que dit le domaine : l'ecran s'en sert pour laisser le feedback s'entendre en entier.
+    EXPECT_GT( controller.rhythmCellDurationMs(), 0 );
+
+    // Et l'ecran commence par l'ECOUTE : le doigt n'est pas juge tant que la cellule n'a pas ete entendue.
+    EXPECT_FALSE( controller.isRhythmPlaying() );
+
+    // Rien n'a encore ete frappe : -1, et non 0, qui est deja un Miss.
+    EXPECT_EQ( -1, controller.rhythmLastQuality() );
+}
+
+TEST( ExerciseSessionControllerTest, a_tap_during_the_listening_phase_is_heard_but_not_judged )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
+
+    controller.startSession();
+
+    const int drumsBefore = notePlayer.drumCount();
+
+    controller.tapRhythm();
+
+    // Le doigt s'entend toujours : sans ce son, taper donnerait l'impression que l'ecran n'a pas recu le geste.
+    EXPECT_GT( notePlayer.drumCount(), drumsBefore );
+
+    // Et il ne vaut RIEN tant que la cellule n'a pas ete entendue en entier : celui qui accompagne le modele pendant
+    // qu'il s'ecoute ne perd pas une vie pour l'avoir suivi.
+    EXPECT_FALSE( controller.isRhythmPlaying() );
+    EXPECT_EQ( -1, controller.rhythmLastQuality() );
+    EXPECT_EQ( 0, controller.rhythmCoveredOnsets() );
+}
+
+TEST( ExerciseSessionControllerTest, tapping_on_an_interval_question_changes_nothing )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+
+    controller.startSession();
+
+    // La meme mesure de surete que le domaine : une frappe sur une question d'intervalle ne juge rien, et ne fait
+    // aucun bruit - il n'y a pas de batterie derriere.
+    controller.tapRhythm();
+
+    EXPECT_EQ( 0, notePlayer.drumCount() );
+    EXPECT_EQ( -1, controller.rhythmLastQuality() );
+
+    // Et les proprietes de la cellule restent vides plutot que d'inventer un nom ou un tempo.
+    EXPECT_FALSE( controller.isRhythmQuestion() );
+    EXPECT_TRUE( controller.rhythmPatternName().isEmpty() );
+    EXPECT_TRUE( controller.rhythmHits().isEmpty() );
+    EXPECT_EQ( 0, controller.rhythmBeatsPerBar() );
+    EXPECT_EQ( 0, controller.rhythmCellDurationMs() );
+}
+
+TEST( ExerciseSessionControllerTest, a_rhythm_question_shows_no_interval )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
+
+    controller.startSession();
+
+    // La question porte un intervalle tire au hasard - c'est l'ordre des tirages - mais il n'a jamais ete joue : le
+    // montrer ferait croire a un intervalle entendu, et l'ecran afficherait un verdict faux.
+    EXPECT_TRUE( controller.heardInterval().isEmpty() );
+    EXPECT_TRUE( controller.hintText().isEmpty() );
+}
+
+TEST( ExerciseSessionControllerTest, passing_a_rhythm_question_plays_the_cell_once )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
+
+    controller.startSession();
+
+    const int drumsAfterListening = notePlayer.drumCount();
+
+    controller.revealAnswer();
+
+    // Passer la question laisse entendre ce qu'il fallait reproduire : la cellule est rejouee, et la question est close.
+    EXPECT_GT( notePlayer.drumCount(), drumsAfterListening );
+    EXPECT_TRUE( controller.isFeedbackVisible() );
+}
+
+TEST( ExerciseSessionControllerTest, leaving_a_rhythm_question_silences_the_loop )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
+
+    controller.startSession();
+
+    controller.stopSession();
+
+    // La boucle est un son comme un autre : quitter l'ecran la fait taire, et la session est bel et bien terminee.
+    EXPECT_FALSE( controller.running() );
+    EXPECT_GT( notePlayer.stopCount(), 0 );
+    EXPECT_FALSE( controller.isRhythmQuestion() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// La question d'accord, vue par l'ecran
+//
+// Le domaine dit ce qu'est un accord ; ici, on verifie ce que l'ECRAN peut jouer, lire et renvoyer : un accord plaque,
+// une poignee de couleurs nommees, et un index qui repart vers le domaine tel qu'il a ete affiche.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionControllerTest, a_chord_question_is_played_as_a_block )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+
+    controller.startSession();
+
+    EXPECT_TRUE( controller.isChordQuestion() );
+    EXPECT_EQ( 4, controller.questionKind() );
+
+    // PLAQUE, et pas arpege : un seul appel, plusieurs notes. C'est la couleur qu'on fait entendre, et c'est ce que le
+    // joueur doit reconnaitre.
+    ASSERT_EQ( 1, notePlayer.playedChords().size() );
+    EXPECT_GE( notePlayer.playedChords().front().notes.size(), 3U );
+
+    // Et aucune melodie : une suite de notes serait une autre question.
+    EXPECT_TRUE( notePlayer.playedMelodies().empty() );
+}
+
+TEST( ExerciseSessionControllerTest, the_chord_choices_and_the_accord_are_ready_to_display )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+
+    controller.startSession();
+
+    const QVariantList choices = controller.chordChoices();
+
+    // Deux couleurs au depart : majeur et mineur. L'ecran affiche la liste telle quelle, et renvoie l'index choisi.
+    ASSERT_EQ( 2, choices.size() );
+
+    const QVariantMap firstChoice = choices.first().toMap();
+
+    EXPECT_FALSE( firstChoice.value( "name" ).toString().isEmpty() );
+    EXPECT_TRUE( firstChoice.contains( "quality" ) );
+    EXPECT_EQ( 3, firstChoice.value( "noteCount" ).toInt() );
+
+    // L'accord entendu est decrit pour l'ecran, symbole compris : "C" + "m" font "Cm", et l'ecran n'assemble rien.
+    const QVariantMap heard = controller.heardChord();
+
+    EXPECT_FALSE( heard.value( "name" ).toString().isEmpty() );
+    EXPECT_FALSE( heard.value( "symbol" ).toString().isEmpty() );
+    EXPECT_FALSE( heard.value( "rootName" ).toString().isEmpty() );
+
+    // Et rien n'a encore ete repondu : un verdict qui parlerait d'une reponse qui n'existe pas serait un mensonge.
+    EXPECT_TRUE( controller.answeredChord().isEmpty() );
+}
+
+TEST( ExerciseSessionControllerTest, naming_the_heard_colour_scores_and_the_accord_is_heard_again )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+
+    controller.startSession();
+
+    const int quality = controller.heardChord().value( "quality" ).toInt();
+
+    controller.answerChord( quality );
+
+    EXPECT_TRUE( controller.isFeedbackVisible() );
+    EXPECT_TRUE( controller.wasLastAnswerCorrect() );
+
+    // La confirmation est l'accord lui-meme, rejoue : deux appels plaques au total.
+    EXPECT_EQ( 2, notePlayer.playedChords().size() );
+
+    // Et la couleur nommee est retenue, pour que le verdict puisse la montrer.
+    EXPECT_EQ( quality, controller.answeredChord().value( "quality" ).toInt() );
+}
+
+TEST( ExerciseSessionControllerTest, an_index_that_is_not_a_colour_is_refused )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+
+    controller.startSession();
+
+    // Un ecran qui inventerait un index ne doit pas pouvoir repondre : la question reste posee, et rien ne bouge.
+    controller.answerChord( 99 );
+    controller.answerChord( -1 );
+
+    EXPECT_TRUE( controller.isAsking() );
+    EXPECT_TRUE( controller.answeredChord().isEmpty() );
+}
+
+TEST( ExerciseSessionControllerTest, an_interval_question_offers_no_chord )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+
+    controller.startSession();
+
+    // Les proprietes d'accord sont vides plutot que fausses : un ecran qui les lirait par erreur n'afficherait rien.
+    EXPECT_FALSE( controller.isChordQuestion() );
+    EXPECT_TRUE( controller.chordChoices().isEmpty() );
+    EXPECT_TRUE( controller.heardChord().isEmpty() );
+
+    // Et repondre une couleur ne juge rien.
+    controller.answerChord( static_cast<int>( domain::ChordQuality::Minor ) );
+
+    EXPECT_TRUE( controller.isAsking() );
+}
+
+TEST( ExerciseSessionControllerTest, the_four_question_shares_are_remembered_and_stay_in_range )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    // Vingt pour cent par defaut, pour les quatre genres de question.
+    EXPECT_EQ( 20, controller.singQuestionShare() );
+    EXPECT_EQ( 20, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 20, controller.chordQuestionShare() );
+
+    controller.setRhythmQuestionShare( 0 );
+    controller.setChordQuestionShare( 45 );
+
+    // Zero est une valeur legitime : c'est meme la demande de Roger, pouvoir ENLEVER le rythme.
+    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 0, levelStore.storedRhythmQuestionShare() );
+
+    EXPECT_EQ( 45, controller.chordQuestionShare() );
+    EXPECT_EQ( 45, levelStore.storedChordQuestionShare() );
+
+    // Et une valeur qui n'a pas de sens est refusee, pas convertie.
+    controller.setRhythmQuestionShare( 150 );
+    controller.setChordQuestionShare( -3 );
+
+    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 45, controller.chordQuestionShare() );
 }
 
 }    // namespace musichien::ui

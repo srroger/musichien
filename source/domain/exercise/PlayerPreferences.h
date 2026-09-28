@@ -118,6 +118,29 @@ public:
     [[nodiscard]] virtual double storedReferencePitch() const = 0;
 
     virtual void storeReferencePitch( double p_hertz ) = 0;
+
+    // How many questions in a hundred ask the player to SING the interval, the rest asking him to name it. A rule of
+    // the session, remembered so that a player who wants more singing does not ask for it every time.
+    [[nodiscard]] virtual std::int32_t storedSingQuestionShare() const = 0;
+
+    virtual void storeSingQuestionShare( std::int32_t p_share ) = 0;
+
+    // Combien de questions sur cent portent sur le RYTHME.
+    //
+    // Meme regle, meme raison d'etre reglable, et cette fois c'est une demande explicite de Roger : apres avoir
+    // entendu l'exercice, il veut pouvoir le doser - "pour potentiellement l'enlever si finalement ce n'est pas ouf
+    // ou a revoir". Une part a zero, et le rythme disparait de la session sans qu'aucune ligne de code ne change.
+    [[nodiscard]] virtual std::int32_t storedRhythmQuestionShare() const = 0;
+
+    virtual void storeRhythmQuestionShare( std::int32_t p_share ) = 0;
+
+    // Combien de questions sur cent portent sur les ACCORDS.
+    //
+    // Troisieme part reglable, et la coincidence n'en est pas une : des qu'un genre de question existe, quelqu'un
+    // voudra le doser. Elles vivent donc toutes les trois ici, et le controleeur les traite de la meme facon.
+    [[nodiscard]] virtual std::int32_t storedChordQuestionShare() const = 0;
+
+    virtual void storeChordQuestionShare( std::int32_t p_share ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -170,6 +193,18 @@ public:
 
     void storeReferencePitch( double p_hertz ) override { m_referencePitch = p_hertz; }
 
+    [[nodiscard]] std::int32_t storedSingQuestionShare() const override { return m_singQuestionShare; }
+
+    void storeSingQuestionShare( std::int32_t p_share ) override { m_singQuestionShare = p_share; }
+
+    [[nodiscard]] std::int32_t storedRhythmQuestionShare() const override { return m_rhythmQuestionShare; }
+
+    void storeRhythmQuestionShare( std::int32_t p_share ) override { m_rhythmQuestionShare = p_share; }
+
+    [[nodiscard]] std::int32_t storedChordQuestionShare() const override { return m_chordQuestionShare; }
+
+    void storeChordQuestionShare( std::int32_t p_share ) override { m_chordQuestionShare = p_share; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -190,6 +225,14 @@ private:
     Note m_tuningRoot{ 60 };
 
     double m_referencePitch{ 440.0 };
+
+    std::int32_t m_singQuestionShare{ 20 };
+
+    // Vingt pour cent chacune, comme le chant : un premier lancement entend un peu de tout, et c'est au joueur de
+    // decider ensuite ce qu'il veut travailler. Les memes valeurs que les reglages par defaut du domaine.
+    std::int32_t m_rhythmQuestionShare{ 20 };
+
+    std::int32_t m_chordQuestionShare{ 20 };
 };
 
 }    // namespace musichien::domain

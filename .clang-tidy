@@ -29,6 +29,11 @@ Checks: |
   misc-*,
   -misc-confusable-identifiers,
   -misc-unused-parameters,
+
+  # misc-non-private-member-variables-in-classes flaggait nos AGREGATS DE DONNEES - Chord, Question, RhythmHit - dont
+  # tout l'interet est justement d'etre un simple paquet de valeurs, sans invariant a proteger. Les transformer en
+  # classes avec accesseurs ajouterait de la ceremonie sans rien garantir de plus.
+  -misc-non-private-member-variables-in-classes,
   # misc-const-correctness is far too noisy on Qt code: adding const to a QObject based local
   # frequently breaks its signal/slot usage, for no real benefit.
   -misc-const-correctness,

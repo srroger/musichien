@@ -19,11 +19,13 @@
 #include "domain/audio/NotePlayer.h"
 #include "domain/audio/SampledInstrument.h"
 #include "domain/audio/ToneSynthesizer.h"
+#include "infrastructure/audio/AudioMixer.h"
 
 #include <QAudioFormat>
 #include <QAudioSink>
 #include <QIODevice>
 
+#include <array>
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -49,10 +51,27 @@ public:
     void playNote( const domain::Note & p_note ) override;
     void playMelody( std::span<const domain::Note> p_notes, std::chrono::milliseconds p_gap ) override;
     void playChord( std::span<const domain::Note> p_notes ) override;
+
+    // The sustained chord: the same notes, held for the given duration, so the beating between them can be counted.
+    void playChordFor( std::span<const domain::Note> p_notes, std::chrono::milliseconds p_duration ) override;
     void playMistakeCue() override;
 
     // Le clic de menu : un accuse de reception, pas une reponse.
     void playTapCue() override;
+
+    // Le clic du metronome : accentue sur le premier temps d'une mesure.
+    void playMetronomeClick( bool p_accented ) override;
+
+    // Frappe un element de la batterie, rendu par la synthese.
+    void playDrum( domain::Drum p_drum ) override;
+
+    // Les sons de batterie ECHANTILLONNES, dans l'ordre de domain::Drum. Une percussion qui a son echantillon est
+    // jouee telle quelle - une vraie peau, une vraie coque, une vraie baguette ; la synthese reste le repli, comme
+    // pour les notes.
+    void useDrumSamples( std::array<std::vector<float>, domain::DRUM_COUNT> p_samples );
+
+    // Les deux clics du metronome, echantillonnes eux aussi : deux blocs de bois. Vides, la synthese les remplace.
+    void useMetronomeClicks( std::vector<float> p_accented, std::vector<float> p_plain );
 
     // Le petit arpège de l'accueil : montant, ouvert, au piano, et VOLONTAIREMENT discret.
     //
@@ -67,6 +86,10 @@ public:
 
     void stopAll() override;
 
+    // The tuning every following note is heard in. The root is always the FIRST note of what is played, which is
+    // exactly what the domain's frequencyFor expects: an interval is heard FROM its first note.
+    void setTuning( domain::TuningContext p_tuning ) override;
+
     // The sampled instruments, when there are any. They become the sound of the EXERCISES - a real piano, a real
     // guitar, a real saxophone - while the synthesiser keeps the mistake cue, which must not be beautiful.
     //
@@ -75,8 +98,11 @@ public:
     // colour. The day the player chooses his instrument explicitly, this becomes a preference - the drawing here
     // is what makes the variety exist in the meantime.
     //
-    // Passing an empty list is legal and means "no samples": the synthesiser then plays everything.
-    void useInstruments( std::vector<domain::SampledInstrument> p_instruments );
+    // Passing an empty list is legal and means "no samples". p_waveforms lists the PURE WAVEFORMS (sine, sawtooth,
+    // square) that join the drawing as additional timbres, so an exercise can be heard with a controlled spectrum.
+    // With no samples and no waveform, the synthesiser (the struck string) plays everything.
+    void useInstruments( std::vector<domain::SampledInstrument> p_instruments,
+                         std::vector<domain::Waveform> p_waveforms );
 
     [[nodiscard]] std::chrono::milliseconds noteDuration() const override;
 
@@ -85,6 +111,11 @@ public:
     // A machine without a usable sound card must be diagnosed at start up, not the moment the player
     // taps a button in the middle of an exercise.
     void prepareAudioOutput();
+
+    // Reopens the audio output against whatever device is now default. Called when the operating system says the
+    // devices changed - a bluetooth headset plugged or removed - so that the sound follows the player instead of
+    // staying on a dead device.
+    void reopenAudioOutput();
 
     // False when no audio output could be opened.
 
@@ -100,24 +131,54 @@ private:
     // Opens the audio output on first use, and decides the sample format once and for all.
     void ensureAudioOutputIsOpen();
 
-    // Replaces whatever is playing by a new buffer of samples.
-    void playSamples( std::vector<float> p_samples );
+    // Starts the sink on the mixer on first need, and hands the device back once the mix falls silent: an output
+    // left open on a phone drains the battery.
+    void startSinkIfNeeded();
+    void stopSinkWhenSilent();
+
+    // Replaces whatever is playing by a new buffer of samples. The right behaviour for a note, a melody, a chord:
+    // two overlapping notes would make an interval impossible to name.
+    void playSamples( std::vector<float> p_samples, float p_gain = 1.0F );
+
+    // ADDS a buffer to what is already playing. The right behaviour for percussion and for the metronome: a drum hit
+    // and a click must be heard TOGETHER, not one instead of the other.
+    void mixSamples( std::vector<float> p_samples, float p_gain = 1.0F );
 
     std::unique_ptr<QAudioSink> m_audioSink;
 
-    // Owned by the sink: it must not be deleted here.
-    QIODevice * m_audioOutputDevice{ nullptr };
+    // Everything the sink reads. Owned here, handed to the sink by start().
+    std::unique_ptr<AudioMixer> m_mixer;
 
-    // Created once the real sample rate of the device is known, because the synthesizer must generate
-    // samples at the very rate the device consumes them. Otherwise every note would be out of tune.
-    // The instrument the next listening will use. Drawn at random from m_instruments, but STABLE as long as the
-    // question does not change: being played back on a different instrument would turn "listen again" into a
-    // different question, and the verdict into a trap.
-    [[nodiscard]] const domain::SampledInstrument & instrumentFor( std::span<const domain::Note> p_notes );
+    // Whether the sink is currently pulling from the mixer. Tracked because start() on an already running sink
+    // restarts it, which would cut the sound being played.
+    bool m_isSinkRunning{ false };
 
-    // Empty when there are no samples, in which case every buffer comes from the synthesiser.
+    // The timbre the next listening will use. Drawn at random among the samples AND the sine (when it is enabled),
+    // but STABLE as long as the question does not change: being played back on a different instrument would turn
+    // "listen again" into a different question, and the verdict into a trap. Returns an index into m_instruments, or
+    // m_instruments.size() for the sine.
+    [[nodiscard]] std::size_t timbreIndexFor( std::span<const domain::Note> p_notes );
+
+    // One note, rendered with the timbre drawn for the given sequence. Falls back on the struck-string synthesiser
+    // when there is neither a sample nor the sine.
+    [[nodiscard]] std::vector<float> renderNoteFor( std::span<const domain::Note> p_sequence,
+                                                    const domain::Note & p_note,
+                                                    std::chrono::milliseconds p_duration );
+
+    [[nodiscard]] std::vector<float> renderChordFor( std::span<const domain::Note> p_notes,
+                                                     std::chrono::milliseconds p_duration );
+
+    [[nodiscard]] std::vector<float> renderMelodyFor( std::span<const domain::Note> p_notes,
+                                                      std::chrono::milliseconds p_noteDuration,
+                                                      std::chrono::milliseconds p_gap );
+
+    // The sampled instruments, empty when there are none.
     std::vector<domain::SampledInstrument> m_instruments;
 
+    // The pure waveforms that join the drawing, empty when there are none.
+    std::vector<domain::Waveform> m_waveforms;
+
+    // The drawn timbre: an index into m_instruments, or m_instruments.size() + a waveform index.
     std::size_t m_instrumentIndex{ 0 };
 
     // What was played last, which is how "the same question" is recognised.
@@ -127,8 +188,21 @@ private:
 
     std::optional<domain::ToneSynthesizer> m_synthesizer;
 
+    // Created from the same real sample rate, so the drums are in tune with the notes.
+    std::optional<domain::DrumSynthesizer> m_drumSynthesizer;
+
+    // One recorded sound per piece, in the order of domain::Drum. Empty when the samples could not be read, in which
+    // case the synthesiser plays.
+    std::array<std::vector<float>, domain::DRUM_COUNT> m_drumSamples;
+
+    // The two metronome clicks: the accented one, and the plain one. Empty when they could not be read.
+    std::vector<float> m_accentedClick;
+    std::vector<float> m_plainClick;
+
+    // Equal temperament at 440 Hz until setTuning says otherwise.
+    domain::TuningContext m_tuning;
+
     QAudioFormat m_audioFormat;
-    std::vector<float> m_currentSamples;
     std::string m_outputDescription{ "not opened yet" };
 };
 
