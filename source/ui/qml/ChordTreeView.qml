@@ -18,6 +18,10 @@ import QtQuick
 import QtQuick.Layouts
 
 Item {
+    // Le RANG d'un noeud dans SA COLONNE : c'est ce qui fait tenir l'arbre en hauteur.
+    // Roger : « le but etait que l'arbre prenne moins de place. Il faudrait que les Dim, m5, mMaj7 et C9 soient en haut
+    // aussi, et pas en bas. En gros il faut que l'arbre prenne le moins de place. »
+
     id: chordTreeView
 
     // Vrai quand les couleurs OFFERTES doivent etre cliquables : c'est le cas pendant une question d'accord, ou l'arbre
@@ -32,36 +36,53 @@ Item {
     // Les mesures. La largeur suit l'ecran : trois colonnes doivent tenir cote a cote, et la colonne la plus profonde est
     // la troisieme.
     readonly property real columnGap: 14
-    readonly property real stepGap: 12
     readonly property real rowGap: 5
     readonly property real nodeWidth: Math.max(62, (width - (3 * columnGap)) / 4)
     readonly property real nodeHeight: showDegrees ? 38 : 30
 
     signal qualityChosen(int p_quality)
 
-    // La position d'un noeud : sa PROFONDEUR est sa colonne, son RANG est sa ligne.
+    // Chaque colonne empile donc SES noeuds, independamment des autres : la troisieme colonne commence a la meme hauteur
+    // que la deuxieme, et non apres elle. L'arbre passe de QUINZE lignes a HUIT, sans qu'un seul noeud disparaisse - et
+    // c'est toute la difference entre une liste mise en colonnes et un arbre qui tient dans un ecran de telephone.
+    function nodeRow(p_index) {
+        var depth = ExerciseController.chordTree[p_index].depth;
+        var row = 0;
+        for (var index = 0; index < p_index; ++index) {
+            if (ExerciseController.chordTree[index].depth === depth)
+                ++row;
+
+        }
+        return row;
+    }
+
+    // Combien de noeuds dans une colonne : c'est la HAUTEUR de l'arbre, et non le nombre de couleurs.
+    function columnCount(p_depth) {
+        var count = 0;
+        for (var index = 0; index < ExerciseController.chordTree.length; ++index) {
+            if (ExerciseController.chordTree[index].depth === p_depth)
+                ++count;
+
+        }
+        return count;
+    }
+
+    // La position d'un noeud : sa PROFONDEUR est sa colonne, son RANG DANS SA COLONNE est sa ligne.
     function nodeX(p_index) {
         return ExerciseController.chordTree[p_index].depth * (nodeWidth + columnGap);
     }
 
     function nodeY(p_index) {
-        var y = 0;
-        var depth = -1;
-        for (var index = 0; index < p_index; ++index) {
-            var nodeDepth = ExerciseController.chordTree[index].depth;
-            // La MARCHE : un peu d'air quand on change de branche.
-            if (nodeDepth !== depth) {
-                y += stepGap;
-                depth = nodeDepth;
-            }
-            y += nodeHeight + rowGap;
-        }
-        return y;
+        return nodeRow(p_index) * (nodeHeight + rowGap);
     }
 
-    // La hauteur de tout l'arbre, marches comprises : c'est ce que le parent doit reserver.
+    // La hauteur de tout l'arbre : la colonne la plus longue, et un peu d'air en bas.
     function treeHeight() {
-        return nodeY(ExerciseController.chordTree.length) + nodeHeight + stepGap;
+        var rows = 0;
+        for (var depth = 0; depth < 4; ++depth) {
+            rows = Math.max(rows, columnCount(depth));
+        }
+        return (rows * (nodeHeight + rowGap)) + 12;
     }
 
     // Cette couleur est-elle une reponse possible ?
