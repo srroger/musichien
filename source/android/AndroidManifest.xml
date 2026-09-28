@@ -20,8 +20,11 @@
     without a warning.
 
     The INSERT markers below are replaced by androiddeployqt with the values declared in
-    cmake/musichienAndroid.cmake. There is no android:icon attribute on purpose: the project has no
-    icon yet, and an empty one would be rejected.
+    cmake/musichienAndroid.cmake.
+
+    L'ICONE vit dans source/android/res, en deux versions : les cinq densites de mipmap pour les lanceurs anciens, et un
+    fichier XML d'icone ADAPTATIVE pour Android 8 et plus, ou le systeme decoupe lui-meme la forme. android:roundIcon
+    dit la meme chose pour les lanceurs qui demandent une icone ronde - et sans lui, ils rogneraient la carree.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.srroger.musichien"
@@ -74,6 +77,8 @@
         android:name="org.qtproject.qt.android.bindings.QtApplication"
         android:hardwareAccelerated="true"
         android:label="-- %%INSERT_APP_NAME%% --"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/MusichienTheme"
         android:enableOnBackInvokedCallback="true">
 

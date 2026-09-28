@@ -7,4 +7,10 @@
 -->
 <resources>
     <color name="musichien_night">#FF1B1035</color>
+
+    <!--
+        Le rose de l'illustration de l'icone (cuteShiba.jpg), PRELEVE dessus et non choisi a l'oeil : c'est ce qui
+        garantit qu'il n'y a aucune couture entre le fond de l'icone et le premier plan, que le lanceur recadre.
+    -->
+    <color name="musichien_launcher_background">#FFCAEC</color>
 </resources>

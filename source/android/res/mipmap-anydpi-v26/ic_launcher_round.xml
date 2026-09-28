@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    La meme icone, pour les lanceurs qui demandent une forme RONDE. Android choisit celui-ci quand il existe, et
+    retombe sur l'icone carree sinon - d'ou les deux fichiers, qui decrivent la meme chose.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/musichien_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
