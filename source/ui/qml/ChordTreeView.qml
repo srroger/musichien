@@ -8,17 +8,22 @@
 // ---------------------------------------------------------------------------------------------------------------------
 // La disposition
 
-// La PROFONDEUR d'un noeud donne sa colonne, son RANG dans la liste donne sa ligne. L'arbre vient du domaine range par
-// profondeur, donc les enfants directs d'une couleur se suivent, et une petite MARCHE se glisse chaque fois que la
-// profondeur change - elle dit « nouvelle branche » sans gaspiller tout un trou, ce que Roger a signale sur la branche
-// des suspendus.
+// La PROFONDEUR d'un noeud donne sa colonne ; sa LIGNE, elle, se calcule a partir de son PARENT, et c'est ce qui rend
+// les branches visibles. Un enfant se pose sur la ligne de son parent quand la place est libre dans sa colonne : le C9
+// vient donc a droite du C7, et la chaine C - Cm - Cdim - Cm7b5 se lit d'un seul regard sur la premiere ligne.
+// Roger, apres avoir vu la premiere version : « la du coup, il ressemble vraiment a juste des colonnes empilees, on ne
+// voit plus du tout les branches. Tu as le droit de prendre un peu d'espace quand meme, genre un leger espace
+// supplementaire entre le Cm et le Csus4, mais pas entre le Cdim et Cm7. Et le C9 tu peux le mettre sur la meme ligne
+// que le C7. » Les trois demandes sont satisfaites, et elles le sont par la MEME regle : on s'aligne sur son parent, on
+// s'ecarte d'une ligne quand - et seulement quand - une grande branche se referme pour en ouvrir une autre.
 // =====================================================================================================================
 import Musichien
 import QtQuick
 import QtQuick.Layouts
 
 Item {
-    // Le RANG d'un noeud dans SA COLONNE : c'est ce qui fait tenir l'arbre en hauteur.
+    // Les lignes de TOUS les noeuds, calculees UNE fois - quinze noeuds, et chaque repeinture de branche les
+    // redemanderait quinze fois s'il fallait les recalculer a chaque appel.
     // Roger : « le but etait que l'arbre prenne moins de place. Il faudrait que les Dim, m5, mMaj7 et C9 soient en haut
     // aussi, et pas en bas. En gros il faut que l'arbre prenne le moins de place. »
 
@@ -39,50 +44,87 @@ Item {
     readonly property real rowGap: 5
     readonly property real nodeWidth: Math.max(62, (width - (3 * columnGap)) / 4)
     readonly property real nodeHeight: showDegrees ? 38 : 30
+    // Les lignes de tous les noeuds, calculees une seule fois : voir computeRows(), plus bas.
+    readonly property var nodeRows: computeRows()
 
     signal qualityChosen(int p_quality)
 
-    // Chaque colonne empile donc SES noeuds, independamment des autres : la troisieme colonne commence a la meme hauteur
-    // que la deuxieme, et non apres elle. L'arbre passe de QUINZE lignes a HUIT, sans qu'un seul noeud disparaisse - et
-    // c'est toute la difference entre une liste mise en colonnes et un arbre qui tient dans un ecran de telephone.
-    function nodeRow(p_index) {
-        var depth = ExerciseController.chordTree[p_index].depth;
-        var row = 0;
-        for (var index = 0; index < p_index; ++index) {
-            if (ExerciseController.chordTree[index].depth === depth)
-                ++row;
+    // Chaque noeud s'aligne sur SON PARENT, et n'est Ecarte que lorsque sa ligne est deja prise dans sa colonne : c'est
+    // ce qui fait tenir l'arbre en NEUF lignes au lieu de quinze, tout en gardant les branches visibles (la version
+    // « chaque colonne empilee toute seule » en faisait huit, mais ne montrait plus aucune branche du tout).
+    function computeRows() {
+        var nodes = ExerciseController.chordTree;
+        var state = {
+            "rows": [],
+            "children": []
+        };
+        for (var index = 0; index < nodes.length; ++index) {
+            // -1 veut dire « pas encore pose », et c'est ce que lit rowIsFree.
+            state.rows.push(-1);
+            state.children.push([]);
+        }
+        for (var index = 0; index < nodes.length; ++index) {
+            if (!nodes[index].isRoot)
+                state.children[nodes[index].parentIndex].push(index);
 
         }
-        return row;
+        placeSubtree(state, 0, 0);
+        return state.rows;
     }
 
-    // Combien de noeuds dans une colonne : c'est la HAUTEUR de l'arbre, et non le nombre de couleurs.
-    function columnCount(p_depth) {
-        var count = 0;
-        for (var index = 0; index < ExerciseController.chordTree.length; ++index) {
-            if (ExerciseController.chordTree[index].depth === p_depth)
-                ++count;
+    // Pose un noeud, puis toute sa descendance. Rend la derniere ligne utilisee par ce sous-arbre.
+    function placeSubtree(p_state, p_index, p_minimumRow) {
+        var nodes = ExerciseController.chordTree;
+        var node = nodes[p_index];
+        var row = node.isRoot ? 0 : Math.max(p_minimumRow, p_state.rows[node.parentIndex]);
+        while (!rowIsFree(p_state, node.depth, row))
+            ++row;
+
+        p_state.rows[p_index] = row;
+        var end = row;
+        for (var rank = 0; rank < p_state.children[p_index].length; ++rank) {
+            var child = p_state.children[p_index][rank];
+            // Le premier enfant s'aligne sur son parent ; les suivants se rangent sous les precedents.
+            var next = row;
+            if (rank > 0) {
+                var brother = p_state.children[p_index][rank - 1];
+                // L'ECART : une ligne vide entre deux grandes branches. Il n'est pose qu'entre les enfants directs de la
+                // RACINE, la ou les branches se separent vraiment - un espace entre le Cm et le Csus4, aucun entre le
+                // Cdim et le Cm7 qui sont deux freres de la meme branche, exactement ce que Roger a demande.
+                next = p_state.rows[brother] + ((p_index === 0 && p_state.children[brother].length > 0) ? 2 : 1);
+            }
+            end = Math.max(end, placeSubtree(p_state, child, next));
+        }
+        return end;
+    }
+
+    // Cette ligne est-elle libre dans cette colonne ?
+    function rowIsFree(p_state, p_depth, p_row) {
+        var nodes = ExerciseController.chordTree;
+        for (var index = 0; index < nodes.length; ++index) {
+            if (p_state.rows[index] === p_row && nodes[index].depth === p_depth)
+                return false;
 
         }
-        return count;
+        return true;
     }
 
-    // La position d'un noeud : sa PROFONDEUR est sa colonne, son RANG DANS SA COLONNE est sa ligne.
+    // La position d'un noeud : sa PROFONDEUR est sa colonne, sa ligne vient du calcul ci-dessus.
     function nodeX(p_index) {
         return ExerciseController.chordTree[p_index].depth * (nodeWidth + columnGap);
     }
 
     function nodeY(p_index) {
-        return nodeRow(p_index) * (nodeHeight + rowGap);
+        return nodeRows[p_index] * (nodeHeight + rowGap);
     }
 
-    // La hauteur de tout l'arbre : la colonne la plus longue, et un peu d'air en bas.
+    // La hauteur de tout l'arbre : la ligne la plus basse, et un peu d'air en bas.
     function treeHeight() {
-        var rows = 0;
-        for (var depth = 0; depth < 4; ++depth) {
-            rows = Math.max(rows, columnCount(depth));
+        var lastRow = 0;
+        for (var index = 0; index < nodeRows.length; ++index) {
+            lastRow = Math.max(lastRow, nodeRows[index]);
         }
-        return (rows * (nodeHeight + rowGap)) + 12;
+        return ((lastRow + 1) * (nodeHeight + rowGap)) + 12;
     }
 
     // Cette couleur est-elle une reponse possible ?
