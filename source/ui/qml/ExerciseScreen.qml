@@ -751,44 +751,43 @@ Item {
 
             }
 
-            // Le tout DEFILE : un joueur de haut niveau peut avoir QUINZE couleurs a l'ecran (les six triades, les
-            // trois septiemes, la sixte, le demi-diminu, le diminue 7, le mineur-majeur, add9 et la neuvieme), et une
-            // grille qui depasse l'ecran cacherait des reponses - ce qui rendrait la question impossible, pas dure.
+            // Le tout TIENT DANS L'ECRAN : une page de jeu qui se fait scroller cache ses propres reponses, et un
+            // joueur de haut niveau peut avoir QUINZE couleurs a l'ecran (les six triades, les trois septiemes, la
+            // sixte, le demi-diminu, le diminue 7, le mineur-majeur, add9 et la neuvieme). Trois colonnes et des
+            // etiquettes courtes, voila comment quinze reponses tiennent sur un telephone.
             // -------------------------------------------------------------------------------------------------
-            ScrollView {
+            GridLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: ExerciseController.isChordQuestion
-                clip: true
+                // TROIS colonnes quand il y a de quoi les remplir, deux sinon : un debutant qui n'a que majeur et
+                // mineur aurait deux petits boutons perdus chacun dans un tiers d'ecran.
+                columns: ExerciseController.chordChoices.length >= 3 ? 3 : 2
+                rowSpacing: 8
+                columnSpacing: 8
 
-                GridLayout {
-                    width: parent.width
-                    columns: 2
-                    rowSpacing: 10
-                    columnSpacing: 10
+                Repeater {
+                    model: ExerciseController.chordChoices
 
-                    Repeater {
-                        model: ExerciseController.chordChoices
+                    delegate: Button {
+                        required property var modelData
+                        // La bonne reponse est mise en avant QUAND ELLE EST CONNUE, jamais avant : un bouton qui se
+                        // signalerait tout seul donnerait la reponse.
+                        readonly property bool isTheAnswer: ExerciseController.heardChord.quality === modelData.quality
 
-                        delegate: Button {
-                            required property var modelData
-                            // La bonne reponse est mise en avant QUAND ELLE EST CONNUE, jamais avant : un bouton qui se
-                            // signalerait tout seul donnerait la reponse.
-                            readonly property bool isTheAnswer: ExerciseController.heardChord.quality === modelData.quality
-
-                            Layout.fillWidth: true
-                            height: 56
-                            highlighted: isTheAnswer && ExerciseController.isFeedbackVisible
-                            enabled: ExerciseController.isAsking
-                            // Le nombre de notes est affiche : c'est ce qui separe une triade d'une septieme, et c'est
-                            // la premiere chose que l'oreille attrape. Le libelle est generique, parce que le domaine
-                            // en connait de trois a cinq notes et que l'ecran n'a pas a tenir une liste a jour.
-                            text: qsTr("%1 — %2 notes").arg(modelData.name).arg(modelData.noteCount)
-                            // L'index de la qualite voyage tel quel : l'ecran affiche un nom, et renvoie l'index de ce
-                            // qu'il a affiche. Il ne nomme rien lui-meme.
-                            onClicked: ExerciseController.answerChord(modelData.quality)
-                        }
-
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 52
+                        Layout.maximumHeight: 64
+                        highlighted: isTheAnswer && ExerciseController.isFeedbackVisible
+                        enabled: ExerciseController.isAsking
+                        // L'ETIQUETTE COURTE - "m7b5", "Maj7", "sus4" - et le nombre de notes a cote : c'est ce qui
+                        // separe une triade d'une septieme, et c'est la premiere chose que l'oreille attrape. Le nom
+                        // complet ("Half-diminished") revient dans le verdict, la ou il y a la place de l'ecrire :
+                        // une reponse coupee en deux n'est pas une reponse.
+                        text: qsTr("%1 · %2").arg(modelData.name).arg(modelData.noteCount)
+                        // L'index de la qualite voyage tel quel : l'ecran affiche une etiquette, et renvoie l'index de
+                        // ce qu'il a affiche. Il ne nomme rien lui-meme.
+                        onClicked: ExerciseController.answerChord(modelData.quality)
                     }
 
                 }

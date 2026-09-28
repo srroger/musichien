@@ -784,8 +784,15 @@ QVariantList ExerciseSessionController::chordChoices() const
     for( const domain::ChordQuality quality : m_session->currentQuestion().chordChoices )
     {
         QVariantMap described;
+
         described.insert( QStringLiteral( "quality" ), static_cast<int>( quality ) );
-        described.insert( QStringLiteral( "name" ), QString::fromUtf8( domain::chordQualityName( quality ).data(), static_cast<int>( domain::chordQualityName( quality ).size() ) ) );
+
+        // LE NOM COURT est ce que l'ecran affiche : "m7b5" tient dans un bouton de telephone, "Half-diminished" n'y
+        // tient pas, et une reponse coupee en deux n'est pas une reponse. Le nom complet reste donne par le verdict.
+        described.insert( QStringLiteral( "name" ), QString::fromUtf8( domain::chordQualityShortLabel( quality ).data(), static_cast<int>( domain::chordQualityShortLabel( quality ).size() ) ) );
+
+        described.insert( QStringLiteral( "fullName" ), QString::fromUtf8( domain::chordQualityName( quality ).data(), static_cast<int>( domain::chordQualityName( quality ).size() ) ) );
+
         described.insert( QStringLiteral( "noteCount" ), static_cast<int>( domain::chordNoteCount( quality ) ) );
 
         choices.append( described );
@@ -1194,7 +1201,9 @@ void ExerciseSessionController::setSingQuestionShare( int p_share )
 
 int ExerciseSessionController::rhythmQuestionShare() const
 {
-    return ( m_levelStore != nullptr ) ? m_levelStore->storedRhythmQuestionShare() : 20;
+    // ZERO quand il n'y a pas de profil : le defaut de l'application, celui du domaine et celui du fichier de
+    // reglages disent tous les trois la meme chose, sinon l'un des trois finirait par mentir a l'ecran.
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedRhythmQuestionShare() : 0;
 }
 
 void ExerciseSessionController::setRhythmQuestionShare( int p_share )

@@ -222,6 +222,59 @@ std::string_view chordQualitySymbolSuffix( ChordQuality p_quality ) noexcept
     return "";
 }
 
+std::string_view chordQualityShortLabel( ChordQuality p_quality ) noexcept
+{
+    switch( p_quality )
+    {
+        case ChordQuality::Major:
+            return "Maj";
+
+        case ChordQuality::Minor:
+            return "min";
+
+        case ChordQuality::Sus4:
+            return "sus4";
+
+        case ChordQuality::Sus2:
+            return "sus2";
+
+        case ChordQuality::Diminished:
+            return "dim";
+
+        case ChordQuality::Augmented:
+            return "aug";
+
+        case ChordQuality::DominantSeventh:
+            return "7";
+
+        case ChordQuality::MajorSeventh:
+            return "Maj7";
+
+        case ChordQuality::MinorSeventh:
+            return "min7";
+
+        case ChordQuality::Sixth:
+            return "6";
+
+        case ChordQuality::HalfDiminished:
+            return "m7b5";
+
+        case ChordQuality::DiminishedSeventh:
+            return "dim7";
+
+        case ChordQuality::MinorMajorSeventh:
+            return "mMaj7";
+
+        case ChordQuality::Add9:
+            return "add9";
+
+        case ChordQuality::Ninth:
+            return "9";
+    }
+
+    return "Maj";
+}
+
 std::span<const ChordQuality> chordLearningOrder() noexcept
 {
     return LEARNING_ORDER;

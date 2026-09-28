@@ -230,7 +230,11 @@ private:
 
     // Vingt pour cent chacune, comme le chant : un premier lancement entend un peu de tout, et c'est au joueur de
     // decider ensuite ce qu'il veut travailler. Les memes valeurs que les reglages par defaut du domaine.
-    std::int32_t m_rhythmQuestionShare{ 20 };
+    //
+    // SAUF le rythme, a zero : sa question n'est pas encore fiable dans le temps, et Roger a demande qu'elle soit
+    // ETEINTE par defaut. Un reglage qui vaut zero ne veut pas dire « pas encore fait » : il veut dire « disponible,
+    // et pas impose ».
+    std::int32_t m_rhythmQuestionShare{ 0 };
 
     std::int32_t m_chordQuestionShare{ 20 };
 };

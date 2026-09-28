@@ -1096,17 +1096,19 @@ TEST( ExerciseSessionControllerTest, the_four_question_shares_are_remembered_and
 
     ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
-    // Vingt pour cent par defaut, pour les quatre genres de question.
+    // Vingt pour cent par defaut pour le chant et les accords... et ZERO pour le rythme : la question de rythme est
+    // eteinte tant qu'on ne l'allume pas (sa mesure du temps n'est pas encore fiable).
     EXPECT_EQ( 20, controller.singQuestionShare() );
-    EXPECT_EQ( 20, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
     EXPECT_EQ( 20, controller.chordQuestionShare() );
 
-    controller.setRhythmQuestionShare( 0 );
-    controller.setChordQuestionShare( 45 );
+    // On l'allume : le reglage existe, et c'est ce qui compte - Roger veut pouvoir le doser, y compris depuis zero.
+    controller.setRhythmQuestionShare( 25 );
 
-    // Zero est une valeur legitime : c'est meme la demande de Roger, pouvoir ENLEVER le rythme.
-    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
-    EXPECT_EQ( 0, levelStore.storedRhythmQuestionShare() );
+    EXPECT_EQ( 25, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 25, levelStore.storedRhythmQuestionShare() );
+
+    controller.setChordQuestionShare( 45 );
 
     EXPECT_EQ( 45, controller.chordQuestionShare() );
     EXPECT_EQ( 45, levelStore.storedChordQuestionShare() );
@@ -1115,8 +1117,14 @@ TEST( ExerciseSessionControllerTest, the_four_question_shares_are_remembered_and
     controller.setRhythmQuestionShare( 150 );
     controller.setChordQuestionShare( -3 );
 
-    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 25, controller.rhythmQuestionShare() );
     EXPECT_EQ( 45, controller.chordQuestionShare() );
+
+    // ZERO est une valeur legitime, et c'est meme celle par defaut : elle fait disparaitre le rythme d'une session.
+    controller.setRhythmQuestionShare( 0 );
+
+    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 0, levelStore.storedRhythmQuestionShare() );
 }
 
 }    // namespace musichien::ui

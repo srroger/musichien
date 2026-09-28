@@ -187,6 +187,28 @@ TEST( ChordTest, the_notes_of_a_chord_are_its_root_transposed_by_its_intervals )
     EXPECT_EQ( 70, seventh.at( 3 ).midiNumber() );
 }
 
+TEST( ChordTest, every_quality_has_a_short_label_that_fits_a_phone )
+{
+    std::set<std::string_view> labels;
+
+    for( const ChordQuality quality : chordLearningOrder() )
+    {
+        const std::string_view label = chordQualityShortLabel( quality );
+
+        EXPECT_FALSE( label.empty() ) << chordQualityName( quality );
+
+        // COURT, et c'est la contrainte qui compte : quinze etiquettes doivent tenir sur l'ecran d'un telephone, en
+        // trois colonnes. Six caracteres est la limite qu'on s'est donnee, et "Half-diminished" n'y entrerait pas.
+        EXPECT_LE( label.size(), 6U ) << chordQualityName( quality );
+
+        // Et AUCUN doublon : deux accords qui partageraient leur etiquette seraient deux reponses pour un seul bouton,
+        // donc une question a laquelle on ne peut pas repondre.
+        EXPECT_TRUE( labels.insert( label ).second ) << label << " est utilise deux fois";
+    }
+
+    EXPECT_EQ( CHORD_QUALITY_COUNT, labels.size() );
+}
+
 TEST( ChordTest, a_name_is_readable_and_a_suffix_is_stuck_to_the_root )
 {
     EXPECT_EQ( "Major", chordQualityName( ChordQuality::Major ) );

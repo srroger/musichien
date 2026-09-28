@@ -250,11 +250,14 @@ void QSettingsPlayerPreferences::storeSingQuestionShare( std::int32_t p_share )
 
 std::int32_t QSettingsPlayerPreferences::storedRhythmQuestionShare() const
 {
-    const std::int32_t stored = QSettings{}.value( RHYTHM_QUESTION_SHARE_KEY, 20 ).toInt();
+    // ZERO, et c'est le defaut du DOMAINE aussi (SessionSettings) : la question de rythme existe, elle se regle, et
+    // elle est eteinte tant qu'on ne l'allume pas. Une valeur hors bornes retombe sur ce meme zero, pas sur autre
+    // chose : un fichier abime doit rendre le silence, jamais imposer du rythme.
+    const std::int32_t stored = QSettings{}.value( RHYTHM_QUESTION_SHARE_KEY, 0 ).toInt();
 
     if( stored < 0 || stored > 100 )
     {
-        return 20;
+        return 0;
     }
 
     return stored;

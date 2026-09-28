@@ -132,13 +132,11 @@ struct SessionSettings
 
     // Share of questions, in percent, that ask the player to REPRODUCE a rhythmic cell.
     //
-    // Twenty by default, like the sung questions, and for the same reason: rhythm is the other half of the ear -
-    // pitch says WHAT, rhythm says WHEN - and it deserves to show up in a session. The listening core stays the
-    // main game all the same, which is what the modest share says.
-    //
-    // Like the other two shares, it is a RULE and not a switch of the screen: a session is ONE loop, and the
-    // rhythm is one of its questions rather than a page of its own.
-    std::int32_t rhythmQuestionShare{ 20 };
+    // ZERO par defaut, et c'est une decision de Roger apres avoir joue : « comme la feature n'est pas propre, je
+    // prefere la rendre par defaut a 0 ». La question de rythme fonctionne, mais son horloge n'est pas encore fiable
+    // (voir la note 05 du Vault), et une question dont on ne peut pas croire le temps n'a rien a faire dans une
+    // session ordinaire. Qui veut du rythme le demande : le reglage est la, entre 0 et 100.
+    std::int32_t rhythmQuestionShare{ 0 };
 
     // Le tempo, en battements par minute, auquel la cellule rythmique est posee.
     //
