@@ -1687,111 +1687,13 @@ ApplicationWindow {
                     text: qsTr("Chaque couleur s'obtient depuis celle du dessus en UN geste. Lis les gestes, et les quinze accords deviennent une seule histoire.")
                 }
 
-                Item {
-                    id: chordTreeBoard
-
-                    // Les mesures d'un noeud. La largeur suit l'ecran : trois colonnes doivent tenir cote a cote, et la
-                    // colonne la plus profonde est la troisieme.
-                    readonly property real columnGap: 16
-                    readonly property real nodeWidth: Math.min(120, (width - (3 * columnGap)) / 4)
-                    readonly property real nodeHeight: 40
-                    readonly property real rowGap: 6
-
-                    // La position d'un noeud : sa PROFONDEUR est sa colonne, son RANG est sa ligne.
-                    function nodeX(p_index) {
-                        return ExerciseController.chordTree[p_index].depth * (nodeWidth + columnGap);
-                    }
-
-                    function nodeY(p_index) {
-                        return p_index * (nodeHeight + rowGap);
-                    }
-
+                // L'ARBRE, dessine par le COMPOSANT partage avec l'ecran de jeu : une seule definition du layout, donc
+                // aucune chance de voir deux arbres differents selon l'ecran qui les montre. Ce detail a son importance -
+                // un arbre de competences qui ne se ressemblerait pas d'un ecran a l'autre serait un arbre auquel on ne se
+                // fierait plus.
+                ChordTreeView {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: (ExerciseController.chordTree.length * (nodeHeight + rowGap)) + 8
-
-                    // Les LIENS d'abord : ils passent DERRIERE les noeuds, comme les branches d'un arbre passent derriere
-                    // ses feuilles. Un Canvas plutot qu'une pile de rectangles : trois segments par branche, en quinze
-                    // branches, cela ferait quarante-cinq rectangles a tenir a jour.
-                    Canvas {
-                        id: chordTreeLinks
-
-                        anchors.fill: parent
-                        onPaint: {
-                            var context = getContext("2d");
-                            context.reset();
-                            context.strokeStyle = "#4a3670";
-                            context.lineWidth = 2;
-                            var nodes = ExerciseController.chordTree;
-                            for (var index = 0; index < nodes.length; ++index) {
-                                var node = nodes[index];
-                                if (node.isRoot)
-                                    continue;
-
-                                var parent = node.parentIndex;
-                                var startX = chordTreeBoard.nodeX(parent) + chordTreeBoard.nodeWidth;
-                                var startY = chordTreeBoard.nodeY(parent) + (chordTreeBoard.nodeHeight / 2);
-                                var endX = chordTreeBoard.nodeX(index);
-                                var endY = chordTreeBoard.nodeY(index) + (chordTreeBoard.nodeHeight / 2);
-                                // Le coude : la branche descend le long d'une colonne invisible, entre les deux.
-                                var elbow = endX - (chordTreeBoard.columnGap / 2);
-                                context.beginPath();
-                                context.moveTo(startX, startY);
-                                context.lineTo(elbow, startY);
-                                context.lineTo(elbow, endY);
-                                context.lineTo(endX, endY);
-                                context.stroke();
-                            }
-                        }
-                    }
-
-                    // Puis les NOEUDS, poses PAR-DESSUS les branches.
-                    Repeater {
-                        model: ExerciseController.chordTree
-
-                        delegate: Rectangle {
-                            required property var modelData
-                            required property int index
-
-                            x: chordTreeBoard.nodeX(index)
-                            y: chordTreeBoard.nodeY(index)
-                            width: chordTreeBoard.nodeWidth
-                            height: chordTreeBoard.nodeHeight
-                            radius: 8
-                            color: ExerciseController.chordColourName(modelData.quality)
-                            // La racine est CERNE de dore : c'est d'elle que tout part, et l'oeil doit le voir tout de suite.
-                            border.width: modelData.isRoot ? 3 : 0
-                            border.color: "#ffd479"
-
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                width: parent.width - 8
-                                spacing: 0
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    horizontalAlignment: Text.AlignHCenter
-                                    color: "#2b1b47"
-                                    font.pixelSize: 15
-                                    font.bold: true
-                                    text: modelData.name
-                                }
-
-                                // LES DEGRES sous le nom : « Cm » et « 1 b3 5 ». C'est ce qui reste quand on a oublie
-                                // l'accord, et c'est exactement ce qu'on veut retenir.
-                                Text {
-                                    Layout.fillWidth: true
-                                    horizontalAlignment: Text.AlignHCenter
-                                    color: "#4a3670"
-                                    font.pixelSize: 10
-                                    text: modelData.degrees
-                                }
-
-                            }
-
-                        }
-
-                    }
-
+                    showDegrees: true
                 }
 
                 // Les GESTES, en clair, sous la carte : l'arbre montre le CHEMIN, cette liste dit ce qu'on fait en le

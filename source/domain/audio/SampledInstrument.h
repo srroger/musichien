@@ -53,6 +53,15 @@ inline constexpr std::size_t INSTRUMENT_COUNT = 6;
 inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{
   "piano", "guitare", "saxo", "sinusoïdal", "dent de scie", "carré" };
 
+// Les instruments d'un PREMIER lancement : le piano et la guitare, et rien d'autre.
+//
+// Roger : « je voudrais par defaut : Piano et Guitare. Les autres sont trop desagreables ou trop etranges pour etre mis
+// par defaut ». C'est une decision de conception, et elle vit ici comme les autres regles du projet : un premier
+// lancement doit sonner JUSTE, sans rien demander au joueur.
+//
+// Le saxo et les trois formes d'onde restent OFFERTS dans les reglages : ils ne sont simplement pas imposes.
+[[nodiscard]] std::vector<bool> defaultEnabledInstruments();
+
 // The waveforms offered as instruments, in the same order as their names at the end of INSTRUMENT_NAMES. The adapter
 // maps the corresponding flags onto this list.
 inline constexpr std::array<Waveform, 3> WAVEFORM_INSTRUMENTS{ Waveform::Sine, Waveform::Sawtooth, Waveform::Square };

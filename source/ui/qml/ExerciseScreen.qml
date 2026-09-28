@@ -240,6 +240,26 @@ Item {
             // n'est pas une reponse y est : ecouter, l'indice, l'arpege, et voir la reponse.
             // Les libelles sont COURTS : trois ou quatre boutons sur la largeur d'un telephone ne tiennent pas avec des
             // phrases, et un bouton coupe en deux n'est pas un bouton.
+            // Le tout TIENT DANS L'ECRAN : une page de jeu qui se fait scroller cache ses propres reponses, et un
+            // joueur de haut niveau peut avoir QUINZE couleurs a l'ecran (les six triades, les trois septiemes, la
+            // sixte, le demi-diminu, le diminue 7, le mineur-majeur, add9 et la neuvieme). Trois colonnes et des
+            // etiquettes courtes, voila comment quinze reponses tiennent sur un telephone.
+            // -------------------------------------------------------------------------------------------------
+            // L'ARBRE DES ACCORDS, pour REPONDRE.
+            // Roger : « on affiche pas les boutons, mais c'est bien de garder les boutons vides plutot que rien du tout.
+            // Histoire de faire comme pour le cercle des quintes. Ou alors faire les boutons en gris sombre, en mode
+            // desactive, histoire qu'on voie quand meme le schema des mutations. Ce serait beaucoup mieux que de garder la
+            // grille simple un peu moche. »
+            // C'est exactement ce que fait ce composant : les couleurs de la palette sont ALLUMEES et cliquables, les
+            // autres restent visibles en sombre. Et repondre dans l'arbre, c'est deja comprendre l'accord qu'on cherche.
+            // L'INDICE et l'ARPEGE apparaissent apres un PREMIER essai rate, et seulement quand le domaine dit qu'ils ont
+            // un sens. L'arpege est le meilleur des deux : il ne donne pas la reponse, il donne a entendre ce qui la
+            // constitue.
+            // -------------------------------------------------------------------------------------------------
+            // L'ANECDOTE DE LA QUESTION, juste au-dessus des actions.
+            // Roger : « pendant les questionnaires, a chaque question, entre les boutons d'actions et les boutons de
+            // reponses ». C'est la place juste : assez haute pour se lire entre deux questions, assez basse pour ne pas
+            // voler la place de la reponse - qui reste au centre, et c'est elle qui compte.
 
             anchors.fill: parent
             anchors.margins: 16
@@ -819,89 +839,37 @@ Item {
 
             }
 
-            // Le tout TIENT DANS L'ECRAN : une page de jeu qui se fait scroller cache ses propres reponses, et un
-            // joueur de haut niveau peut avoir QUINZE couleurs a l'ecran (les six triades, les trois septiemes, la
-            // sixte, le demi-diminu, le diminue 7, le mineur-majeur, add9 et la neuvieme). Trois colonnes et des
-            // etiquettes courtes, voila comment quinze reponses tiennent sur un telephone.
-            // -------------------------------------------------------------------------------------------------
-            GridLayout {
+            // Le dessin vient de ChordTreeView.qml, partage avec la carte du profil : une seule definition du layout,
+            // donc aucun risque de voir deux arbres differents selon l'ecran qui les montre.
+            ChordTreeView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                // La grille se pose au MILIEU de l'espace de reponse : c'est la reponse, et c'est la que l'oeil la cherche.
-                // Roger : « les boutons des intervalles, au centre de l'ecran plutot que tout tchique en bas ».
                 Layout.alignment: Qt.AlignVCenter
                 visible: ExerciseController.isChordQuestion
-                // TROIS colonnes quand il y a de quoi les remplir, deux sinon : un debutant qui n'a que majeur et
-                // mineur aurait deux petits boutons perdus chacun dans un tiers d'ecran.
-                columns: ExerciseController.chordChoices.length >= 3 ? 3 : 2
-                rowSpacing: 8
-                columnSpacing: 8
-
-                Repeater {
-                    // Et une COULEUR par couleur d'accord, comme pour les intervalles : l'oeil trie avant de lire.
-                    // La teinte vient de la position dans l'ordre d'apprentissage, etalee pour que deux voisines ne
-                    // se ressemblent jamais.
-
-                    model: ExerciseController.chordChoices
-
-                    delegate: Button {
-                        required property var modelData
-                        // La bonne reponse est mise en avant QUAND ELLE EST CONNUE, jamais avant : un bouton qui se
-                        // signalerait tout seul donnerait la reponse.
-                        readonly property bool isTheAnswer: ExerciseController.heardChord.quality === modelData.quality
-
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 52
-                        Layout.maximumHeight: 64
-                        highlighted: isTheAnswer && ExerciseController.isFeedbackVisible
-                        enabled: ExerciseController.isAsking
-                        // LE NOM DE L'ACCORD, en notation anglo-saxonne : « C », « Cm », « Csus4 », « Cm7b5 ». C'est ce
-                        // qu'un musicien lit sur une partition, et c'est bien plus clair que « Maj · 3 ».
-                        text: modelData.name
-                        // L'index de la qualite voyage tel quel : l'ecran affiche un nom, et renvoie l'index de ce
-                        // qu'il a affiche. Il ne nomme rien lui-meme.
-                        onClicked: ExerciseController.answerChord(modelData.quality)
-
-                        // Le FOND porte la couleur, et le texte est SOMBRE - exactement comme les boutons d'intervalles,
-                        // et pour la meme raison : un fond colore se lit d'un coup d'oeil, alors qu'un texte colore sur
-                        // fond clair demande d'etre lu. Roger : « fond de couleurs avec texte en noir ».
-                        background: Rectangle {
-                            radius: 8
-                            color: ExerciseController.chordColourName(modelData.quality)
-                            border.width: parent.highlighted ? 3 : 0
-                            border.color: "#ffffff"
-                            opacity: ExerciseController.isAsking ? 1 : 0.72
-
-                            Behavior on opacity {
-                                NumberAnimation {
-                                    duration: 180
-                                }
-
-                            }
-
-                        }
-
-                        contentItem: Text {
-                            text: parent.text
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            // Le meme violet tres sombre que les intervalles : ce n'est pas du noir, c'est la nuit du jeu.
-                            color: "#2b1b47"
-                            font.pixelSize: 17
-                            font.bold: true
-                            elide: Text.ElideRight
-                        }
-
-                    }
-
+                interactive: true
+                showDegrees: false
+                offeredQualities: ExerciseController.chordChoices
+                onQualityChosen: function(p_quality) {
+                    ExerciseController.answerChord(p_quality);
                 }
-
             }
 
-            // L'INDICE et l'ARPEGE apparaissent apres un PREMIER essai rate, et seulement quand le domaine dit qu'ils ont
-            // un sens. L'arpege est le meilleur des deux : il ne donne pas la reponse, il donne a entendre ce qui la
-            // constitue.
-            // -------------------------------------------------------------------------------------------------
+            // Elle change a CHAQUE question (voir refreshQuestionAnecdote), et le texte est vide quand le livre
+            // d'anecdotes est vide : l'ecran ne montre alors rien du tout, ce qui vaut mieux qu'une ligne vide.
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                Layout.minimumWidth: 0
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                maximumLineCount: 3
+                elide: Text.ElideRight
+                visible: ExerciseController.questionAnecdoteText !== ""
+                text: ExerciseController.questionAnecdoteText
+                color: "#8a77ad"
+                font.pixelSize: 12
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 8

@@ -74,9 +74,14 @@ constexpr std::array<ChordDegree, 5> NINTH_DEGREES{ ChordDegree{ 1, 0 },
 
 }    // namespace
 
-// L'ARBRE, ecrit dans l'ORDRE DE LECTURE : un parcours en profondeur, ou le sous-arbre entier d'une couleur vient avant
-// la couleur suivante. L'ecran n'a donc aucune disposition a calculer - il pose les lignes dans cet ordre, et un enfant
-// reste toujours proche de son parent.
+// L'ARBRE, ecrit dans l'ORDRE DE LECTURE : les couleurs sont rangees par PROFONDEUR, et a l'interieur d'une profondeur
+// par ordre d'apprentissage. Un parent vient donc toujours avant ses enfants, et un sous-arbre n'est plus force de
+// pousser tout le reste vers le bas.
+//
+// Roger : « on voit quand meme que la deuxieme branche du C avec le Csus4, Csus2 va tres loin, car tu as laisse
+// beaucoup d'espace entre le Cm et le Csus4... tu peux rapprocher le Csus4 du Cm ». C'est exactement ce que fait cet
+// ordre : les enfants directs du majeur se suivent, et l'ecran marque la separation par une petite MARCHE au lieu de
+// laisser un trou.
 //
 // Les libelles de mutation sont en minuscules et sans accent : « tierce abaissee », « septieme mineure ajoutee ». C'est
 // le GESTE qui compte, et il se lit sous le nom de l'accord comme la legende d'un arbre de competences.
@@ -84,25 +89,27 @@ constexpr std::array<ChordNode, 15> CHORD_TREE{ {
   // La racine : tout part de la, et un majeur ne s'obtient de rien.
   ChordNode{ ChordQuality::Major, ChordQuality::Major, "le point de depart", 0 },
 
-  // Le monde mineur, et ce qui en descend.
+  // LES ENFANTS DIRECTS DU MAJEUR : un seul geste, et ils se suivent a l'ecran.
   ChordNode{ ChordQuality::Minor, ChordQuality::Major, "tierce abaissee", 1 },
-  ChordNode{ ChordQuality::Diminished, ChordQuality::Minor, "quinte abaissee", 2 },
-  ChordNode{ ChordQuality::HalfDiminished, ChordQuality::Diminished, "septieme mineure ajoutee", 3 },
-  ChordNode{ ChordQuality::DiminishedSeventh, ChordQuality::Diminished, "septieme diminuee ajoutee", 3 },
-  ChordNode{ ChordQuality::MinorSeventh, ChordQuality::Minor, "septieme mineure ajoutee", 2 },
-  ChordNode{ ChordQuality::MinorMajorSeventh, ChordQuality::Minor, "septieme majeure ajoutee", 2 },
-
-  // Puis les couleurs qui restent majeures, mais autrement.
   ChordNode{ ChordQuality::Sus4, ChordQuality::Major, "tierce remplacee par la quarte", 1 },
   ChordNode{ ChordQuality::Sus2, ChordQuality::Major, "tierce remplacee par la seconde", 1 },
   ChordNode{ ChordQuality::Augmented, ChordQuality::Major, "quinte augmentee", 1 },
   ChordNode{ ChordQuality::Sixth, ChordQuality::Major, "sixte ajoutee", 1 },
   ChordNode{ ChordQuality::MajorSeventh, ChordQuality::Major, "septieme majeure ajoutee", 1 },
   ChordNode{ ChordQuality::Add9, ChordQuality::Major, "neuvieme ajoutee", 1 },
-
-  // Et la dominante, qui se prolonge en neuvieme.
   ChordNode{ ChordQuality::DominantSeventh, ChordQuality::Major, "septieme mineure ajoutee", 1 },
+
+  // PUIS CE QUI DESCEND DU MINEUR : un geste de plus.
+  ChordNode{ ChordQuality::Diminished, ChordQuality::Minor, "quinte abaissee", 2 },
+  ChordNode{ ChordQuality::MinorSeventh, ChordQuality::Minor, "septieme mineure ajoutee", 2 },
+  ChordNode{ ChordQuality::MinorMajorSeventh, ChordQuality::Minor, "septieme majeure ajoutee", 2 },
+
+  // Et ce qui descend de la dominante.
   ChordNode{ ChordQuality::Ninth, ChordQuality::DominantSeventh, "neuvieme ajoutee", 2 },
+
+  // LES SONS LES PLUS TENDUS, au bout de la branche mineure.
+  ChordNode{ ChordQuality::HalfDiminished, ChordQuality::Diminished, "septieme mineure ajoutee", 3 },
+  ChordNode{ ChordQuality::DiminishedSeventh, ChordQuality::Diminished, "septieme diminuee ajoutee", 3 },
 } };
 
 std::int32_t semitonesOfDegree( ChordDegree p_degree ) noexcept

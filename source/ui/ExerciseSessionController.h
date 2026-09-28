@@ -187,6 +187,13 @@ class ExerciseSessionController final : public QObject
 
     // A loading-screen anecdote, refreshed on demand. Empty when the content file has nothing to say.
     Q_PROPERTY( QString anecdoteText READ anecdoteText NOTIFY anecdoteChanged )
+
+    // L'anecdote de la QUESTION en cours.
+    //
+    // Roger : « je voudrais que pendant les questionnaires, a chaque question, [une anecdote s'affiche] entre les boutons
+    // d'actions et les boutons de reponses ». Elle change a chaque question, donc on apprend quelque chose en jouant au
+    // lieu d'attendre entre deux parties.
+    Q_PROPERTY( QString questionAnecdoteText READ questionAnecdoteText NOTIFY questionAnecdoteChanged )
     Q_PROPERTY( int lives READ lives NOTIFY scoreChanged )
     Q_PROPERTY( bool hasUnlimitedLives READ hasUnlimitedLives NOTIFY scoreChanged )
 
@@ -344,7 +351,12 @@ public:
     // The anecdote currently shown, and a way to draw a new one.
     [[nodiscard]] QString anecdoteText() const;
 
+    [[nodiscard]] QString questionAnecdoteText() const { return m_questionAnecdoteText; }
+
     Q_INVOKABLE void refreshAnecdote();
+
+    // Tire une nouvelle anecdote de QUESTION. Privee : c'est le deroulement d'une partie qui la declenche, jamais l'ecran.
+    void refreshQuestionAnecdote();
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
@@ -585,6 +597,9 @@ signals:
     // A new anecdote was drawn.
     void anecdoteChanged();
 
+    // L'anecdote de la question a change : une question de plus, donc une anecdote de plus.
+    void questionAnecdoteChanged();
+
 private:
     // Rebuilds the list of choices from the question being asked, and only then notifies. Called
     // whenever the question changes AND whenever the grid closes in after a mistake.
@@ -702,6 +717,8 @@ private:
     std::mt19937 m_anecdoteRandomEngine{ std::random_device{}() };
 
     QString m_anecdoteText;
+    // L'anecdote de la question en cours, tiree a chaque question.
+    QString m_questionAnecdoteText;
 
     // Empty when the device cannot vibrate.
     VibrationCallback m_vibrate;

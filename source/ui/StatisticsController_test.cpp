@@ -1,7 +1,10 @@
 #include "ui/StatisticsController.h"
 
+#include <QDate>
+#include <QDateTime>
 #include <QMetaProperty>
 #include <QString>
+#include <QTime>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -64,14 +67,25 @@ TEST( StatisticsControllerTest, today_shows_up_in_the_histogram_and_the_streak )
 {
     domain::QuestionLogFake log;
 
-    const auto now = std::chrono::system_clock::now();
+    // LES INSTANTS SONT CHOISIS DANS LA JOURNEE, et pas relatifs a « maintenant ».
+    //
+    // Ce test a d'abord utilise « maintenant moins trois minutes » et « maintenant moins vingt-six heures », ce qui
+    // semblait plus simple et echouait entre minuit et deux heures du matin : a 00 h 05, « moins vingt-six heures » tombe
+    // AVANT-hier, la journee d'hier manque, et la flamme s'arrete a un jour. Un test qui depend de l'heure a laquelle on
+    // le lance est un test qui ment une fois sur douze.
+    const auto noonOf = []( int p_daysFromToday ) {
+        const QDateTime moment{ QDate::currentDate().addDays( p_daysFromToday ), QTime{ 12, 0 } };
 
-    log.append( recordOf( now - std::chrono::minutes{ 3 }, domain::QuestionKind::NamedInterval, true ) );
-    log.append( recordOf( now - std::chrono::minutes{ 2 }, domain::QuestionKind::NamedInterval, true ) );
-    log.append( recordOf( now - std::chrono::minutes{ 1 }, domain::QuestionKind::NamedInterval, false ) );
+        return std::chrono::system_clock::time_point{ std::chrono::milliseconds{ moment.toMSecsSinceEpoch() } };
+    };
+
+    // Trois questions aujourd'hui, dont deux trouvees.
+    log.append( recordOf( noonOf( 0 ), domain::QuestionKind::NamedInterval, true ) );
+    log.append( recordOf( noonOf( 0 ) + std::chrono::minutes{ 1 }, domain::QuestionKind::NamedInterval, true ) );
+    log.append( recordOf( noonOf( 0 ) + std::chrono::minutes{ 2 }, domain::QuestionKind::NamedInterval, false ) );
 
     // Et une HIER : la flamme doit compter deux jours.
-    log.append( recordOf( now - std::chrono::hours{ 26 }, domain::QuestionKind::Chord, true ) );
+    log.append( recordOf( noonOf( -1 ), domain::QuestionKind::Chord, true ) );
 
     StatisticsController controller{ log };
 

@@ -12,6 +12,7 @@
     <qresource prefix="/">
         <file>qml/ExerciseScreen.qml</file>
         <file>qml/Main.qml</file>
+        <file>qml/ChordTreeView.qml</file>
         <file>qml/StaffBall.qml</file>
         <!--
           The content files live at the root of the project, as docs/ARCHITECTURE.md requires, and the

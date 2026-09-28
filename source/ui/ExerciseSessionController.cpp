@@ -139,14 +139,22 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
     // constructeur, exactement comme le niveau a prime sur eux juste avant.
     applyStoredQuestionShares( m_settings );
 
-    // The instruments the player asked for. An empty list is a first run: everything is offered, which is what a
-    // fresh installation should sound like.
+    // The instruments the player asked for. An EMPTY list is a first run, and a first run sounds like a PIANO and a
+    // GUITARE - see defaultEnabledInstruments for why those two and not the others.
     if( m_levelStore != nullptr )
     {
         m_enabledInstruments = m_levelStore->storedEnabledInstruments();
     }
 
-    m_enabledInstruments.resize( domain::INSTRUMENT_COUNT, true );
+    if( m_enabledInstruments.empty() )
+    {
+        m_enabledInstruments = domain::defaultEnabledInstruments();
+    }
+
+    // Une liste plus courte que ce que ce build connait veut dire « un instrument de plus depuis la derniere fois » :
+    // les nouveaux arrivent ETEINTS, comme au premier lancement. Imposer un son que le joueur n'a pas demande serait la
+    // seule facon de le surprendre desagreablement.
+    m_enabledInstruments.resize( domain::INSTRUMENT_COUNT, false );
 
     // La boucle de rythme. Le timer le plus precis que Qt offre, comme la page Rythme : le clic doit tomber ou
     // l'oreille l'attend, et un timer grossier fait tituber toute une mesure.
@@ -570,6 +578,9 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
     // The end of the previous session has been announced; this one gets its own turn.
     m_sessionEndAnnounced = false;
 
+    // La PREMIERE question a son anecdote, comme les suivantes : c'est la meme regle du debut a la fin.
+    refreshQuestionAnecdote();
+
     emit runningChanged();
 
     refreshChoices();
@@ -589,6 +600,13 @@ void ExerciseSessionController::stopSession()
     m_session.reset();
 
     m_choices.clear();
+
+    // ON REVIENT SUR LA PAGE PRINCIPALE : une nouvelle anecdote y attend le joueur.
+    //
+    // Roger : « j'aimerais que les anecdotes qu'on affiche changent a chaque fois qu'on revient sur la page
+    // principale ». C'est exactement ce qui se passe ici : la page d'accueil garde la meme mise en page, mais son texte
+    // n'est jamais deux fois le meme - c'est ce qui donne envie de la relire.
+    refreshAnecdote();
 
     emit runningChanged();
     emit questionChanged();
@@ -966,6 +984,9 @@ void ExerciseSessionController::continueToNextQuestion()
 
     m_session->advance();
 
+    // Une nouvelle question, donc une nouvelle anecdote : c'est le rythme que Roger a demande.
+    refreshQuestionAnecdote();
+
     refreshChoices();
 
     if( !m_session->isFinished() )
@@ -1029,6 +1050,17 @@ void ExerciseSessionController::refreshAnecdote()
     m_anecdoteText = anecdote.has_value() ? QString::fromStdString( anecdote->text ) : QString{};
 
     emit anecdoteChanged();
+}
+
+void ExerciseSessionController::refreshQuestionAnecdote()
+{
+    // Une anecdote par QUESTION : c'est ce qui fait qu'une partie apprend quelque chose, et c'est aussi ce qui donne une
+    // raison de revenir. Un livre vide rend une chaine vide, et l'ecran n'affiche alors rien du tout.
+    const std::optional<domain::Anecdote> anecdote = m_anecdoteBook.random( m_anecdoteRandomEngine );
+
+    m_questionAnecdoteText = anecdote.has_value() ? QString::fromStdString( anecdote->text ) : QString{};
+
+    emit questionAnecdoteChanged();
 }
 
 void ExerciseSessionController::announceSessionEndIfNeeded()

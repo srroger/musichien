@@ -1536,4 +1536,28 @@ TEST( ExerciseSessionControllerTest, the_chord_tree_is_ready_to_be_drawn )
     EXPECT_NE( controller.chordColourName( 0 ), controller.chordColourName( 1 ) );
 }
 
+TEST( ExerciseSessionControllerTest, a_first_run_offers_a_piano_and_a_guitar )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    // Un profil VIERGE : c'est un premier lancement.
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, &levelStore };
+
+    const QVariantList instruments = controller.instruments();
+
+    ASSERT_EQ( 6, instruments.size() );
+
+    // Roger : « je voudrais par defaut : Piano et Guitare. Les autres sont trop desagreables ou trop etranges pour etre
+    // mis par defaut ». Un premier lancement doit sonner JUSTE : deux sons neutres, et le reste a portee de reglage.
+    EXPECT_TRUE( instruments.at( 0 ).toMap().value( QStringLiteral( "enabled" ) ).toBool() );
+    EXPECT_TRUE( instruments.at( 1 ).toMap().value( QStringLiteral( "enabled" ) ).toBool() );
+
+    for( int index = 2; index < instruments.size(); ++index )
+    {
+        EXPECT_FALSE( instruments.at( index ).toMap().value( QStringLiteral( "enabled" ) ).toBool() )
+          << "instrument " << index << " allume au premier lancement";
+    }
+}
+
 }    // namespace musichien::ui
