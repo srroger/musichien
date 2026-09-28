@@ -357,10 +357,19 @@ Item {
                 id: promptBoard
 
                 Layout.fillWidth: true
-                Layout.preferredHeight: 76
+                // La hauteur SUIT le contenu, et c'est la correction d'un vrai defaut : une hauteur fixe de 76 points
+                // laissait le verdict, le mot du bilan et le prompt se CHEVAUCHER avec ce qui suit des que l'un des trois
+                // passait a deux lignes - ce que Roger a vu tout de suite. Une zone qui s'adapte ne peut pas deborder.
+                Layout.preferredHeight: promptColumn.implicitHeight + 8
                 Layout.minimumHeight: 56
 
                 ColumnLayout {
+                    // Le BILAN : son mot, sous le verdict. Vide hors bilan, et ce n'est pas un detail - un ecran qui parle
+                    // pour ne rien dire devient un ecran qu'on n'ecoute plus, et le silence est ce qui donne du poids aux
+                    // mots qui restent (voir encouragementText, cote controleeur).
+
+                    id: promptColumn
+
                     anchors.centerIn: parent
                     width: parent.width
                     spacing: 4
@@ -378,18 +387,19 @@ Item {
                         font.bold: true
                     }
 
-                    // Le BILAN : son mot, sous le verdict. Vide hors bilan, et ce n'est pas un detail - un ecran qui parle
-                    // pour ne rien dire devient un ecran qu'on n'ecoute plus, et le silence est ce qui donne du poids aux
-                    // mots qui restent (voir encouragementText, cote controleeur).
+                    // Il est GROS, et c'est la demande de Roger : c'est un mot qu'on doit lire sans le chercher, au moment
+                    // ou l'on vient de repondre. Il est aussi le seul texte de l'ecran qui s'adresse directement au joueur.
                     Text {
                         Layout.fillWidth: true
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.WordWrap
                         visible: ExerciseController.encouragementText !== ""
                         text: ExerciseController.encouragementText
                         color: "#ffd479"
-                        font.pixelSize: 15
-                        font.italic: true
+                        font.pixelSize: 20
+                        font.bold: true
                     }
 
                     Text {
@@ -859,13 +869,31 @@ Item {
                         // qu'il a affiche. Il ne nomme rien lui-meme.
                         onClicked: ExerciseController.answerChord(modelData.quality)
 
-                        // Le contentItem est ecrit a la main : le style Material peint le texte des boutons comme il
-                        // l'entend, et c'est ce qui rendait ces boutons ternes et peu lisibles.
+                        // Le FOND porte la couleur, et le texte est SOMBRE - exactement comme les boutons d'intervalles,
+                        // et pour la meme raison : un fond colore se lit d'un coup d'oeil, alors qu'un texte colore sur
+                        // fond clair demande d'etre lu. Roger : « fond de couleurs avec texte en noir ».
+                        background: Rectangle {
+                            radius: 8
+                            color: exerciseScreen.chordColour(modelData.quality)
+                            border.width: parent.highlighted ? 3 : 0
+                            border.color: "#ffffff"
+                            opacity: ExerciseController.isAsking ? 1 : 0.72
+
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: 180
+                                }
+
+                            }
+
+                        }
+
                         contentItem: Text {
                             text: parent.text
-                            color: exerciseScreen.chordColour(modelData.quality)
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
+                            // Le meme violet tres sombre que les intervalles : ce n'est pas du noir, c'est la nuit du jeu.
+                            color: "#2b1b47"
                             font.pixelSize: 17
                             font.bold: true
                             elide: Text.ElideRight
