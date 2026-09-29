@@ -479,6 +479,53 @@ TEST( ExerciseSessionControllerTest, an_interval_without_a_hint_shows_nothing )
 // that would be easy to lose: a level must never make the game unplayable.
 // ---------------------------------------------------------------------------------------------------------------------
 
+TEST( ExerciseSessionControllerTest, the_tuner_page_receives_its_texts )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, &levelStore };
+
+    domain::TunerGuide guide;
+    guide.setTemperamentText( domain::Temperament::Equal, "l'egal" );
+    guide.setTemperamentText( domain::Temperament::Pythagorean, "le pythagoricien" );
+    guide.setDiapasonText( "le diapason" );
+    guide.setReferenceNoteText( "la tonique" );
+    guide.addHowToStep( "premiere etape" );
+
+    controller.setTunerGuide( guide );
+
+    // Le texte suit le TEMPERAMENT CHOISI, et non l'ordre du fichier de contenu : c'est la correspondance que le QML
+    // ne pourrait pas faire sans la recopier.
+    EXPECT_EQ( QStringLiteral( "l'egal" ), controller.temperamentExplanation() );
+
+    controller.setTemperament( static_cast<int>( domain::Temperament::Pythagorean ) );
+    EXPECT_EQ( QStringLiteral( "le pythagoricien" ), controller.temperamentExplanation() );
+
+    const QVariantMap page = controller.tunerGuide();
+
+    EXPECT_EQ( QStringLiteral( "le diapason" ), page.value( QStringLiteral( "diapason" ) ).toString() );
+    EXPECT_EQ( QStringLiteral( "la tonique" ), page.value( QStringLiteral( "noteDeReference" ) ).toString() );
+    ASSERT_EQ( 1, page.value( QStringLiteral( "modeEmploi" ) ).toList().size() );
+    EXPECT_EQ( QStringLiteral( "premiere etape" ), page.value( QStringLiteral( "modeEmploi" ) ).toList().front().toString() );
+}
+
+TEST( ExerciseSessionControllerTest, an_empty_tuner_guide_leaves_empty_texts_and_nothing_else )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, &levelStore };
+
+    // Aucun guide injecte : c'est un fichier de contenu manquant, et la page doit se contenter de ses propres phrases.
+    // Un texte vide n'est pas un plantage, et l'ecran sait le reconnaitre.
+    EXPECT_TRUE( controller.temperamentExplanation().isEmpty() );
+    EXPECT_TRUE( controller.tunerGuide().value( QStringLiteral( "diapason" ) ).toString().isEmpty() );
+
+    // Et les REGLAGES, eux, restent la : ce qui manque est le commentaire, jamais la fonction.
+    EXPECT_EQ( 440.0, controller.referencePitch() );
+}
+
 TEST( ExerciseSessionControllerTest, a_level_decides_where_the_sessions_start )
 {
     domain::NotePlayerFake notePlayer;

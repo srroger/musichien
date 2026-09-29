@@ -22,6 +22,8 @@ musichienFunction_AddLibrary(infrastructure
     content/JsonHintBook.cpp
     content/JsonAnecdoteBook.h
     content/JsonAnecdoteBook.cpp
+    content/JsonTunerGuide.h
+    content/JsonTunerGuide.cpp
     haptics/DeviceHaptics.h
     haptics/DeviceHaptics.cpp
     notifications/NotificationScheduler.h
@@ -69,6 +71,7 @@ if(MUSICHIEN_BUILD_TESTING)
         musichien_infrastructure
         audio/AudioMixer_test.cpp
         content/JsonHintBook_test.cpp
+        content/JsonTunerGuide_test.cpp
         statistics/JsonLinesQuestionLog_test.cpp
     )
 

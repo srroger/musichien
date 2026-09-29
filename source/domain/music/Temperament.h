@@ -14,7 +14,11 @@
 //
 // This is what a singer does without thinking: he does not sing a tempered fifth, he sings a just one, adjusting it
 // to the chord underneath. Hearing the difference is part of ear training, and the harmonica is a fine example - its
-// tuning is deliberately NOT equal, so that its chords ring. See the project journal, notes 05 and 17.
+// tuning is deliberately NOT equal, so that its chords ring.
+//
+// Le DERNIER paragraphe est le vocabulaire, et il compte : le diapason est la hauteur absolue du la de reference
+// (440 Hz par la norme ISO 16, 442 Hz dans les orchestres, 415 Hz pour le baroque), et le temperament est la facon de
+// REPARTIR les douze notes dans l'octave. Ce sont deux choix independants, et la page Accordeur les separe.
 //
 // Consequence for the code: a frequency is no longer a property of a note, it is a property of a note HEARD FROM a
 // root. Every call site that used Note::frequencyHz() alone becomes a call to frequencyFor().
@@ -37,7 +41,11 @@ enum class Temperament
 
 // One name per temperament, in the order of the enum. The settings screen reads them from here, so that the list and
 // the enum can never drift apart.
-inline constexpr std::array<std::string_view, 3> TEMPERAMENT_NAMES{ "Tempéré", "Pythagoricien", "Juste" };
+//
+// Les noms sont ceux de la litterature musicale francaise, et pas des raccourcis : « temperature egal » est le nom du
+// systeme (on lit aussi « gamme temperee »), « pythagoricien » renvoie au cycle des quintes pures, et le temperament
+// juste est rattache a Zarlino, dont la gamme naturelle est la reference historique.
+inline constexpr std::array<std::string_view, 3> TEMPERAMENT_NAMES{ "Tempérament égal", "Pythagoricien", "Juste (Zarlino)" };
 
 // The tuning a note is HEARD in: which temperament, and at what diapason. This is the context that travels from the
 // settings screen down to the audio layer, so that the sound follows the choice.

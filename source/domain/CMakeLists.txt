@@ -16,6 +16,8 @@ musichienFunction_AddLibrary(domain
     music/Note.cpp
     music/Temperament.h
     music/Temperament.cpp
+    music/TunerGuide.h
+    music/TunerGuide.cpp
     music/Interval.h
     music/Interval.cpp
     music/Chord.h
@@ -97,6 +99,7 @@ if(MUSICHIEN_BUILD_TESTING)
         musichien_domain
         music/Interval_test.cpp
         music/Temperament_test.cpp
+        music/TunerGuide_test.cpp
         music/Chord_test.cpp
         music/ChordTree_test.cpp
         audio/ToneSynthesizer_test.cpp
