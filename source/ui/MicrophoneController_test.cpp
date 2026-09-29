@@ -122,10 +122,10 @@ TEST( MicrophoneControllerTest, every_octave_of_a_note_is_named_while_the_ball_s
         int expectedOctaveShift;
     };
 
-    constexpr std::array<Octave, 4> OCTAVES{ { { 110.0, "A2  110 Hz", -2 },
-                                               { 220.0, "A3  220 Hz", -1 },
-                                               { 440.0, "A4  440 Hz", 0 },
-                                               { 880.0, "A5  880 Hz", +1 } } };
+    constexpr std::array<Octave, 4> OCTAVES{ { { 110.0, "A2  110.0 Hz", -2 },
+                                               { 220.0, "A3  220.0 Hz", -1 },
+                                               { 440.0, "A4  440.0 Hz", 0 },
+                                               { 880.0, "A5  880.0 Hz", +1 } } };
 
     MicrophoneUnderTest test;
 
@@ -159,6 +159,26 @@ TEST( MicrophoneControllerTest, every_octave_of_a_note_is_named_while_the_ball_s
 
         test.controller.stopTest();
     }
+}
+
+// La frequence lue s'affiche avec UNE decimale : c'est ce qui permet de voir une corde bouger de 440,0 a 440,4 Hz
+// quand on la tourne, ou de comparer deux instruments au dixieme de hertz. Deux decimales mentiraient sur la finesse
+// de la mesure, aucune priverait l'accordeur de ce qu'il a de plus utile.
+TEST( MicrophoneControllerTest, the_frequency_read_is_shown_with_its_decimal )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    test.start();
+
+    ASSERT_TRUE( test.controller.isListening() );
+    ASSERT_NE( test.detector, nullptr );
+
+    // Un peu au-dessus du la : la note reste le la, et la frequence garde sa decimale.
+    test.detector->hear( 442.3 );
+
+    EXPECT_EQ( test.controller.detectedNoteLabel(), QStringLiteral( "A4  442.3 Hz" ) );
 }
 
 // L'ecoute demandee deux fois ne rouvre pas le micro : l'ecran d'accueil et la page Accordeur la demandent tous les

@@ -107,10 +107,15 @@ constexpr double OFF_CENTS = 20.0;
 
     if( !note.has_value() )
     {
-        return QStringLiteral( "%1 Hz" ).arg( p_frequencyHz, 0, 'f', 0 );
+        return QStringLiteral( "%1 Hz" ).arg( p_frequencyHz, 0, 'f', 1 );
     }
 
-    return QStringLiteral( "%1  %2 Hz" ).arg( QString::fromStdString( note->name() ) ).arg( p_frequencyHz, 0, 'f', 0 );
+    // Une seule decimale, et c'est un choix : deux decimales decriraient une exactitude que la mesure n'a pas. Le
+    // dernier chiffre est une LECTURE, pas une verite - alors que la page d'un exercice, elle, affiche deux decimales
+    // pour une frequence CALCULEE, qui est exacte. Mieux vaut un chiffre honnete qu'un chiffre flatteur.
+    return QStringLiteral( "%1  %2 Hz" )
+      .arg( QString::fromStdString( note->name() ) )
+      .arg( p_frequencyHz, 0, 'f', 1 );
 }
 
 }    // namespace
