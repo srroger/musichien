@@ -2000,11 +2000,24 @@ ApplicationWindow {
                                 text: qsTr("Hz")
                             }
 
-                            // TROIS DIAPASONS en un geste : le baroque, la norme, et l'orchestre. Ce sont les trois
-                            // qu'on cherche vraiment quand on accorde, et les taper a la main est une perte de temps.
+                        }
+
+                        // TROIS DIAPASONS en un geste : le baroque, la norme, et l'orchestre. Ce sont les trois
+                        // qu'on cherche vraiment quand on accorde, et les taper a la main est une perte de temps.
+                        // Sur leur PROPRE ligne, et c'est la meme lecon que la banquette des intervalles : poses a
+                        // cote du champ et de son unite, il ne restait plus assez de place pour trois chiffres, et
+                        // le style Material repliait « 440 » en « 4... ». Le style Material reserve 24 points de
+                        // marge de chaque cote d'un bouton ; ces boutons portent un nombre, pas une phrase, donc ils
+                        // n'ont pas besoin de la marge, ils ont besoin de la place.
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
                             Button {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 36
+                                leftPadding: 6
+                                rightPadding: 6
                                 text: "415"
                                 onClicked: ExerciseController.setReferencePitch(415)
                             }
@@ -2012,6 +2025,8 @@ ApplicationWindow {
                             Button {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 36
+                                leftPadding: 6
+                                rightPadding: 6
                                 text: "440"
                                 onClicked: ExerciseController.setReferencePitch(440)
                             }
@@ -2019,6 +2034,8 @@ ApplicationWindow {
                             Button {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 36
+                                leftPadding: 6
+                                rightPadding: 6
                                 text: "442"
                                 onClicked: ExerciseController.setReferencePitch(442)
                             }
