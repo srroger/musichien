@@ -657,12 +657,17 @@ void ExerciseSessionController::answerDirection( int p_direction )
     processAnswer( m_session->answerDirection( direction ) );
 }
 
-void ExerciseSessionController::answerSung( bool p_isCorrect )
+void ExerciseSessionController::answerSung( bool p_isCorrect, int p_centsOffset )
 {
     if( ( m_session == nullptr ) || !isAsking() )
     {
         return;
     }
+
+    // La mesure est mise de cote AVANT de traiter la reponse : la traiter resynchronise la cible du micro, ce qui
+    // remet son detecteur a zero. Sans cette ligne, l'ecart du chant etait efface a l'instant meme ou le verdict
+    // s'affichait - et le joueur ne voyait jamais de combien il avait ete juste.
+    m_lastSungCentsOffset = p_centsOffset;
 
     processAnswer( m_session->answerSung( p_isCorrect ) );
 }

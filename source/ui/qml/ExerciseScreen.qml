@@ -99,10 +99,10 @@ Item {
         // mesure contre le temperament du jeu.
         if (ExerciseController.questionKind === 2) {
             var sungVerdict = qsTr("%1 (%2)").arg(heard.name).arg(heard.identifier);
-            if (MicrophoneController.hasSungInterval) {
-                var sungCents = Math.round(MicrophoneController.sungCentsOffset);
-                sungVerdict += qsTr(" — écart %1 cents").arg((sungCents > 0 ? "+" : "") + sungCents);
-            }
+            // L'ecart du chant vient du CONTROLEUR D'EXERCICE, et non du micro : celui-ci est deja resynchronise sur
+            // la question suivante au moment ou le verdict s'affiche, et sa mesure a ete remise a zero.
+            var sungCents = Math.round(ExerciseController.lastSungCentsOffset);
+            sungVerdict += qsTr(" — écart %1 cents").arg((sungCents > 0 ? "+" : "") + sungCents);
             return sungVerdict;
         }
 
@@ -554,7 +554,7 @@ Item {
                 Connections {
                     function onSungIntervalChanged() {
                         if (ExerciseController.questionKind === 2 && MicrophoneController.hasSungInterval)
-                            ExerciseController.answerSung(MicrophoneController.sungVerdict === 1);
+                            ExerciseController.answerSung(MicrophoneController.sungVerdict === 1, MicrophoneController.sungCentsOffset);
 
                     }
 
