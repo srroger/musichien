@@ -190,6 +190,34 @@ TEST( MainScreenTest, the_main_screen_shows_its_main_actions )
     EXPECT_GT( texts.size(), 20 ) << "l'ecran principal ne construit presque rien";
 }
 
+TEST( MainScreenTest, the_main_screen_opens_the_tools_it_promises )
+{
+    application();
+
+    QQmlEngine engine;
+
+    const std::unique_ptr<QObject> screen = loadMainScreen( engine );
+
+    ASSERT_NE( nullptr, screen.get() );
+
+    QStringList texts;
+
+    collectTexts( screen.get(), texts );
+
+    const auto hasTextContaining = [&texts]( const QString & p_word ) {
+        return std::ranges::any_of( texts, [&p_word]( const QString & p_text ) {
+            return p_text.contains( p_word );
+        } );
+    };
+
+    // Les portes vers les outils et les pages, et chacune est une promesse : ce qui n'est pas nomme ici n'est pas
+    // atteignable depuis l'accueil.
+    EXPECT_TRUE( hasTextContaining( QStringLiteral( "Métronome" ) ) ) << "le metronome a disparu de l'accueil";
+    EXPECT_TRUE( hasTextContaining( QStringLiteral( "Accordeur" ) ) ) << "l'accordeur n'est pas atteignable";
+    EXPECT_TRUE( hasTextContaining( QStringLiteral( "Options" ) ) );
+    EXPECT_TRUE( hasTextContaining( QStringLiteral( "Profil" ) ) );
+}
+
 TEST( MainScreenTest, nothing_needs_to_scroll_sideways_on_a_phone )
 {
     application();

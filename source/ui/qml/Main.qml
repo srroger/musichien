@@ -40,6 +40,11 @@ ApplicationWindow {
     // de quinze noms a retenir. C'est la meilleure page pedagogique du jeu.
     // Une anecdote par ouverture, comme les ecrans de chargement d'autrefois : un petit texte qui change et qui
     // donne a lire. Tiree au hasard dans le fichier de contenu, jamais ecrite en dur ici.
+    // =================================================================================================================
+    // LA PAGE ACCORDEUR
+    // L'accordeur vivait dans les reglages, ce qui est la meilleure facon de ne jamais le trouver : c'est un OUTIL, et un
+    // outil se prend quand on en a besoin. La page porte les trois choses qui vont ensemble - le micro, les reglages
+    // d'accordage, et de quoi comprendre ce qu'on regle.
 
     id: mainWindow
 
@@ -425,8 +430,9 @@ ApplicationWindow {
 
                 }
 
-                // Options et Profil sous les modes de jeu : ce sont des portes vers des PAGES, pas des actions de
-                // jeu, donc elles se rangent apres, a parts egales.
+                // Les OUTILS et les portes vers des PAGES, sous les modes de jeu. Deux rangees de deux plutot qu'une
+                // rangee de quatre : « Metronome » et « Accordeur » ne tiennent pas cote a cote sur la largeur d'un
+                // telephone, et un libelle coupe en deux n'est plus un libelle.
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
@@ -435,9 +441,23 @@ ApplicationWindow {
                     Button {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
-                        text: qsTr("Rythme")
+                        text: qsTr("Métronome")
                         onClicked: rhythmDialog.open()
                     }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Accordeur")
+                        onClicked: tunerDialog.open()
+                    }
+
+                }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    spacing: 8
 
                     Button {
                         Layout.fillWidth: true
@@ -871,7 +891,7 @@ ApplicationWindow {
                         color: "#e8dcff"
                         font.pixelSize: 14
                         font.bold: true
-                        text: qsTr("Accordage")
+                        text: qsTr("Accordage (tempérament et diapason)")
                     }
 
                     DarkComboBox {
@@ -887,7 +907,7 @@ ApplicationWindow {
                         color: "#8a77ad"
                         font.pixelSize: 12
                         wrapMode: Text.WordWrap
-                        text: qsTr("Le tempéré est la référence. Les autres sonnent plus juste par endroits, et faux ailleurs.")
+                        text: qsTr("Le tempéré est la référence. Les autres sonnent plus juste par endroits, et faux ailleurs. La page Accordeur explique chacun d'eux.")
                     }
 
                     // La note de reference : sans elle, un accordage non egal ne veut rien dire. Elle n'apparait
@@ -924,7 +944,7 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             color: "#e8dcff"
                             font.pixelSize: 13
-                            text: qsTr("La de référence (diapason)")
+                            text: qsTr("Diapason (le la de référence)")
                         }
 
                         SpinBox {
@@ -997,88 +1017,10 @@ ApplicationWindow {
                     }
                 }
 
-                // Le micro : choisir le peripherique et le tester en direct. La boule monte et descend sur une portee
-                // miniature au rythme de la voix - c'est l'affichage qu'aura la question chantee, expose ici d'abord.
-                Rectangle {
-                    id: microphonePanel
-
-                    Layout.fillWidth: true
+                // Le micro : choisir le peripherique et le tester. Le MEME panneau sert ici et sur la page
+                // Accordeur - deux copies finiraient par montrer deux accordeurs differents.
+                MicrophonePanel {
                     Layout.topMargin: 10
-                    // Un Rectangle qui ne contient qu'un layout ancre n'a AUCUNE hauteur propre : ses enfants se
-                    // posaient les uns sur les autres. La hauteur vient donc du contenu, explicitement.
-                    Layout.preferredHeight: microphoneColumn.implicitHeight + 24
-                    color: "#2a1a46"
-                    radius: 8
-                    border.width: 1
-                    border.color: "#5c4a80"
-
-                    ColumnLayout {
-                        // --- Chanter un intervalle -----------------------------------------------------------
-
-                        id: microphoneColumn
-
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 12
-                        spacing: 10
-
-                        Text {
-                            Layout.fillWidth: true
-                            color: "#e8dcff"
-                            font.pixelSize: 14
-                            font.bold: true
-                            text: qsTr("Le micro")
-                        }
-
-                        DarkComboBox {
-                            model: MicrophoneController.inputDeviceNames
-                            currentIndex: MicrophoneController.currentDeviceIndex
-                            onActivated: MicrophoneController.selectDevice(index)
-                        }
-
-                        // La portee miniature : la boule suit la hauteur chantee. Le composant StaffBall porte le style.
-                        StaffBall {
-                        }
-
-                        // La note la plus proche, l'ecart en cents, et la couleur : c'est un ACCORDEUR, et il sert
-                        // aussi bien a verifier une guitare qu'a voir si la voix est juste.
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 10
-
-                            Text {
-                                Layout.fillWidth: true
-                                color: mainWindow.tuningColor()
-                                font.pixelSize: 16
-                                font.bold: true
-                                text: MicrophoneController.detectedNoteLabel
-                            }
-
-                            Text {
-                                Layout.alignment: Qt.AlignRight
-                                color: mainWindow.tuningColor()
-                                font.pixelSize: 15
-                                visible: MicrophoneController.detectedFrequencyHz > 0
-                                text: {
-                                    var cents = Math.round(MicrophoneController.detectedCents);
-                                    if (cents === 0)
-                                        return qsTr("juste");
-
-                                    return (cents > 0 ? "+" : "") + cents + qsTr(" cents");
-                                }
-                            }
-
-                        }
-
-                        Button {
-                            Layout.alignment: Qt.AlignRight
-                            text: MicrophoneController.isListening ? qsTr("■ Arrêter") : qsTr("♪ Tester le micro")
-                            onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
-                        }
-
-                    }
-
                 }
 
                 Button {
@@ -1776,6 +1718,378 @@ ApplicationWindow {
 
     }
 
+    // Les textes viennent d'un fichier de contenu (assets/content/tuner.json), comme les anecdotes et les indices : ils
+    // s'ecrivent et se corrigent sans toucher au code. Un fichier absent laisse la page sans explications, et rien
+    // d'autre : les reglages, eux, restent la.
+    // =================================================================================================================
+    Dialog {
+        id: tunerDialog
+
+        anchors.centerIn: parent
+        // Plein ecran : c'est une page qu'on lit et qu'on regle, pas un message qu'on acquitte.
+        width: mainWindow.width
+        height: mainWindow.height
+        modal: true
+        padding: 12
+        // Quitter la page lache le micro : un micro ouvert vide la batterie, et une pastille d'enregistrement qui reste
+        // allumee sur un telephone est une pastille qui inquiete.
+        onClosed: MicrophoneController.stopTest()
+
+        background: Rectangle {
+            color: "#160d2b"
+        }
+
+        contentItem: ScrollView {
+            id: tunerScroll
+
+            clip: true
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+            ColumnLayout {
+                width: tunerScroll.availableWidth
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    color: "#e8dcff"
+                    font.pixelSize: 20
+                    font.bold: true
+                    text: qsTr("Accordeur")
+                }
+
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.fillWidth: true
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Joue une note, ou chante-la : l'accordeur dit laquelle c'est, et de combien elle s'en écarte.")
+                }
+
+                // LE MEME PANNEAU que dans les reglages : la portee, la boule, la note la plus proche et l'ecart en
+                // cents. Deux copies montreraient tot ou tard deux accordeurs differents.
+                MicrophonePanel {
+                }
+
+                // --- Comment s'en servir -------------------------------------------------------------------------
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 8
+                    color: "#e8dcff"
+                    font.pixelSize: 15
+                    font.bold: true
+                    text: qsTr("Comment s'en servir")
+                }
+
+                Repeater {
+                    model: ExerciseController.tunerGuide.modeEmploi
+
+                    delegate: RowLayout {
+                        required property var modelData
+                        required property int index
+
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Text {
+                            Layout.alignment: Qt.AlignTop
+                            color: "#ffd479"
+                            font.pixelSize: 14
+                            font.bold: true
+                            text: (index + 1) + "."
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            color: "#cbb8e8"
+                            font.pixelSize: 13
+                            wrapMode: Text.WordWrap
+                            text: modelData
+                        }
+
+                    }
+
+                }
+                // --- Le temperament ------------------------------------------------------------------------------
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 8
+                    Layout.preferredHeight: temperamentColumn.implicitHeight + 24
+                    color: "#2a1a46"
+                    radius: 8
+                    border.width: 1
+                    border.color: "#5c4a80"
+
+                    ColumnLayout {
+                        id: temperamentColumn
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 12
+                        spacing: 8
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#e8dcff"
+                            font.pixelSize: 15
+                            font.bold: true
+                            text: qsTr("Tempérament")
+                        }
+
+                        DarkComboBox {
+                            model: ExerciseController.temperaments
+                            currentIndex: ExerciseController.temperament
+                            onActivated: ExerciseController.setTemperament(index)
+                        }
+
+                        // L'EXPLICATION du temperament choisi : d'ou il vient, et comment il fonctionne. Elle vient du
+                        // fichier de contenu, donc c'est le contenu qui change, jamais le code.
+                        Text {
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            Layout.fillWidth: true
+                            visible: text !== ""
+                            color: "#cbb8e8"
+                            font.pixelSize: 13
+                            wrapMode: Text.WordWrap
+                            text: ExerciseController.temperamentExplanation
+                        }
+
+                        Text {
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            Layout.fillWidth: true
+                            color: "#8a77ad"
+                            font.pixelSize: 12
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Valeur par défaut : tempérament égal.")
+                        }
+
+                    }
+
+                }
+
+                // --- La note de reference ------------------------------------------------------------------------
+                Rectangle {
+                    Layout.fillWidth: true
+                    // Elle n'apparait QUE quand elle veut dire quelque chose : le tempere egal l'ignore, et un reglage
+                    // qui ne fait rien fait douter de tous les autres.
+                    visible: ExerciseController.temperament !== 0
+                    Layout.preferredHeight: referenceColumn.implicitHeight + 24
+                    color: "#2a1a46"
+                    radius: 8
+                    border.width: 1
+                    border.color: "#5c4a80"
+
+                    ColumnLayout {
+                        id: referenceColumn
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 12
+                        spacing: 8
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#e8dcff"
+                            font.pixelSize: 15
+                            font.bold: true
+                            text: qsTr("Note de référence")
+                        }
+
+                        DarkComboBox {
+                            model: ExerciseController.tuningRoots
+                            currentIndex: ExerciseController.tuningRoot
+                            onActivated: ExerciseController.setTuningRoot(index)
+                        }
+
+                        Text {
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            Layout.fillWidth: true
+                            visible: text !== ""
+                            color: "#cbb8e8"
+                            font.pixelSize: 13
+                            wrapMode: Text.WordWrap
+                            text: ExerciseController.tunerGuide.noteDeReference
+                        }
+
+                        Text {
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            Layout.fillWidth: true
+                            color: "#8a77ad"
+                            font.pixelSize: 12
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Valeur par défaut : do.")
+                        }
+
+                    }
+
+                }
+
+                // --- Le diapason ---------------------------------------------------------------------------------
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: diapasonColumn.implicitHeight + 24
+                    color: "#2a1a46"
+                    radius: 8
+                    border.width: 1
+                    border.color: "#5c4a80"
+
+                    ColumnLayout {
+                        id: diapasonColumn
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 12
+                        spacing: 8
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#e8dcff"
+                            font.pixelSize: 15
+                            font.bold: true
+                            text: qsTr("Diapason (le la de référence)")
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            SpinBox {
+                                Layout.preferredWidth: 110
+                                Layout.preferredHeight: 36
+                                from: 400
+                                to: 480
+                                stepSize: 1
+                                editable: true
+                                value: ExerciseController.referencePitch
+                                onValueModified: ExerciseController.setReferencePitch(value)
+
+                                contentItem: TextInput {
+                                    text: parent.textFromValue(parent.value, parent.locale)
+                                    color: "#ffffff"
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    font.pixelSize: 15
+                                    validator: parent.validator
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                    readOnly: !parent.editable
+                                }
+
+                                background: Rectangle {
+                                    color: "#1b1035"
+                                    radius: 4
+                                    border.width: 1
+                                    border.color: "#5c4a80"
+                                }
+
+                            }
+
+                            Text {
+                                color: "#8a77ad"
+                                font.pixelSize: 14
+                                text: qsTr("Hz")
+                            }
+
+                            // TROIS DIAPASONS en un geste : le baroque, la norme, et l'orchestre. Ce sont les trois
+                            // qu'on cherche vraiment quand on accorde, et les taper a la main est une perte de temps.
+                            Button {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 36
+                                text: "415"
+                                onClicked: ExerciseController.setReferencePitch(415)
+                            }
+
+                            Button {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 36
+                                text: "440"
+                                onClicked: ExerciseController.setReferencePitch(440)
+                            }
+
+                            Button {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 36
+                                text: "442"
+                                onClicked: ExerciseController.setReferencePitch(442)
+                            }
+
+                        }
+
+                        Text {
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            Layout.fillWidth: true
+                            visible: text !== ""
+                            color: "#cbb8e8"
+                            font.pixelSize: 13
+                            wrapMode: Text.WordWrap
+                            text: ExerciseController.tunerGuide.diapason
+                        }
+
+                        Text {
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            Layout.fillWidth: true
+                            color: "#8a77ad"
+                            font.pixelSize: 12
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Valeur par défaut : 440 Hz.")
+                        }
+
+                    }
+
+                }
+
+                // --- Les valeurs par defaut ----------------------------------------------------------------------
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    color: "#8a77ad"
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Les valeurs par défaut sont celles du jeu : tempérament égal, note de référence do, diapason 440 Hz.")
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Rétablir les valeurs par défaut")
+                        onClicked: {
+                            ExerciseController.setTemperament(0);
+                            ExerciseController.setTuningRoot(0);
+                            ExerciseController.setReferencePitch(440);
+                        }
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Fermer")
+                        onClicked: tunerDialog.close()
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
     Timer {
         id: feedbackTimer
 
@@ -1791,6 +2105,9 @@ ApplicationWindow {
         height: Math.min(mainWindow.height * 0.9, rhythmColumn.implicitHeight + 32)
         modal: true
         padding: 16
+        // QUITTER LA PAGE ARRETE LE METRONOME, et il n'y a pas d'exception : un clic qui continue de battre sous une
+        // autre page est un son qu'on ne peut plus arreter, puisqu'on ne voit plus le bouton qui l'a lance.
+        onClosed: RhythmController.stop()
 
         background: Rectangle {
             color: "#241442"
@@ -2012,6 +2329,85 @@ ApplicationWindow {
 
                 }
 
+            }
+
+        }
+
+    }
+
+    component MicrophonePanel: Rectangle {
+        Layout.fillWidth: true
+        // Un Rectangle qui ne contient qu'un layout ancre n'a AUCUNE hauteur propre : ses enfants se
+        // posaient les uns sur les autres. La hauteur vient donc du contenu, explicitement.
+        Layout.preferredHeight: microphoneColumn.implicitHeight + 24
+        color: "#2a1a46"
+        radius: 8
+        border.width: 1
+        border.color: "#5c4a80"
+
+        ColumnLayout {
+            // --- Chanter un intervalle -----------------------------------------------------------
+
+            id: microphoneColumn
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 12
+            spacing: 10
+
+            Text {
+                Layout.fillWidth: true
+                color: "#e8dcff"
+                font.pixelSize: 14
+                font.bold: true
+                text: qsTr("Le micro")
+            }
+
+            DarkComboBox {
+                model: MicrophoneController.inputDeviceNames
+                currentIndex: MicrophoneController.currentDeviceIndex
+                onActivated: MicrophoneController.selectDevice(index)
+            }
+
+            // La portee miniature : la boule suit la hauteur chantee. Le composant StaffBall porte le style.
+            StaffBall {
+            }
+
+            // La note la plus proche, l'ecart en cents, et la couleur : c'est un ACCORDEUR, et il sert
+            // aussi bien a verifier une guitare qu'a voir si la voix est juste.
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    color: mainWindow.tuningColor()
+                    font.pixelSize: 16
+                    font.bold: true
+                    text: MicrophoneController.detectedNoteLabel
+                }
+
+                Text {
+                    Layout.alignment: Qt.AlignRight
+                    color: mainWindow.tuningColor()
+                    font.pixelSize: 15
+                    visible: MicrophoneController.detectedFrequencyHz > 0
+                    text: {
+                        var cents = Math.round(MicrophoneController.detectedCents);
+                        if (cents === 0)
+                            return qsTr("juste");
+
+                        return (cents > 0 ? "+" : "") + cents + qsTr(" cents");
+                    }
+                }
+
+            }
+
+            Button {
+                Layout.alignment: Qt.AlignRight
+                text: MicrophoneController.isListening ? qsTr("■ Arrêter") : qsTr("♪ Tester le micro")
+                onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
             }
 
         }
