@@ -297,6 +297,13 @@ public:
     // The developer button that fires a reminder right now, to check the plumbing.
     Q_INVOKABLE void testReminder();
 
+    // Demande a Android l'autorisation d'afficher des notifications, si elle manque.
+    //
+    // Appelee au demarrage de l'ecran d'accueil, et quand le joueur rallume le rappel. Pas avant, et pas a chaque
+    // instant : Android ne montre la boite qu'une fois de toute facon, et une demande posee pour rien est une demande
+    // qui fait douter de tout le reste.
+    Q_INVOKABLE void requestNotificationPermission();
+
     // The tuning, as the index of the domain's enumeration, and the names a screen can show.
     [[nodiscard]] int temperament() const;
 
@@ -580,6 +587,12 @@ signals:
 
     // The player has just pressed the "test the notification" button.
     void testReminderRequested();
+
+    // L'application demande a Android l'autorisation d'AFFICHER des notifications.
+    //
+    // Un signal plutot qu'un appel direct, et c'est le motif du projet : ce controleur ne connait pas
+    // l'infrastructure, il demande ; c'est main() qui sait a qui la demande s'adresse.
+    void notificationPermissionRequested();
 
     // La boucle de rythme a avance : un temps de plus, un passage en reproduction, ou une frappe jugee.
     //

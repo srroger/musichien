@@ -25,6 +25,10 @@ public:
     {
         (void)p_content;
     }
+
+    void requestNotificationPermission() override
+    {
+    }
 };
 
 }    // namespace musichien::infrastructure

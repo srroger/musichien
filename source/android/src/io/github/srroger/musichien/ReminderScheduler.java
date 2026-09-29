@@ -1,9 +1,13 @@
 package io.github.srroger.musichien;
 
+import android.Manifest;
+import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 
 import java.util.Calendar;
 
@@ -20,6 +24,10 @@ public class ReminderScheduler {
     public static final int MAX_SLOTS = 8;
 
     private static final int BASE_REQUEST_CODE = 100;
+
+    // Le code de la demande d'autorisation. Peu importe sa valeur : Android le rend tel quel a l'activite, qui n'en
+    // fait rien - mais il doit exister, et rester stable.
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 1;
 
     public static void scheduleDaily(Context context, int hour, int minute, String content, int slot) {
         AlarmManager alarm = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
@@ -63,6 +71,39 @@ public class ReminderScheduler {
             // Les extras ne comptent pas dans le matching d'un PendingIntent : un intent sans texte annule bien celui
             // qui en portait un.
             alarm.cancel(pendingIntent(context, null, slot));
+        }
+    }
+
+    // Demande l'autorisation d'AFFICHER des notifications, si elle manque.
+    //
+    // Depuis Android 13 (API 33), declarer POST_NOTIFICATIONS dans le manifeste ne suffit plus : il faut la demander a
+    // l'utilisateur, et une notification postee sans elle disparait SANS ERREUR. C'est la pire des pannes, parce
+    // qu'elle est silencieuse : les alarmes se declenchaient bien, et rien n'apparaissait nulle part.
+    //
+    // L'appel vient du DEMARRAGE de l'application, et surtout pas de l'instant ou la notification doit s'afficher : a
+    // cet instant-la l'application est en arriere-plan ou eteinte, et Android n'affiche une demande de permission que
+    // devant une ACTIVITE. Demander a une alarme qui sonne ne montre rien a personne - et c'est exactement ce que
+    // faisait le recepteur avant que cette methode n'existe.
+    //
+    // Avant Android 13, l'autorisation est donnee a l'installation : il n'y a rien a demander, et rien a refuser.
+    public static void requestNotificationPermission(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
+        }
+
+        if (context == null
+                || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                   == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        // Devant une activite seulement : ailleurs, Android ignore la demande en silence, ce qui donnerait
+        // l'illusion d'avoir demande quelque chose.
+        if (context instanceof Activity) {
+            ((Activity) context).requestPermissions(
+                new String[] { Manifest.permission.POST_NOTIFICATIONS },
+                NOTIFICATION_PERMISSION_REQUEST_CODE
+            );
         }
     }
 

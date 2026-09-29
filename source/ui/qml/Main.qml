@@ -38,6 +38,8 @@ ApplicationWindow {
     // Une carte ou chaque accord s'obtient en modifiant un intervalle : la forme rappelle les arbres de competences
     // d'un jeu de role, et ca donne un ORDRE aux accords - quinze couleurs, quatorze gestes, une seule racine, au lieu
     // de quinze noms a retenir. C'est la meilleure page pedagogique du jeu.
+    // Une anecdote par ouverture, comme les ecrans de chargement d'autrefois : un petit texte qui change et qui
+    // donne a lire. Tiree au hasard dans le fichier de contenu, jamais ecrite en dur ici.
 
     id: mainWindow
 
@@ -155,8 +157,6 @@ ApplicationWindow {
     // The colour of the window itself, not of any item inside it. On Android this is what shows through a system bar
     // while the first frame paints, and it must match the top of the gradient rather than flash white.
     color: "#1b1035"
-    // Une anecdote par ouverture, comme les ecrans de chargement d'autrefois : un petit texte qui change et qui
-    // donne a lire. Tiree au hasard dans le fichier de contenu, jamais ecrite en dur ici.
     Component.onCompleted: ExerciseController.refreshAnecdote()
     width: 420
     height: 820
@@ -167,6 +167,15 @@ ApplicationWindow {
     // Leaving the screen must never leave an audio stream open: on a phone that is a battery drain,
     // and a bug. The view model was given a method for exactly this call.
     onClosing: IntervalController.stopPlayback()
+
+    // La demande d'autorisation part un peu APRES le premier affichage : le joueur voit d'abord la page, et la boite
+    // d'Android arrive ensuite, sur quelque chose qui existe. Posee pendant la construction de l'ecran, elle
+    // apparaitrait sur une fenetre encore vide, ce qui ressemble a un plantage plutot qu'a une question.
+    Timer {
+        interval: 800
+        running: true
+        onTriggered: ExerciseController.requestNotificationPermission()
+    }
 
     Rectangle {
         // The loop itself, and the only thing the player ever sees of it: the bench below is a tool for

@@ -13,8 +13,12 @@ namespace musichien::infrastructure
 namespace
 {
 
-// Le contexte de l'application, que le Java exige pour atteindre AlarmManager.
-[[nodiscard]] QJniObject applicationContext()
+// L'objet que le Java attend pour atteindre AlarmManager et poser une question a l'utilisateur.
+//
+// C'est l'ACTIVITE, malgre le nom que Qt lui donne : QtNative.getContext() renvoie la reference a l'activite, pas le
+// contexte applicatif. Ce detail compte, et pas qu'un peu : requestPermissions n'affiche une boite de dialogue que
+// devant une activite, et un nom qui dit « applicationContext » ferait croire le contraire.
+[[nodiscard]] QJniObject activityContext()
 {
     return QNativeInterface::QAndroidApplication::context();
 }
@@ -39,7 +43,7 @@ void AndroidNotificationScheduler::scheduleDailyNotifications( std::span<const D
         QJniObject::callStaticMethod<void>( "io/github/srroger/musichien/ReminderScheduler",
                                             "scheduleDaily",
                                             "(Landroid/content/Context;IILjava/lang/String;I)V",
-                                            applicationContext().object(),
+                                            activityContext().object(),
                                             static_cast<jint>( notification.hour ),
                                             static_cast<jint>( notification.minute ),
                                             content.object(),
@@ -52,7 +56,7 @@ void AndroidNotificationScheduler::cancelNotifications()
     QJniObject::callStaticMethod<void>( "io/github/srroger/musichien/ReminderScheduler",
                                         "cancelAll",
                                         "(Landroid/content/Context;)V",
-                                        applicationContext().object() );
+                                        activityContext().object() );
 }
 
 void AndroidNotificationScheduler::showReminderNow( std::string_view p_content )
@@ -62,8 +66,18 @@ void AndroidNotificationScheduler::showReminderNow( std::string_view p_content )
     QJniObject::callStaticMethod<void>( "io/github/srroger/musichien/ReminderReceiver",
                                         "showReminder",
                                         "(Landroid/content/Context;Ljava/lang/String;)V",
-                                        applicationContext().object(),
+                                        activityContext().object(),
                                         content.object() );
+}
+
+void AndroidNotificationScheduler::requestNotificationPermission()
+{
+    // Le Java decide : il sait quelle version d'Android est en face, si l'autorisation manque vraiment, et si l'objet
+    // recu est une activite. Repeter ces trois verifications ici serait la meilleure facon de les faire diverger.
+    QJniObject::callStaticMethod<void>( "io/github/srroger/musichien/ReminderScheduler",
+                                        "requestNotificationPermission",
+                                        "(Landroid/content/Context;)V",
+                                        activityContext().object() );
 }
 
 }    // namespace musichien::infrastructure

@@ -535,6 +535,13 @@ int main( int p_argumentCount, char * p_arguments[] )
                           notificationScheduler.showReminderNow( randomAnecdoteText( anecdoteBook, notificationRandomEngine ) );
                       } );
 
+    // LA DEMANDE D'AUTORISATION, branchee comme le reste : le controleur dit qu'il faut demander, et c'est ici qu'on
+    // sait a qui. Sans cette ligne, les notifications etaient declarees actives, les alarmes se declenchaient, et rien
+    // n'apparaissait jamais - l'application avait simplement oublie de demander la permission.
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::notificationPermissionRequested,
+                      [&notificationScheduler]() { notificationScheduler.requestNotificationPermission(); } );
+
     applyNotifications();
 
     // Bonjour. Un arpège montant de do, sol, do : une quinte et une octave, aucune tierce, donc rien

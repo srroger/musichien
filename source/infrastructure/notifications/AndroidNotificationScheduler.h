@@ -17,6 +17,8 @@ public:
     void cancelNotifications() override;
 
     void showReminderNow( std::string_view p_content ) override;
+
+    void requestNotificationPermission() override;
 };
 
 }    // namespace musichien::infrastructure

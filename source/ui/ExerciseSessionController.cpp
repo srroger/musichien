@@ -1158,6 +1158,13 @@ void ExerciseSessionController::setDailyReminderEnabled( bool p_enabled )
 
     m_levelStore->storeDailyReminderEnabled( p_enabled );
 
+    // Rallumer le rappel demande l'autorisation SUR LE CHAMP : le joueur vient d'exprimer une intention, et c'est le
+    // meilleur moment pour poser la question. Attendre le prochain lancement serait une reponse a cote.
+    if( p_enabled )
+    {
+        emit notificationPermissionRequested();
+    }
+
     emit dailyReminderChanged();
 }
 
@@ -1438,6 +1445,11 @@ void ExerciseSessionController::setReminderMinute( int p_minute )
 void ExerciseSessionController::testReminder()
 {
     emit testReminderRequested();
+}
+
+void ExerciseSessionController::requestNotificationPermission()
+{
+    emit notificationPermissionRequested();
 }
 
 void ExerciseSessionController::refreshChoices()

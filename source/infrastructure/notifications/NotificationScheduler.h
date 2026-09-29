@@ -61,6 +61,16 @@ public:
     // que les anecdotes se lisent bien sur un vrai ecran. Tester un rappel est la premiere chose dont un rappel a
     // besoin, et il est honnete de l'exposer ici.
     virtual void showReminderNow( std::string_view p_content ) = 0;
+
+    // Demande a l'UTILISATEUR l'autorisation d'afficher des notifications, si elle manque.
+    //
+    // Depuis Android 13, une notification ne s'affiche pas sans cette autorisation, et Android ne la donne pas a
+    // l'installation : il faut la demander, une fois, devant l'utilisateur. La demander au demarrage plutot qu'a
+    // l'instant ou la notification doit s'afficher est la seule facon qui marche : une alarme qui sonne n'a pas
+    // d'ecran ou poser la question.
+    //
+    // Sur une machine sans notifications - un bureau, un test - c'est une methode qui ne fait rien, et c'est exact.
+    virtual void requestNotificationPermission() = 0;
 };
 
 }    // namespace musichien::infrastructure
