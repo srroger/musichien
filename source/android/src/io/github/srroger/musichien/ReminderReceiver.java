@@ -81,21 +81,10 @@ public class ReminderReceiver extends BroadcastReceiver {
         return lines[new java.util.Random().nextInt(lines.length)];
     }
 
-    // Sur Android 13 et plus, une notification ne s'affiche pas sans la permission POST_NOTIFICATIONS. Elle est
-    // demandee ici, au moment ou l'on en a besoin - jamais au demarrage, jamais pour rien.
+    // Sur Android 13 et plus, une notification ne s'affiche pas sans la permission POST_NOTIFICATIONS. La decision de
+    // la demander vit dans ReminderScheduler, avec son pourquoi : ici on la laisse passer, parce que ce chemin est
+    // celui du test manuel - et une alarme qui sonne n'a devant elle aucune activite a qui demander quoi que ce soit.
     private static void ensurePermission(Context context) {
-        if (Build.VERSION.SDK_INT < 33) {
-            return;
-        }
-
-        if (context.checkSelfPermission("android.permission.POST_NOTIFICATIONS")
-                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-
-        if (context instanceof android.app.Activity) {
-            ((android.app.Activity) context).requestPermissions(
-                new String[] { "android.permission.POST_NOTIFICATIONS" }, 1);
-        }
+        ReminderScheduler.requestNotificationPermission(context);
     }
 }

@@ -102,6 +102,24 @@ void storeIntervalOnlyShares( domain::PlayerPreferencesFake & p_store )
     p_store.storeChordQuestionShare( 0 );
 }
 
+// Une couleur d'accord qui n'est PAS la bonne, prise parmi celles que le joueur peut repondre.
+[[nodiscard]] int wrongChordChoice( ExerciseSessionController & p_controller )
+{
+    const int correct = p_controller.heardChord().value( "quality" ).toInt();
+
+    for( const QVariant & choice : p_controller.chordChoices() )
+    {
+        const int quality = choice.toMap().value( "quality" ).toInt();
+
+        if( quality != correct )
+        {
+            return quality;
+        }
+    }
+
+    return correct;
+}
+
 // The interval the session just asked, as the screen reads it.
 [[nodiscard]] std::int32_t heardDistance( const ExerciseSessionController & p_controller )
 {
@@ -562,9 +580,9 @@ TEST( ExerciseSessionControllerTest, the_levels_to_offer_are_ready_to_display )
 
 TEST( ExerciseSessionControllerTest, every_choice_is_on_the_circle_at_the_place_of_its_class )
 {
-    // Le bug que ce test surveille a coute une soiree de test a Roger : la carte ignorait silencieusement un
-    // intervalle quand un AUTRE de la meme classe occupait deja sa place. La question devenait alors impossible
-    // a repondre - le bouton affichait l'octave quand l'unisson etait demande - et rien n'echouait.
+    // Le bug que ce test surveille est silencieux : la carte ignorait un intervalle quand un AUTRE de la meme classe
+    // occupait deja sa place. La question devenait alors impossible a repondre - le bouton affichait l'octave quand
+    // l'unisson etait demande - et rien n'echouait.
     //
     // La regle est donc verifiee pour CHAQUE intervalle offert, sur chaque question d'une session entiere, et
     // non seulement pour la cible : tout ce que la session propose doit se retrouver sur la carte.
@@ -629,9 +647,9 @@ TEST( ExerciseSessionControllerTest, every_choice_is_on_the_circle_at_the_place_
 
 TEST( ExerciseSessionControllerTest, a_place_holds_every_octave_of_its_class )
 {
-    // Le cas precis rapporte par Roger, et il est traitre parce qu'il n'arrive qu'avec les intervalles composes :
-    // quand l'unisson ET l'octave sont sur la table, ils visent la MEME place du cercle. La carte les ecrasait
-    // l'un par l'autre, et le joueur n'avait plus rien de juste a cliquer.
+    // Le cas est traitre parce qu'il n'arrive qu'avec les intervalles composes : quand l'unisson ET l'octave sont sur
+    // la table, ils visent la MEME place du cercle. La carte les ecrasait l'un par l'autre, et le joueur n'avait plus
+    // rien de juste a cliquer.
     //
     // Ce test CONSTRUIT la situation au lieu de l'attendre au hasard : la carte entiere, donc les trois octaves
     // de la meme note sur la meme place.
@@ -1020,9 +1038,20 @@ TEST( ExerciseSessionControllerTest, the_chord_choices_and_the_accord_are_ready_
 
     const QVariantMap firstChoice = choices.first().toMap();
 
-    EXPECT_FALSE( firstChoice.value( "name" ).toString().isEmpty() );
     EXPECT_TRUE( firstChoice.contains( "quality" ) );
-    EXPECT_EQ( 3, firstChoice.value( "noteCount" ).toInt() );
+    EXPECT_FALSE( firstChoice.value( "name" ).toString().isEmpty() );
+
+    // LE NOM DU BOUTON est la notation anglo-saxonne : la tonique de la question, plus le suffixe de la couleur. « Maj »
+    // et « min » ont disparu, et avec eux le numero de notes : un majeur ne s'annonce pas, donc son bouton dit juste la
+    // tonique - « C ».
+    const QString rootName = controller.heardChord().value( "rootName" ).toString();
+
+    EXPECT_EQ( rootName, firstChoice.value( "name" ).toString() );
+
+    // Et le mineur, juste a cote, ajoute son « m » : « Cm ».
+    const QVariantMap secondChoice = choices.at( 1 ).toMap();
+
+    EXPECT_EQ( rootName + QStringLiteral( "m" ), secondChoice.value( "name" ).toString() );
 
     // L'accord entendu est decrit pour l'ecran, symbole compris : "C" + "m" font "Cm", et l'ecran n'assemble rien.
     const QVariantMap heard = controller.heardChord();
@@ -1096,17 +1125,19 @@ TEST( ExerciseSessionControllerTest, the_four_question_shares_are_remembered_and
 
     ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
-    // Vingt pour cent par defaut, pour les quatre genres de question.
+    // Vingt pour cent par defaut pour le chant et les accords... et ZERO pour le rythme : la question de rythme est
+    // eteinte tant qu'on ne l'allume pas (sa mesure du temps n'est pas encore fiable).
     EXPECT_EQ( 20, controller.singQuestionShare() );
-    EXPECT_EQ( 20, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
     EXPECT_EQ( 20, controller.chordQuestionShare() );
 
-    controller.setRhythmQuestionShare( 0 );
-    controller.setChordQuestionShare( 45 );
+    // On l'allume : le reglage existe, et c'est ce qui compte - le rythme se dose, y compris depuis zero.
+    controller.setRhythmQuestionShare( 25 );
 
-    // Zero est une valeur legitime : c'est meme la demande de Roger, pouvoir ENLEVER le rythme.
-    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
-    EXPECT_EQ( 0, levelStore.storedRhythmQuestionShare() );
+    EXPECT_EQ( 25, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 25, levelStore.storedRhythmQuestionShare() );
+
+    controller.setChordQuestionShare( 45 );
 
     EXPECT_EQ( 45, controller.chordQuestionShare() );
     EXPECT_EQ( 45, levelStore.storedChordQuestionShare() );
@@ -1115,8 +1146,432 @@ TEST( ExerciseSessionControllerTest, the_four_question_shares_are_remembered_and
     controller.setRhythmQuestionShare( 150 );
     controller.setChordQuestionShare( -3 );
 
-    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 25, controller.rhythmQuestionShare() );
     EXPECT_EQ( 45, controller.chordQuestionShare() );
+
+    // ZERO est une valeur legitime, et c'est meme celle par defaut : elle fait disparaitre le rythme d'une session.
+    controller.setRhythmQuestionShare( 0 );
+
+    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
+    EXPECT_EQ( 0, levelStore.storedRhythmQuestionShare() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Le journal des questions conclues
+//
+// C'est la fondation des statistiques : une ligne par question CONCLUE, et rien de plus. Le journal est un port, donc ce
+// fichier y branche un journal EN MEMOIRE et regarde ce qui part - exactement ce que l'application fait avec un
+// fichier.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionControllerTest, a_concluded_question_is_written_to_the_journal )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+    controller.setQuestionLog( &log );
+
+    controller.startSession();
+
+    // Rien tant que la question n'est pas conclue : une question posee n'est pas encore une lecon.
+    EXPECT_EQ( 0U, log.size() );
+
+    const int correctQuality = controller.heardChord().value( "quality" ).toInt();
+
+    controller.answerChord( correctQuality );
+
+    ASSERT_EQ( 1U, log.size() );
+
+    const domain::QuestionRecord & record = log.records().front();
+
+    EXPECT_EQ( domain::QuestionKind::Chord, record.kind );
+    EXPECT_EQ( correctQuality, record.target );
+    EXPECT_EQ( domain::QuestionOutcome::CorrectFirstTry, record.outcome );
+    EXPECT_EQ( 1, record.attemptCount );
+}
+
+TEST( ExerciseSessionControllerTest, a_wrong_answer_that_leaves_the_question_open_writes_nothing )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    domain::SessionSettings settings = chordOnlySettings();
+    settings.lives = std::nullopt;    // pour que la question reste posee apres l'erreur
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startSession();
+
+    controller.answerChord( wrongChordChoice( controller ) );
+
+    // La question est TOUJOURS POSEE : elle se retente, et c'est la tentative finale qui compte. Ecrire ici ferait
+    // compter trois fois la meme question pour une seule lecon.
+    EXPECT_TRUE( controller.isAsking() );
+    EXPECT_EQ( 0U, log.size() );
+
+    controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
+
+    // Conclue au deuxieme essai : une ligne, et elle dit « trouve », pas « su ».
+    ASSERT_EQ( 1U, log.size() );
+    EXPECT_EQ( domain::QuestionOutcome::CorrectAfterRetries, log.records().front().outcome );
+    EXPECT_EQ( 2, log.records().front().attemptCount );
+}
+
+TEST( ExerciseSessionControllerTest, answering_twice_writes_one_line )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+    controller.setQuestionLog( &log );
+
+    controller.startSession();
+
+    const int correctQuality = controller.heardChord().value( "quality" ).toInt();
+
+    controller.answerChord( correctQuality );
+    controller.answerChord( correctQuality );    // refusee : la question est deja en feedback
+
+    EXPECT_EQ( 1U, log.size() );
+}
+
+TEST( ExerciseSessionControllerTest, a_revealed_question_is_recorded_as_help_not_as_a_mistake )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+    controller.setQuestionLog( &log );
+
+    controller.startSession();
+    controller.revealAnswer();
+
+    ASSERT_EQ( 1U, log.size() );
+
+    // Vue la reponse : ni une reussite, ni un echec. Un joueur qui demande la reponse n'est pas un joueur qui se
+    // trompe, et ses statistiques lui mentiraient s'il y apparaissait comme tel.
+    EXPECT_EQ( domain::QuestionOutcome::Revealed, log.records().front().outcome );
+}
+
+TEST( ExerciseSessionControllerTest, a_session_without_a_journal_still_plays )
+{
+    domain::NotePlayerFake notePlayer;
+
+    // AUCUN journal branche : c'est le cas d'un test, et celui d'un appareil dont le disque est plein. Le jeu doit
+    // fonctionner exactement pareil - des statistiques, pas une regle du jeu.
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+
+    controller.startSession();
+    controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
+
+    EXPECT_TRUE( controller.isFeedbackVisible() );
+    EXPECT_TRUE( controller.wasLastAnswerCorrect() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Le Bilan
+//
+// Une session dont les questions sont DECIDEES, du plus facile au plus difficile. Le plan vient des STATISTIQUES : ce
+// fichier remplit donc un journal EN MEMOIRE, puis regarde ce que le bilan en fait.
+// ---------------------------------------------------------------------------------------------------------------------
+
+namespace
+{
+
+// Un journal qui a de la matiere : des cibles sues, et des cibles qui resistent.
+//
+// Les cibles sont des INTERVALLES : c'est le triple (genre, cible, direction) qui fait une cible, et six d'entre elles
+// suffisent a ce qu'un « facile puis difficile » ait un sens.
+void fillJournalWithWorkedTargets( domain::QuestionLogFake & p_log )
+{
+    const auto now = std::chrono::system_clock::now();
+
+    const auto add = [&p_log, &now]( std::int32_t p_semitones, bool p_correct, int p_count ) {
+        for( int index = 0; index < p_count; ++index )
+        {
+            domain::QuestionRecord record;
+
+            record.askedAt = now - std::chrono::hours{ 1 };
+            record.kind = domain::QuestionKind::NamedInterval;
+            record.target = p_semitones;
+            record.direction = domain::IntervalDirection::Ascending;
+            record.outcome = p_correct ? domain::QuestionOutcome::CorrectFirstTry : domain::QuestionOutcome::Failed;
+
+            p_log.append( record );
+        }
+    };
+
+    add( 12, true, 5 );
+    add( 7, true, 5 );
+    add( 4, true, 3 );
+
+    add( 2, false, 5 );
+    add( 6, false, 5 );
+    add( 11, false, 3 );
+}
+
+}    // namespace
+
+TEST( ExerciseSessionControllerTest, a_review_session_plans_its_questions )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    fillJournalWithWorkedTargets( log );
+
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    EXPECT_TRUE( controller.running() );
+    EXPECT_TRUE( controller.isReviewRunning() );
+
+    // Le bilan est FINI : ses questions sont decidees, donc son compte est celui du plan - et il ne se perd pas, puisqu'un
+    // bilan sans vies ne peut pas s'arreter au milieu.
+    EXPECT_GT( controller.questionCount(), 0 );
+    EXPECT_LT( controller.questionCount(), 10 );
+    EXPECT_TRUE( controller.hasUnlimitedLives() );
+}
+
+TEST( ExerciseSessionControllerTest, a_review_session_without_a_journal_is_an_ordinary_game )
+{
+    domain::NotePlayerFake notePlayer;
+
+    // Aucun journal : il n'y a rien a reviser. Le bilan devient une partie ordinaire plutot que de refuser de s'ouvrir -
+    // un bouton qui ne fait rien est pire qu'un bouton qui fait autre chose.
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+
+    controller.startReviewSession();
+
+    EXPECT_TRUE( controller.running() );
+    EXPECT_FALSE( controller.isReviewRunning() );
+    EXPECT_EQ( SESSION_QUESTION_COUNT, controller.questionCount() );
+}
+
+TEST( ExerciseSessionControllerTest, the_encouragement_speaks_only_during_a_review )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    fillJournalWithWorkedTargets( log );
+
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+    controller.setQuestionLog( &log );
+
+    // Une partie ordinaire ne dit RIEN : l'ecran reste silencieux, et c'est ce qui donne du poids aux mots du bilan.
+    controller.startSession();
+
+    EXPECT_TRUE( controller.encouragementText().isEmpty() );
+
+    controller.stopSession();
+    controller.startReviewSession();
+
+    // Le bilan, lui, parle - au minimum quand il attaque ce qui resiste.
+    bool spokeAtSomePoint = false;
+
+    for( int question = 0; question < controller.questionCount(); ++question )
+    {
+        if( !controller.encouragementText().isEmpty() )
+        {
+            spokeAtSomePoint = true;
+
+            break;
+        }
+
+        if( controller.isChordQuestion() )
+        {
+            controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
+        }
+        else
+        {
+            controller.answer( heardDistance( controller ) );
+        }
+
+        controller.continueToNextQuestion();
+    }
+
+    EXPECT_TRUE( spokeAtSomePoint ) << "le bilan n'a jamais encourage le joueur";
+}
+
+TEST( ExerciseSessionControllerTest, resetting_the_profile_also_wipes_the_statistics )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+    domain::QuestionLogFake log;
+
+    storeIntervalOnlyShares( levelStore );
+    levelStore.storeChordQuestionShare( 100 );
+
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings(), {}, {}, {}, &levelStore };
+    controller.setQuestionLog( &log );
+
+    controller.startSession();
+    controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
+
+    ASSERT_EQ( 1U, log.size() );
+
+    controller.resetProfile();
+
+    // Un score a zero qui garderait son journal serait un demi-mensonge : la page de statistiques continuerait de
+    // raconter une histoire que le joueur vient d'effacer.
+    EXPECT_EQ( 0U, log.size() );
+}
+
+TEST( ExerciseSessionControllerTest, the_chord_hint_removes_a_choice_from_the_screen )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings = chordOnlySettings();
+
+    // Six couleurs : il faut de quoi retirer un leurre. Avec deux couleurs - le niveau d'un debutant - la question se
+    // resoudrait au premier essai, et l'indice n'aurait rien a enlever.
+    settings.startingChordQualityCount = 6;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+
+    // Rien avant d'avoir essaye : l'indice attend un premier essai rate.
+    EXPECT_FALSE( controller.isChordHintAvailable() );
+
+    controller.answerChord( wrongChordChoice( controller ) );
+
+    // Une erreur ne change pas la question - elle se retente - et l'indice est desormais propose.
+    ASSERT_TRUE( controller.isAsking() );
+    EXPECT_TRUE( controller.isChordHintAvailable() );
+
+    const int choiceCountBefore = controller.chordChoices().size();
+
+    controller.useChordHint();
+
+    // L'ECRAN a une reponse en moins : la grille se relit depuis le domaine, donc retirer la reponse retire le bouton.
+    EXPECT_EQ( choiceCountBefore - 1, controller.chordChoices().size() );
+
+    // Et la bonne reponse est toujours proposee : un indice qui la retirerait rendrait la question impossible.
+    const int correctQuality = controller.heardChord().value( "quality" ).toInt();
+
+    bool correctChoiceIsStillOffered = false;
+
+    for( const QVariant & choice : controller.chordChoices() )
+    {
+        if( choice.toMap().value( "quality" ).toInt() == correctQuality )
+        {
+            correctChoiceIsStillOffered = true;
+        }
+    }
+
+    EXPECT_TRUE( correctChoiceIsStillOffered );
+
+    // Et la reponse reste juste : retirer un leurre ne change pas la question.
+    controller.answerChord( correctQuality );
+
+    EXPECT_TRUE( controller.wasLastAnswerCorrect() );
+}
+
+TEST( ExerciseSessionControllerTest, the_arpeggio_is_offered_even_when_nothing_can_be_removed )
+{
+    domain::NotePlayerFake notePlayer;
+
+    // DEUX couleurs, donc rien a retirer : c'est le niveau d'un debutant, et c'est exactement le cas ou l'arpege compte
+    // le plus.
+    domain::SessionSettings settings = chordOnlySettings();
+    settings.startingChordQualityCount = 2;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+    controller.answerChord( wrongChordChoice( controller ) );
+
+    EXPECT_FALSE( controller.isChordHintAvailable() );
+    EXPECT_TRUE( controller.isChordArpeggioAvailable() );
+}
+
+TEST( ExerciseSessionControllerTest, the_chord_tree_is_ready_to_be_drawn )
+{
+    domain::NotePlayerFake notePlayer;
+
+    ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
+
+    const QVariantList tree = controller.chordTree();
+
+    // Quinze couleurs, comme le domaine : l'arbre est la CARTE de tout ce que le jeu sait jouer, et il ne doit pas en
+    // oublier une - ce serait une branche manquante sur un arbre de competences.
+    ASSERT_EQ( 15, tree.size() );
+
+    const QVariantMap root = tree.first().toMap();
+
+    EXPECT_TRUE( root.value( QStringLiteral( "isRoot" ) ).toBool() );
+    EXPECT_EQ( -1, root.value( QStringLiteral( "parentIndex" ) ).toInt() );
+    EXPECT_EQ( 0, root.value( QStringLiteral( "depth" ) ).toInt() );
+
+    // La racine est un do majeur : « C », et ses degres sont 1 3 5.
+    EXPECT_EQ( QStringLiteral( "C" ), root.value( QStringLiteral( "name" ) ).toString() );
+    EXPECT_EQ( QStringLiteral( "1 3 5" ), root.value( QStringLiteral( "degrees" ) ).toString() );
+
+    // Et le mineur, juste en dessous, s'appelle « Cm » : le nom anglo-saxon, sur la carte comme sur les boutons.
+    EXPECT_EQ( QStringLiteral( "Cm" ), tree.at( 1 ).toMap().value( QStringLiteral( "name" ) ).toString() );
+
+    for( int index = 1; index < tree.size(); ++index )
+    {
+        const QVariantMap node = tree.at( index ).toMap();
+
+        // Chaque noeud sait de QUI il descend, et son parent vient AVANT lui : l'ecran trace un trait entre deux
+        // positions, il lui faut les deux - et une branche qui remonterait la liste ne se dessinerait pas.
+        EXPECT_GE( node.value( QStringLiteral( "parentIndex" ) ).toInt(), 0 );
+        EXPECT_LT( node.value( QStringLiteral( "parentIndex" ) ).toInt(), index );
+
+        // Et chaque noeud porte son geste et ses degres : ce sont eux qui apprennent quelque chose.
+        EXPECT_FALSE( node.value( QStringLiteral( "mutation" ) ).toString().isEmpty() );
+        EXPECT_FALSE( node.value( QStringLiteral( "degrees" ) ).toString().isEmpty() );
+    }
+
+    // La couleur vient du CONTROLEUR, pour que tous les ecrans peignent la meme : deux teintes differentes pour le meme
+    // accord, et le code couleur n'apprendrait plus rien.
+    EXPECT_FALSE( controller.chordColourName( 0 ).isEmpty() );
+    EXPECT_NE( controller.chordColourName( 0 ), controller.chordColourName( 1 ) );
+}
+
+TEST( ExerciseSessionControllerTest, a_first_run_offers_a_piano_and_a_guitar )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    // Un profil VIERGE : c'est un premier lancement.
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, &levelStore };
+
+    const QVariantList instruments = controller.instruments();
+
+    ASSERT_EQ( 6, instruments.size() );
+
+    // Un premier lancement doit sonner JUSTE : piano et guitare, deux sons neutres, et le reste a portee de reglage.
+    EXPECT_TRUE( instruments.at( 0 ).toMap().value( QStringLiteral( "enabled" ) ).toBool() );
+    EXPECT_TRUE( instruments.at( 1 ).toMap().value( QStringLiteral( "enabled" ) ).toBool() );
+
+    for( int index = 2; index < instruments.size(); ++index )
+    {
+        EXPECT_FALSE( instruments.at( index ).toMap().value( QStringLiteral( "enabled" ) ).toBool() )
+          << "instrument " << index << " allume au premier lancement";
+    }
+}
+TEST( ExerciseSessionControllerTest, the_daily_reminder_is_active_at_the_first_launch )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, &levelStore };
+
+    // Un premier lancement a le rappel ACTIF, sans rien avoir a cocher. Une application d'oreille musicale qui ne se
+    // rappelle a personne est une application qu'on oublie - et c'est exactement ce que le rappel existe pour eviter.
+    EXPECT_TRUE( controller.dailyReminderEnabled() );
+
+    // Et celui qui le coupe garde son choix : le reglage s'ecrit, et il se relit.
+    controller.setDailyReminderEnabled( false );
+
+    EXPECT_FALSE( controller.dailyReminderEnabled() );
+    EXPECT_FALSE( levelStore.dailyReminderEnabled() );
 }
 
 }    // namespace musichien::ui

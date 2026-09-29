@@ -109,9 +109,8 @@ TEST( PlayerLevelTest, every_level_produces_a_playable_session )
 
 TEST( PlayerLevelTest, a_higher_level_opens_the_chords_wider )
 {
-    // Roger, apres avoir joue : « pour les accords, ca commence avec majeur mineur quelle que soit la difficulte. Il
-    // faudrait que les accords disponibles soient directement nombreux si on augmente la difficulte. Majeur mineur
-    // c'est pour les debutants. »
+    // Les accords offerts ne peuvent pas rester « majeur, mineur » quelle que soit la difficulte : ils s'ouvrent avec le
+    // niveau, parce que deux couleurs, c'est un terrain de debutant.
     //
     // Le niveau decide donc la main d'accords comme il decide la palette d'intervalles : un joueur qui se declare
     // "a l'aise" n'a pas a gagner les suspendues une par une.

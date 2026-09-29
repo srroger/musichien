@@ -186,6 +186,17 @@ void answerChordCorrectly( ExerciseSession & p_session )
     p_session.answerChord( askedChordQuality( p_session ) );
 }
 
+// Une session d'accords avec de quoi RETIRER un leurre : six couleurs, la ou le niveau d'un debutant n'en offre que deux.
+//
+// Six, et pas quinze : il faut assez de leurres pour que l'indice ait un sens, et assez peu pour qu'un test se lise.
+[[nodiscard]] SessionSettings wideChordSettings()
+{
+    SessionSettings settings = chordOnlySettings();
+    settings.startingChordQualityCount = 6;
+
+    return settings;
+}
+
 }    // namespace
 
 TEST( ExerciseSessionTest, a_session_asks_its_first_question_immediately )
@@ -718,9 +729,32 @@ TEST( ExerciseSessionTest, a_session_can_ask_to_sing_instead_of_naming )
     EXPECT_EQ( 1, session.score().streak() );
 }
 
-// ---------------------------------------------------------------------------------------------------------------------
-// Le rythme, comme question
-//
+TEST( ExerciseSessionTest, a_sung_question_can_be_passed_at_once )
+{
+    SessionSettings settings;
+    settings.singQuestionShare = 100;    // toute la session est chantee
+
+    ExerciseSession session{ 7, settings };
+
+    ASSERT_EQ( QuestionKind::Sing, session.currentQuestion().kind );
+
+    // On peut ne pas etre en mesure de chanter du tout : l'endroit est bruyant, la gorge est prise, le micro ne suit
+    // pas. La sortie est donc offerte TOUT DE SUITE - sans attendre une erreur, et sans qu'un mode doive l'autoriser.
+    // Demander au joueur de rater une question pour avoir le droit de la passer serait une cruaute gratuite.
+    EXPECT_TRUE( session.isHelpAvailable() );
+
+    const std::size_t helpedBefore = session.score().helpedQuestionCount();
+
+    session.revealAnswer();
+
+    // Passer coute quelque chose, et le domaine le dit : la question est comptee comme AIDEE, la serie retombe a zero,
+    // et la suite se joue sur un terrain plus sur. C'est ce qui distingue une porte d'une recompense - et c'est pour
+    // cela que le bouton peut etre offert tout de suite sans rien casser au jeu.
+    EXPECT_EQ( SessionState::Feedback, session.state() );
+    EXPECT_EQ( helpedBefore + 1, session.score().helpedQuestionCount() );
+    EXPECT_EQ( 0, session.score().streak() );
+}
+
 // Le rythme est entre dans la session comme un GENRE de question, au meme titre que le chant : la meme boucle, le meme
 // score, les memes vies. Tout ce qui suit se joue donc sans une seule seconde d'attente - consequence directe du fait
 // que le domaine ne mesure pas le temps : il RECOIT la position des frappes, et il les juge.
@@ -926,8 +960,7 @@ TEST( ExerciseSessionTest, a_chord_question_offers_only_the_colours_the_player_k
 
     EXPECT_EQ( QuestionKind::Chord, question.kind );
 
-    // Deux couleurs au depart, et ce sont majeur et mineur : c'est ce que Roger a demande, et c'est ce que la palette
-    // d'un debutant contient.
+    // Deux couleurs au depart, et ce sont majeur et mineur : c'est ce que la palette d'un debutant contient.
     ASSERT_EQ( 2U, question.chordChoices.size() );
     EXPECT_EQ( ChordQuality::Major, question.chordChoices.at( 0 ) );
     EXPECT_EQ( ChordQuality::Minor, question.chordChoices.at( 1 ) );
@@ -1092,6 +1125,152 @@ TEST( ExerciseSessionTest, the_chord_share_decides_whether_an_accord_is_asked )
     }
 
     EXPECT_TRUE( chordSession.isFinished() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Le plan : une session qui suit un ORDRE decide
+//
+// C'est ce qui rend un Bilan possible : une suite qui commence par ce que le joueur reussit et finit par ce qui lui
+// resiste. Le domaine ne sait pas POURQUOI l'ordre est celui-la - il le suit, et c'est tout.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionTest, a_planned_session_asks_its_questions_in_order )
+{
+    SessionSettings settings = intervalOnlySettings();
+
+    settings.plannedQuestions = {
+      QuestionTarget{ QuestionKind::NamedInterval, 12, IntervalDirection::Ascending },
+      QuestionTarget{ QuestionKind::NamedInterval, 3, IntervalDirection::Descending },
+      QuestionTarget{ QuestionKind::Chord, static_cast<std::int32_t>( ChordQuality::Diminished ), IntervalDirection::Ascending },
+    };
+
+    settings.questionCount = settings.plannedQuestions.size();
+
+    // La palette et la main d'accords doivent contenir ce que le plan demande, sinon la grille ne pourrait pas offrir la
+    // bonne reponse - et un plan qui poserait une question sans sa reponse serait un piege.
+    settings.startingPaletteSize = SUPPORTED_INTERVAL_COUNT;
+    settings.startingChordQualityCount = CHORD_QUALITY_COUNT;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    // Question 1 : l'octave, montante.
+    EXPECT_EQ( QuestionKind::NamedInterval, session.currentQuestion().kind );
+    EXPECT_EQ( 12, session.currentQuestion().target.semitones() );
+    EXPECT_EQ( IntervalDirection::Ascending, session.currentQuestion().direction );
+
+    answerCorrectly( session );
+    session.advance();
+
+    // Question 2 : la tierce mineure, DESCENDANTE - le sens vient du plan, et non d'un tirage.
+    EXPECT_EQ( 3, session.currentQuestion().target.semitones() );
+    EXPECT_EQ( IntervalDirection::Descending, session.currentQuestion().direction );
+
+    answerCorrectly( session );
+    session.advance();
+
+    // Question 3 : un accord, et c'est bien celui que le plan a decide.
+    EXPECT_EQ( QuestionKind::Chord, session.currentQuestion().kind );
+    EXPECT_EQ( ChordQuality::Diminished, session.currentQuestion().chord.quality );
+
+    EXPECT_NE( session.currentQuestion().chordChoices.end(),
+               std::ranges::find( session.currentQuestion().chordChoices, ChordQuality::Diminished ) );
+
+    EXPECT_TRUE( session.answerChord( ChordQuality::Diminished ) );
+    session.advance();
+
+    EXPECT_TRUE( session.isFinished() );
+}
+
+TEST( ExerciseSessionTest, an_exhausted_plan_goes_back_to_drawing )
+{
+    SessionSettings settings = intervalOnlySettings();
+
+    settings.plannedQuestions = {
+      QuestionTarget{ QuestionKind::NamedInterval, 12, IntervalDirection::Ascending },
+    };
+
+    // PLUS de questions que le plan n'en porte : c'est le cas d'une session ordinaire qui aurait un plan, et celui d'un
+    // Bilan auquel on aurait ajoute des questions. La suite doit reprendre son tirage sans rien casser.
+    settings.questionCount = 4;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    EXPECT_EQ( 12, session.currentQuestion().target.semitones() );
+
+    answerCorrectly( session );
+    session.advance();
+
+    // Le plan est epuise : la question vient de la palette, comme dans n'importe quelle partie.
+    EXPECT_EQ( QuestionKind::NamedInterval, session.currentQuestion().kind );
+
+    const std::span<const Interval> palette = session.palette();
+
+    EXPECT_NE( palette.end(), std::ranges::find( palette, session.currentQuestion().target ) );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// L'indice d'accord
+//
+// L'indice d'accord : une mauvaise reponse retiree de la grille, ou l'accord rejoue en arpege.
+// ---------------------------------------------------------------------------------------------------------------------
+
+TEST( ExerciseSessionTest, the_chord_hint_waits_for_a_first_failed_attempt )
+{
+    ExerciseSession session{ TEST_SEED, wideChordSettings() };
+
+    // Un indice offert AVANT d'avoir essaye ne serait pas un indice, ce serait un raccourci.
+    EXPECT_FALSE( session.canRemoveOneWrongChordChoice() );
+    EXPECT_FALSE( session.canHearChordAsArpeggio() );
+
+    session.answerChord( wrongChordAnswer( session ) );
+
+    // Une fois rate : les deux aides sont la.
+    EXPECT_TRUE( session.canRemoveOneWrongChordChoice() );
+    EXPECT_TRUE( session.canHearChordAsArpeggio() );
+}
+
+TEST( ExerciseSessionTest, removing_a_wrong_chord_choice_never_removes_the_right_one )
+{
+    ExerciseSession session{ TEST_SEED, wideChordSettings() };
+
+    session.answerChord( wrongChordAnswer( session ) );
+
+    const std::vector<ChordQuality> before = session.currentQuestion().chordChoices;
+
+    ASSERT_TRUE( session.removeOneWrongChordChoice() );
+
+    const std::vector<ChordQuality> after = session.currentQuestion().chordChoices;
+
+    EXPECT_EQ( before.size() - 1, after.size() );
+
+    // La BONNE reponse est toujours la : un indice qui retirerait la reponse rendrait la question impossible, ce qui est
+    // le contraire d'une aide.
+    EXPECT_NE( after.end(), std::ranges::find( after, askedChordQuality( session ) ) );
+
+    // Et celle qui est partie etait bien une fausse : tout ce qui reste etait deja dans la liste d'avant.
+    for( const ChordQuality quality : after )
+    {
+        EXPECT_NE( before.end(), std::ranges::find( before, quality ) );
+    }
+}
+
+TEST( ExerciseSessionTest, the_chord_hint_stops_when_only_a_hint_would_be_left )
+{
+    SessionSettings settings = chordOnlySettings();
+
+    // Une palette de DEUX couleurs : la bonne reponse et un leurre. Il n'y a rien a retirer, et le domaine doit le dire
+    // plutot que d'offrir un bouton qui ne ferait rien.
+    settings.startingChordQualityCount = 2;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    session.answerChord( wrongChordAnswer( session ) );
+
+    EXPECT_FALSE( session.canRemoveOneWrongChordChoice() );
+
+    // Mais l'ARPEGE reste disponible, et c'est la nuance qui compte : un debutant n'a rien a eliminer, et c'est
+    // precisement lui que l'accord note a note aide le plus.
+    EXPECT_TRUE( session.canHearChordAsArpeggio() );
 }
 
 }    // namespace musichien::domain

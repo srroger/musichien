@@ -41,7 +41,7 @@ TEST( RhythmControllerTest, the_tempo_stays_inside_its_range_and_goes_down_to_on
     domain::NotePlayerFake notePlayer;
     RhythmController controller{ notePlayer };
 
-    // Roger asked for the floor to be 1 bpm: a very slow exercise is a legitimate thing to want.
+    // The floor is 1 bpm: a very slow exercise is a legitimate thing to want.
     controller.setBpm( 1 );
     EXPECT_EQ( 1, controller.bpm() );
 

@@ -38,9 +38,8 @@ constexpr double HAMMER_RELEASE = 1.2;
 // How many times the averaging filter is applied on every round trip.
 //
 // One stage is a slightly dark string; two make a much softer one, because each further stage takes the top
-// off the harmonics that are still alive. Roger's ear, on the first version: "une vieille guitare japonaise
-// un peu aiguë et numérique, ce serait mieux un son plus doux". The brightness of a struck string lives
-// entirely in this number and in how the hammer is shaped.
+// off the harmonics that are still alive. The brightness of a struck string lives entirely in this number
+// and in how the hammer is shaped: one stage is a thin, metallic string, four make a soft and round one.
 constexpr std::size_t LOOP_FILTER_STAGES = 4;
 
 // Latency, in samples, of the averaging filter inside the loop.

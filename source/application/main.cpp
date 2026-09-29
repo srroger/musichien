@@ -17,18 +17,23 @@
 #    include "infrastructure/notifications/NullNotificationScheduler.h"
 #endif
 #include "infrastructure/preferences/QSettingsPlayerPreferences.h"
+#include "infrastructure/statistics/JsonLinesQuestionLog.h"
 #include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
 #include "ui/MicrophoneController.h"
 #include "ui/RhythmController.h"
+#include "ui/StatisticsController.h"
 
 #include <QAudioDevice>
+#include <QDir>
 #include <QFile>
 #include <QGuiApplication>
 #include <QMediaDevices>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
+#include <QStandardPaths>
+#include <QString>
 #include <QUrl>
 #include <QtQml>
 
@@ -112,28 +117,17 @@ constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
     return book;
 }
 
-// Builds the reminder's content pool: every anecdote, one per line, so that the Android receiver can draw a
-// DIFFERENT one on each daily firing without the application running. An empty book falls back to the plain nudge.
-[[nodiscard]] std::string reminderContentFor( const musichien::domain::AnecdoteBook & p_anecdotes )
+// UNE anecdote au hasard, prete a devenir le texte d'une notification.
+//
+// UNE seule, et c'est tout le point : une notification qui contiendrait les vingt anecdotes du fichier ne serait pas une
+// notification, ce serait un mur de texte - et personne ne lit un mur de texte sur un ecran verrouille. La litterature
+// du fichier sert l'ecran d'accueil et l'ecran de fin de session ; ici, c'est une phrase qui doit tenir dans une bulle.
+[[nodiscard]] std::string randomAnecdoteText( const musichien::domain::AnecdoteBook & p_anecdotes,
+                                              std::mt19937 & p_randomEngine )
 {
-    std::string content;
+    const std::optional<musichien::domain::Anecdote> anecdote = p_anecdotes.random( p_randomEngine );
 
-    for( const std::string & text : p_anecdotes.texts() )
-    {
-        if( !content.empty() )
-        {
-            content += '\n';
-        }
-
-        content += text;
-    }
-
-    if( content.empty() )
-    {
-        return "Une oreille, une minute : l'intervalle du jour t'attend.";
-    }
-
-    return content;
+    return anecdote.has_value() ? anecdote->text : std::string{};
 }
 
 // Reads ONE sampled instrument from the embedded wave files.
@@ -287,7 +281,7 @@ int main( int p_argumentCount, char * p_arguments[] )
     std::cerr << "Musichien: " << instruments.size() << " sampled instrument(s)\n";
 
     // La batterie, rendue depuis la meme banque libre que les instruments : une vraie peau vaut mieux qu'une chute de
-    // sinus, et Roger l'a entendu tout de suite.
+    // sinus.
     std::array<std::vector<float>, musichien::domain::DRUM_COUNT> drumSamples = loadDrumSamples();
 
     const auto loadedDrumCount = static_cast<std::size_t>( std::ranges::count_if(
@@ -343,12 +337,47 @@ int main( int p_argumentCount, char * p_arguments[] )
     // par copie, et garde pour le rappel.
     musichien::domain::AnecdoteBook anecdoteBook = loadAnecdoteBook();
 
+    // Le journal des questions conclues : c'est la FONDATION des statistiques, et il est cree AVANT
+    // le controleur qui va l'utiliser - un pointeur vers un objet deja detruit ne se voit pas tout de suite, et se voit
+    // tres mal.
+    //
+    // Le dossier vient de Qt, qui sait ou une application a le droit d'ecrire sur chaque plateforme. Il peut ne pas
+    // exister au premier lancement : QDir le cree, et si cela echoue le journal se taira sans que rien d'autre ne
+    // s'arrete.
+    const QString applicationDataDirectory = QStandardPaths::writableLocation( QStandardPaths::AppDataLocation );
+
+    QDir{}.mkpath( applicationDataDirectory );
+
+    // Le journal ECRIT, donc il n'est pas const : c'est un objet a part entiere, pas une constante de configuration.
+    musichien::infrastructure::JsonLinesQuestionLog questionLog{
+      applicationDataDirectory + QStringLiteral( "/questions.jsonl" ) };
+
     musichien::ui::ExerciseSessionController exerciseController{ notePlayer,
                                                                  {},
                                                                  loadHintBook(),
                                                                  anecdoteBook,
                                                                  musichien::infrastructure::vibrateForMistake,
                                                                  &playerLevelStore };
+
+    // Une question conclue est ecrite ici, une fois pour toutes les genres de question.
+    exerciseController.setQuestionLog( &questionLog );
+
+    // La page de statistiques : elle LIT le meme journal, et ne l'ecrit jamais. Un seul journal, une seule verite - deux
+    // objets qui ecriraient le meme fichier finiraient par se contredire.
+    musichien::ui::StatisticsController statisticsController{ questionLog };
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "StatisticsController",
+                                  &statisticsController );
+
+    // Une remise a zero efface le journal : la page de statistiques doit alors oublier ce qu'elle avait calcule, sinon
+    // elle continuerait d'afficher l'histoire que le joueur vient d'effacer.
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::statisticsChanged,
+                      &statisticsController,
+                      &musichien::ui::StatisticsController::refresh );
 
     // Le micro. Le view model ne connait que le port PitchDetector : la vraie implementation (QAudioSource + YIN)
     // est construite ICI, dans la couche de câblage, et livrée par la factory à chaque changement de périphérique.
@@ -445,39 +474,75 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     applyTuning();
 
-    // Le rappel quotidien. Le port cache la plateforme : sur le bureau, rien ne se planifie ; sur Android, une
-    // vraie notification sera posee. Ce que l'application sait, c'est qu'une case a ete cochee, et elle demande au
-    // port de s'en occuper.
+    // Le rappel quotidien. Le port cache la plateforme : sur le bureau, rien ne se planifie ; sur Android, de
+    // VRAIES notifications sont posees.
+    //
+    // QUATRE par jour : trois anecdotes - le matin, le midi, le soir - et le rappel d'entrainement a l'heure choisie.
+    // Le contenu du rappel est le livre entier, pour qu'une anecdote DIFFERENTE
+    // puisse tomber chaque jour ; celui des trois autres est tire ici, a chaque lancement, ce qui les fait changer d'une
+    // session a l'autre sans qu'aucune alarme n'ait besoin de reveiller l'application.
 #ifdef Q_OS_ANDROID
     musichien::infrastructure::AndroidNotificationScheduler notificationScheduler;
 #else
     musichien::infrastructure::NullNotificationScheduler notificationScheduler;
 #endif
 
-    const auto applyReminder = [&exerciseController, &notificationScheduler, &anecdoteBook]() {
-        if( exerciseController.dailyReminderEnabled() )
+    // Le moteur qui tire les anecdotes des notifications. Il vit le temps de l'application : deux lancements successifs
+    // n'ont aucune raison de raconter la meme chose.
+    std::mt19937 notificationRandomEngine{ std::random_device{}() };
+
+    const auto applyNotifications = [&exerciseController, &notificationScheduler, &anecdoteBook, &notificationRandomEngine]() {
+        if( !exerciseController.dailyReminderEnabled() )
         {
-            notificationScheduler.scheduleDailyReminder( exerciseController.reminderHour(),
-                                                         exerciseController.reminderMinute(),
-                                                         reminderContentFor( anecdoteBook ) );
+            notificationScheduler.cancelNotifications();
+
+            return;
         }
-        else
+
+        std::vector<musichien::infrastructure::NotificationScheduler::DailyNotification> notifications;
+
+        // Les trois anecdotes : leur moment vient du DOMAINE, leur texte du livre. Si le livre est vide, il n'y a rien a
+        // raconter - et une notification vide serait pire que pas de notification du tout.
+        for( const musichien::domain::ReminderMoment & moment : musichien::domain::ANECDOTE_REMINDER_MOMENTS )
         {
-            notificationScheduler.cancelReminder();
+            const std::string text = randomAnecdoteText( anecdoteBook, notificationRandomEngine );
+
+            if( text.empty() )
+            {
+                continue;
+            }
+
+            notifications.push_back( { moment.hour, moment.minute, text } );
         }
+
+        // Et le rappel d'entrainement, a l'heure que le joueur a choisie : il porte une anecdote lui aussi, parce que
+        // c'est ce qui donne envie d'ouvrir l'application. Un rappel qui dit « viens t'entrainer » se fait ignorer ;
+        // une chose drole a lire, non.
+        notifications.push_back( { exerciseController.reminderHour(),
+                                   exerciseController.reminderMinute(),
+                                   randomAnecdoteText( anecdoteBook, notificationRandomEngine ) } );
+
+        notificationScheduler.scheduleDailyNotifications( notifications );
     };
 
     QObject::connect( &exerciseController,
                       &musichien::ui::ExerciseSessionController::dailyReminderChanged,
-                      applyReminder );
+                      applyNotifications );
 
     QObject::connect( &exerciseController,
                       &musichien::ui::ExerciseSessionController::testReminderRequested,
-                      [&notificationScheduler, &anecdoteBook]() {
-                          notificationScheduler.showReminderNow( reminderContentFor( anecdoteBook ) );
+                      [&notificationScheduler, &anecdoteBook, &notificationRandomEngine]() {
+                          notificationScheduler.showReminderNow( randomAnecdoteText( anecdoteBook, notificationRandomEngine ) );
                       } );
 
-    applyReminder();
+    // LA DEMANDE D'AUTORISATION, branchee comme le reste : le controleur dit qu'il faut demander, et c'est ici qu'on
+    // sait a qui. Sans cette ligne, les notifications etaient declarees actives, les alarmes se declenchaient, et rien
+    // n'apparaissait jamais - l'application avait simplement oublie de demander la permission.
+    QObject::connect( &exerciseController,
+                      &musichien::ui::ExerciseSessionController::notificationPermissionRequested,
+                      [&notificationScheduler]() { notificationScheduler.requestNotificationPermission(); } );
+
+    applyNotifications();
 
     // Bonjour. Un arpège montant de do, sol, do : une quinte et une octave, aucune tierce, donc rien
     // à comprendre - seulement quelque chose qui monte et qui flotte. Au piano, et très discret : c'est

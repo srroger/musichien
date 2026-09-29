@@ -3,13 +3,25 @@
 // =====================================================================================================================
 // Musichien - NotificationScheduler
 //
-// The daily reminder, the way Duolingo does it: a nudge at the same time every day, so that the player comes back.
+// Les notifications quotidiennes : trois anecdotes dans la journee, pour s'instruire musique avec le sourire, et un
+// rappel qui n'a rien a vendre.
 //
-// This is a PORT, exactly like NotePlayer: the application asks for a reminder, and it does not care whether the
-// answer is an Android AlarmManager, a desktop no-op or a push service that does not exist. The infrastructure
-// provides the real one; a test provides the silence.
+// C'est un PORT, exactement comme NotePlayer : l'application demande des notifications, et elle ne sait pas si la
+// reponse est un AlarmManager Android, un silence de bureau ou un service qui n'existe pas.
+//
+// ---------------------------------------------------------------------------------------------------------------------
+// Pourquoi UNE liste, et pas une par une
+//
+// `scheduleDailyNotifications` remplace la journee ENTIERE. Une porte unique plutot que quatre appels independants, et
+// c'est ce qui garantit que l'ensemble veut toujours dire quelque chose : programmer une anecdote et oublier le rappel
+// devient impossible, alors que deux methodes separees finiraient par se contredire.
+//
+// L'implementation Android utilise un SLOT par notification (un requestCode distinct) : deux notifications qui
+// partageraient le meme creneau seraient la meme alarme, et la seconde effacerait la premiere.
 // =====================================================================================================================
 
+#include <span>
+#include <string>
 #include <string_view>
 
 namespace musichien::infrastructure
@@ -27,18 +39,38 @@ public:
 
     virtual ~NotificationScheduler() = default;
 
-    // A reminder every day at this hour and minute. The content is the whole pool the receiver may draw from: one
-    // line per possible message, so that a DIFFERENT anecdote can land each day. The pool is frozen into the alarm,
-    // so the receiver can show it without asking back - a notification is the one message that must survive a reboot.
-    virtual void scheduleDailyReminder( int p_hour, int p_minute, std::string_view p_content ) = 0;
+    // Une notification quotidienne : un instant dans la journee, et ce qu'elle raconte.
+    struct DailyNotification
+    {
+        int hour{ 0 };
+        int minute{ 0 };
 
-    // No more reminders.
-    virtual void cancelReminder() = 0;
+        // Le texte de la notification. Pour une anecdote, c'est l'anecdote elle-meme : elle est FIGEE dans l'alarme,
+        // parce que la notification doit pouvoir s'afficher sans que l'application se reveille - et une notification
+        // qui a besoin de l'application pour dire quelque chose est une notification qui n'arrive pas.
+        std::string content;
+    };
 
-    // Fires a reminder RIGHT NOW, drawn from the same pool as the daily one: the developer button, to check that the
-    // plumbing works AND that the anecdotes read well on a real screen. It is honest to expose it here, because
-    // testing a reminder is the one thing a reminder feature needs most.
+    // Remplace TOUTES les notifications quotidiennes par celles-ci.
+    virtual void scheduleDailyNotifications( std::span<const DailyNotification> p_notifications ) = 0;
+
+    // Plus aucune notification quotidienne.
+    virtual void cancelNotifications() = 0;
+
+    // Affiche une notification MAINTENANT : le bouton de developpement, pour verifier que la plomberie fonctionne ET
+    // que les anecdotes se lisent bien sur un vrai ecran. Tester un rappel est la premiere chose dont un rappel a
+    // besoin, et il est honnete de l'exposer ici.
     virtual void showReminderNow( std::string_view p_content ) = 0;
+
+    // Demande a l'UTILISATEUR l'autorisation d'afficher des notifications, si elle manque.
+    //
+    // Depuis Android 13, une notification ne s'affiche pas sans cette autorisation, et Android ne la donne pas a
+    // l'installation : il faut la demander, une fois, devant l'utilisateur. La demander au demarrage plutot qu'a
+    // l'instant ou la notification doit s'afficher est la seule facon qui marche : une alarme qui sonne n'a pas
+    // d'ecran ou poser la question.
+    //
+    // Sur une machine sans notifications - un bureau, un test - c'est une methode qui ne fait rien, et c'est exact.
+    virtual void requestNotificationPermission() = 0;
 };
 
 }    // namespace musichien::infrastructure

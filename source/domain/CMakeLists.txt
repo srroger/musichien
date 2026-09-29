@@ -21,6 +21,10 @@ musichienFunction_AddLibrary(domain
     music/Chord.h
     music/Chord.cpp
 
+    # L'arbre des accords : comment chaque couleur s'obtient d'une autre, en un geste
+    music/ChordTree.h
+    music/ChordTree.cpp
+
     # Audio, expressed as a port: the domain says WHAT it needs, never HOW it is done
     audio/NotePlayer.h
     audio/NotePlayerFake.h
@@ -49,6 +53,19 @@ musichienFunction_AddLibrary(domain
     exercise/SessionScore.cpp
     exercise/ExerciseSession.h
     exercise/ExerciseSession.cpp
+
+    # Le journal des questions conclues, et ce qu'il permet de dire : la fondation des statistiques
+    exercise/QuestionRecord.h
+    exercise/QuestionRecord.cpp
+    exercise/QuestionLog.h
+    exercise/QuestionStatistics.h
+    exercise/QuestionStatistics.cpp
+
+    # Quand l'application a le droit de se rappeler au joueur : une decision de design, testable
+    exercise/ReminderSchedule.h
+
+    # Et quand elle met le Bilan en avant : le week-end, ce qui se discute et se teste aussi
+    exercise/Weekend.h
 
     # The memory hooks, as content the domain holds and the infrastructure fills
     exercise/HintBook.h
@@ -81,6 +98,7 @@ if(MUSICHIEN_BUILD_TESTING)
         music/Interval_test.cpp
         music/Temperament_test.cpp
         music/Chord_test.cpp
+        music/ChordTree_test.cpp
         audio/ToneSynthesizer_test.cpp
         audio/SungIntervalDetector_test.cpp
         audio/DrumSynthesizer_test.cpp
@@ -93,6 +111,9 @@ if(MUSICHIEN_BUILD_TESTING)
         exercise/LearningOrder_test.cpp
         exercise/PlayerLevel_test.cpp
         exercise/SessionScore_test.cpp
+        exercise/QuestionStatistics_test.cpp
+        exercise/ReminderSchedule_test.cpp
+        exercise/Weekend_test.cpp
     )
 
 endif()

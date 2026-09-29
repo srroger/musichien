@@ -11,9 +11,8 @@
 // Why samples at all, when there is already a physical model
 //
 // A struck string is a string. A piano is a string AND a soundboard, a felt hammer, three strings per note and a
-// body - and no amount of tuning a lone string will make it a piano. Roger heard it immediately: "il manque de
-// richesse harmonique". The samples answer that, and they cost 240 KB per note instead of the 40 to 215 MB of a
-// sound bank.
+// body - and no amount of tuning a lone string will make it a piano: what it lacks is harmonic richness. The samples
+// answer that, and they cost 240 KB per note instead of the 40 to 215 MB of a sound bank.
 //
 // ---------------------------------------------------------------------------------------------------------------------
 // What this class does NOT do
@@ -52,6 +51,13 @@ inline constexpr std::size_t INSTRUMENT_COUNT = 6;
 
 inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{
   "piano", "guitare", "saxo", "sinusoïdal", "dent de scie", "carré" };
+
+// Les instruments d'un PREMIER lancement : le piano et la guitare, et rien d'autre. Les timbres restants sont trop
+// etranges pour etre imposes tels quels ; c'est une decision de conception, et elle vit ici comme les autres regles du
+// projet : un premier lancement doit sonner JUSTE, sans rien demander au joueur.
+//
+// Le saxo et les trois formes d'onde restent OFFERTS dans les reglages : ils ne sont simplement pas imposes.
+[[nodiscard]] std::vector<bool> defaultEnabledInstruments();
 
 // The waveforms offered as instruments, in the same order as their names at the end of INSTRUMENT_NAMES. The adapter
 // maps the corresponding flags onto this list.

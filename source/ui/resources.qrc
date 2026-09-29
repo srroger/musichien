@@ -12,6 +12,7 @@
     <qresource prefix="/">
         <file>qml/ExerciseScreen.qml</file>
         <file>qml/Main.qml</file>
+        <file>qml/ChordTreeView.qml</file>
         <file>qml/StaffBall.qml</file>
         <!--
           The content files live at the root of the project, as docs/ARCHITECTURE.md requires, and the
@@ -27,6 +28,11 @@
           le PC et le telephone.
         -->
         <file alias="assets/fonts/NotoMusic-Regular.ttf">../../assets/fonts/NotoMusic-Regular.ttf</file>
+        <!--
+          Le chien de l'application, en illustration. Il est lu par le meme chemin que les autres ressources de
+          contenu (:/assets/images/...), avec son alias : c'est ce qui garantit qu'il suit jusqu'au telephone.
+        -->
+        <file alias="assets/images/shiba-guitar.png">../../assets/images/shiba-guitar.png</file>
     <!--
       Les echantillons d instruments : meme motif que les fichiers de contenu, alias compris,
       pour que le chemin de ressource soit celui du disque sur le PC comme sur le telephone.
@@ -54,8 +60,8 @@
         <file alias="assets/soundfonts/drum_hihat.wav">../../assets/soundfonts/drum_hihat.wav</file>
         <file alias="assets/soundfonts/drum_tom.wav">../../assets/soundfonts/drum_tom.wav</file>
     <!--
-      Les deux clics du metronome : deux blocs de bois. Roger trouvait les temps faibles "un peu moches" ; un bloc de
-      bois est la sonorite du metronome, et l'ecart aigu/grave dit ou est le premier temps sans qu'on ait a compter.
+      Les deux clics du metronome : deux blocs de bois, la sonorite du metronome, et l'ecart aigu/grave qui dit ou est
+      le premier temps sans qu'on ait a compter.
     -->
         <file alias="assets/soundfonts/drum_click_high.wav">../../assets/soundfonts/drum_click_high.wav</file>
         <file alias="assets/soundfonts/drum_click_low.wav">../../assets/soundfonts/drum_click_low.wav</file>

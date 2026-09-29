@@ -15,6 +15,7 @@
 // =====================================================================================================================
 
 #include "domain/exercise/PlayerLevel.h"
+#include "domain/exercise/ReminderSchedule.h"
 #include "domain/music/Temperament.h"
 
 #include <cstdint>
@@ -93,6 +94,12 @@ public:
 
     virtual void storeDailyReminderEnabled( bool p_enabled ) = 0;
 
+    // A QUELLE HEURE le rappel arrive. L'activer ou non est juste au-dessus ; ici, c'est le moment de la journee, et
+    // cela se retient pour la meme raison qu'un instrument : une heure qu'on choisit et qui s'oublie n'est pas un choix.
+    [[nodiscard]] virtual ReminderMoment storedReminderMoment() const = 0;
+
+    virtual void storeReminderMoment( ReminderMoment p_moment ) = 0;
+
     // The TUNING the player wants to hear, and the root it is heard from.
     //
     // Equal temperament is the default and the reference: it is what the music around us is built on, and what an ear
@@ -127,9 +134,8 @@ public:
 
     // Combien de questions sur cent portent sur le RYTHME.
     //
-    // Meme regle, meme raison d'etre reglable, et cette fois c'est une demande explicite de Roger : apres avoir
-    // entendu l'exercice, il veut pouvoir le doser - "pour potentiellement l'enlever si finalement ce n'est pas ouf
-    // ou a revoir". Une part a zero, et le rythme disparait de la session sans qu'aucune ligne de code ne change.
+    // Meme regle, meme raison d'etre reglable : une part a zero, et le rythme disparait de la session sans qu'aucune
+    // ligne de code ne change.
     [[nodiscard]] virtual std::int32_t storedRhythmQuestionShare() const = 0;
 
     virtual void storeRhythmQuestionShare( std::int32_t p_share ) = 0;
@@ -181,6 +187,10 @@ public:
 
     void storeDailyReminderEnabled( bool p_enabled ) override { m_dailyReminderEnabled = p_enabled; }
 
+    [[nodiscard]] ReminderMoment storedReminderMoment() const override { return m_reminderMoment; }
+
+    void storeReminderMoment( ReminderMoment p_moment ) override { m_reminderMoment = p_moment; }
+
     [[nodiscard]] Temperament storedTemperament() const override { return m_temperament; }
 
     void storeTemperament( Temperament p_temperament ) override { m_temperament = p_temperament; }
@@ -218,7 +228,12 @@ private:
 
     std::int64_t m_starCount{ 0 };
 
-    bool m_dailyReminderEnabled{ false };
+    bool m_dailyReminderEnabled{ true };
+
+    // 19 h par defaut : apres le diner, quand la journee de travail est finie et qu'une partie de dix questions est
+    // encore possible. C'est le meme genre de choix que les trois moments d'anecdotes - une heure ou l'on est
+    // disponible, pas une heure ou l'on est occupe.
+    ReminderMoment m_reminderMoment{ 19, 0 };
 
     Temperament m_temperament{ Temperament::Equal };
 
@@ -230,7 +245,10 @@ private:
 
     // Vingt pour cent chacune, comme le chant : un premier lancement entend un peu de tout, et c'est au joueur de
     // decider ensuite ce qu'il veut travailler. Les memes valeurs que les reglages par defaut du domaine.
-    std::int32_t m_rhythmQuestionShare{ 20 };
+    //
+    // SAUF le rythme, a zero, et c'est une valeur VOULUE : un reglage qui vaut zero ne veut pas dire « pas encore
+    // fait », il veut dire « disponible, et pas impose ».
+    std::int32_t m_rhythmQuestionShare{ 0 };
 
     std::int32_t m_chordQuestionShare{ 20 };
 };

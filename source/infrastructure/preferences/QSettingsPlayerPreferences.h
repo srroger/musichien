@@ -54,6 +54,10 @@ public:
 
     void storeDailyReminderEnabled( bool p_enabled ) override;
 
+    [[nodiscard]] domain::ReminderMoment storedReminderMoment() const override;
+
+    void storeReminderMoment( domain::ReminderMoment p_moment ) override;
+
     [[nodiscard]] domain::Temperament storedTemperament() const override;
 
     void storeTemperament( domain::Temperament p_temperament ) override;

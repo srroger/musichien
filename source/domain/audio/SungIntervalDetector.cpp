@@ -13,6 +13,8 @@ void SungIntervalDetector::reset() noexcept
     m_heldMidiNumber = 0;
     m_heldMilliseconds = 0;
     m_trackedMidi = 0.0;
+    m_silenceMilliseconds = 0;
+    m_voiceRestarted = false;
 }
 
 void SungIntervalDetector::update( double p_frequencyHz,
@@ -33,8 +35,20 @@ void SungIntervalDetector::update( double p_frequencyHz,
         m_heldMidiNumber = 0;
         m_heldMilliseconds = 0;
 
+        // Un silence ASSEZ LONG vaut une reprise : le chanteur a arrete, puis il repart. C'est ce qui permet a l'unisson
+        // d'exister - la meme note, deux fois. Le seuil est la pour qu'un vibrato ou une syllabe ne suffise pas.
+        m_silenceMilliseconds += p_elapsedMilliseconds;
+
+        if( ( m_silenceMilliseconds >= MINIMUM_SILENCE_MILLISECONDS ) && ( m_reading.firstMidiNumber != 0 ) )
+        {
+            m_voiceRestarted = true;
+        }
+
         return;
     }
+
+    // Une note est entendue : le silence est fini.
+    m_silenceMilliseconds = 0;
 
     const double midiNumber = static_cast<double>( REFERENCE_MIDI_NUMBER )
                               + ( static_cast<double>( SEMITONES_PER_OCTAVE )
@@ -58,7 +72,7 @@ void SungIntervalDetector::update( double p_frequencyHz,
     else
     {
         // The tracking: the VOICE wobbles, the tracked pitch must not. No single reading decides a note - the
-        // average of the last few does, which is what absorbs the noise and the instability Roger heard.
+        // average of the last few does, which is what absorbs the noise and the natural instability of a voice.
         m_trackedMidi += ( midiNumber - m_trackedMidi ) * TRACKING_ALPHA;
 
         // The note is the tracked pitch, rounded. Rounding is the tolerance itself: the average has to move half a
@@ -88,6 +102,17 @@ void SungIntervalDetector::update( double p_frequencyHz,
     }
 
     if( m_heldMidiNumber != m_reading.firstMidiNumber )
+    {
+        m_reading.secondMidiNumber = m_heldMidiNumber;
+
+        return;
+    }
+
+    // LA MEME NOTE, REPRISE APRES UN SILENCE : c'est un UNISSON, et c'est un intervalle comme un autre.
+    //
+    // Sans cette ligne, la deuxieme note devait etre differente de la premiere, et l'unisson etait impossible a reussir -
+    // alors que c'est l'exercice le plus direct qui soit : rester JUSTE.
+    if( m_voiceRestarted )
     {
         m_reading.secondMidiNumber = m_heldMidiNumber;
     }

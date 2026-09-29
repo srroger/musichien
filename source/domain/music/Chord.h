@@ -20,7 +20,7 @@
 //     d'abord, puis la majeur, puis la mineur - qui ne different de la premiere que par une seule note.
 //
 // La source de cet ordre est la progression des cours d'harmonie (musictheory.net : les quatre triades, puis les
-// septiemes) ; elle est notee dans le Vault, note 24.
+// septiemes).
 // =====================================================================================================================
 
 #include "domain/music/Note.h"
@@ -97,6 +97,12 @@ inline constexpr std::int32_t CHORD_ROOT_SEMITONES = 0;
 // La fin du symbole d'un accord : vide pour majeur (un accord majeur ne s'annonce pas), "m", "sus4", "dim", "aug",
 // "7", "maj7", "m7". Un symbole se COLLE a la tonique ("Cm", "C7"), il ne la remplace pas.
 [[nodiscard]] std::string_view chordQualitySymbolSuffix( ChordQuality p_quality ) noexcept;
+
+// Les qualites d'accord, en abrege : ce qu'un musicien lit sur une partition.
+//
+// La question d'accord affiche ces etiquettes courtes - "m7b5" tient dans un bouton de telephone, "Half-diminished"
+// n'y tient pas - et le verdict, lui, redonne le NOM complet. Le bouton est un choix, le verdict est une lecon.
+[[nodiscard]] std::string_view chordQualityShortLabel( ChordQuality p_quality ) noexcept;
 
 // Toutes les qualites, de la plus simple a la plus riche.
 [[nodiscard]] std::span<const ChordQuality> chordLearningOrder() noexcept;

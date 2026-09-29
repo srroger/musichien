@@ -45,12 +45,26 @@ Question ExerciseSession::buildQuestion()
 {
     Question question;
 
-    // L'intervalle est tire EN PREMIER, meme quand la question sera rythmique : c'est l'ordre des tirages que les
-    // tests existants ont appris a suivre, et une question de rythme qui ne s'en sert pas ne doit pas deplacer les
-    // autres questions pour autant.
-    question.target = drawTarget();
+    // Un PLAN decide la question, quand il y en a un : genre, cible et sens. C'est ce qui fait d'un Bilan une suite
+    // DECIDEE - du plus facile au plus difficile - la ou une partie ordinaire laisse le tirage choisir. Le plan passe
+    // avant tout tirage : ce qui est decide ne se retire pas.
+    const std::optional<QuestionTarget> planned = plannedQuestionAt( m_questionNumber - 1 );
 
-    question.kind = drawKind();
+    if( planned.has_value() )
+    {
+        question.kind = planned->kind;
+        question.target = Interval{ planned->target };
+        question.direction = planned->direction;
+    }
+    else
+    {
+        // L'intervalle est tire EN PREMIER, meme quand la question sera rythmique : c'est l'ordre des tirages que les
+        // tests existants ont appris a suivre, et une question de rythme qui ne s'en sert pas ne doit pas deplacer les
+        // autres questions pour autant.
+        question.target = drawTarget();
+
+        question.kind = drawKind();
+    }
 
     if( question.kind == QuestionKind::Rhythm )
     {
@@ -63,6 +77,17 @@ Question ExerciseSession::buildQuestion()
 
     if( question.kind == QuestionKind::Chord )
     {
+        if( planned.has_value() )
+        {
+            // Le plan a dit la COULEUR ; la tonique reste tiree, parce qu'un bilan ne teste pas la hauteur, et les
+            // choix sont ceux de la palette.
+            question.chord.quality = static_cast<ChordQuality>( planned->target );
+            question.chord.rootMidiNumber = drawChordRootMidiNumber( question.chord.quality );
+            question.chordChoices.assign( m_chordPalette.begin(), m_chordPalette.end() );
+
+            return question;
+        }
+
         // Un accord a une tonique et une couleur, mais ni direction ni grille de choix tires au hasard : il a sa
         // propre palette, et sa propre facon de se repondre.
         buildChordQuestion( question );
@@ -70,25 +95,29 @@ Question ExerciseSession::buildQuestion()
         return question;
     }
 
-    if( question.kind == QuestionKind::Sing )
+    if( !planned.has_value() )
     {
-        // Une question chantee monte toujours : chanter un intervalle descendant depuis une note inconnue est un
-        // autre exercice, et le premier jet chante vers le haut.
-        question.direction = IntervalDirection::Ascending;
-    }
-    else if( question.kind == QuestionKind::Direction )
-    {
-        // Le mode guide demande "ca monte ou ca descend ?" : un intervalle harmonique n'a pas de sens a ce
-        // moment-la, donc il est sorti du tirage.
-        question.direction = ( std::uniform_int_distribution<std::int32_t>{ 0, 1 }( m_randomEngine ) == 0 )
-                               ? IntervalDirection::Ascending
-                               : IntervalDirection::Descending;
-    }
-    else
-    {
-        // The direction is drawn BEFORE the root, because the root depends on it: the room an interval
-        // needs is on one side or the other.
-        question.direction = drawDirection();
+        // Le SENS n'est tire que si personne ne l'a decide : un plan le porte deja.
+        if( question.kind == QuestionKind::Sing )
+        {
+            // Une question chantee monte toujours : chanter un intervalle descendant depuis une note inconnue est un
+            // autre exercice, et le premier jet chante vers le haut.
+            question.direction = IntervalDirection::Ascending;
+        }
+        else if( question.kind == QuestionKind::Direction )
+        {
+            // Le mode guide demande "ca monte ou ca descend ?" : un intervalle harmonique n'a pas de sens a ce
+            // moment-la, donc il est sorti du tirage.
+            question.direction = ( std::uniform_int_distribution<std::int32_t>{ 0, 1 }( m_randomEngine ) == 0 )
+                                   ? IntervalDirection::Ascending
+                                   : IntervalDirection::Descending;
+        }
+        else
+        {
+            // The direction is drawn BEFORE the root, because the root depends on it: the room an interval
+            // needs is on one side or the other.
+            question.direction = drawDirection();
+        }
     }
 
     question.rootMidiNumber = drawRootMidiNumber( question.target, question.direction );
@@ -98,6 +127,18 @@ Question ExerciseSession::buildQuestion()
     question.choices = AnswerGrid::build( m_palette, question.target, m_settings.choiceCount, m_randomEngine );
 
     return question;
+}
+
+std::optional<QuestionTarget> ExerciseSession::plannedQuestionAt( std::size_t p_index ) const noexcept
+{
+    if( p_index >= m_settings.plannedQuestions.size() )
+    {
+        // Plan epuise, ou pas de plan du tout : la session reprend son tirage. C'est ce qui permet a un Bilan de finir
+        // proprement, et a une partie ordinaire de ne rien savoir de tout ceci.
+        return std::nullopt;
+    }
+
+    return m_settings.plannedQuestions.at( p_index );
 }
 
 IntervalDirection ExerciseSession::drawDirection()
@@ -554,6 +595,61 @@ void ExerciseSession::advance()
     m_state = SessionState::Asking;
 }
 
+bool ExerciseSession::canHearChordAsArpeggio() const noexcept
+{
+    return m_settings.aidsAllowed && ( m_state == SessionState::Asking )
+           && ( m_currentQuestion.kind == QuestionKind::Chord ) && ( m_currentQuestion.wrongAttemptCount >= 1 );
+}
+
+bool ExerciseSession::canRemoveOneWrongChordChoice() const noexcept
+{
+    // Une question d'ACCORD, et rien d'autre : retirer un intervalle faux serait un autre jeu, et personne ne l'a
+    // demande.
+    if( m_currentQuestion.kind != QuestionKind::Chord )
+    {
+        return false;
+    }
+
+    // Les aides doivent etre autorisees, le joueur doit avoir ESSAYE une fois, et il doit rester de quoi retirer : sous
+    // trois choix il n'y a plus que la bonne reponse et un leurre, et une question a deux boutons n'est plus une
+    // question.
+    return m_settings.aidsAllowed && ( m_state == SessionState::Asking ) && ( m_currentQuestion.wrongAttemptCount >= 1 )
+           && ( m_currentQuestion.chordChoices.size() > 2 );
+}
+
+bool ExerciseSession::removeOneWrongChordChoice()
+{
+    if( !canRemoveOneWrongChordChoice() )
+    {
+        return false;
+    }
+
+    // Les positions des leurres : tout ce qui n'est pas la bonne reponse.
+    std::vector<std::size_t> wrongChoices;
+
+    for( std::size_t index = 0; index < m_currentQuestion.chordChoices.size(); ++index )
+    {
+        if( m_currentQuestion.chordChoices.at( index ) != m_currentQuestion.chord.quality )
+        {
+            wrongChoices.push_back( index );
+        }
+    }
+
+    if( wrongChoices.empty() )
+    {
+        return false;
+    }
+
+    std::uniform_int_distribution<std::size_t> distribution{ 0, wrongChoices.size() - 1 };
+
+    const std::size_t chosen = wrongChoices.at( distribution( m_randomEngine ) );
+
+    m_currentQuestion.chordChoices.erase( m_currentQuestion.chordChoices.begin()
+                                          + static_cast<std::ptrdiff_t>( chosen ) );
+
+    return true;
+}
+
 bool ExerciseSession::isHintAvailable() const noexcept
 {
     // No condition on the state, on purpose: the hint is worth showing while the player is still
@@ -572,6 +668,16 @@ bool ExerciseSession::isHelpAvailable() const noexcept
     // Une question de rythme s'aide PLUS TOT qu'une question d'intervalle, et la difference est une regle du domaine
     // plutot qu'un caprice de l'ecran : voir wrongAttemptsBeforeRhythmHelp. Un intervalle se reecoute autant de fois
     // qu'on veut ; une cellule ne s'entend que pendant sa boucle d'ecoute.
+    //
+    // Le CHANT n'attend aucune tentative du tout, et il n'attend pas non plus qu'un mode donne le droit a l'aide :
+    // on peut ne pas etre en mesure de chanter - un endroit bruyant, une gorge prise, un micro qui ne suit pas. Faire
+    // rater une question pour decouvrir la sortie serait demander au joueur de rater pour avoir le droit de passer.
+    // Passer n'est d'ailleurs pas une aide ici, c'est une PORTE : elle coute une question, et le score le sait deja.
+    if( m_currentQuestion.kind == QuestionKind::Sing )
+    {
+        return m_state == SessionState::Asking;
+    }
+
     const std::int32_t attemptsBeforeHelp = ( m_currentQuestion.kind == QuestionKind::Rhythm )
                                               ? m_settings.wrongAttemptsBeforeRhythmHelp
                                               : m_settings.wrongAttemptsBeforeHelp;

@@ -212,8 +212,8 @@ TEST( AnswerGridTest, a_grid_asking_for_one_choice_still_offers_two )
 
 TEST( AnswerGridTest, the_grid_is_laid_out_in_circle_of_fifths_order )
 {
-    // Roger : "les intervalles places au bon endroit du cercle". La position d'un bouton doit vouloir dire
-    // quelque chose, et elle ne le peut que si elle ne change jamais : c'est ce que ce test protege.
+    // Les intervalles sont places au bon endroit du cercle. La position d'un bouton doit vouloir dire quelque chose, et
+    // elle ne le peut que si elle ne change jamais : c'est ce que ce test protege.
     //
     // Une quinte fait sept demi-tons, donc l'ordre attendu est do, sol, re, la, mi, si, fa diese...
     const std::vector<Interval> palette{ Interval{ 0 }, Interval{ 1 }, Interval{ 2 }, Interval{ 3 }, Interval{ 4 }, Interval{ 5 }, Interval{ 6 }, Interval{ 7 }, Interval{ 8 }, Interval{ 9 }, Interval{ 10 }, Interval{ 11 }, Interval{ 12 } };

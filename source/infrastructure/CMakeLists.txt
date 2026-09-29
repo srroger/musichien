@@ -28,6 +28,10 @@ musichienFunction_AddLibrary(infrastructure
     notifications/NullNotificationScheduler.h
     preferences/QSettingsPlayerPreferences.h
     preferences/QSettingsPlayerPreferences.cpp
+
+    # Le journal des questions conclues : une ligne JSON par question, en ajout seul (fondation des statistiques)
+    statistics/JsonLinesQuestionLog.h
+    statistics/JsonLinesQuestionLog.cpp
 )
 
 # nlohmann/json is header only: linking it is only about the include path of the pinned version. It is
@@ -65,6 +69,7 @@ if(MUSICHIEN_BUILD_TESTING)
         musichien_infrastructure
         audio/AudioMixer_test.cpp
         content/JsonHintBook_test.cpp
+        statistics/JsonLinesQuestionLog_test.cpp
     )
 
 endif()

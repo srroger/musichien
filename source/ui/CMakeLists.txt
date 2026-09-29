@@ -48,6 +48,8 @@ musichienFunction_AddLibrary(ui
     MicrophoneController.cpp
     RhythmController.h
     RhythmController.cpp
+    StatisticsController.h
+    StatisticsController.cpp
 )
 
 target_link_libraries(musichien_ui PUBLIC
@@ -55,6 +57,10 @@ target_link_libraries(musichien_ui PUBLIC
 
     Qt6::Core
     Qt6::Qml
+
+    # Qt6::Gui n'est pas la pour peindre : QColor y vit, et c'est lui qui donne a une couleur d'accord SA teinte, une
+    # seule fois pour tous les ecrans. Qt Quick le tire de toute facon, donc cela n'ajoute rien au paquet.
+    Qt6::Gui
 )
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -76,6 +82,8 @@ if(MUSICHIEN_BUILD_TESTING)
         RhythmController_test.cpp
         IntervalPlaybackController_test.cpp
         ExerciseScreen_test.cpp
+        MainScreen_test.cpp
+        StatisticsController_test.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc
     )
 

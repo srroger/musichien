@@ -1,5 +1,6 @@
 #include "domain/rhythm/Rhythm.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace musichien::domain
@@ -18,6 +19,36 @@ double beatDurationMs( double p_bpm ) noexcept
 double beatTimeMs( double p_bpm, std::size_t p_beatIndex ) noexcept
 {
     return beatDurationMs( p_bpm ) * static_cast<double>( p_beatIndex );
+}
+
+BeatSchedule planNextBeat( double p_bpm, std::size_t p_beatIndex, double p_elapsedMs ) noexcept
+{
+    const double beatMs = beatDurationMs( p_bpm );
+
+    if( beatMs <= 0.0 )
+    {
+        // Un metronome a l'arret n'a rien a planifier : ni battement, ni delai. Le domaine refuse deja les frappes
+        // pour la meme raison, donc les deux disent la meme chose.
+        return BeatSchedule{};
+    }
+
+    // Une horloge qui n'a pas encore demarre - ou qui a ete remise a zero - se lit comme zero, jamais comme un temps
+    // negatif qui ferait sortir l'index de la grille.
+    const double elapsedMs = std::max( p_elapsedMs, 0.0 );
+
+    const double delayMs = beatTimeMs( p_bpm, p_beatIndex ) - elapsedMs;
+
+    if( delayMs < -beatMs )
+    {
+        // Trop tard pour rattraper : la grille se recale, et le battement vise devient le premier dont l'echeance est
+        // encore a venir.
+        const std::size_t nextBeatIndex = static_cast<std::size_t>( elapsedMs / beatMs ) + 1;
+
+        return BeatSchedule{ nextBeatIndex, beatTimeMs( p_bpm, nextBeatIndex ) - elapsedMs };
+    }
+
+    // A l'heure, ou en retard de moins d'un temps : on vise l'echeance d'origine, et le retard ne se reporte pas.
+    return BeatSchedule{ p_beatIndex, std::max( delayMs, 0.0 ) };
 }
 
 HitQuality judgeDistance( double p_distanceMs ) noexcept

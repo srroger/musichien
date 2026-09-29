@@ -226,6 +226,19 @@ void normaliseOnsetEnergy( std::span<float> p_samples, std::int32_t p_sampleRate
 
 }    // namespace
 
+std::vector<bool> defaultEnabledInstruments()
+{
+    std::vector<bool> instruments( INSTRUMENT_COUNT, false );
+
+    // Le piano et la guitare : les deux premiers de la liste, et les deux plus neutres a l'oreille. Par INDEX plutot que
+    // par nom, parce qu'un nom se traduit et qu'un index est un contrat (voir INSTRUMENT_NAMES - l'ordre ne bouge
+    // jamais, les nouveaux instruments vont a la fin).
+    instruments[0] = true;
+    instruments[1] = true;
+
+    return instruments;
+}
+
 std::optional<SampledNote> sampledNoteFromWave( std::span<const std::byte> p_bytes,
                                                 std::int32_t p_rootMidiNumber )
 {

@@ -32,6 +32,12 @@ RhythmController::RhythmController( domain::NotePlayer & p_notePlayer, QObject *
     // page feel drunk. Not sample-accurate, but close enough for the first loop.
     m_beatTimer.setTimerType( Qt::PreciseTimer );
 
+    // SINGLE SHOT, et c'est le cœur de la justesse du metronome. Un timer REPETITIF repart de l'instant ou il a tire :
+    // tire : chaque battement joue un peu en retard ajoute son retard a tous les suivants, et le metronome prend une
+    // seconde dans la vue du musicien au bout de deux minutes. Ici, chaque battement re-arme le suivant depuis
+    // l'horloge de depart (voir scheduleNextBeat), et le retard ne se reporte jamais.
+    m_beatTimer.setSingleShot( true );
+
     QObject::connect( &m_beatTimer, &QTimer::timeout, this, &RhythmController::onBeat );
 }
 
@@ -48,7 +54,9 @@ void RhythmController::setBpm( int p_bpm )
 
     if( m_isRunning )
     {
-        m_beatTimer.start( static_cast<int>( domain::beatDurationMs( m_bpm ) ) );
+        // Le tempo change : la grille repart d'ICI. Un nouveau tempo s'attend a partir de maintenant - le recaler sur
+        // le demarrage rejouerait le passe, et ferait sauter le metronome de plusieurs temps.
+        restartBeatGrid();
     }
 
     emit bpmChanged();
@@ -82,9 +90,10 @@ void RhythmController::start()
     m_lastQuality = 0;
 
     m_clock.restart();
-    m_beatTimer.start( static_cast<int>( domain::beatDurationMs( m_bpm ) ) );
+    m_beatIndex = 0;
 
-    // The downbeat sounds at once, so the ear starts on a clean reference.
+    // The downbeat sounds at once, so the ear starts on a clean reference. C'est lui qui arme le battement suivant :
+    // le demarrage et la marche passent donc par le MEME chemin, et il n'y a pas deux endroits qui planifient.
     onBeat();
 
     emit isRunningChanged();
@@ -181,7 +190,12 @@ void RhythmController::playDrum( int p_drumIndex )
 
 void RhythmController::onBeat()
 {
-    m_beatInBar = m_beatInBar % m_beatsPerBar;
+    // Le rang GLOBAL du temps, dont la position dans la mesure se DEDUIT. C'est ce qui permet a la mesure de se
+    // recompter apres un recalage de la grille, au lieu de suivre un compteur qui aurait derive avec elle.
+    const std::int64_t beatIndex = m_beatIndex;
+    ++m_beatIndex;
+
+    m_beatInBar = static_cast<int>( beatIndex % m_beatsPerBar );
 
     m_notePlayer.playMetronomeClick( m_beatInBar == 0 );
 
@@ -189,7 +203,39 @@ void RhythmController::onBeat()
 
     schedulePatternHitsForBeat( m_beatInBar );
 
-    ++m_beatInBar;
+    scheduleNextBeat();
+}
+
+// Le battement suivant, vise depuis l'ORIGINE de la grille.
+//
+// Un QTimer repetitif repart de l'instant ou il a TIRE, et non de l'instant ou il aurait du tirer : chaque battement
+// un peu en retard decale donc tous les suivants, et le retard s'additionne. A 90 bpm, un millieme de seconde par temps
+// suffit a faire entendre un metronome qui traine au bout d'une minute ; sur un telephone, le retard d'un tir est bien
+// plus gros que cela, et l'oreille l'entend des les premieres mesures.
+//
+// La decision - quand, et quel battement - appartient au domaine (domain::planNextBeat), ou elle est pure et testee.
+// Ici il n'y a plus qu'a obeir : c'est ce qui rend ce correctif verifiable sans l'ecouter.
+void RhythmController::scheduleNextBeat()
+{
+    const domain::BeatSchedule schedule = domain::planNextBeat( static_cast<double>( m_bpm ), static_cast<std::size_t>( m_beatIndex ), static_cast<double>( m_clock.elapsed() ) );
+
+    // Le recalage eventuel de la grille - apres un reveil du telephone, par exemple - remonte par l'index : c'est lui
+    // qui sait QUEL battement suivra, et donc OU en est la mesure.
+    m_beatIndex = static_cast<std::int64_t>( schedule.beatIndex );
+
+    m_beatTimer.start( static_cast<int>( std::lround( schedule.delayMs ) ) );
+}
+
+void RhythmController::restartBeatGrid()
+{
+    m_clock.restart();
+
+    // Le temps 0 est celui qui vient de sonner : la nouvelle grille commence au temps 1.
+    m_beatIndex = 1;
+
+    // Le premier temps de la nouvelle grille est la premiere echeance : on repasse par la meme porte que tous les
+    // autres battements, sans avoir a deviner un delai ici.
+    scheduleNextBeat();
 }
 
 QVariantList RhythmController::patterns() const

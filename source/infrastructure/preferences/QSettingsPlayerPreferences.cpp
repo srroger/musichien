@@ -50,6 +50,11 @@ constexpr const char * SING_QUESTION_SHARE_KEY = "player/sing-question-share";
 constexpr const char * RHYTHM_QUESTION_SHARE_KEY = "player/rhythm-question-share";
 constexpr const char * CHORD_QUESTION_SHARE_KEY = "player/chord-question-share";
 
+// L'heure du rappel, en deux nombres separes : une heure et une minute se lisent dans un fichier de reglages plus
+// facilement qu'un instant encode, et un joueur curieux doit pouvoir comprendre ce qu'il lit.
+constexpr const char * REMINDER_HOUR_KEY = "player/reminder-hour";
+constexpr const char * REMINDER_MINUTE_KEY = "player/reminder-minute";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -158,7 +163,10 @@ void QSettingsPlayerPreferences::storeStarCount( std::int64_t p_count )
 
 bool QSettingsPlayerPreferences::dailyReminderEnabled() const
 {
-    return QSettings{}.value( REMINDER_KEY, false ).toBool();
+    // Le rappel est ACTIF au premier lancement, et c'est un choix de produit : une application d'oreille musicale qui
+    // ne se rappelle a personne est une application qu'on oublie. La cle n'existe pas encore a ce moment-la, donc le
+    // defaut est bien celui-ci - et celui qui le coupe garde son choix, puisque sa cle, elle, existe.
+    return QSettings{}.value( REMINDER_KEY, true ).toBool();
 }
 
 void QSettingsPlayerPreferences::storeDailyReminderEnabled( bool p_enabled )
@@ -166,6 +174,28 @@ void QSettingsPlayerPreferences::storeDailyReminderEnabled( bool p_enabled )
     QSettings settings;
 
     settings.setValue( REMINDER_KEY, p_enabled );
+}
+
+domain::ReminderMoment QSettingsPlayerPreferences::storedReminderMoment() const
+{
+    const QSettings settings;
+
+    const int hour = settings.value( REMINDER_HOUR_KEY, 19 ).toInt();
+    const int minute = settings.value( REMINDER_MINUTE_KEY, 0 ).toInt();
+
+    // Une heure impossible dans un fichier edite a la main est RAMENEE dans la journee plutot que refusee : le joueur
+    // garde son rappel, a l'heure la plus proche de ce qu'il a voulu dire.
+    return domain::clampedReminderMoment( domain::ReminderMoment{ hour, minute } );
+}
+
+void QSettingsPlayerPreferences::storeReminderMoment( domain::ReminderMoment p_moment )
+{
+    const domain::ReminderMoment moment = domain::clampedReminderMoment( p_moment );
+
+    QSettings settings;
+
+    settings.setValue( REMINDER_HOUR_KEY, moment.hour );
+    settings.setValue( REMINDER_MINUTE_KEY, moment.minute );
 }
 
 domain::Temperament QSettingsPlayerPreferences::storedTemperament() const
@@ -250,11 +280,14 @@ void QSettingsPlayerPreferences::storeSingQuestionShare( std::int32_t p_share )
 
 std::int32_t QSettingsPlayerPreferences::storedRhythmQuestionShare() const
 {
-    const std::int32_t stored = QSettings{}.value( RHYTHM_QUESTION_SHARE_KEY, 20 ).toInt();
+    // ZERO, et c'est le defaut du DOMAINE aussi (SessionSettings) : la question de rythme existe, elle se regle, et
+    // elle est eteinte tant qu'on ne l'allume pas. Une valeur hors bornes retombe sur ce meme zero, pas sur autre
+    // chose : un fichier abime doit rendre le silence, jamais imposer du rythme.
+    const std::int32_t stored = QSettings{}.value( RHYTHM_QUESTION_SHARE_KEY, 0 ).toInt();
 
     if( stored < 0 || stored > 100 )
     {
-        return 20;
+        return 0;
     }
 
     return stored;

@@ -99,13 +99,17 @@ set_target_properties(musichien_app PROPERTIES
 # ---------------------------------------------------------------------------------------------------------------------
 # Identity shown by the system
 #
-# The version code is an integer that a store would have to increment on every release. Musichien is
-# never published, so the semantic version is simply flattened: 0.2.1 becomes 21. It still has to be
-# an integer, and it still has to increase, because that is what Android compares when installing an
-# update over an existing application.
+# The version code is an integer that Android compares when it installs an update over an existing
+# application: it MUST increase, or the installation is refused with INSTALL_FAILED_VERSION_DOWNGRADE.
+#
+# The three numbers are therefore given WEIGHTS rather than being concatenated. Concatenation looked
+# simpler and was wrong: it turned 0.10.3 into 103, and 1.0.0 into 100 - a release that the phone would
+# have refused to install, at the exact moment the project reached its first major version.
+#
+#   major x 10000 + minor x 100 + patch     ->   0.10.3 = 1003, 1.0.0 = 10000
 # ---------------------------------------------------------------------------------------------------------------------
-set(MUSICHIEN_ANDROID_VERSION_CODE
-    "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${PROJECT_VERSION_PATCH}")
+math(EXPR MUSICHIEN_ANDROID_VERSION_CODE
+     "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")
 
 set_target_properties(musichien_app PROPERTIES
     QT_ANDROID_PACKAGE_NAME "${MUSICHIEN_ANDROID_PACKAGE_NAME}"

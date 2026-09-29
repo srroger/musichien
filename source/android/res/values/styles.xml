@@ -3,7 +3,7 @@
     Musichien - the theme of the Android window.
 
     Why this file exists, in one sentence: without it, the application inherits the PLATFORM DEFAULT theme,
-    which is a LIGHT one - and Roger found a white status bar with white icons on it, where nothing but the
+    which is a LIGHT one - and the result is a white status bar with white icons on it, where nothing but the
     battery could be read.
 
     A status bar is drawn by the system, not by QML: no amount of styling inside the application can reach it.
@@ -24,8 +24,8 @@
             THE important one. Since Android 15 (API 35) - and this application targets 36 - the status bar colour
             above is DEPRECATED AND IGNORED: the system draws the bars transparent and lets the window paint under
             them. What shows through is then the WINDOW BACKGROUND, which defaults to WHITE - a white strip with
-            white icons on it, exactly what Roger saw. Painting the window in the game's own night blue is what makes
-            that strip disappear into the game instead of glaring.
+            white icons on it. Painting the window in the game's own night blue is what makes that strip disappear
+            into the game instead of glaring.
         -->
         <item name="android:windowBackground">@color/musichien_night</item>
         <item name="android:windowLightStatusBar">false</item>

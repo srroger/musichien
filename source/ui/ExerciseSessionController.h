@@ -27,6 +27,8 @@
 #include "domain/exercise/ExerciseSession.h"
 #include "domain/exercise/HintBook.h"
 #include "domain/exercise/PlayerPreferences.h"
+#include "domain/exercise/QuestionLog.h"
+#include "domain/exercise/QuestionStatistics.h"
 #include "domain/exercise/Rank.h"
 
 #include <QElapsedTimer>
@@ -139,6 +141,10 @@ class ExerciseSessionController final : public QObject
     // stable, et une couleur nouvelle s'ajoute a la fin.
     Q_PROPERTY( QVariantList chordChoices READ chordChoices NOTIFY questionChanged )
 
+    // Le bilan : l'ecran affiche son nom et son mot quand il tourne.
+    Q_PROPERTY( bool isReviewRunning READ isReviewRunning NOTIFY sessionChanged )
+    Q_PROPERTY( QString encouragementText READ encouragementText NOTIFY sessionChanged )
+
     // What the domain says about the interval that was asked, and about the one the player chose. The
     // screen reads names and identifiers, it composes neither.
     Q_PROPERTY( QVariantMap heardInterval READ heardInterval NOTIFY sessionChanged )
@@ -181,6 +187,10 @@ class ExerciseSessionController final : public QObject
 
     // A loading-screen anecdote, refreshed on demand. Empty when the content file has nothing to say.
     Q_PROPERTY( QString anecdoteText READ anecdoteText NOTIFY anecdoteChanged )
+
+    // L'anecdote de la QUESTION en cours. Elle change a chaque question, donc on apprend quelque chose en jouant au lieu
+    // d'attendre entre deux parties.
+    Q_PROPERTY( QString questionAnecdoteText READ questionAnecdoteText NOTIFY questionAnecdoteChanged )
     Q_PROPERTY( int lives READ lives NOTIFY scoreChanged )
     Q_PROPERTY( bool hasUnlimitedLives READ hasUnlimitedLives NOTIFY scoreChanged )
 
@@ -195,9 +205,9 @@ class ExerciseSessionController final : public QObject
     // itself is not this object's job - the application wires the signal to the platform scheduler.
     Q_PROPERTY( bool dailyReminderEnabled READ dailyReminderEnabled WRITE setDailyReminderEnabled NOTIFY dailyReminderChanged )
 
-    // L'heure du rappel : une constante pour l'instant, lue par le compte a rebours de l'ecran.
-    Q_PROPERTY( int reminderHour READ reminderHour CONSTANT )
-    Q_PROPERTY( int reminderMinute READ reminderMinute CONSTANT )
+    // L'heure du rappel : un reglage du joueur, et il est modifiable.
+    Q_PROPERTY( int reminderHour READ reminderHour WRITE setReminderHour NOTIFY dailyReminderChanged )
+    Q_PROPERTY( int reminderMinute READ reminderMinute WRITE setReminderMinute NOTIFY dailyReminderChanged )
 
     // L'accordage. Le tempere egal d'abord, et les anciens pour le plaisir d'entendre ce que "juste" veut dire.
     // La liste des noms vient du domaine, donc elle ne peut pas deriver de l'enumeration.
@@ -278,8 +288,21 @@ public:
 
     [[nodiscard]] int reminderMinute() const noexcept;
 
+    // L'heure du rappel, choisie par le joueur. La valeur est RAMENEE dans une journee plutot que refusee : un ecran qui
+    // se tromperait ne doit pas priver le joueur de son rappel.
+    Q_INVOKABLE void setReminderHour( int p_hour );
+
+    Q_INVOKABLE void setReminderMinute( int p_minute );
+
     // The developer button that fires a reminder right now, to check the plumbing.
     Q_INVOKABLE void testReminder();
+
+    // Demande a Android l'autorisation d'afficher des notifications, si elle manque.
+    //
+    // Appelee au demarrage de l'ecran d'accueil, et quand le joueur rallume le rappel. Pas avant, et pas a chaque
+    // instant : Android ne montre la boite qu'une fois de toute facon, et une demande posee pour rien est une demande
+    // qui fait douter de tout le reste.
+    Q_INVOKABLE void requestNotificationPermission();
 
     // The tuning, as the index of the domain's enumeration, and the names a screen can show.
     [[nodiscard]] int temperament() const;
@@ -332,7 +355,12 @@ public:
     // The anecdote currently shown, and a way to draw a new one.
     [[nodiscard]] QString anecdoteText() const;
 
+    [[nodiscard]] QString questionAnecdoteText() const { return m_questionAnecdoteText; }
+
     Q_INVOKABLE void refreshAnecdote();
+
+    // Tire une nouvelle anecdote de QUESTION. Privee : c'est le deroulement d'une partie qui la declenche, jamais l'ecran.
+    void refreshQuestionAnecdote();
     // The settings of the session to come, provided by the caller rather than written here: they are
     // data of the game, they will come from the profile of the player, and a test needs to be able to
     // pin them down - a session whose direction is drawn at random cannot be asserted precisely.
@@ -420,9 +448,81 @@ public:
     // symbole : il renvoie l'index de ce qu'il a affiche.
     Q_INVOKABLE void answerChord( int p_quality );
 
+    // Vrai quand il y a un indice a proposer : une question d'accord, des aides, un essai deja rate, et de quoi retirer
+    // une reponse fausse.
+    Q_PROPERTY( bool isChordHintAvailable READ isChordHintAvailable NOTIFY questionChanged )
+
+    // L'ARBRE DES ACCORDS, pret a etre dessine : une entree par couleur, dans l'ordre de LECTURE (le parent avant ses
+    // enfants), avec son nom anglo-saxon, ses degres, sa profondeur et le geste qui la fait naitre.
+    //
+    // CONSTANT : l'arbre est de la theorie, il ne change pas d'une partie a l'autre.
+    Q_PROPERTY( QVariantList chordTree READ chordTree CONSTANT )
+
+    [[nodiscard]] QVariantList chordTree() const;
+
+    // Le nombre de couleurs d'accord que le jeu connait.
+    //
+    // L'ecran s'en sert pour repartir ses teintes sur tout le cercle chromatique. Une constante ecrite a la main dans le
+    // QML finirait par mentir le jour ou une qualite s'ajoute : c'est exactement le genre de nombre qui doit traverser la
+    // frontiere une seule fois, et dans ce sens-la.
+    Q_PROPERTY( int chordQualityCount READ chordQualityCount CONSTANT )
+
+    [[nodiscard]] int chordQualityCount() const noexcept;
+
+    // LA COULEUR d'une couleur d'accord, prete a peindre.
+    //
+    // Elle est calculee ICI plutot que dans un fichier QML, et c'est deliberé : deux ecrans qui recalculeraient chacun
+    // leur teinte finiraient par en montrer deux differentes, et un code couleur qui diverge n'apprend plus rien. C'est
+    // la meme raison qui fait que les noms viennent du domaine.
+    Q_INVOKABLE [[nodiscard]] QString chordColourName( int p_quality ) const;
+
+    [[nodiscard]] bool isChordHintAvailable() const noexcept;
+
+    // Vrai quand l'arpege a un sens. Separe du precedent, parce qu'un DEBUTANT n'a que deux couleurs d'accord : il n'a
+    // jamais rien a retirer, et l'arpege reste pourtant l'aide qui lui apprend le plus.
+    Q_PROPERTY( bool isChordArpeggioAvailable READ isChordArpeggioAvailable NOTIFY questionChanged )
+
+    [[nodiscard]] bool isChordArpeggioAvailable() const noexcept;
+
+    // L'INDICE : retire une mauvaise reponse de la grille d'accords. La regle vit dans le DOMAINE ; le controleur ne
+    // fait que la brancher.
+    Q_INVOKABLE void useChordHint();
+
+    // Rejoue l'accord en ARPEGE : les notes l'une apres l'autre, au lieu de plaquees.
+    //
+    // C'est le second indice demande - « puis le jouer en arpege » - et le meilleur des deux : il ne donne pas la
+    // reponse, il donne a ENTENDRE ce qui la constitue.
+    Q_INVOKABLE void playCurrentChordAsArpeggio();
+
+    // Le week-end : c'est le moment du Bilan, et l'ecran s'en sert pour le mettre en avant.
+    //
+    // La regle vit dans le DOMAINE (Weekend.h) et elle y est TESTEE : un ecran qui redeciderait ici ce qu'est un week-end
+    // finirait par dire autre chose que le reste de l'application.
+    Q_PROPERTY( bool isWeekEnd READ isWeekEnd NOTIFY sessionChanged )
+
+    [[nodiscard]] bool isWeekEnd() const;
+
+    // Le BILAN : une session dont les questions sont DECIDEES, du plus facile au plus difficile, et qui finit par ce qui
+    // resiste au joueur. Il se lance quand on veut ; l'ecran le met en avant le week-end.
+    Q_INVOKABLE void startReviewSession();
+
+    // Vrai pendant un bilan : l'ecran sait alors que la session est differente, et peut le dire.
+    [[nodiscard]] bool isReviewRunning() const noexcept { return m_isReviewRunning; }
+
+    // Le mot du moment : un encouragement AVANT une difficulte connue, et apres une reussite sur ce qui resistait.
+    //
+    // Vide quand il n'y a rien a dire, et ce n'est pas un detail : un ecran qui parle pour ne rien dire devient un ecran
+    // qu'on n'ecoute plus. Le silence est ce qui donne du poids aux mots qui restent.
+    [[nodiscard]] QString encouragementText() const;
+
     // The microphone controller, injected so that a sung question can reach the voice. Null in the tests: a sung
     // question then cannot be answered, but nothing breaks.
     void setMicrophoneController( MicrophoneController * p_microphone );
+
+    // Le journal des questions conclues, injecte par l'application comme le micro : ce controleur dit « enregistre
+    // ceci » sans savoir ou cela va. Null quand il n'y a nulle part ou ecrire - un test, ou un appareil ou l'ecriture
+    // echoue - et tout continue de fonctionner : des statistiques, pas une regle du jeu.
+    void setQuestionLog( domain::QuestionLog * p_questionLog );
 
     // The player asks for the answer, after the session said it may be revealed.
     Q_INVOKABLE void revealAnswer();
@@ -459,6 +559,13 @@ signals:
     // The experience total has just grown, after a session ended.
     void totalExperienceChanged();
 
+    // Le journal des questions conclues a ETE EFFACE : une remise a zero. La page de statistiques ecoute ce signal, sans
+    // quoi elle montrerait encore l'histoire d'avant.
+    //
+    // Rien n'est emis apres chaque question, et c'est deliberé : la page se rafraichit a son OUVERTURE, et relire tout le
+    // fichier a chaque question couterait cher pour une page que personne ne regarde a ce moment-la.
+    void statisticsChanged();
+
     // The player has just turned the daily reminder on or off.
     void dailyReminderChanged();
 
@@ -481,6 +588,12 @@ signals:
     // The player has just pressed the "test the notification" button.
     void testReminderRequested();
 
+    // L'application demande a Android l'autorisation d'AFFICHER des notifications.
+    //
+    // Un signal plutot qu'un appel direct, et c'est le motif du projet : ce controleur ne connait pas
+    // l'infrastructure, il demande ; c'est main() qui sait a qui la demande s'adresse.
+    void notificationPermissionRequested();
+
     // La boucle de rythme a avance : un temps de plus, un passage en reproduction, ou une frappe jugee.
     //
     // Un seul signal pour les trois, parce que c'est la MEME question de l'ecran - "ou en est-on ?" - et qu'un ecran
@@ -489,6 +602,9 @@ signals:
 
     // A new anecdote was drawn.
     void anecdoteChanged();
+
+    // L'anecdote de la question a change : une question de plus, donc une anecdote de plus.
+    void questionAnecdoteChanged();
 
 private:
     // Rebuilds the list of choices from the question being asked, and only then notifies. Called
@@ -553,6 +669,11 @@ private:
     // Un temps de la boucle : ce qui sonne sur ce temps, puis l'avancement.
     void onRhythmBeat();
 
+    // Le battement suivant de la mesure, vise depuis LE DEBUT DE LA MESURE et non depuis le precedent : la mesure ne
+    // peut donc pas deriver, et le premier temps de chaque phase tombe toujours a sa place. La decision elle-meme
+    // appartient au domaine (domain::planNextBeat), ou elle est pure - et donc testee.
+    void scheduleNextRhythmBeat();
+
     // Les frappes de la cellule qui tombent dans le temps p_beatInBar. Les frappes decalees - les syncopes - partent
     // en differe, parce que c'est ce qu'est une syncope : une frappe ENTRE deux temps.
     void playRhythmHitsForBeat( int p_beatInBar );
@@ -568,6 +689,22 @@ private:
 
     // Plays the same two notes TOGETHER, whatever direction the question was asked in.
     void playCurrentQuestionAsChord();
+
+    // Ecrit une ligne pour la question en cours, qui vient d'etre CONCLUE.
+    //
+    // L'horloge est lue ICI et nulle part ailleurs : le domaine recoit une date, il ne la demande jamais - c'est ce qui
+    // garde le domaine pur et le journal testable sans attendre une seconde.
+    void recordCurrentQuestion( bool p_wasCorrect, bool p_wasRevealed );
+
+    // Les questions d'un BILAN, construites a partir des STATISTIQUES : ce que le joueur reussit d'abord, ce qui lui
+    // resiste ensuite. Vide quand il n'y a pas de journal, ou pas assez de matiere pour dire « facile puis difficile ».
+    [[nodiscard]] std::vector<domain::QuestionTarget> reviewPlan() const;
+
+    // La question en cours fait-elle partie de ce qui RESISTE au joueur ?
+    //
+    // Le plan est construit dans cet ordre, donc le controleeur le sait sans recroiser les statistiques a chaque
+    // question - et c'est ce qui rend l'encouragement possible au bon moment.
+    [[nodiscard]] bool isCurrentQuestionAHardPart() const noexcept;
 
     // Joue un accord : ses notes, plaquee. Le seul chemin par lequel un accord s'entend, que ce soit pour poser la
     // question ou pour la confirmer.
@@ -591,12 +728,22 @@ private:
     std::mt19937 m_anecdoteRandomEngine{ std::random_device{}() };
 
     QString m_anecdoteText;
+    // L'anecdote de la question en cours, tiree a chaque question.
+    QString m_questionAnecdoteText;
 
     // Empty when the device cannot vibrate.
     VibrationCallback m_vibrate;
 
     // May be null: a test, or an application that has nowhere to remember anything, must still run.
     domain::PlayerPreferences * m_levelStore{ nullptr };
+
+    // May be null too, et pour la meme raison : un journal absent coute des statistiques, jamais une partie.
+    domain::QuestionLog * m_questionLog{ nullptr };
+
+    // Le bilan en cours, et le nombre de questions qui l'ont ouvert. Ces deux valeurs suffisent a dire au joueur ou il
+    // en est : l'echauffement est passe, ce qui suit est ce qui lui resiste.
+    bool m_isReviewRunning{ false };
+    std::size_t m_reviewEasyQuestionCount{ 0 };
 
     // Read once from the store, then kept here: the screen asks for it on every question, and a settings file
     // has no business being read that often.
@@ -620,8 +767,11 @@ private:
     QTimer m_rhythmTimer;
     QElapsedTimer m_rhythmClock;
 
-    // Le temps qui sonne, 0 = le premier de la mesure.
-    int m_rhythmBeatInBar{ 0 };
+    // Le temps a jouer dans la mesure, de 0 a beatsPerBar. La valeur beatsPerBar n'est pas un temps : c'est le signal
+    // que la mesure est finie et que la phase suivante commence. C'est ce qui fait tomber le premier temps de la
+    // reproduction PILE a l'instant ou l'ecoute aurait joue le sien, au lieu d'un temps trop tot - un temps perdu a
+    // chaque mesure, qui s'entend comme un metronome qui boite.
+    int m_rhythmBeatIndex{ 0 };
 
     // Vrai pendant la reproduction, faux pendant l'ecoute. C'est la seule chose que ce booleen decide, et c'est
     // beaucoup : ce qui sonne, et ce qui est juge.

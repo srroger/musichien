@@ -104,10 +104,24 @@ private:
     // La cellule en cours, ou rien quand seul le metronome joue.
     [[nodiscard]] const domain::RhythmPattern * activePattern() const;
 
+    // Le battement suivant, vise depuis l'ORIGINE de la grille et non depuis le precedent : c'est toute la difference
+    // entre un metronome et un timer qui derive. La decision elle-meme vit dans le domaine (domain::planNextBeat), ou
+    // elle est pure - et donc testee.
+    void scheduleNextBeat();
+
+    // Recale la grille sur l'instant present : au demarrage, et a chaque changement de tempo.
+    void restartBeatGrid();
+
     domain::NotePlayer & m_notePlayer;
 
+    // SINGLE SHOT, et c'est le point du correctif : chaque battement re-arme le suivant depuis l'horloge, au lieu de
+    // repartir de sa propre echeance et d'accumuler son retard.
     QTimer m_beatTimer;
     QElapsedTimer m_clock;
+    // Le rang du battement a venir depuis le demarrage de la grille. Un compteur ne sert qu'a une chose ici : dire a
+    // quelle echeance viser, et la position dans la mesure s'en DEDUIT - une mesure qui se recale doit pouvoir se
+    // recompter, ce qu'un compteur separe ne saurait pas faire.
+    std::int64_t m_beatIndex{ 0 };
     std::int64_t m_lastTapMs{ -1 };
 
     int m_bpm{ 90 };

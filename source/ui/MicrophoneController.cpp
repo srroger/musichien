@@ -148,7 +148,10 @@ MicrophoneController::MicrophoneController( QStringList p_deviceNames,
     // the audio server simply does not expose it. Telling the player that is worth more than saying "nothing here".
     if( m_deviceNames.isEmpty() )
     {
-        m_deviceNames = { tr( "Aucune entrée audio détectée — vérifie le profil de ta carte son (entrée stéréo)" ) };
+        // COURT, et c'est deliberé : ce message est une ENTREE de liste deroulante, et un ComboBox prend la largeur de
+        // son texte. Quatre-vingt-cinq caracteres elargissaient tout le dialogue des reglages - bien plus large que
+        // l'ecran - et faisaient apparaitre un defilement horizontal. Le conseil reste, en abrégé : c'est lui qui aide.
+        m_deviceNames = { tr( "Aucune entrée audio (voir ta carte son)" ) };
     }
 
     // Une premiere cible des l'ouverture : la page de chant ne doit jamais s'afficher sans rien a chanter.
