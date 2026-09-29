@@ -59,26 +59,16 @@ constexpr double SAMPLE_RATE = 44100.0;
     return window;
 }
 
-// Un demi-ton d'ecart, c'est 6 % : ces tolerances sont donc plus strictes que ce que l'oreille demande.
+// Un demi-ton d'ecart, c'est 6 % : cette tolerance est donc quatre fois plus stricte que ce que l'oreille demande.
 //
-// La tolerance s'elargit avec la hauteur, et c'est une limite CONNUE de la methode : plus la note est aigue, plus sa
-// periode est courte, donc plus deux notes voisines sont proches en nombre d'echantillons. Mesure : sous les dix cents
-// jusqu'a 1000 Hz, autour de trente jusqu'a 2000 Hz, et jusqu'a un demi-ton dans les derniers aigus. La note reste la
-// bonne - ce qui rend la valeur utile - mais l'accordeur n'y est plus au cent pres. Le dire ici vaut mieux que de le
-// cacher, et c'est ce qui distingue une limite assume d'un plafond arbitraire.
+// Elle ne s'elargit plus avec la hauteur, et c'est le progres de cette version : l'affinage par le spectre corrige la
+// perte de finesse du comptage dans les aigus. Le si0 d'une basse et le do le plus haut d'un piano sont desormais lus
+// a mieux d'un pour cent, comme les notes medium.
 [[nodiscard]] double toleranceFor( double p_frequencyHz )
 {
-    if( p_frequencyHz <= 1000.0 )
-    {
-        return 0.01;
-    }
+    (void)p_frequencyHz;
 
-    if( p_frequencyHz <= 2000.0 )
-    {
-        return 0.03;
-    }
-
-    return 0.07;
+    return 0.01;
 }
 
 void expectReadAs( double p_expectedHz )
@@ -93,7 +83,7 @@ void expectReadAs( double p_expectedHz )
 
 TEST( PitchEstimatorTest, a_pure_tone_is_read_at_its_own_frequency )
 {
-    for( const double frequencyHz : { 82.4, 110.0, 220.0, 440.0, 880.0 } )
+    for( const double frequencyHz : { 82.4, 110.0, 220.0, 440.0, 880.0, 2093.0, 4186.01 } )
     {
         const double estimated = PitchEstimator::estimate( sine( frequencyHz ), SAMPLE_RATE );
 
@@ -117,14 +107,21 @@ TEST( PitchEstimatorTest, the_high_notes_are_not_read_an_octave_below )
 
 TEST( PitchEstimatorTest, a_sung_note_is_read_through_its_harmonics )
 {
-    expectReadAs( 220.0 );
-    expectReadAs( 440.0 );
-    expectReadAs( 880.0 );
-    expectReadAs( 1200.0 );
-    expectReadAs( 1500.0 );
-    expectReadAs( 2000.0 );
-    expectReadAs( 3000.0 );
-    expectReadAs( 4000.0 );
+    // Du si0 d'une basse cinq cordes au do le plus haut d'un piano : toute la tessiture des instruments.
+    expectReadAs( 30.87 );
+    expectReadAs( 41.20 );
+    expectReadAs( 55.00 );
+    expectReadAs( 82.41 );
+    expectReadAs( 110.00 );
+    expectReadAs( 220.00 );
+    expectReadAs( 440.00 );
+    expectReadAs( 880.00 );
+    expectReadAs( 1046.50 );
+    expectReadAs( 2093.00 );
+    expectReadAs( 2637.02 );
+    expectReadAs( 3135.96 );
+    expectReadAs( 3520.00 );
+    expectReadAs( 4186.01 );
 }
 
 // Une note aigue etait refusee des qu'elle sortait de la plage de recherche : l'accordeur se taisait au moment ou la
