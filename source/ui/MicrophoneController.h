@@ -43,6 +43,11 @@ class MicrophoneController final : public QObject
     Q_PROPERTY( double detectedPitchRatio READ detectedPitchRatio NOTIFY detectedPitchRatioChanged )
     Q_PROPERTY( double detectedMidi READ detectedMidi NOTIFY detectedMidiChanged )
     Q_PROPERTY( double detectedStaffFraction READ detectedStaffFraction NOTIFY detectedStaffFractionChanged )
+
+    // De combien d'octaves la note REELLE est au-dessus (positif) ou en dessous (negatif) de la place ou la boule se
+    // pose. Zero quand la boule dit la verite entiere. L'ecran en fait un signe, et c'est ce qui rend l'accordeur
+    // utilisable pour une hauteur absolue : la boule reste sur les cinq lignes, la note, elle, ne ment pas.
+    Q_PROPERTY( int detectedOctaveShift READ detectedOctaveShift NOTIFY detectedOctaveShiftChanged )
     Q_PROPERTY( QString detectedNoteLabel READ detectedNoteLabel NOTIFY detectedNoteLabelChanged )
 
     // How far the voice is from the nearest note, in cents, and how good that is. This is what turns the microphone
@@ -104,6 +109,7 @@ public:
     [[nodiscard]] double detectedPitchRatio() const { return m_detectedPitchRatio; }
     [[nodiscard]] double detectedMidi() const { return m_detectedMidi; }
     [[nodiscard]] double detectedStaffFraction() const { return m_detectedStaffFraction; }
+    [[nodiscard]] int detectedOctaveShift() const { return m_detectedOctaveShift; }
     [[nodiscard]] QString detectedNoteLabel() const { return m_detectedNoteLabel; }
     [[nodiscard]] double detectedCents() const { return m_detectedCents; }
     [[nodiscard]] int detectedTuningState() const { return m_detectedTuningState; }
@@ -111,6 +117,11 @@ public:
     Q_INVOKABLE void selectDevice( int p_deviceIndex );
     Q_INVOKABLE void startTest();
     Q_INVOKABLE void stopTest();
+
+    // Ouvre le micro s'il ne l'est pas deja. Le jeu est bati sur le micro : la page Accordeur n'a donc plus de bouton
+    // « tester le micro », elle demande simplement a ecouter en arrivant - et redemander a un micro deja ouvert
+    // relancerait pour rien le peripherique, ce qui s'entendrait sous la forme d'un clic.
+    Q_INVOKABLE void ensureListening();
 
     // --- La question chantee -----------------------------------------------------------------------------------------
 
@@ -152,6 +163,7 @@ signals:
     void detectedPitchRatioChanged();
     void detectedMidiChanged();
     void detectedStaffFractionChanged();
+    void detectedOctaveShiftChanged();
     void detectedNoteLabelChanged();
     void detectedCentsChanged();
     void detectedTuningStateChanged();
@@ -174,6 +186,7 @@ private:
     double m_detectedPitchRatio{ 0.0 };
     double m_detectedMidi{ 0.0 };
     double m_detectedStaffFraction{ 0.5 };
+    int m_detectedOctaveShift{ 0 };
     double m_detectedCents{ 0.0 };
     int m_detectedTuningState{ 0 };
     QString m_detectedNoteLabel;

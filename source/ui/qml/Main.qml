@@ -176,10 +176,16 @@ ApplicationWindow {
     // La demande d'autorisation part un peu APRES le premier affichage : le joueur voit d'abord la page, et la boite
     // d'Android arrive ensuite, sur quelque chose qui existe. Posee pendant la construction de l'ecran, elle
     // apparaitrait sur une fenetre encore vide, ce qui ressemble a un plantage plutot qu'a une question.
+    //
+    // Le MICRO est demande au meme moment, et pour la meme raison : le jeu entier est bati sur lui. Le laisser ferme
+    // jusqu'a ce que le joueur ouvre un ecran qui en a besoin ferait de l'accordeur un reglage cache.
     Timer {
         interval: 800
         running: true
-        onTriggered: ExerciseController.requestNotificationPermission()
+        onTriggered: {
+            ExerciseController.requestNotificationPermission();
+            MicrophoneController.ensureListening();
+        }
     }
 
     Rectangle {
@@ -1731,9 +1737,10 @@ ApplicationWindow {
         height: mainWindow.height
         modal: true
         padding: 12
-        // Quitter la page lache le micro : un micro ouvert vide la batterie, et une pastille d'enregistrement qui reste
-        // allumee sur un telephone est une pastille qui inquiete.
-        onClosed: MicrophoneController.stopTest()
+        // Arriver sur la page ouvre le micro : le jeu entier est bati sur lui, et un accordeur qui reste muet tant
+        // qu'on n'a pas cherche un bouton est un accordeur qu'on croit casse. Le micro reste ensuite ouvert, y
+        // compris en quittant : le refermer ici eteindrait aussi l'ecoute des exercices de chant.
+        onOpened: MicrophoneController.ensureListening()
 
         background: Rectangle {
             color: "#160d2b"
@@ -2389,6 +2396,9 @@ ApplicationWindow {
 
             // La portee miniature : la boule suit la hauteur chantee. Le composant StaffBall porte le style.
             StaffBall {
+                // Le signe de l'octave : ici, oui. L'accordeur sert a lire une hauteur ABSOLUE, et le signe dit que
+                // la note est ailleurs que sur la portee - c'est ce qui distingue un accordeur d'un jeu.
+                showOctaveShift: true
             }
 
             // La note la plus proche, l'ecart en cents, et la couleur : c'est un ACCORDEUR, et il sert
@@ -2419,12 +2429,6 @@ ApplicationWindow {
                     }
                 }
 
-            }
-
-            Button {
-                Layout.alignment: Qt.AlignRight
-                text: MicrophoneController.isListening ? qsTr("■ Arrêter") : qsTr("♪ Tester le micro")
-                onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
             }
 
         }

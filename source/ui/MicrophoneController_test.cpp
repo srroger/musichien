@@ -52,7 +52,11 @@ namespace
 class PitchDetectorFake final : public domain::PitchDetector
 {
 public:
-    void start( PitchCallback p_callback ) override { m_callback = std::move( p_callback ); }
+    void start( PitchCallback p_callback ) override
+    {
+        m_callback = std::move( p_callback );
+        ++m_startCount;
+    }
 
     void stop() override { m_callback = nullptr; }
 
@@ -65,8 +69,12 @@ public:
         }
     }
 
+    // Combien de fois le micro a ete OUVERT : c'est ce qui permet de verifier qu'une demande repetee ne le rouvre pas.
+    [[nodiscard]] int startCount() const { return m_startCount; }
+
 private:
     PitchCallback m_callback;
+    int m_startCount{ 0 };
 };
 
 // Le controleur, son faux detecteur, et le doigt sur le micro : les trois sont livres ensemble parce que le test a
@@ -101,6 +109,8 @@ struct MicrophoneUnderTest
 // Le cas qui a motive ce fichier : le MEME la, dans quatre octaves. La boule se pose quatre fois au meme endroit -
 // c'est ce qui la garde sur la portee - et le nom, lui, doit dire A2, A3, A4, A5. Si un jour le repli de la boule
 // venait a se melanger avec la lecture de la note, c'est ce test qui le dirait, et il nommerait l'octave fautive.
+//
+// Le SIGNE compte autant que le nom : c'est lui qui dit, sans quitter la portee des yeux, que la note est ailleurs.
 TEST( MicrophoneControllerTest, every_octave_of_a_note_is_named_while_the_ball_stands_still )
 {
     (void)application();
@@ -109,12 +119,13 @@ TEST( MicrophoneControllerTest, every_octave_of_a_note_is_named_while_the_ball_s
     {
         double frequencyHz;
         const char * expectedLabel;
+        int expectedOctaveShift;
     };
 
-    constexpr std::array<Octave, 4> OCTAVES{ { { 110.0, "A2  110 Hz" },
-                                               { 220.0, "A3  220 Hz" },
-                                               { 440.0, "A4  440 Hz" },
-                                               { 880.0, "A5  880 Hz" } } };
+    constexpr std::array<Octave, 4> OCTAVES{ { { 110.0, "A2  110 Hz", -2 },
+                                               { 220.0, "A3  220 Hz", -1 },
+                                               { 440.0, "A4  440 Hz", 0 },
+                                               { 880.0, "A5  880 Hz", +1 } } };
 
     MicrophoneUnderTest test;
 
@@ -134,6 +145,7 @@ TEST( MicrophoneControllerTest, every_octave_of_a_note_is_named_while_the_ball_s
 
         EXPECT_EQ( test.controller.detectedNoteLabel(), QString::fromLatin1( octave.expectedLabel ) );
         EXPECT_NEAR( test.controller.detectedCents(), 0.0, 0.01 );
+        EXPECT_EQ( test.controller.detectedOctaveShift(), octave.expectedOctaveShift );
 
         if( !ballFractionIsKnown )
         {
@@ -147,6 +159,26 @@ TEST( MicrophoneControllerTest, every_octave_of_a_note_is_named_while_the_ball_s
 
         test.controller.stopTest();
     }
+}
+
+// L'ecoute demandee deux fois ne rouvre pas le micro : l'ecran d'accueil et la page Accordeur la demandent tous les
+// deux, et relancer le peripherique s'entendrait sous la forme d'un clic.
+TEST( MicrophoneControllerTest, asking_to_listen_twice_opens_the_microphone_once )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    test.start();
+
+    ASSERT_TRUE( test.controller.isListening() );
+
+    const int startsBefore = test.detector->startCount();
+
+    test.controller.ensureListening();
+
+    EXPECT_EQ( test.detector->startCount(), startsBefore );
+    EXPECT_TRUE( test.controller.isListening() );
 }
 
 // L'ecart en cents se mesure contre la note REELLE : une note juste reste juste dans toutes les octaves, meme si la
