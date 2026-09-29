@@ -36,7 +36,7 @@ public:
     void stop() override;
 
 private:
-    struct Impl;
+    class Impl;
 
     std::unique_ptr<Impl> m_impl;
 };

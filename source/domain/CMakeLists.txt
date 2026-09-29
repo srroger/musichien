@@ -39,6 +39,8 @@ musichienFunction_AddLibrary(domain
     audio/ToneSynthesizer.cpp
     audio/SampledInstrument.h
     audio/SampledInstrument.cpp
+    audio/PitchEstimator.h
+    audio/PitchEstimator.cpp
     audio/DrumSynthesizer.h
     audio/DrumSynthesizer.cpp
 
@@ -108,6 +110,7 @@ if(MUSICHIEN_BUILD_TESTING)
         music/Chord_test.cpp
         music/ChordTree_test.cpp
         audio/ToneSynthesizer_test.cpp
+        audio/PitchEstimator_test.cpp
         audio/SungIntervalDetector_test.cpp
         audio/DrumSynthesizer_test.cpp
         rhythm/Rhythm_test.cpp

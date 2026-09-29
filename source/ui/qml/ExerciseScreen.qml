@@ -476,6 +476,11 @@ Item {
                 visible: ExerciseController.questionKind === 2
                 spacing: 10
 
+                // Le micro suit l'ecran qui s'en sert : il s'ouvre quand la question se chante, et se referme quand
+                // elle se tait. Un exercice passe la plupart de son temps sans chant, et un micro ouvert pour rien
+                // vide la batterie.
+                onVisibleChanged: visible ? MicrophoneController.ensureListening() : MicrophoneController.stopTest()
+
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter

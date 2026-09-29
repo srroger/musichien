@@ -1,5 +1,7 @@
 #include "infrastructure/audio/QAudioPitchDetector.h"
 
+#include "domain/audio/PitchEstimator.h"
+
 #include <QAudioFormat>
 #include <QAudioSource>
 #include <QIODevice>
@@ -19,95 +21,26 @@ namespace musichien::infrastructure
 namespace
 {
 
-constexpr std::int32_t SAMPLE_RATE = 44100;
+// Le taux demande au peripherique, et le seul repli acceptable : si la carte refuse ce format et n'annonce rien, on
+// estime avec celui-ci plutot que de tout arreter. Ce qui COMPTE est le taux REELLEMENT ouvert, lu plus bas sur la
+// QAudioSource : l'estimer avec une constante quand la carte tourne a 48 kHz decalait toutes les notes d'un
+// demi-ton et demi.
+constexpr std::int32_t PREFERRED_SAMPLE_RATE = 44100;
+
 constexpr std::int32_t CHANNEL_COUNT = 1;
-
-// One YIN window: long enough to resolve a low note, short enough to feel alive.
-constexpr std::size_t WINDOW_SIZE = 2048;
-
-// The human voice, in hertz: the detector refuses to look outside this range, which is what keeps a rumble from
-// being read as a note.
-constexpr double MIN_FREQUENCY_HZ = 60.0;
-constexpr double MAX_FREQUENCY_HZ = 1200.0;
-
-// The YIN cumulative-difference threshold. Lower is stricter; 0.15 is the textbook value for the voice.
-constexpr double YIN_THRESHOLD = 0.15;
 
 // An Int16 root-mean-square below this is silence, not a note: it stops the detector from reporting garbage when
 // nobody sings.
 constexpr double SILENCE_RMS = 300.0;
 
-// Estimates the fundamental frequency with YIN. Returns 0.0 when nothing stable is found.
-//
-// The idea: the signal repeats itself at the period. The difference function d(tau) measures how well the window
-// agrees with itself shifted by tau; the first deep dip is the period, and the cumulative normalisation makes that
-// dip scale-free - a quiet note and a loud one land on the same answer.
-[[nodiscard]] double estimatePitch( const std::vector<double> & p_window, double p_sampleRate )
+// Le taux REELLEMENT accepte par la carte : le format demande n'est pas toujours celui obtenu - beaucoup de
+// telephones ne travaillent qu'a 48 kHz - et estimer la hauteur avec le mauvais taux decale chaque note d'un
+// demi-ton et demi.
+[[nodiscard]] double openedSampleRate( const QAudioSource & p_source )
 {
-    const auto tauMin = static_cast<std::size_t>( p_sampleRate / MAX_FREQUENCY_HZ );
-    const auto tauMax = static_cast<std::size_t>( p_sampleRate / MIN_FREQUENCY_HZ );
+    const std::int32_t sampleRate = p_source.format().sampleRate();
 
-    std::vector<double> difference( tauMax + 1, 0.0 );
-
-    for( std::size_t tau = tauMin; tau <= tauMax; ++tau )
-    {
-        double sum = 0.0;
-
-        for( std::size_t sample = 0; sample + tau < WINDOW_SIZE; ++sample )
-        {
-            const double diff = p_window.at( sample ) - p_window.at( sample + tau );
-
-            sum += diff * diff;
-        }
-
-        difference.at( tau ) = sum;
-    }
-
-    // The cumulative mean normalised difference: cmnd(tau) = difference(tau) * tau / sum(difference up to tau).
-    std::vector<double> cmnd( tauMax + 1, 0.0 );
-
-    cmnd.at( 0 ) = 1.0;
-
-    double runningSum = 0.0;
-
-    for( std::size_t tau = 1; tau <= tauMax; ++tau )
-    {
-        runningSum += difference.at( tau );
-
-        cmnd.at( tau ) = difference.at( tau ) * static_cast<double>( tau ) / runningSum;
-    }
-
-    // The first local minimum below the threshold is the period. Looking for a minimum, rather than the first value
-    // under the threshold, avoids reporting the shoulder of the dip.
-    std::size_t tau = tauMin;
-
-    while( tau + 1 <= tauMax
-           && ( cmnd.at( tau ) >= YIN_THRESHOLD || cmnd.at( tau ) >= cmnd.at( tau + 1 ) ) )
-    {
-        ++tau;
-    }
-
-    if( tau >= tauMax )
-    {
-        return 0.0;
-    }
-
-    // Parabolic interpolation: the true dip sits between whole samples, and this finds it. The formula is the
-    // standard one for a parabola through three points.
-    const double below = cmnd.at( tau - 1 );
-    const double here = cmnd.at( tau );
-    const double above = cmnd.at( tau + 1 );
-
-    const double denominator = 2.0 * ( ( 2.0 * here ) - above - below );
-
-    auto refinedTau = static_cast<double>( tau );
-
-    if( std::abs( denominator ) > 1e-12 )
-    {
-        refinedTau += ( below - above ) / denominator;
-    }
-
-    return p_sampleRate / refinedTau;
+    return ( sampleRate > 0 ) ? static_cast<double>( sampleRate ) : static_cast<double>( PREFERRED_SAMPLE_RATE );
 }
 
 }    // namespace
@@ -118,7 +51,7 @@ public:
     explicit Impl( QAudioDevice p_device )
       : m_device{ std::move( p_device ) }
     {
-        m_format.setSampleRate( SAMPLE_RATE );
+        m_format.setSampleRate( PREFERRED_SAMPLE_RATE );
         m_format.setChannelCount( CHANNEL_COUNT );
         m_format.setSampleFormat( QAudioFormat::Int16 );
     }
@@ -132,6 +65,10 @@ private:
     QIODevice * m_io{ nullptr };
     musichien::domain::PitchDetector::PitchCallback m_callback;
     std::vector<double> m_window;
+
+    // Le taux REELLEMENT ouvert par le peripherique, lu sur la source une fois qu'elle existe. Une carte qui tourne a
+    // 48 kHz alors qu'on l'estime a 44,1 kHz fait lire toutes les notes un demi-ton et demi trop bas.
+    double m_sampleRate{ static_cast<double>( PREFERRED_SAMPLE_RATE ) };
 
     // The last GOOD pitch, and how many frames have been silent since. A voice drops out for a few frames and YIN
     // can read the octave: both would make the ball blink, so the last good pitch is held for a moment and the
@@ -164,7 +101,7 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
 
     impl.m_callback = std::move( p_callback );
     impl.m_window.clear();
-    impl.m_window.reserve( WINDOW_SIZE );
+    impl.m_window.reserve( domain::PitchEstimator::WINDOW_SIZE );
 
     if( impl.m_device.isNull() )
     {
@@ -173,9 +110,13 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
 
     impl.m_source = std::make_unique<QAudioSource>( impl.m_device, impl.m_format );
 
+    // Le taux que la carte a REELLEMENT accepte.
+    impl.m_sampleRate = openedSampleRate( *impl.m_source );
+
     // A small buffer means small chunks. On the desktop the default is a whole second at a time, which makes the ball
     // jump once a second instead of gliding; twenty milliseconds is the good middle ground between latency and load.
-    impl.m_source->setBufferSize( SAMPLE_RATE * static_cast<int>( sizeof( std::int16_t ) ) * 20 / 1000 );
+    impl.m_source->setBufferSize( static_cast<int>( impl.m_sampleRate ) * static_cast<int>( sizeof( std::int16_t ) ) * 20
+                                  / 1000 );
 
     impl.m_io = impl.m_source->start();
 
@@ -204,7 +145,7 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
         {
             impl.m_window.push_back( static_cast<double>( samples[index] ) / 32768.0 );
 
-            if( impl.m_window.size() < WINDOW_SIZE )
+            if( impl.m_window.size() < domain::PitchEstimator::WINDOW_SIZE )
             {
                 continue;
             }
@@ -216,38 +157,24 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
                 sumSquared += value * value;
             }
 
-            const double rms = std::sqrt( sumSquared / static_cast<double>( WINDOW_SIZE ) );
+            const double rms = std::sqrt( sumSquared / static_cast<double>( domain::PitchEstimator::WINDOW_SIZE ) );
 
             double frequencyHz = 0.0;
 
             if( rms * 32768.0 > SILENCE_RMS )
             {
-                frequencyHz = estimatePitch( impl.m_window, SAMPLE_RATE );
+                frequencyHz = domain::PitchEstimator::estimate( impl.m_window, impl.m_sampleRate );
             }
 
-            // Post-traitement de robustesse, pour la VOIX.
-            //
-            // Deux defauts classiques d'un estimateur de periode sur un son riche en harmoniques :
-            //   * l'erreur d'octave : il lit 2x (ou 1/2) la vraie periode, donc la fondamentale saute d'une octave ;
-            //   * le dropout : une frame sans reponse claire, qui vaut "silence" pendant quelques millisecondes.
-            // L'un comme l'autre font clignoter la boule, alors que le chanteur, lui, tient sa note.
             if( frequencyHz > 0.0 )
             {
-                // Replie l'octave : un saut soudain d'un facteur deux n'est pas la voix, c'est l'estimateur.
-                if( impl.m_lastFrequency > 0.0 )
-                {
-                    const double ratio = frequencyHz / impl.m_lastFrequency;
-
-                    if( ratio > 1.8 )
-                    {
-                        frequencyHz /= 2.0;
-                    }
-                    else if( ratio < 0.55 )
-                    {
-                        frequencyHz *= 2.0;
-                    }
-                }
-
+                // Ce qu'on ne fait PLUS : replier l'octave quand la hauteur saute de plus d'un facteur deux.
+                //
+                // Ce repli partait d'une bonne intention - une erreur d'octave de l'estimateur - et produisait le
+                // defaut que Roger a entendu : en montant, la hauteur REELLE finissait par franchir le facteur deux,
+                // le repli la divisait, et la valeur corrigee devenait la reference de la comparaison suivante. La
+                // detection se retrouvait VERROUILLEE une octave en dessous, et plus la voix montait, plus l'affichage
+                // restait bas. Une frame mal lue est moins grave qu'un estimateur qui s'enferme : on ne corrige plus.
                 impl.m_lastFrequency = frequencyHz;
                 impl.m_silenceFrames = 0;
             }
@@ -272,7 +199,8 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
             }
 
             impl.m_window.erase( impl.m_window.begin(),
-                                 impl.m_window.begin() + static_cast<std::ptrdiff_t>( WINDOW_SIZE / 2 ) );
+                                 impl.m_window.begin()
+                                   + static_cast<std::ptrdiff_t>( domain::PitchEstimator::WINDOW_SIZE / 2 ) );
         }
     } );
 }
@@ -289,8 +217,8 @@ void QAudioPitchDetector::stop()
         // deleteLater rather than resetting to null: stop() may be called FROM the readyRead slot itself - the tuner
         // stops itself the moment it has heard enough. Destroying the QAudioSource, and the QIODevice whose slot is
         // on the stack right now, would be a use-after-free. Deferring the deletion to the event loop is the safe way.
-        impl.m_source->deleteLater();
-        impl.m_source.release();
+        QAudioSource * const deferred = impl.m_source.release();
+        deferred->deleteLater();
     }
 
     impl.m_callback = nullptr;
