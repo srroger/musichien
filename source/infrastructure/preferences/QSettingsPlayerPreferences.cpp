@@ -163,7 +163,10 @@ void QSettingsPlayerPreferences::storeStarCount( std::int64_t p_count )
 
 bool QSettingsPlayerPreferences::dailyReminderEnabled() const
 {
-    return QSettings{}.value( REMINDER_KEY, false ).toBool();
+    // Le rappel est ACTIF au premier lancement, et c'est un choix de produit : une application d'oreille musicale qui
+    // ne se rappelle a personne est une application qu'on oublie. La cle n'existe pas encore a ce moment-la, donc le
+    // defaut est bien celui-ci - et celui qui le coupe garde son choix, puisque sa cle, elle, existe.
+    return QSettings{}.value( REMINDER_KEY, true ).toBool();
 }
 
 void QSettingsPlayerPreferences::storeDailyReminderEnabled( bool p_enabled )

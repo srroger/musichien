@@ -580,9 +580,9 @@ TEST( ExerciseSessionControllerTest, the_levels_to_offer_are_ready_to_display )
 
 TEST( ExerciseSessionControllerTest, every_choice_is_on_the_circle_at_the_place_of_its_class )
 {
-    // Le bug que ce test surveille a coute une soiree de test a Roger : la carte ignorait silencieusement un
-    // intervalle quand un AUTRE de la meme classe occupait deja sa place. La question devenait alors impossible
-    // a repondre - le bouton affichait l'octave quand l'unisson etait demande - et rien n'echouait.
+    // Le bug que ce test surveille est silencieux : la carte ignorait un intervalle quand un AUTRE de la meme classe
+    // occupait deja sa place. La question devenait alors impossible a repondre - le bouton affichait l'octave quand
+    // l'unisson etait demande - et rien n'echouait.
     //
     // La regle est donc verifiee pour CHAQUE intervalle offert, sur chaque question d'une session entiere, et
     // non seulement pour la cible : tout ce que la session propose doit se retrouver sur la carte.
@@ -647,9 +647,9 @@ TEST( ExerciseSessionControllerTest, every_choice_is_on_the_circle_at_the_place_
 
 TEST( ExerciseSessionControllerTest, a_place_holds_every_octave_of_its_class )
 {
-    // Le cas precis rapporte par Roger, et il est traitre parce qu'il n'arrive qu'avec les intervalles composes :
-    // quand l'unisson ET l'octave sont sur la table, ils visent la MEME place du cercle. La carte les ecrasait
-    // l'un par l'autre, et le joueur n'avait plus rien de juste a cliquer.
+    // Le cas est traitre parce qu'il n'arrive qu'avec les intervalles composes : quand l'unisson ET l'octave sont sur
+    // la table, ils visent la MEME place du cercle. La carte les ecrasait l'un par l'autre, et le joueur n'avait plus
+    // rien de juste a cliquer.
     //
     // Ce test CONSTRUIT la situation au lieu de l'attendre au hasard : la carte entiere, donc les trois octaves
     // de la meme note sur la meme place.
@@ -1042,8 +1042,8 @@ TEST( ExerciseSessionControllerTest, the_chord_choices_and_the_accord_are_ready_
     EXPECT_FALSE( firstChoice.value( "name" ).toString().isEmpty() );
 
     // LE NOM DU BOUTON est la notation anglo-saxonne : la tonique de la question, plus le suffixe de la couleur. « Maj »
-    // et « min » ont disparu, et avec eux le « · 3 » que Roger trouvait bizarre : un majeur ne s'annonce pas, donc son
-    // bouton dit juste la tonique - « C ».
+    // et « min » ont disparu, et avec eux le numero de notes : un majeur ne s'annonce pas, donc son bouton dit juste la
+    // tonique - « C ».
     const QString rootName = controller.heardChord().value( "rootName" ).toString();
 
     EXPECT_EQ( rootName, firstChoice.value( "name" ).toString() );
@@ -1131,7 +1131,7 @@ TEST( ExerciseSessionControllerTest, the_four_question_shares_are_remembered_and
     EXPECT_EQ( 0, controller.rhythmQuestionShare() );
     EXPECT_EQ( 20, controller.chordQuestionShare() );
 
-    // On l'allume : le reglage existe, et c'est ce qui compte - Roger veut pouvoir le doser, y compris depuis zero.
+    // On l'allume : le reglage existe, et c'est ce qui compte - le rythme se dose, y compris depuis zero.
     controller.setRhythmQuestionShare( 25 );
 
     EXPECT_EQ( 25, controller.rhythmQuestionShare() );
@@ -1416,8 +1416,7 @@ TEST( ExerciseSessionControllerTest, resetting_the_profile_also_wipes_the_statis
     controller.resetProfile();
 
     // Un score a zero qui garderait son journal serait un demi-mensonge : la page de statistiques continuerait de
-    // raconter une histoire que le joueur vient effacer. Roger : « n'oublie pas que "Remise a zero" met a zero les
-    // statistiques aussi. »
+    // raconter une histoire que le joueur vient d'effacer.
     EXPECT_EQ( 0U, log.size() );
 }
 
@@ -1512,8 +1511,7 @@ TEST( ExerciseSessionControllerTest, the_chord_tree_is_ready_to_be_drawn )
     EXPECT_EQ( QStringLiteral( "C" ), root.value( QStringLiteral( "name" ) ).toString() );
     EXPECT_EQ( QStringLiteral( "1 3 5" ), root.value( QStringLiteral( "degrees" ) ).toString() );
 
-    // Et le mineur, juste en dessous, s'appelle « Cm » : le nom anglo-saxon que Roger a demande, sur la carte comme sur les
-    // boutons.
+    // Et le mineur, juste en dessous, s'appelle « Cm » : le nom anglo-saxon, sur la carte comme sur les boutons.
     EXPECT_EQ( QStringLiteral( "Cm" ), tree.at( 1 ).toMap().value( QStringLiteral( "name" ) ).toString() );
 
     for( int index = 1; index < tree.size(); ++index )
@@ -1548,8 +1546,7 @@ TEST( ExerciseSessionControllerTest, a_first_run_offers_a_piano_and_a_guitar )
 
     ASSERT_EQ( 6, instruments.size() );
 
-    // Roger : « je voudrais par defaut : Piano et Guitare. Les autres sont trop desagreables ou trop etranges pour etre
-    // mis par defaut ». Un premier lancement doit sonner JUSTE : deux sons neutres, et le reste a portee de reglage.
+    // Un premier lancement doit sonner JUSTE : piano et guitare, deux sons neutres, et le reste a portee de reglage.
     EXPECT_TRUE( instruments.at( 0 ).toMap().value( QStringLiteral( "enabled" ) ).toBool() );
     EXPECT_TRUE( instruments.at( 1 ).toMap().value( QStringLiteral( "enabled" ) ).toBool() );
 
@@ -1559,5 +1556,24 @@ TEST( ExerciseSessionControllerTest, a_first_run_offers_a_piano_and_a_guitar )
           << "instrument " << index << " allume au premier lancement";
     }
 }
+TEST( ExerciseSessionControllerTest, the_daily_reminder_is_active_at_the_first_launch )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, &levelStore };
+
+    // Un premier lancement a le rappel ACTIF, sans rien avoir a cocher. Une application d'oreille musicale qui ne se
+    // rappelle a personne est une application qu'on oublie - et c'est exactement ce que le rappel existe pour eviter.
+    EXPECT_TRUE( controller.dailyReminderEnabled() );
+
+    // Et celui qui le coupe garde son choix : le reglage s'ecrit, et il se relit.
+    controller.setDailyReminderEnabled( false );
+
+    EXPECT_FALSE( controller.dailyReminderEnabled() );
+    EXPECT_FALSE( levelStore.dailyReminderEnabled() );
+}
+
+
 
 }    // namespace musichien::ui
