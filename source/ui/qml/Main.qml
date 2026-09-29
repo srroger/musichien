@@ -1148,13 +1148,24 @@ ApplicationWindow {
                 }
 
                 Text {
+                    // Un texte long doit se REPLIER, pas elargir la page : le verdict porte desormais la mesure en
+                    // cents, et sans ces deux lignes il poussait la page au-dela de la largeur d'un telephone.
+                    Layout.preferredWidth: 0
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
                     color: mainWindow.singingVerdictColor()
                     font.pixelSize: 18
                     font.bold: true
                     visible: MicrophoneController.hasSungInterval
-                    text: MicrophoneController.sungVerdict === 1 ? qsTr("Juste !") : qsTr("Raté — entendu : %1 demi-tons").arg(MicrophoneController.sungSemitones)
+                    // Le verdict, PUIS la mesure : « juste » ne dit pas de combien, et c'est ce chiffre qui permet de
+                    // progresser. Un ecart positif veut dire un intervalle chante trop large, negatif trop etroit.
+                    text: {
+                        var cents = Math.round(MicrophoneController.sungCentsOffset);
+                        var offset = (cents > 0 ? "+" : "") + cents + qsTr(" cents");
+                        var verdict = MicrophoneController.sungVerdict === 1 ? qsTr("Juste !") : qsTr("Raté — entendu : %1 demi-tons").arg(MicrophoneController.sungSemitones);
+                        return verdict + qsTr("  ·  %1").arg(offset);
+                    }
                 }
 
                 Button {

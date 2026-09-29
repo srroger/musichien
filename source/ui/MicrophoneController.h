@@ -70,6 +70,13 @@ class MicrophoneController final : public QObject
     // 0 tant que rien n'a ete chante, 1 quand l'intervalle est juste, 2 quand il ne l'est pas.
     Q_PROPERTY( int sungVerdict READ sungVerdict NOTIFY sungIntervalChanged )
 
+    // L'ecart, en CENTS, entre l'intervalle chante et l'intervalle PARFAIT du temperament courant : zero quand il est
+    // exactement celui du jeu, positif quand il a ete chante trop large, negatif quand il a ete chante trop etroit.
+    //
+    // Un verdict dit « juste » ou « rate » ; ce chiffre, lui, dit DE COMBIEN - et c'est ce qui permet de progresser.
+    // Le calcul part du temperament choisi, pas d'un tempere egal suppose : l'ecart affiche est celui du jeu.
+    Q_PROPERTY( int sungCentsOffset READ sungCentsOffset NOTIFY sungIntervalChanged )
+
     // Le feedback de tenue : la premiere note a-t-elle ete validee, et ou en est la barre de stabilite (0..1). C'est
     // ce qui dit au chanteur si sa note TIENT ou si elle glisse.
     Q_PROPERTY( bool hasFirstNote READ hasFirstNote NOTIFY sungIntervalChanged )
@@ -153,6 +160,7 @@ public:
     [[nodiscard]] bool hasSungInterval() const { return m_sungIntervalDetector.reading().hasInterval(); }
     [[nodiscard]] int sungSemitones() const { return m_sungIntervalDetector.reading().semitones(); }
     [[nodiscard]] int sungVerdict() const;
+    [[nodiscard]] int sungCentsOffset() const;
     [[nodiscard]] bool hasFirstNote() const { return m_sungIntervalDetector.reading().firstMidiNumber != 0; }
     [[nodiscard]] double sungStability() const { return m_sungIntervalDetector.stabilityFraction(); }
 

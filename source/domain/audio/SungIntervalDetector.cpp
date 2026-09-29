@@ -13,6 +13,7 @@ void SungIntervalDetector::reset() noexcept
     m_heldMidiNumber = 0;
     m_heldMilliseconds = 0;
     m_trackedMidi = 0.0;
+    m_firstTrackedMidi = 0.0;
     m_silenceMilliseconds = 0;
     m_voiceRestarted = false;
 }
@@ -98,12 +99,19 @@ void SungIntervalDetector::update( double p_frequencyHz,
     {
         m_reading.firstMidiNumber = m_heldMidiNumber;
 
+        // Le point de depart des cents : la hauteur CONTINUE, et non le demi-ton arrondi.
+        m_firstTrackedMidi = m_trackedMidi;
+
         return;
     }
 
     if( m_heldMidiNumber != m_reading.firstMidiNumber )
     {
         m_reading.secondMidiNumber = m_heldMidiNumber;
+
+        // La mesure fine de l'intervalle : la distance entre les deux hauteurs continues, en cents. Un demi-ton vaut
+        // cent cents, donc la difference des deux positions MIDI, multipliee par cent.
+        m_reading.cents = ( m_trackedMidi - m_firstTrackedMidi ) * 100.0;
 
         return;
     }
@@ -115,6 +123,7 @@ void SungIntervalDetector::update( double p_frequencyHz,
     if( m_voiceRestarted )
     {
         m_reading.secondMidiNumber = m_heldMidiNumber;
+        m_reading.cents = ( m_trackedMidi - m_firstTrackedMidi ) * 100.0;
     }
 }
 

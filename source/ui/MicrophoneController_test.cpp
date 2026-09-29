@@ -181,6 +181,23 @@ TEST( MicrophoneControllerTest, the_frequency_read_is_shown_with_its_decimal )
     EXPECT_EQ( test.controller.detectedNoteLabel(), QStringLiteral( "A4  442.3 Hz" ) );
 }
 
+// Sans chant, l'ecart est NUL et non une valeur inventee : un ecran qui afficherait « +0 cents » avant que le joueur
+// ait chante quoi que ce soit lui apprendrait a ne plus lire ce chiffre.
+TEST( MicrophoneControllerTest, no_sung_interval_means_no_offset_at_all )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    test.start();
+
+    ASSERT_TRUE( test.controller.isListening() );
+
+    EXPECT_FALSE( test.controller.hasSungInterval() );
+    EXPECT_EQ( 0, test.controller.sungCentsOffset() );
+    EXPECT_EQ( 0, test.controller.sungVerdict() );
+}
+
 // L'ecoute demandee deux fois ne rouvre pas le micro : l'ecran d'accueil et la page Accordeur la demandent tous les
 // deux, et relancer le peripherique s'entendrait sous la forme d'un clic.
 TEST( MicrophoneControllerTest, asking_to_listen_twice_opens_the_microphone_once )

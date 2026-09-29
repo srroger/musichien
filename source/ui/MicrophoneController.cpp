@@ -339,6 +339,32 @@ int MicrophoneController::sungVerdict() const
     return ( std::abs( reading.semitones() - m_singingTargetSemitones ) <= 1 ) ? 1 : 2;
 }
 
+int MicrophoneController::sungCentsOffset() const
+{
+    const domain::SungIntervalDetector::Reading & reading = m_sungIntervalDetector.reading();
+
+    if( !reading.hasInterval() )
+    {
+        return 0;
+    }
+
+    // L'intervalle PARFAIT : celui du temperament choisi, depuis la note de depart chantee. C'est le meme calcul que
+    // celui qui decide du son joue - donc l'ecart affiche dit la verite du jeu, et non celle d'un tempere egal suppose.
+    const domain::Temperament temperament =
+      ( m_preferences != nullptr ) ? m_preferences->storedTemperament() : domain::Temperament::Equal;
+    const domain::Note root = ( m_preferences != nullptr ) ? m_preferences->storedTuningRoot() : domain::Note{ 60 };
+    const double referencePitch = ( m_preferences != nullptr ) ? m_preferences->storedReferencePitch() : 440.0;
+
+    const domain::Note start{ reading.firstMidiNumber };
+    const domain::Note arrived = start.transposedBy( m_singingTargetSemitones );
+
+    const double perfectCents =
+      domain::centsBetween( domain::frequencyFor( arrived, root, temperament, referencePitch ),
+                            domain::frequencyFor( start, root, temperament, referencePitch ) );
+
+    return static_cast<int>( std::lround( reading.cents - perfectCents ) );
+}
+
 void MicrophoneController::ensureDetector()
 {
     if( m_detector )

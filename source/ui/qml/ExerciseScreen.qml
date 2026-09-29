@@ -94,6 +94,18 @@ Item {
         if (heard.identifier === undefined)
             return "";
 
+        // Le chant : au-dela du nom de l'intervalle, ce qui compte est de combien il est PROPRE. L'ecart en cents est
+        // une mesure, pas un jugement : il dit la meme chose a celui qui progresse et a celui qui plafonne, et il est
+        // mesure contre le temperament du jeu.
+        if (ExerciseController.questionKind === 2) {
+            var sungVerdict = qsTr("%1 (%2)").arg(heard.name).arg(heard.identifier);
+            if (MicrophoneController.hasSungInterval) {
+                var sungCents = Math.round(MicrophoneController.sungCentsOffset);
+                sungVerdict += qsTr(" — écart %1 cents").arg((sungCents > 0 ? "+" : "") + sungCents);
+            }
+            return sungVerdict;
+        }
+
         var verdict = qsTr("%1 (%2)").arg(heard.name).arg(heard.identifier);
         if (exerciseScreen.hasAnswered && !ExerciseController.wasLastAnswerCorrect)
             verdict += qsTr(" — tu as répondu %1").arg(exerciseScreen.answeredInterval.identifier);
