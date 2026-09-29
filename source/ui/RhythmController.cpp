@@ -20,6 +20,11 @@ constexpr int MAXIMUM_BEATS_PER_BAR = 12;
 constexpr std::int64_t MINIMUM_TAP_INTERVAL_MS = 100;
 constexpr std::int64_t MAXIMUM_TAP_INTERVAL_MS = 2000;
 
+// La cadence du RAFRAICHISSEMENT de l'affichage. Vingt millisecondes : cinquante fois par seconde, ce qui suffit a
+// faire suivre le curseur de la mesure a l'oeil, et ce qui ne coute rien puisqu'il ne fait que repeindre. Sa precision
+// n'a aucune importance - c'est le flux audio qui fait battre le metronome.
+constexpr int DISPLAY_REFRESH_MS = 20;
+
 }    // namespace
 
 RhythmController::RhythmController( domain::NotePlayer & p_notePlayer, QObject * p_parent )
@@ -28,17 +33,15 @@ RhythmController::RhythmController( domain::NotePlayer & p_notePlayer, QObject *
 {
     m_clock.start();
 
-    // The most precise timer Qt has: the beat must land where the ear expects it, and a coarse timer makes the whole
-    // page feel drunk. Not sample-accurate, but close enough for the first loop.
-    m_beatTimer.setTimerType( Qt::PreciseTimer );
+    // LE SON NE DEPEND PLUS D'ICI.
+    //
+    // Ce timer ne fait que REPEINDRE : il lit le temps du flux audio et met la page a jour. Sa precision n'a donc
+    // aucune importance, et c'est tout l'interet du changement - le metronome reste juste meme quand l'interface est
+    // occupee a peindre, parce que ce n'est plus elle qui le fait battre.
+    m_displayTimer.setTimerType( Qt::PreciseTimer );
+    m_displayTimer.setInterval( DISPLAY_REFRESH_MS );
 
-    // SINGLE SHOT, et c'est le cœur de la justesse du metronome. Un timer REPETITIF repart de l'instant ou il a tire :
-    // tire : chaque battement joue un peu en retard ajoute son retard a tous les suivants, et le metronome prend une
-    // seconde dans la vue du musicien au bout de deux minutes. Ici, chaque battement re-arme le suivant depuis
-    // l'horloge de depart (voir scheduleNextBeat), et le retard ne se reporte jamais.
-    m_beatTimer.setSingleShot( true );
-
-    QObject::connect( &m_beatTimer, &QTimer::timeout, this, &RhythmController::onBeat );
+    QObject::connect( &m_displayTimer, &QTimer::timeout, this, &RhythmController::refreshFromAudioClock );
 }
 
 void RhythmController::setBpm( int p_bpm )
@@ -54,9 +57,12 @@ void RhythmController::setBpm( int p_bpm )
 
     if( m_isRunning )
     {
-        // Le tempo change : la grille repart d'ICI. Un nouveau tempo s'attend a partir de maintenant - le recaler sur
-        // le demarrage rejouerait le passe, et ferait sauter le metronome de plusieurs temps.
-        restartBeatGrid();
+        // Le tempo change : la grille repart d'ICI, dans le flux. Un nouveau tempo s'attend a partir de maintenant, et
+        // le recaler sur le demarrage rejouerait le passe.
+        m_notePlayer.startMetronome( static_cast<double>( m_bpm ), m_beatsPerBar );
+
+        // Le dernier temps vu appartenait a l'ancienne grille : on repart de zero pour l'affichage et pour les cellules.
+        m_lastBeatIndex = -1;
     }
 
     emit bpmChanged();
@@ -90,11 +96,18 @@ void RhythmController::start()
     m_lastQuality = 0;
 
     m_clock.restart();
-    m_beatIndex = 0;
+    m_lastBeatIndex = -1;
 
-    // The downbeat sounds at once, so the ear starts on a clean reference. C'est lui qui arme le battement suivant :
-    // le demarrage et la marche passent donc par le MEME chemin, et il n'y a pas deux endroits qui planifient.
-    onBeat();
+    // LE SON : c'est le flux audio qui bat, a partir de cet instant. Le temps 0 tombe a la position courante du flux,
+    // et tout se compte en echantillons depuis la.
+    m_notePlayer.startMetronome( static_cast<double>( m_bpm ), m_beatsPerBar );
+
+    // L'AFFICHAGE suit le flux, lui, a sa propre cadence : il ne fait que repeindre.
+    m_displayTimer.start();
+
+    // Et une fois tout de suite, pour que le premier temps s'affiche sans attendre le premier rafraichissement : le
+    // metronome sonne deja, et une page qui montrerait encore l'ancien temps serait en retard sur lui.
+    refreshFromAudioClock();
 
     emit isRunningChanged();
     emit scoreChanged();
@@ -110,7 +123,12 @@ void RhythmController::stop()
     }
 
     m_isRunning = false;
-    m_beatTimer.stop();
+
+    m_displayTimer.stop();
+
+    // Et le son s'arrete dans le FLUX : le mixer retire les clics deja planifies, sans quoi un temps sonnerait encore
+    // apres l'arret - le pire des deux mondes.
+    m_notePlayer.stopMetronome();
 
     emit isRunningChanged();
 }
@@ -120,7 +138,10 @@ void RhythmController::tap()
     if( m_isRunning )
     {
         // The game: the tap is judged against the nearest beat.
-        const double elapsedMs = static_cast<double>( m_clock.elapsed() );
+        //
+        // LE TEMPS VIENT DU FLUX AUDIO, et non d'une horloge d'interface : c'est le temps que le joueur ENTEND, celui
+        // du clic qui vient de sonner - et non celui du moment ou la page a bien voulu traiter l'evenement.
+        const double elapsedMs = m_notePlayer.metronomeElapsedMs();
 
         const double beatMs = domain::beatDurationMs( m_bpm );
 
@@ -188,54 +209,49 @@ void RhythmController::playDrum( int p_drumIndex )
     m_notePlayer.playDrum( static_cast<domain::Drum>( p_drumIndex ) );
 }
 
-void RhythmController::onBeat()
+void RhythmController::refreshFromAudioClock()
 {
-    // Le rang GLOBAL du temps, dont la position dans la mesure se DEDUIT. C'est ce qui permet a la mesure de se
-    // recompter apres un recalage de la grille, au lieu de suivre un compteur qui aurait derive avec elle.
-    const std::int64_t beatIndex = m_beatIndex;
-    ++m_beatIndex;
+    // LE TEMPS VIENT DU FLUX, et le compteur de temps de l'interface ne fait que le SUIVRE.
+    //
+    // C'est ce qui remplace onBeat : plus aucun son n'est declenche ici. Le clic a deja sonne dans le flux audio, a
+    // l'echantillon pres ; ce qui reste a faire, c'est de dire ce que l'oreille est en train d'entendre.
+    const std::int64_t beatIndex = m_notePlayer.metronomeBeatIndex();
+
+    // LE TEMPS NE SE TRAITE QU'UNE FOIS. Le rafraichissement passe vingt fois par seconde : sans cette garde, les
+    // frappes d'une cellule partiraient vingt fois par temps.
+    if( beatIndex == m_lastBeatIndex )
+    {
+        return;
+    }
+
+    // Le tout premier temps d'une grille : il n'a pas de precedent pour annoncer ses frappes.
+    const bool isFirstBeat = ( m_lastBeatIndex < 0 );
+
+    m_lastBeatIndex = beatIndex;
 
     m_beatInBar = static_cast<int>( beatIndex % m_beatsPerBar );
 
-    m_notePlayer.playMetronomeClick( m_beatInBar == 0 );
-
     emit beatInBarChanged();
 
-    schedulePatternHitsForBeat( m_beatInBar );
+    // Les frappes du temps SUIVANT sont posees MAINTENANT : avec un temps d'avance, le mixer a tout le loisir de les
+    // ecrire a leur position exacte. Planifier le temps en cours serait trop tard - il vient de sonner.
+    schedulePatternHitsForBeat( beatIndex + 1 );
 
-    scheduleNextBeat();
+    // Et au tout premier temps, celles du temps en cours aussi : sans quoi la premiere frappe de la cellule manquerait,
+    // faute d'un temps precedent pour l'annoncer.
+    if( isFirstBeat )
+    {
+        schedulePatternHitsForBeat( beatIndex );
+    }
 }
 
-// Le battement suivant, vise depuis l'ORIGINE de la grille.
-//
-// Un QTimer repetitif repart de l'instant ou il a TIRE, et non de l'instant ou il aurait du tirer : chaque battement
-// un peu en retard decale donc tous les suivants, et le retard s'additionne. A 90 bpm, un millieme de seconde par temps
-// suffit a faire entendre un metronome qui traine au bout d'une minute ; sur un telephone, le retard d'un tir est bien
-// plus gros que cela, et l'oreille l'entend des les premieres mesures.
-//
-// La decision - quand, et quel battement - appartient au domaine (domain::planNextBeat), ou elle est pure et testee.
-// Ici il n'y a plus qu'a obeir : c'est ce qui rend ce correctif verifiable sans l'ecouter.
-void RhythmController::scheduleNextBeat()
+double RhythmController::positionOfBeat( std::int64_t p_beatIndex ) const noexcept
 {
-    const domain::BeatSchedule schedule = domain::planNextBeat( static_cast<double>( m_bpm ), static_cast<std::size_t>( m_beatIndex ), static_cast<double>( m_clock.elapsed() ) );
+    const double beatMs = domain::beatDurationMs( static_cast<double>( m_bpm ) );
 
-    // Le recalage eventuel de la grille - apres un reveil du telephone, par exemple - remonte par l'index : c'est lui
-    // qui sait QUEL battement suivra, et donc OU en est la mesure.
-    m_beatIndex = static_cast<std::int64_t>( schedule.beatIndex );
-
-    m_beatTimer.start( static_cast<int>( std::lround( schedule.delayMs ) ) );
-}
-
-void RhythmController::restartBeatGrid()
-{
-    m_clock.restart();
-
-    // Le temps 0 est celui qui vient de sonner : la nouvelle grille commence au temps 1.
-    m_beatIndex = 1;
-
-    // Le premier temps de la nouvelle grille est la premiere echeance : on repasse par la meme porte que tous les
-    // autres battements, sans avoir a deviner un delai ici.
-    scheduleNextBeat();
+    // La position du temps n depuis le PREMIER TEMPS DU METRONOME : c'est cette base-la que le lecteur audio attend,
+    // parce que c'est elle qu'il traduit en echantillons.
+    return static_cast<double>( p_beatIndex ) * beatMs;
 }
 
 QVariantList RhythmController::patterns() const
@@ -281,7 +297,7 @@ const domain::RhythmPattern * RhythmController::activePattern() const
     return &domain::allRhythmPatterns().at( static_cast<std::size_t>( m_currentPattern - 1 ) );
 }
 
-void RhythmController::schedulePatternHitsForBeat( int p_beatInBar )
+void RhythmController::schedulePatternHitsForBeat( std::int64_t p_beatIndex )
 {
     const domain::RhythmPattern * pattern = activePattern();
 
@@ -297,29 +313,26 @@ void RhythmController::schedulePatternHitsForBeat( int p_beatInBar )
         return;
     }
 
-    const double barBeat = static_cast<double>( p_beatInBar );
+    // La mesure qui contient ce temps commence ici : les frappes d'une cellule sont ecrites DEPUIS le premier temps de
+    // la mesure, il faut donc les ramener sur la base du metronome.
+    const std::int64_t measureStart = ( p_beatIndex / m_beatsPerBar ) * m_beatsPerBar;
+
+    const auto beatInBar = static_cast<double>( p_beatIndex - measureStart );
 
     for( const domain::RhythmHit & hit : pattern->hits() )
     {
-        if( ( hit.beat < barBeat ) || ( hit.beat >= barBeat + 1.0 ) )
+        // Les frappes de CE temps, et seulement elles : le temps voisin s'occupe des siennes.
+        if( ( hit.beat < beatInBar ) || ( hit.beat >= beatInBar + 1.0 ) )
         {
             continue;
         }
 
-        const auto delayMs = static_cast<int>( std::lround( ( hit.beat - barBeat ) * beatMs ) );
-
-        if( delayMs <= 0 )
-        {
-            m_notePlayer.playDrum( hit.drum );
-
-            continue;
-        }
-
-        // Une frappe decalee part en differe : c'est ce qu'est une syncope - une frappe ENTRE deux temps.
+        // LA POSITION, et non « dans un instant ».
         //
-        // Le controleur est le contexte du tir differe, donc si le metronome s'arrete et que l'objet vit toujours, le
-        // tir part quand meme ; c'est voulu, la fin d'une mesure doit s'entendre.
-        QTimer::singleShot( delayMs, this, [this, drum = hit.drum]() { m_notePlayer.playDrum( drum ); } );
+        // C'est ce qui fait qu'une syncope tombe ENTRE deux temps : la position se traduit en echantillons, et le mixer
+        // la pose exactement la. Un QTimer::singleShot, lui, visait l'instant ou le thread d'interface serait revenu -
+        // ce qui n'est pas un instant musical.
+        m_notePlayer.playDrumAt( hit.drum, positionOfBeat( measureStart ) + ( hit.beat * beatMs ) );
     }
 }
 
