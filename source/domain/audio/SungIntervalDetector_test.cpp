@@ -107,6 +107,49 @@ TEST( SungIntervalDetectorTest, a_falling_interval_is_negative )
     EXPECT_EQ( -7, detector.reading().semitones() );
 }
 
+// La mesure FINE de l'intervalle, et non son nom : une quinte du tempere egal vaut sept cents cents, et c'est ce
+// chiffre qui dit si elle etait juste ou non. Le nom, lui, ne distingue pas une quinte de 700 cents d'une quinte de
+// 740.
+TEST( SungIntervalDetectorTest, a_just_fifth_measures_seven_hundred_cents )
+{
+    SungIntervalDetector detector;
+
+    hold( detector, frequencyOf( 69 ), 1500 );    // La 4
+    hold( detector, frequencyOf( 76 ), 1500 );    // Mi 5
+
+    ASSERT_TRUE( detector.reading().hasInterval() );
+    EXPECT_EQ( 7, detector.reading().semitones() );
+    EXPECT_NEAR( 700.0, detector.reading().cents, 1.0 );
+}
+
+TEST( SungIntervalDetectorTest, a_widened_fifth_says_by_how_much )
+{
+    SungIntervalDetector detector;
+
+    // Vingt cents trop large : la meme quinte, chantee un cinquieme de demi-ton trop haut. Le NOM de l'intervalle ne
+    // change pas - c'est bien une quinte - et c'est pourtant toute la difference pour celui qui s'accorde.
+    const double widened = frequencyOf( 76 ) * std::pow( 2.0, 20.0 / 1200.0 );
+
+    hold( detector, frequencyOf( 69 ), 1500 );
+    hold( detector, widened, 1500 );
+
+    ASSERT_TRUE( detector.reading().hasInterval() );
+    EXPECT_EQ( 7, detector.reading().semitones() );
+    EXPECT_NEAR( 720.0, detector.reading().cents, 2.0 );
+}
+
+TEST( SungIntervalDetectorTest, a_falling_interval_measures_negative )
+{
+    SungIntervalDetector detector;
+
+    hold( detector, frequencyOf( 76 ), 1500 );
+    hold( detector, frequencyOf( 69 ), 1500 );
+
+    ASSERT_TRUE( detector.reading().hasInterval() );
+    EXPECT_EQ( -7, detector.reading().semitones() );
+    EXPECT_NEAR( -700.0, detector.reading().cents, 1.0 );
+}
+
 TEST( SungIntervalDetectorTest, a_note_only_brushed_on_the_way_does_not_count )
 {
     SungIntervalDetector detector;

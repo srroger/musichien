@@ -205,7 +205,7 @@ void QAudioNotePlayer::stopSinkWhenSilent()
             return;
         }
 
-        if( !m_mixer->isPlaying() )
+        if( !m_mixer->isPlaying() && !m_mixer->isMetronomeRunning() )
         {
             m_audioSink->stop();
 
@@ -509,6 +509,130 @@ void QAudioNotePlayer::playMetronomeClick( bool p_accented )
 void QAudioNotePlayer::useDrumSamples( std::array<std::vector<float>, domain::DRUM_COUNT> p_samples )
 {
     m_drumSamples = std::move( p_samples );
+}
+
+void QAudioNotePlayer::playDrumAt( domain::Drum p_drum, double p_positionMs )
+{
+    ensureAudioOutputIsOpen();
+
+    if( m_mixer == nullptr )
+    {
+        return;
+    }
+
+    const auto index = static_cast<std::size_t>( p_drum );
+
+    std::vector<float> samples;
+
+    if( ( index < m_drumSamples.size() ) && !m_drumSamples.at( index ).empty() )
+    {
+        samples = m_drumSamples.at( index );
+    }
+    else if( m_drumSynthesizer.has_value() )
+    {
+        samples = m_drumSynthesizer->renderDrum( p_drum );
+    }
+
+    if( samples.empty() )
+    {
+        return;
+    }
+
+    // La position demandee se compte depuis le PREMIER TEMPS du metronome, exactement comme le temps que l'oreille
+    // entend. L'ecart entre les deux est donc un DELAI, que l'on traduit en echantillons : c'est ce qui pose une
+    // syncope ENTRE deux temps, et non « a peu pres ».
+    constexpr double MILLISECONDS_PER_SECOND = 1000.0;
+
+    const double delayMs = p_positionMs - m_mixer->metronomeElapsedMs();
+    const double framesPerMs = static_cast<double>( m_audioFormat.sampleRate() ) / MILLISECONDS_PER_SECOND;
+
+    const std::int64_t startFrame =
+      m_mixer->framesWritten() + static_cast<std::int64_t>( std::llround( delayMs * framesPerMs ) );
+
+    m_mixer->playAt( std::move( samples ), startFrame, DRUM_GAIN );
+
+    startSinkIfNeeded();
+}
+
+void QAudioNotePlayer::startMetronome( double p_bpm, int p_beatsPerBar )
+{
+    ensureAudioOutputIsOpen();
+
+    if( ( m_mixer == nullptr ) || ( m_audioSink == nullptr ) )
+    {
+        return;
+    }
+
+    // Les clics EFFECTIFS, donnes une seule fois : le mixer les rejouera des milliers de fois, et c'est desormais LUI
+    // qui les posera, a l'echantillon pres.
+    m_mixer->setMetronomeClicks( effectiveClick( true ), effectiveClick( false ) );
+
+    // Le tampon de sortie est le decalage entre ce qui est ECRIT et ce qui est ENTENDU. Sans cette correction, une
+    // frappe parfaitement juste serait jugee en avance de tout le tampon, et le joueur apprendrait a jouer en retard.
+    const auto channelCount = static_cast<std::int64_t>( std::max( 1, m_audioFormat.channelCount() ) );
+    const auto bytesPerFrame = static_cast<std::int64_t>( sizeof( float ) ) * channelCount;
+
+    m_mixer->setOutputLatencyFrames( static_cast<std::int64_t>( SINK_BUFFER_BYTES ) / std::max<std::int64_t>( 1, bytesPerFrame ) );
+
+    m_mixer->startMetronome( p_bpm, p_beatsPerBar );
+
+    startSinkIfNeeded();
+}
+
+void QAudioNotePlayer::stopMetronome()
+{
+    if( m_mixer != nullptr )
+    {
+        m_mixer->stopMetronome();
+    }
+
+    // Et le peripherique peut rendre l'appareil des qu'il n'y a plus rien a jouer : sur un telephone, un flux ouvert
+    // entre deux exercices vide la batterie.
+    stopSinkWhenSilent();
+}
+
+std::int64_t QAudioNotePlayer::metronomeBeatIndex() const
+{
+    return ( m_mixer != nullptr ) ? m_mixer->metronomeBeatIndex() : 0;
+}
+
+bool QAudioNotePlayer::isMetronomeBeatAccented() const
+{
+    return ( m_mixer != nullptr ) && m_mixer->isMetronomeBeatAccented();
+}
+
+double QAudioNotePlayer::metronomeElapsedMs() const
+{
+    return ( m_mixer != nullptr ) ? m_mixer->metronomeElapsedMs() : 0.0;
+}
+
+std::vector<float> QAudioNotePlayer::effectiveClick( bool p_accented )
+{
+    const std::vector<float> & sampled = p_accented ? m_accentedClick : m_plainClick;
+
+    if( !sampled.empty() )
+    {
+        return sampled;
+    }
+
+    // Le repli : la synthese, avec l'ancien timbre. Un metronome muet serait pire qu'un metronome moins beau.
+    if( !m_synthesizer.has_value() )
+    {
+        return {};
+    }
+
+    const domain::Note note{ p_accented ? 88 : 72 };
+
+    std::vector<float> samples = m_synthesizer->renderNote( note, std::chrono::milliseconds{ 60 } );
+
+    const float gain = p_accented ? FALLBACK_ACCENTED_CLICK_GAIN : FALLBACK_PLAIN_CLICK_GAIN;
+
+    for( float & sample : samples )
+    {
+        sample *= gain;
+    }
+
+    return samples;
 }
 
 void QAudioNotePlayer::useMetronomeClicks( std::vector<float> p_accented, std::vector<float> p_plain )

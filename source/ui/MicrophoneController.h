@@ -43,6 +43,11 @@ class MicrophoneController final : public QObject
     Q_PROPERTY( double detectedPitchRatio READ detectedPitchRatio NOTIFY detectedPitchRatioChanged )
     Q_PROPERTY( double detectedMidi READ detectedMidi NOTIFY detectedMidiChanged )
     Q_PROPERTY( double detectedStaffFraction READ detectedStaffFraction NOTIFY detectedStaffFractionChanged )
+
+    // De combien d'octaves la note REELLE est au-dessus (positif) ou en dessous (negatif) de la place ou la boule se
+    // pose. Zero quand la boule dit la verite entiere. L'ecran en fait un signe, et c'est ce qui rend l'accordeur
+    // utilisable pour une hauteur absolue : la boule reste sur les cinq lignes, la note, elle, ne ment pas.
+    Q_PROPERTY( int detectedOctaveShift READ detectedOctaveShift NOTIFY detectedOctaveShiftChanged )
     Q_PROPERTY( QString detectedNoteLabel READ detectedNoteLabel NOTIFY detectedNoteLabelChanged )
 
     // How far the voice is from the nearest note, in cents, and how good that is. This is what turns the microphone
@@ -64,6 +69,13 @@ class MicrophoneController final : public QObject
 
     // 0 tant que rien n'a ete chante, 1 quand l'intervalle est juste, 2 quand il ne l'est pas.
     Q_PROPERTY( int sungVerdict READ sungVerdict NOTIFY sungIntervalChanged )
+
+    // L'ecart, en CENTS, entre l'intervalle chante et l'intervalle PARFAIT du temperament courant : zero quand il est
+    // exactement celui du jeu, positif quand il a ete chante trop large, negatif quand il a ete chante trop etroit.
+    //
+    // Un verdict dit « juste » ou « rate » ; ce chiffre, lui, dit DE COMBIEN - et c'est ce qui permet de progresser.
+    // Le calcul part du temperament choisi, pas d'un tempere egal suppose : l'ecart affiche est celui du jeu.
+    Q_PROPERTY( int sungCentsOffset READ sungCentsOffset NOTIFY sungIntervalChanged )
 
     // Le feedback de tenue : la premiere note a-t-elle ete validee, et ou en est la barre de stabilite (0..1). C'est
     // ce qui dit au chanteur si sa note TIENT ou si elle glisse.
@@ -104,6 +116,7 @@ public:
     [[nodiscard]] double detectedPitchRatio() const { return m_detectedPitchRatio; }
     [[nodiscard]] double detectedMidi() const { return m_detectedMidi; }
     [[nodiscard]] double detectedStaffFraction() const { return m_detectedStaffFraction; }
+    [[nodiscard]] int detectedOctaveShift() const { return m_detectedOctaveShift; }
     [[nodiscard]] QString detectedNoteLabel() const { return m_detectedNoteLabel; }
     [[nodiscard]] double detectedCents() const { return m_detectedCents; }
     [[nodiscard]] int detectedTuningState() const { return m_detectedTuningState; }
@@ -111,6 +124,11 @@ public:
     Q_INVOKABLE void selectDevice( int p_deviceIndex );
     Q_INVOKABLE void startTest();
     Q_INVOKABLE void stopTest();
+
+    // Ouvre le micro s'il ne l'est pas deja. Le jeu est bati sur le micro : la page Accordeur n'a donc plus de bouton
+    // « tester le micro », elle demande simplement a ecouter en arrivant - et redemander a un micro deja ouvert
+    // relancerait pour rien le peripherique, ce qui s'entendrait sous la forme d'un clic.
+    Q_INVOKABLE void ensureListening();
 
     // --- La question chantee -----------------------------------------------------------------------------------------
 
@@ -142,6 +160,7 @@ public:
     [[nodiscard]] bool hasSungInterval() const { return m_sungIntervalDetector.reading().hasInterval(); }
     [[nodiscard]] int sungSemitones() const { return m_sungIntervalDetector.reading().semitones(); }
     [[nodiscard]] int sungVerdict() const;
+    [[nodiscard]] int sungCentsOffset() const;
     [[nodiscard]] bool hasFirstNote() const { return m_sungIntervalDetector.reading().firstMidiNumber != 0; }
     [[nodiscard]] double sungStability() const { return m_sungIntervalDetector.stabilityFraction(); }
 
@@ -152,6 +171,7 @@ signals:
     void detectedPitchRatioChanged();
     void detectedMidiChanged();
     void detectedStaffFractionChanged();
+    void detectedOctaveShiftChanged();
     void detectedNoteLabelChanged();
     void detectedCentsChanged();
     void detectedTuningStateChanged();
@@ -174,6 +194,7 @@ private:
     double m_detectedPitchRatio{ 0.0 };
     double m_detectedMidi{ 0.0 };
     double m_detectedStaffFraction{ 0.5 };
+    int m_detectedOctaveShift{ 0 };
     double m_detectedCents{ 0.0 };
     int m_detectedTuningState{ 0 };
     QString m_detectedNoteLabel;

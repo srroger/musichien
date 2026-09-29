@@ -176,6 +176,8 @@ ApplicationWindow {
     // La demande d'autorisation part un peu APRES le premier affichage : le joueur voit d'abord la page, et la boite
     // d'Android arrive ensuite, sur quelque chose qui existe. Posee pendant la construction de l'ecran, elle
     // apparaitrait sur une fenetre encore vide, ce qui ressemble a un plantage plutot qu'a une question.
+    // Le MICRO, lui, n'est PAS ouvert ici : il s'ouvre quand un ecran s'en sert (l'accordeur, les reglages, une
+    // question chantee) et se referme quand cet ecran s'en va. Un microphone ouvert pour rien vide la batterie.
     Timer {
         interval: 800
         running: true
@@ -726,6 +728,11 @@ ApplicationWindow {
         modal: true
         padding: 16
 
+        // Les reglages contiennent la page du micro : l'ouvrir ouvre l'ecoute, le fermer la referme. C'est le meme
+        // reglage que dans l'accordeur, avec la meme regle - pas de microphone ouvert pour rien.
+        onOpened: MicrophoneController.ensureListening()
+        onClosed: MicrophoneController.stopTest()
+
         // Un fond sombre, et pas la feuille blanche du systeme : cette page fait partie du jeu, et le
         // blanc de l’application systeme jurait au milieu du bleu nuit.
         background: Rectangle {
@@ -1141,13 +1148,24 @@ ApplicationWindow {
                 }
 
                 Text {
+                    // Un texte long doit se REPLIER, pas elargir la page : le verdict porte desormais la mesure en
+                    // cents, et sans ces deux lignes il poussait la page au-dela de la largeur d'un telephone.
+                    Layout.preferredWidth: 0
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
                     color: mainWindow.singingVerdictColor()
                     font.pixelSize: 18
                     font.bold: true
                     visible: MicrophoneController.hasSungInterval
-                    text: MicrophoneController.sungVerdict === 1 ? qsTr("Juste !") : qsTr("Raté — entendu : %1 demi-tons").arg(MicrophoneController.sungSemitones)
+                    // Le verdict, PUIS la mesure : « juste » ne dit pas de combien, et c'est ce chiffre qui permet de
+                    // progresser. Un ecart positif veut dire un intervalle chante trop large, negatif trop etroit.
+                    text: {
+                        var cents = Math.round(MicrophoneController.sungCentsOffset);
+                        var offset = (cents > 0 ? "+" : "") + cents + qsTr(" cents");
+                        var verdict = MicrophoneController.sungVerdict === 1 ? qsTr("Juste !") : qsTr("Raté — entendu : %1 demi-tons").arg(MicrophoneController.sungSemitones);
+                        return verdict + qsTr("  ·  %1").arg(offset);
+                    }
                 }
 
                 Button {
@@ -1731,8 +1749,10 @@ ApplicationWindow {
         height: mainWindow.height
         modal: true
         padding: 12
-        // Quitter la page lache le micro : un micro ouvert vide la batterie, et une pastille d'enregistrement qui reste
-        // allumee sur un telephone est une pastille qui inquiete.
+        // Arriver sur la page ouvre le micro : le jeu entier est bati sur lui, et un accordeur qui reste muet tant
+        // qu'on n'a pas cherche un bouton est un accordeur qu'on croit casse. Quitter la page le referme : personne
+        // n'accorde plus rien, et un micro ouvert vide la batterie pour rien.
+        onOpened: MicrophoneController.ensureListening()
         onClosed: MicrophoneController.stopTest()
 
         background: Rectangle {
@@ -2389,6 +2409,9 @@ ApplicationWindow {
 
             // La portee miniature : la boule suit la hauteur chantee. Le composant StaffBall porte le style.
             StaffBall {
+                // Le signe de l'octave : ici, oui. L'accordeur sert a lire une hauteur ABSOLUE, et le signe dit que
+                // la note est ailleurs que sur la portee - c'est ce qui distingue un accordeur d'un jeu.
+                showOctaveShift: true
             }
 
             // La note la plus proche, l'ecart en cents, et la couleur : c'est un ACCORDEUR, et il sert
@@ -2419,12 +2442,6 @@ ApplicationWindow {
                     }
                 }
 
-            }
-
-            Button {
-                Layout.alignment: Qt.AlignRight
-                text: MicrophoneController.isListening ? qsTr("■ Arrêter") : qsTr("♪ Tester le micro")
-                onClicked: MicrophoneController.isListening ? MicrophoneController.stopTest() : MicrophoneController.startTest()
             }
 
         }

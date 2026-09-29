@@ -18,6 +18,8 @@ musichienFunction_AddLibrary(domain
     music/Temperament.cpp
     music/TunerGuide.h
     music/TunerGuide.cpp
+    music/StaffPosition.h
+    music/StaffPosition.cpp
     music/Interval.h
     music/Interval.cpp
     music/Chord.h
@@ -37,12 +39,18 @@ musichienFunction_AddLibrary(domain
     audio/ToneSynthesizer.cpp
     audio/SampledInstrument.h
     audio/SampledInstrument.cpp
+    audio/PitchEstimator.h
+    audio/PitchEstimator.cpp
+    audio/FastFourierTransform.h
+    audio/FastFourierTransform.cpp
     audio/DrumSynthesizer.h
     audio/DrumSynthesizer.cpp
 
     # Rhythm, as pure rules: the metronome's grid and the judgement of a tap, no clock and no sound
     rhythm/Rhythm.h
     rhythm/Rhythm.cpp
+    rhythm/MetronomeGrid.h
+    rhythm/MetronomeGrid.cpp
     rhythm/RhythmPattern.h
     rhythm/RhythmPattern.cpp
 
@@ -100,12 +108,16 @@ if(MUSICHIEN_BUILD_TESTING)
         music/Interval_test.cpp
         music/Temperament_test.cpp
         music/TunerGuide_test.cpp
+        music/StaffPosition_test.cpp
         music/Chord_test.cpp
         music/ChordTree_test.cpp
         audio/ToneSynthesizer_test.cpp
+        audio/PitchEstimator_test.cpp
+        audio/FastFourierTransform_test.cpp
         audio/SungIntervalDetector_test.cpp
         audio/DrumSynthesizer_test.cpp
         rhythm/Rhythm_test.cpp
+        rhythm/MetronomeGrid_test.cpp
         rhythm/RhythmPattern_test.cpp
         exercise/AnswerGrid_test.cpp
         exercise/AnecdoteBook_test.cpp

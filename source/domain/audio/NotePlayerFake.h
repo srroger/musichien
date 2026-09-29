@@ -78,12 +78,50 @@ public:
         ++m_drumCounts.at( static_cast<std::size_t>( p_drum ) );
     }
 
+    void playDrumAt( Drum p_drum, double p_positionMs ) override
+    {
+        ++m_drumCounts.at( static_cast<std::size_t>( p_drum ) );
+
+        m_drumPositions.push_back( p_positionMs );
+    }
+
     void stopAll() override
     {
         ++m_stopCount;
     }
 
     [[nodiscard]] std::chrono::milliseconds noteDuration() const override { return m_noteDuration; }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Le metronome : le fake le SIMULE, et c'est ce qui permet a un test de verifier la logique du jeu - le bon temps,
+    // le bon accent, la bonne duree - sans dependre d'une carte son ni d'une horloge.
+    // -----------------------------------------------------------------------------------------------------------------
+    void startMetronome( double p_bpm, int p_beatsPerBar ) override
+    {
+        m_metronomeBpm = p_bpm;
+        m_metronomeBeatsPerBar = p_beatsPerBar;
+        m_isMetronomeRunning = true;
+        m_metronomeBeatIndex = 0;
+        m_metronomeElapsedMs = 0.0;
+
+        ++m_metronomeStartCount;
+    }
+
+    void stopMetronome() override
+    {
+        m_isMetronomeRunning = false;
+
+        ++m_metronomeStopCount;
+    }
+
+    [[nodiscard]] std::int64_t metronomeBeatIndex() const override { return m_metronomeBeatIndex; }
+
+    [[nodiscard]] bool isMetronomeBeatAccented() const override
+    {
+        return ( m_metronomeBeatsPerBar > 0 ) && ( ( m_metronomeBeatIndex % m_metronomeBeatsPerBar ) == 0 );
+    }
+
+    [[nodiscard]] double metronomeElapsedMs() const override { return m_metronomeElapsedMs; }
 
     // -----------------------------------------------------------------------------------------------------------------
     // Observability, for the assertions of a test
@@ -96,6 +134,20 @@ public:
 
     [[nodiscard]] int metronomeClickCount() const noexcept { return m_metronomeClickCount; }
     [[nodiscard]] int accentedClickCount() const noexcept { return m_accentedClickCount; }
+
+    [[nodiscard]] bool isMetronomeRunning() const noexcept { return m_isMetronomeRunning; }
+    [[nodiscard]] double metronomeBpm() const noexcept { return m_metronomeBpm; }
+    [[nodiscard]] int metronomeBeatsPerBar() const noexcept { return m_metronomeBeatsPerBar; }
+    [[nodiscard]] int metronomeStartCount() const noexcept { return m_metronomeStartCount; }
+    [[nodiscard]] int metronomeStopCount() const noexcept { return m_metronomeStopCount; }
+
+    // Fait AVANCER le temps du metronome comme le ferait le flux audio : un temps de plus, et tant de millisecondes
+    // ecoulees depuis le premier.
+    void advanceMetronomeTo( std::int64_t p_beatIndex, double p_elapsedMs )
+    {
+        m_metronomeBeatIndex = p_beatIndex;
+        m_metronomeElapsedMs = p_elapsedMs;
+    }
 
     [[nodiscard]] int drumCount() const noexcept
     {
@@ -114,6 +166,10 @@ public:
         return m_drumCounts.at( static_cast<std::size_t>( p_drum ) );
     }
 
+    // Les positions demandees, en millisecondes : c'est ce qu'un test lit pour verifier qu'une syncope tombe ENTRE
+    // deux temps, et non « quelque part ».
+    [[nodiscard]] const std::vector<double> & drumPositions() const noexcept { return m_drumPositions; }
+
     void clear()
     {
         m_playedNotes.clear();
@@ -124,6 +180,12 @@ public:
         m_metronomeClickCount = 0;
         m_accentedClickCount = 0;
         m_drumCounts = {};
+
+        m_isMetronomeRunning = false;
+        m_metronomeBeatIndex = 0;
+        m_metronomeElapsedMs = 0.0;
+        m_metronomeStartCount = 0;
+        m_metronomeStopCount = 0;
     }
 
 private:
@@ -136,6 +198,15 @@ private:
     int m_metronomeClickCount{ 0 };
     int m_accentedClickCount{ 0 };
     std::array<int, DRUM_COUNT> m_drumCounts{};
+    std::vector<double> m_drumPositions;
+
+    bool m_isMetronomeRunning{ false };
+    double m_metronomeBpm{ 90.0 };
+    int m_metronomeBeatsPerBar{ 4 };
+    std::int64_t m_metronomeBeatIndex{ 0 };
+    double m_metronomeElapsedMs{ 0.0 };
+    int m_metronomeStartCount{ 0 };
+    int m_metronomeStopCount{ 0 };
 };
 
 }    // namespace musichien::domain

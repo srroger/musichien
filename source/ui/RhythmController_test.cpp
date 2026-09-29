@@ -65,7 +65,7 @@ TEST( RhythmControllerTest, tapping_while_stopped_only_reads_a_tempo )
     EXPECT_EQ( 0, controller.combo() );
 }
 
-TEST( RhythmControllerTest, starting_the_metronome_resets_the_score_and_beats_the_first_time )
+TEST( RhythmControllerTest, starting_the_metronome_hands_the_beat_over_to_the_audio_stream )
 {
     domain::NotePlayerFake notePlayer;
     RhythmController controller{ notePlayer };
@@ -76,13 +76,67 @@ TEST( RhythmControllerTest, starting_the_metronome_resets_the_score_and_beats_th
     EXPECT_EQ( 0, controller.score() );
     EXPECT_EQ( 0, controller.combo() );
 
-    // Le premier temps sonne tout de suite : l'oreille part sur un repere franc.
-    EXPECT_GT( notePlayer.metronomeClickCount(), 0 );
-    EXPECT_EQ( 1, notePlayer.accentedClickCount() );
+    // LE METRONOME EST DESORMAIS MENE PAR LE LECTEUR AUDIO, qui compte des echantillons : c'est lui qui bat, et non
+    // plus l'interface, ou la justesse dependait du thread qui peint l'ecran.
+    EXPECT_TRUE( notePlayer.isMetronomeRunning() );
+    EXPECT_EQ( 1, notePlayer.metronomeStartCount() );
+    EXPECT_DOUBLE_EQ( 90.0, notePlayer.metronomeBpm() );
+    EXPECT_EQ( 4, notePlayer.metronomeBeatsPerBar() );
 
     controller.stop();
 
     EXPECT_FALSE( controller.isRunning() );
+
+    // Et l'arret se fait aussi dans le flux : sans cela, un temps deja planifie sonnerait encore apres l'arret.
+    EXPECT_FALSE( notePlayer.isMetronomeRunning() );
+    EXPECT_EQ( 1, notePlayer.metronomeStopCount() );
+}
+
+TEST( RhythmControllerTest, the_page_never_sends_a_click_itself )
+{
+    domain::NotePlayerFake notePlayer;
+    RhythmController controller{ notePlayer };
+
+    controller.start();
+
+    // LA PREUVE DE LA REFONTE, et c'est la ligne qui compte : le controleur demande au lecteur audio de BATTRE, et il
+    // n'envoie plus un seul clic de sa propre initiative. Un clic pousse par le thread d'interface tombait la ou ce
+    // thread avait bien voulu - c'est cette gigue qui s'entendait.
+    EXPECT_EQ( 0, notePlayer.metronomeClickCount() );
+
+    controller.setBpm( 132 );
+
+    // Changer le tempo ne declenche pas davantage de clic : la nouvelle grille repart dans le flux, et le lecteur audio
+    // s'en occupe.
+    EXPECT_EQ( 0, notePlayer.metronomeClickCount() );
+    EXPECT_EQ( 2, notePlayer.metronomeStartCount() );
+    EXPECT_DOUBLE_EQ( 132.0, notePlayer.metronomeBpm() );
+
+    controller.stop();
+}
+
+TEST( RhythmControllerTest, a_tap_is_judged_against_the_time_the_ear_hears )
+{
+    domain::NotePlayerFake notePlayer;
+    RhythmController controller{ notePlayer };
+
+    controller.start();
+
+    // 90 bpm : un temps toutes les 666,67 millisecondes. Le fake avance le temps du flux comme le ferait une carte son.
+    notePlayer.advanceMetronomeTo( 2, 1333.33 );
+
+    controller.tap();
+
+    EXPECT_EQ( 2, controller.lastQuality() ) << "pile sur le temps : parfait";
+
+    // Le meme temps, mais 167 millisecondes plus tard : le domaine appelle ca un « bon » tap, et il le dit.
+    notePlayer.advanceMetronomeTo( 2, 1500.0 );
+
+    controller.tap();
+
+    EXPECT_EQ( 1, controller.lastQuality() );
+
+    controller.stop();
 }
 
 TEST( RhythmControllerTest, the_metronome_and_the_battery_are_two_different_calls )
@@ -92,12 +146,11 @@ TEST( RhythmControllerTest, the_metronome_and_the_battery_are_two_different_call
 
     controller.start();
 
-    const std::size_t clicksAfterStart = notePlayer.metronomeClickCount();
-
     controller.playDrum( 0 );
 
-    // Le clic du metronome a bien ete demande, et la batterie aussi : deux sons distincts, qui se MELANGENT.
-    EXPECT_GT( clicksAfterStart, 0U );
+    // Le metronome bat dans le flux, et la batterie est frappee par l'interface : deux sons distincts, que le mixer
+    // fait entendre ENSEMBLE.
+    EXPECT_TRUE( notePlayer.isMetronomeRunning() );
     EXPECT_EQ( 1, notePlayer.drumCount() );
     EXPECT_EQ( 0, notePlayer.drumCount( domain::Drum::Snare ) );
 

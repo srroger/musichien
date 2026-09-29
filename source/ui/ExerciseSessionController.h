@@ -77,6 +77,13 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( bool isFinished READ isFinished NOTIFY sessionChanged )
     Q_PROPERTY( bool isFeedbackVisible READ isFeedbackVisible NOTIFY sessionChanged )
     Q_PROPERTY( bool wasLastAnswerCorrect READ wasLastAnswerCorrect NOTIFY sessionChanged )
+
+    // L'ecart, en cents, du chant qui vient d'etre juge - FIGE au moment de la reponse.
+    //
+    // Il ne peut pas etre relu sur le micro pendant que le verdict s'affiche : repondre resynchronise la cible du
+    // micro (voir refreshChoices), ce qui remet le detecteur a zero. La mesure doit donc etre mise de cote AVANT,
+    // exactement comme « la derniere reponse etait juste » l'est deja.
+    Q_PROPERTY( int lastSungCentsOffset READ lastSungCentsOffset NOTIFY sessionChanged )
     Q_PROPERTY( bool isHelpAvailable READ isHelpAvailable NOTIFY sessionChanged )
 
     // Ce que la question en cours demande : 0 pour nommer un intervalle, 1 pour dire dans quel sens il a ete joue.
@@ -404,6 +411,7 @@ public:
     [[nodiscard]] bool isFinished() const noexcept;
     [[nodiscard]] bool isFeedbackVisible() const noexcept;
     [[nodiscard]] bool wasLastAnswerCorrect() const noexcept;
+    [[nodiscard]] int lastSungCentsOffset() const noexcept { return m_lastSungCentsOffset; }
     [[nodiscard]] bool isHelpAvailable() const noexcept;
     [[nodiscard]] QVariantMap heardInterval() const;
     [[nodiscard]] QVariantMap answeredInterval() const;
@@ -454,7 +462,7 @@ public:
 
     // The player sang, on a sung question. Whether it was right comes from the microphone controller, which has
     // listened and compared the sung interval to the target.
-    Q_INVOKABLE void answerSung( bool p_isCorrect );
+    Q_INVOKABLE void answerSung( bool p_isCorrect, int p_centsOffset );
 
     // Le joueur a tape, sur la question de rythme en cours.
     //
@@ -766,6 +774,10 @@ private:
     // Le bilan en cours, et le nombre de questions qui l'ont ouvert. Ces deux valeurs suffisent a dire au joueur ou il
     // en est : l'echauffement est passe, ce qui suit est ce qui lui resiste.
     bool m_isReviewRunning{ false };
+
+    // L'ecart mesure du dernier chant juge, mis de cote au moment de la reponse : le micro est resynchronise juste
+    // apres, et la mesure serait perdue avec lui.
+    int m_lastSungCentsOffset{ 0 };
     std::size_t m_reviewEasyQuestionCount{ 0 };
 
     // Read once from the store, then kept here: the screen asks for it on every question, and a settings file

@@ -2,6 +2,7 @@
 
 #include "domain/audio/NotePlayerFake.h"
 #include "domain/music/Temperament.h"
+#include "ui/MicrophoneController.h"
 
 #include <QStringList>
 #include <QVariantList>
@@ -41,6 +42,19 @@ constexpr std::size_t SESSION_QUESTION_COUNT = 10;
     domain::SessionSettings settings;
 
     settings.singQuestionShare = 0;
+    settings.directionQuestionShare = 0;
+    settings.rhythmQuestionShare = 0;
+    settings.chordQuestionShare = 0;
+
+    return settings;
+}
+
+// Une session qui ne pose QUE des questions chantees : la seule ou l'ecart du chant a un sens.
+[[nodiscard]] domain::SessionSettings singOnlySettings()
+{
+    domain::SessionSettings settings;
+
+    settings.singQuestionShare = 100;
     settings.directionQuestionShare = 0;
     settings.rhythmQuestionShare = 0;
     settings.chordQuestionShare = 0;
@@ -150,6 +164,41 @@ void answerCorrectly( ExerciseSessionController & p_controller )
 }
 
 }    // namespace
+
+// L'ecart du chant est RETENU, et pas relu sur le micro.
+//
+// Repondre resynchronise la cible du micro au debut du traitement de la reponse (voir refreshChoices), ce qui remet
+// son detecteur a zero. Une premiere version relisait l'ecart au moment d'afficher le verdict : la mesure etait donc
+// toujours nulle, et le joueur ne voyait jamais de combien il avait ete juste. Le defaut ne se voyait pas dans les
+// tests du domaine, qui jugent le detecteur, et pas l'ecran.
+TEST( ExerciseSessionControllerTest, the_sung_offset_is_kept_even_though_the_microphone_is_reset )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, singOnlySettings() };
+    MicrophoneController microphone{ QStringList{}, {}, nullptr, &notePlayer };
+
+    controller.setMicrophoneController( &microphone );
+    controller.startSession();
+
+    ASSERT_TRUE( controller.isAsking() );
+    ASSERT_EQ( 2, controller.questionKind() );
+
+    controller.answerSung( true, 25 );
+
+    EXPECT_EQ( 25, controller.lastSungCentsOffset() );
+}
+
+TEST( ExerciseSessionControllerTest, a_session_without_singing_keeps_no_offset )
+{
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+
+    controller.startSession();
+
+    // Aucun chant n'a ete juge : l'ecran doit lire zero, et non une mesure inventee - ou, pire, celle du chant
+    // precedent restee en memoire.
+    EXPECT_EQ( 0, controller.lastSungCentsOffset() );
+}
 
 TEST( ExerciseSessionControllerTest, starting_a_session_asks_the_first_question )
 {

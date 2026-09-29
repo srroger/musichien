@@ -41,6 +41,13 @@ public:
         // The distance between the two, in semitones. Negative when the singer went DOWN, which matters: a falling
         // fifth and a rising fifth are not the same interval.
         [[nodiscard]] std::int32_t semitones() const noexcept { return secondMidiNumber - firstMidiNumber; }
+
+        // De combien l'intervalle a ete chante, en CENTS - la mesure CONTINUE, et non l'arrondi au demi-ton.
+        //
+        // C'est ce qui permet de dire « juste, et a douze cents pres » au lieu d'un « juste » sec : 1200 cents font
+        // une octave, 100 un demi-ton, et une quinte du tempere egal en vaut 700. Le chant n'etant jamais exactement
+        // juste, savoir de combien il ne l'est pas est toute la difference entre un verdict et une mesure.
+        double cents{ 0.0 };
     };
 
     // A reading arrives every few milliseconds. The caller says how much time passed since the previous one: the
@@ -94,6 +101,11 @@ private:
     // The tracked pitch, smoothed across readings. This is what absorbs the noise: a single reading never decides a
     // note, the average of the last few does. 0.0 means "not tracking yet".
     double m_trackedMidi{ 0.0 };
+
+    // La hauteur continue de la PREMIERE note, au moment ou elle a ete acceptee. C'est elle qui sert de point de
+    // depart au calcul des cents : garder la hauteur lissee plutot que l'entier arrondi est ce qui donne a la mesure
+    // sa finesse, et le demi-ton n'est qu'un nom.
+    double m_firstTrackedMidi{ 0.0 };
 
     // Le silence en cours, et s'il a ete assez long pour valoir une reprise. Voir MINIMUM_SILENCE_MILLISECONDS : c'est
     // ce couple qui permet de chanter l'unisson sans qu'un vibrato passe pour deux notes.

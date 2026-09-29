@@ -94,6 +94,18 @@ Item {
         if (heard.identifier === undefined)
             return "";
 
+        // Le chant : au-dela du nom de l'intervalle, ce qui compte est de combien il est PROPRE. L'ecart en cents est
+        // une mesure, pas un jugement : il dit la meme chose a celui qui progresse et a celui qui plafonne, et il est
+        // mesure contre le temperament du jeu.
+        if (ExerciseController.questionKind === 2) {
+            var sungVerdict = qsTr("%1 (%2)").arg(heard.name).arg(heard.identifier);
+            // L'ecart du chant vient du CONTROLEUR D'EXERCICE, et non du micro : celui-ci est deja resynchronise sur
+            // la question suivante au moment ou le verdict s'affiche, et sa mesure a ete remise a zero.
+            var sungCents = Math.round(ExerciseController.lastSungCentsOffset);
+            sungVerdict += qsTr(" — écart %1 cents").arg((sungCents > 0 ? "+" : "") + sungCents);
+            return sungVerdict;
+        }
+
         var verdict = qsTr("%1 (%2)").arg(heard.name).arg(heard.identifier);
         if (exerciseScreen.hasAnswered && !ExerciseController.wasLastAnswerCorrect)
             verdict += qsTr(" — tu as répondu %1").arg(exerciseScreen.answeredInterval.identifier);
@@ -476,6 +488,11 @@ Item {
                 visible: ExerciseController.questionKind === 2
                 spacing: 10
 
+                // Le micro suit l'ecran qui s'en sert : il s'ouvre quand la question se chante, et se referme quand
+                // elle se tait. Un exercice passe la plupart de son temps sans chant, et un micro ouvert pour rien
+                // vide la batterie.
+                onVisibleChanged: visible ? MicrophoneController.ensureListening() : MicrophoneController.stopTest()
+
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
@@ -537,7 +554,7 @@ Item {
                 Connections {
                     function onSungIntervalChanged() {
                         if (ExerciseController.questionKind === 2 && MicrophoneController.hasSungInterval)
-                            ExerciseController.answerSung(MicrophoneController.sungVerdict === 1);
+                            ExerciseController.answerSung(MicrophoneController.sungVerdict === 1, MicrophoneController.sungCentsOffset);
 
                     }
 

@@ -5,6 +5,7 @@
 #include "domain/exercise/PlayerPreferences.h"
 #include "domain/music/Interval.h"
 #include "domain/music/Note.h"
+#include "domain/music/StaffPosition.h"
 #include "domain/music/Temperament.h"
 
 #include <QCoreApplication>
@@ -95,24 +96,6 @@ constexpr double OFF_CENTS = 20.0;
     return 2;
 }
 
-// Where the ball sits on the staff, in treble clef. The five lines are E, G, B, D, F (bottom to top), and one scale
-// step - a line to the next space - is one eighth of the staff's span. The note is folded onto the octave, so it
-// never leaves the staff, and a C always lands back on its space.
-[[nodiscard]] double staffFractionFor( std::int32_t p_midi )
-{
-    // The scale step of each pitch class from C. The five altered notes fall halfway between two naturals.
-    constexpr std::array<double, 12> STEP_FROM_C{ 0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0 };
-
-    const auto pitchClass = static_cast<std::size_t>( ( ( p_midi % 12 ) + 12 ) % 12 );
-
-    // E is two steps above C. Then fold onto the octave - seven steps - so the ball wraps instead of hitting a wall.
-    double stepFromE = STEP_FROM_C.at( pitchClass ) - 2.0;
-    stepFromE -= std::floor( stepFromE / 7.0 ) * 7.0;
-
-    // The bottom line sits at 0.15 of the item's height and the top line at 0.85, so one step is 0.0875.
-    return 0.15 + ( stepFromE * 0.0875 );
-}
-
 [[nodiscard]] QString noteLabelFor( double p_frequencyHz, double p_referencePitchHz )
 {
     if( p_frequencyHz <= 0.0 )
@@ -124,10 +107,15 @@ constexpr double OFF_CENTS = 20.0;
 
     if( !note.has_value() )
     {
-        return QStringLiteral( "%1 Hz" ).arg( p_frequencyHz, 0, 'f', 0 );
+        return QStringLiteral( "%1 Hz" ).arg( p_frequencyHz, 0, 'f', 1 );
     }
 
-    return QStringLiteral( "%1  %2 Hz" ).arg( QString::fromStdString( note->name() ) ).arg( p_frequencyHz, 0, 'f', 0 );
+    // Une seule decimale, et c'est un choix : deux decimales decriraient une exactitude que la mesure n'a pas. Le
+    // dernier chiffre est une LECTURE, pas une verite - alors que la page d'un exercice, elle, affiche deux decimales
+    // pour une frequence CALCULEE, qui est exacte. Mieux vaut un chiffre honnete qu'un chiffre flatteur.
+    return QStringLiteral( "%1  %2 Hz" )
+      .arg( QString::fromStdString( note->name() ) )
+      .arg( p_frequencyHz, 0, 'f', 1 );
 }
 
 }    // namespace
@@ -216,6 +204,18 @@ void MicrophoneController::stopTest()
     onPitch( 0.0F );
 }
 
+void MicrophoneController::ensureListening()
+{
+    // Ne rien faire quand le micro est deja ouvert : relancer le peripherique s'entendrait sous la forme d'un clic, et
+    // l'ecran qui demande l'accordeur n'a aucune raison de faire ce bruit.
+    if( m_isListening )
+    {
+        return;
+    }
+
+    startTest();
+}
+
 void MicrophoneController::newSingingQuestion()
 {
     // Une petite liste d'intervalles CHANTABLES : on reste dans l'octave, et on ecarte pour l'instant ce que la voix
@@ -268,17 +268,18 @@ void MicrophoneController::startSingingCapture()
     emit sungIntervalChanged();
     emit singingCaptureStateChanged();
 
-    // La meme porte que le test du micro : la permission runtime est demandee une fois, au premier usage.
-    startTest();
+    // Le micro s'ouvre s'il ne l'est pas : le jeu ecoute de toute facon, mais un exercice de chant muet serait le
+    // pire des echecs - il ferait porter au joueur la faute d'un peripherique ferme.
+    ensureListening();
 }
 
 void MicrophoneController::stopSingingCapture()
 {
+    // La CAPTURE s'arrete, le micro reste ouvert : le jeu est bati sur lui, et fermer l'ecoute ici eteindrait aussi
+    // l'accordeur, pour toute la session, sans que personne ne l'ait demandé.
     m_isSingingCaptureActive = false;
 
     emit singingCaptureStateChanged();
-
-    stopTest();
 }
 
 QString MicrophoneController::singingTargetLabel() const
@@ -338,6 +339,32 @@ int MicrophoneController::sungVerdict() const
     return ( std::abs( reading.semitones() - m_singingTargetSemitones ) <= 1 ) ? 1 : 2;
 }
 
+int MicrophoneController::sungCentsOffset() const
+{
+    const domain::SungIntervalDetector::Reading & reading = m_sungIntervalDetector.reading();
+
+    if( !reading.hasInterval() )
+    {
+        return 0;
+    }
+
+    // L'intervalle PARFAIT : celui du temperament choisi, depuis la note de depart chantee. C'est le meme calcul que
+    // celui qui decide du son joue - donc l'ecart affiche dit la verite du jeu, et non celle d'un tempere egal suppose.
+    const domain::Temperament temperament =
+      ( m_preferences != nullptr ) ? m_preferences->storedTemperament() : domain::Temperament::Equal;
+    const domain::Note root = ( m_preferences != nullptr ) ? m_preferences->storedTuningRoot() : domain::Note{ 60 };
+    const double referencePitch = ( m_preferences != nullptr ) ? m_preferences->storedReferencePitch() : 440.0;
+
+    const domain::Note start{ reading.firstMidiNumber };
+    const domain::Note arrived = start.transposedBy( m_singingTargetSemitones );
+
+    const double perfectCents =
+      domain::centsBetween( domain::frequencyFor( arrived, root, temperament, referencePitch ),
+                            domain::frequencyFor( start, root, temperament, referencePitch ) );
+
+    return static_cast<int>( std::lround( reading.cents - perfectCents ) );
+}
+
 void MicrophoneController::ensureDetector()
 {
     if( m_detector )
@@ -383,9 +410,14 @@ void MicrophoneController::onPitch( float p_frequencyHz )
 
     // The ball's exact place on the staff: rounded to the nearest note, so a C is always on its space, then folded
     // onto the octave. The cents and the colour carry the fine tuning, the ball carries WHICH note it is.
-    m_detectedStaffFraction = ( m_detectedFrequencyHz > 0.0 )
-                                ? staffFractionFor( static_cast<std::int32_t>( std::lround( m_detectedMidi ) ) )
-                                : 0.5;
+    const std::int32_t nearestMidi = static_cast<std::int32_t>( std::lround( m_detectedMidi ) );
+
+    m_detectedStaffFraction = ( m_detectedFrequencyHz > 0.0 ) ? domain::StaffPosition::fraction( nearestMidi ) : 0.5;
+
+    // Et de combien d'octaves la note REELLE se trouve ailleurs : c'est ce qui permet a l'ecran de le dire a cote de
+    // la boule, et a un accordeur de lire une hauteur ABSOLUE sans quitter la portee des yeux. Zero quand la boule
+    // dit la verite entiere.
+    m_detectedOctaveShift = ( m_detectedFrequencyHz > 0.0 ) ? domain::StaffPosition::octaveShift( nearestMidi ) : 0;
 
     // The tuner part: how far the voice is from the note it is closest to. This is what makes the page useful
     // outside the game - checking a guitar string, or hearing how flat yesterday's cold left the voice.
@@ -417,6 +449,7 @@ void MicrophoneController::onPitch( float p_frequencyHz )
     emit detectedPitchRatioChanged();
     emit detectedMidiChanged();
     emit detectedStaffFractionChanged();
+    emit detectedOctaveShiftChanged();
     emit detectedNoteLabelChanged();
     emit detectedCentsChanged();
     emit detectedTuningStateChanged();

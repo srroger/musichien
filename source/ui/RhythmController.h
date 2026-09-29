@@ -95,33 +95,37 @@ signals:
     void currentPatternChanged();
 
 private:
-    void onBeat();
+    // Le RAFRAICHISSEMENT DE L'AFFICHAGE, et rien d'autre.
+    //
+    // Il lit le temps du flux audio et met la page a jour : le numero du temps, l'accent, et les frappes de la cellule
+    // a venir. Il ne declenche AUCUN son - c'est toute la difference avec ce qu'il remplace, et la raison pour laquelle
+    // la page peut etre occupee a peindre sans que le metronome s'en apercoive.
+    void refreshFromAudioClock();
 
-    // Joue les frappes de la cellule qui tombent dans le temps p_beatInBar. Les frappes decalees - les syncopes -
-    // partent en differe, parce que c'est ca une syncope : une frappe ENTRE deux temps.
-    void schedulePatternHitsForBeat( int p_beatInBar );
+    // Joue les frappes de la cellule qui tombent dans le temps p_beatIndex, a leur position EXACTE dans la mesure.
+    // Les frappes decalees - les syncopes - partent a leur position, et non « dans un instant ».
+    void schedulePatternHitsForBeat( std::int64_t p_beatIndex );
 
     // La cellule en cours, ou rien quand seul le metronome joue.
     [[nodiscard]] const domain::RhythmPattern * activePattern() const;
 
-    // Le battement suivant, vise depuis l'ORIGINE de la grille et non depuis le precedent : c'est toute la difference
-    // entre un metronome et un timer qui derive. La decision elle-meme vit dans le domaine (domain::planNextBeat), ou
-    // elle est pure - et donc testee.
-    void scheduleNextBeat();
-
-    // Recale la grille sur l'instant present : au demarrage, et a chaque changement de tempo.
-    void restartBeatGrid();
+    // L'heure d'un temps dans la mesure, en millisecondes depuis le premier temps du metronome : la base des positions
+    // de la cellule.
+    [[nodiscard]] double positionOfBeat( std::int64_t p_beatIndex ) const noexcept;
 
     domain::NotePlayer & m_notePlayer;
 
-    // SINGLE SHOT, et c'est le point du correctif : chaque battement re-arme le suivant depuis l'horloge, au lieu de
-    // repartir de sa propre echeance et d'accumuler son retard.
-    QTimer m_beatTimer;
+    // Le rafraichissement de l'affichage. Sa precision n'a AUCUNE importance : il ne fait que repeindre.
+    QTimer m_displayTimer;
+
+    // L'horloge du TAP TEMPO, et d'elle seule : deux frappes a la main, et l'ecart entre elles donne le tempo. La ou le
+    // metronome a besoin d'echantillons, deux frappes manuelles se contentent d'une horloge monotone.
     QElapsedTimer m_clock;
-    // Le rang du battement a venir depuis le demarrage de la grille. Un compteur ne sert qu'a une chose ici : dire a
-    // quelle echeance viser, et la position dans la mesure s'en DEDUIT - une mesure qui se recale doit pouvoir se
-    // recompter, ce qu'un compteur separe ne saurait pas faire.
-    std::int64_t m_beatIndex{ 0 };
+
+    // Le dernier temps traite, pour ne le traiter qu'UNE fois : le rafraichissement passe vingt fois par seconde, et
+    // une cellule rejouee vingt fois par temps ne serait plus une cellule.
+    std::int64_t m_lastBeatIndex{ -1 };
+
     std::int64_t m_lastTapMs{ -1 };
 
     int m_bpm{ 90 };

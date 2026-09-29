@@ -19,9 +19,10 @@
   "diapason": "Le diapason est la hauteur absolue du la de reference. La norme ISO 16 la fixe a 440 Hz depuis 1975, et c'est la valeur par defaut. Il a beaucoup bouge auparavant : plus bas au temps de Mozart, autour de 415 Hz pour la musique baroque, 435 Hz en France a partir de 1859, et les orchestres d'aujourd'hui s'accordent souvent a 442 Hz pour sonner plus brillant. Les instruments a vent, en particulier, sont construits pour etre joues un peu haut : regler le diapason, c'est accorder l'accordeur sur eux.",
   "noteDeReference": "La note de reference est la note DEPUIS laquelle les intervalles sont mesures : la tonique. Le temperament egal l'ignore, et c'est justement son interet. Les autres en dependent : accorde en juste sur un do, un clavier sonne admirablement en do et de plus en plus faux des qu'on s'en eloigne. Le do est la valeur par defaut, parce que c'est la tonique de l'arbre des accords et de tous les exercices.",
   "modeEmploi": [
-    "Choisis ton micro dans la liste, puis touche Tester le micro : Android demandera l'autorisation d'ecouter.",
+    "Choisis ton micro dans la liste. L'accordeur ecoute des l'ouverture : il n'y a plus de bouton a toucher.",
     "Joue une note, ou chante-la en la tenant. La boule monte et descend sur la portee.",
     "Lis le nom de la note la plus proche et l'ecart en cents : vert, elle est juste ; jaune, elle est proche ; rouge, elle est loin.",
+    "Un + ou un - a cote de la boule signale que la note jouee est dans une autre octave : la boule reste sur la portee, mais le nom dit la hauteur exacte.",
     "Regle le diapason sur celui de ton instrument. Le temperament, lui, se change pour ENTENDRE ce qu'il change : le tempere est la reference, les autres sont la lecon."
   ]
 }
