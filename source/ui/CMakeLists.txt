@@ -83,6 +83,7 @@ if(MUSICHIEN_BUILD_TESTING)
         IntervalPlaybackController_test.cpp
         ExerciseScreen_test.cpp
         MainScreen_test.cpp
+        MicrophoneController_test.cpp
         StatisticsController_test.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc
     )
