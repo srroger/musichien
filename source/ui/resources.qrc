@@ -23,6 +23,12 @@
         <file alias="assets/content/interval-hints.json">../../assets/content/interval-hints.json</file>
         <file alias="assets/content/anecdotes.json">../../assets/content/anecdotes.json</file>
         <!--
+          Les textes de la page Accordeur : ce qu'un temperament est, d'ou il vient, et ce que sont le diapason et la
+          note de reference. Meme motif que les autres contenus, alias compris - le chemin de ressource est celui du
+          disque, sur le PC comme sur le telephone.
+        -->
+        <file alias="assets/content/tuner.json">../../assets/content/tuner.json</file>
+        <!--
           La police musicale, pour la clef de Sol. Le glyphe U+1D11E n'existe pas dans les polices Android par
           defaut (d'ou le rectangle), alors qu'il est dans Noto Music. Embarquee, elle rend la clef identique sur
           le PC et le telephone.

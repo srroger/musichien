@@ -1266,6 +1266,43 @@ void ExerciseSessionController::setReferencePitch( double p_hertz )
     emit referencePitchChanged();
 }
 
+QString ExerciseSessionController::temperamentExplanation() const
+{
+    const std::string_view text = m_tunerGuide.temperamentText( static_cast<domain::Temperament>( temperament() ) );
+
+    return QString::fromUtf8( text.data(), static_cast<qsizetype>( text.size() ) );
+}
+
+QVariantMap ExerciseSessionController::tunerGuide() const
+{
+    QVariantMap guide;
+
+    guide.insert( QStringLiteral( "diapason" ), QString::fromStdString( std::string{ m_tunerGuide.diapasonText() } ) );
+
+    guide.insert( QStringLiteral( "noteDeReference" ),
+                  QString::fromStdString( std::string{ m_tunerGuide.referenceNoteText() } ) );
+
+    QVariantList howTo;
+
+    for( const std::string & step : m_tunerGuide.howToSteps() )
+    {
+        howTo.append( QString::fromStdString( step ) );
+    }
+
+    guide.insert( QStringLiteral( "modeEmploi" ), howTo );
+
+    return guide;
+}
+
+void ExerciseSessionController::setTunerGuide( domain::TunerGuide p_guide )
+{
+    m_tunerGuide = std::move( p_guide );
+
+    // Le texte affiche depend du temperament CHOISI : arriver apres coup oblige donc a le redire, sans quoi la page
+    // resterait vide jusqu'au prochain changement de reglage.
+    emit temperamentChanged();
+}
+
 int ExerciseSessionController::singQuestionShare() const
 {
     return ( m_levelStore != nullptr ) ? m_levelStore->storedSingQuestionShare() : 20;

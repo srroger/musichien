@@ -30,6 +30,7 @@
 #include "domain/exercise/QuestionLog.h"
 #include "domain/exercise/QuestionStatistics.h"
 #include "domain/exercise/Rank.h"
+#include "domain/music/TunerGuide.h"
 
 #include <QElapsedTimer>
 #include <QObject>
@@ -217,6 +218,12 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( QVariantList tuningRoots READ tuningRoots CONSTANT )
     Q_PROPERTY( double referencePitch READ referencePitch NOTIFY referencePitchChanged )
 
+    // Les EXPLICATIONS de la page Accordeur : ce qu'un temperament est, d'ou il vient, comment il fonctionne, et ce
+    // que sont le diapason et la note de reference. Elles viennent d'un fichier de contenu, jamais du code - le QML ne
+    // fait que les afficher.
+    Q_PROPERTY( QString temperamentExplanation READ temperamentExplanation NOTIFY temperamentChanged )
+    Q_PROPERTY( QVariantMap tunerGuide READ tunerGuide CONSTANT )
+
     // How many questions in a hundred ask the player to SING, the rest asking him to name the interval. A rule the
     // player can tune: from zero (no singing) to one hundred (nothing but singing).
     Q_PROPERTY( int singQuestionShare READ singQuestionShare NOTIFY singQuestionShareChanged )
@@ -323,6 +330,18 @@ public:
     [[nodiscard]] double referencePitch() const;
 
     Q_INVOKABLE void setReferencePitch( double p_hertz );
+
+    // Le texte du temperament CHOISI : une seule phrase longue, tiree du fichier de contenu, qui dit d'ou il vient et
+    // comment il fonctionne. Vide si le fichier n'a pas ete lu, et l'ecran garde alors ses propres mots.
+    [[nodiscard]] QString temperamentExplanation() const;
+
+    // Le reste du guide : le diapason, la note de reference, et le mode d'emploi. Une seule propriete plutot que
+    // quatre, parce que ces textes ne changent jamais et qu'ils se lisent ensemble.
+    [[nodiscard]] QVariantMap tunerGuide() const;
+
+    // Le guide des textes de l'accordeur, injecte par l'application comme le micro et le journal : ce controleur
+    // expose des textes, il ne sait pas d'ou ils viennent.
+    void setTunerGuide( domain::TunerGuide p_guide );
 
     // How many questions in a hundred ask the player to sing, remembered between launches.
     [[nodiscard]] int singQuestionShare() const;
@@ -739,6 +758,10 @@ private:
 
     // May be null too, et pour la meme raison : un journal absent coute des statistiques, jamais une partie.
     domain::QuestionLog * m_questionLog{ nullptr };
+
+    // Les textes de la page Accordeur, lus par l'application au demarrage. Un guide vide est un cas normal : la page
+    // garde alors ses propres phrases, plus courtes, et rien ne casse.
+    domain::TunerGuide m_tunerGuide;
 
     // Le bilan en cours, et le nombre de questions qui l'ont ouvert. Ces deux valeurs suffisent a dire au joueur ou il
     // en est : l'echauffement est passe, ce qui suit est ce qui lui resiste.

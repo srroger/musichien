@@ -9,6 +9,7 @@
 #include "infrastructure/audio/QAudioPitchDetector.h"
 #include "infrastructure/content/JsonAnecdoteBook.h"
 #include "infrastructure/content/JsonHintBook.h"
+#include "infrastructure/content/JsonTunerGuide.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
 #ifdef Q_OS_ANDROID
 #    include "infrastructure/android/AndroidSystemBars.h"
@@ -66,6 +67,8 @@ constexpr const char * INTERVAL_HINTS_RESOURCE = ":/assets/content/interval-hint
 
 constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
 
+constexpr const char * TUNER_GUIDE_RESOURCE = ":/assets/content/tuner.json";
+
 // Reads the memory hints from the resources.
 //
 // The file is opened HERE and not inside the reader: understanding JSON is the infrastructure's job,
@@ -115,6 +118,30 @@ constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
     std::cerr << "Musichien: " << book.count() << " anecdotes read\n";
 
     return book;
+}
+
+// Les textes de la page Accordeur : ce qu'un temperament est, d'ou il vient, ce que sont le diapason et la note de
+// reference, et comment se servir d'un accordeur. Meme contrat que les indices et les anecdotes : un fichier manquant
+// ou casse coute les explications, jamais l'application.
+[[nodiscard]] musichien::domain::TunerGuide loadTunerGuide()
+{
+    QFile contentFile{ QString::fromUtf8( TUNER_GUIDE_RESOURCE ) };
+
+    if( !contentFile.open( QIODevice::ReadOnly ) )
+    {
+        std::cerr << "Musichien: the tuner texts are missing from the resources.\n";
+
+        return {};
+    }
+
+    const QByteArray content = contentFile.readAll();
+
+    musichien::domain::TunerGuide guide = musichien::infrastructure::readTunerGuide(
+      std::string_view{ content.constData(), static_cast<std::size_t>( content.size() ) } );
+
+    std::cerr << "Musichien: " << guide.temperamentCount() << " temperament texts read\n";
+
+    return guide;
 }
 
 // UNE anecdote au hasard, prete a devenir le texte d'une notification.
@@ -361,6 +388,9 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     // Une question conclue est ecrite ici, une fois pour toutes les genres de question.
     exerciseController.setQuestionLog( &questionLog );
+
+    // Les explications de la page Accordeur, lues dans leur fichier de contenu comme les indices et les anecdotes.
+    exerciseController.setTunerGuide( loadTunerGuide() );
 
     // La page de statistiques : elle LIT le meme journal, et ne l'ecrit jamais. Un seul journal, une seule verite - deux
     // objets qui ecriraient le meme fichier finiraient par se contredire.
