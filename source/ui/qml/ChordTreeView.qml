@@ -19,9 +19,6 @@ import QtQuick
 import QtQuick.Layouts
 
 Item {
-    // Les lignes de TOUS les noeuds, calculees UNE fois : quinze noeuds, et chaque repeinture de branche les
-    // redemanderait quinze fois s'il fallait les recalculer a chaque appel.
-
     id: chordTreeView
 
     // Vrai quand les couleurs OFFERTES doivent etre cliquables : c'est le cas pendant une question d'accord, ou l'arbre
@@ -73,8 +70,8 @@ Item {
         return state.rows;
     }
 
-    // Pose un noeud, puis toute sa descendance. Rend la derniere ligne utilisee par ce sous-arbre - c'est elle qui
-    // dit a la branche suivante ou commencer.
+    // La fonction pose un noeud puis toute sa descendance, et rend la derniere ligne utilisee par ce sous-arbre : c'est
+    // elle qui dit a la branche suivante ou commencer.
     function placeSubtree(p_state, p_index, p_minimumRow) {
         var nodes = ExerciseController.chordTree;
         var node = nodes[p_index];
@@ -87,10 +84,6 @@ Item {
             // Le premier enfant s'aligne sur son parent ; les suivants se rangent sous les precedents.
             var next = row;
             if (rank > 0) {
-                // L'ECART : une ligne vide entre deux branches, et jamais avant que la precedente ait fini de
-                // descendre. Sans le maximum, le Cm7 remonterait a la hauteur du Cdim et les deux branches se
-                // melangeraient ; avec lui, la fin du Cdim (donc ses deux enfants) reste un bloc lisible.
-
                 var brother = p_state.children[p_index][rank - 1];
                 if (p_state.children[brother].length > 0)
                     next = Math.max(p_state.rows[brother] + 2, p_state.ends[brother]);

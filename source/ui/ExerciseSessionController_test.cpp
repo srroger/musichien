@@ -1574,6 +1574,4 @@ TEST( ExerciseSessionControllerTest, the_daily_reminder_is_active_at_the_first_l
     EXPECT_FALSE( levelStore.dailyReminderEnabled() );
 }
 
-
-
 }    // namespace musichien::ui
