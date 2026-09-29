@@ -142,8 +142,7 @@ TEST( ChordTest, the_learning_order_holds_every_quality_exactly_once )
         EXPECT_EQ( index, static_cast<std::size_t>( order[index] ) );
     }
 
-    // Et les deux premieres sont les deux couleurs de base : c'est ce qu'un debutant entend en premier, et c'est ce
-    // que Roger a demande ("majeur, mineur" d'abord).
+    // Et les deux premieres sont les deux couleurs de base : c'est ce qu'un debutant entend en premier.
     EXPECT_EQ( ChordQuality::Major, order.front() );
     EXPECT_EQ( ChordQuality::Minor, order[1] );
 }

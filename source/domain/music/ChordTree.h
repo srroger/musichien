@@ -5,9 +5,9 @@
 //
 // L'ARBRE DES ACCORDS : comment chaque couleur s'obtient depuis une autre, en UN geste.
 //
-// Roger : « une carte ou chaque accord est obtenu en modifiant un intervalle... ca enseigne quelque chose de beaucoup plus
-// puissant que "voici 50 accords a retenir" ». Un majeur devient mineur en abaissant sa tierce, un mineur devient
-// demi-diminu en abaissant sa quinte, et ainsi de suite : quinze couleurs, quatorze gestes, et une seule racine.
+// Un majeur devient mineur en abaissant sa tierce, un mineur devient demi-diminu en abaissant sa quinte, et ainsi de
+// suite : quinze couleurs, quatorze gestes, et une seule racine. C'est ce qui enseigne quelque chose de beaucoup plus
+// puissant qu'une liste de cinquante accords a retenir.
 //
 // ---------------------------------------------------------------------------------------------------------------------
 // Pourquoi c'est dans le DOMAINE

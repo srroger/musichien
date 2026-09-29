@@ -18,7 +18,7 @@
 // Pourquoi tant de « Layout.preferredWidth: 0 » et « Layout.minimumWidth: 0 » sur les textes replies
 // Parce qu'un Text replie rapporte la largeur de sa PLUS LONGUE LIGNE comme largeur minimale, et que QtQuick.Layouts la
 // respecte. Une phrase un peu longue elargissait donc le dialogue qui la contient - jusqu'a 489 points pour une vue de
-// 338 sur le telephone de Roger - et faisait apparaitre un DEFILEMENT HORIZONTAL dans une page qui n'avait rien a montrer
+// 338 sur un telephone - et faisait apparaitre un DEFILEMENT HORIZONTAL dans une page qui n'avait rien a montrer
 // de plus a droite. Deux lignes suffisent a l'empecher : la largeur preferee ET la largeur minimale mises a zero, pour
 // que le texte se replie au lieu de pousser le mur.
 // Les deux vont toujours ENSEMBLE, et c'est le minimum qui compte : sans lui, la largeur preferee seule ne change rien.
@@ -35,10 +35,9 @@ ApplicationWindow {
     // Une part de question : un titre, une phrase qui dit ce que le reglage fait, et le nombre.
     // =================================================================================================================
     // L'ARBRE DES ACCORDS
-    // Roger : « une carte ou chaque accord est obtenu en modifiant un intervalle... ca rappelle les arbres de competences
-    // des RPG, et ca donne un ordre aux accords, on s'y retrouve mieux, et pour le cerveau c'est une meilleure
-    // representation ». Il a raison, et c'est la meilleure page pedagogique du jeu : quinze couleurs, quatorze gestes,
-    // une seule racine - au lieu de quinze noms a retenir.
+    // Une carte ou chaque accord s'obtient en modifiant un intervalle : la forme rappelle les arbres de competences
+    // d'un jeu de role, et ca donne un ORDRE aux accords - quinze couleurs, quatorze gestes, une seule racine, au lieu
+    // de quinze noms a retenir. C'est la meilleure page pedagogique du jeu.
 
     id: mainWindow
 
@@ -46,9 +45,9 @@ ApplicationWindow {
     // enough that the screen does not stay cluttered.
     // -------------------------------------------------------------------------------------------------
     // Les instruments joues
-    // Roger : "le saxophone a un volume et un timbre vraiment particulier, le jouer de maniere aleatoire
-    // surtout la nuit peut etre desagreable". Un instrument qu'on ne veut pas doit donc pouvoir etre ecarte,
-    // et le choix doit SURVIVRE au lancement suivant - un reglage qui s'oublie n'est pas un reglage.
+    // Un instrument au timbre particulier que le tirage joue au hasard, surtout la nuit, peut etre desagreable a
+    // entendre. Un instrument qu'on ne veut pas doit donc pouvoir etre ecarte, et le choix doit SURVIVRE au lancement
+    // suivant - un reglage qui s'oublie n'est pas un reglage.
     // Un ComboBox aux couleurs du jeu.
     // Pourquoi un composant : le style Material peint la CASE sur fond clair ET la LISTE ouverte sur fond blanc.
     // Regler seulement `background` ne suffit donc pas - un texte clair sur une liste blanche reste illisible. Il
@@ -217,10 +216,9 @@ ApplicationWindow {
                     Layout.preferredHeight: 28
                 }
 
-                // LE CHIEN, l'illustration et non plus un emoji. Roger : « tu avais mis une dog face comme image de
-                // presentation. Et je l'adore, mais c'est un peu impersonnel. » Un emoji ne dit rien de qui parle :
-                // c'est le meme chien sur tous les telephones du monde. Celui-ci est le notre, il porte sa guitare et
-                // la nuit violette, et c'est exactement l'icone du lanceur - l'application se reconnait d'un ecran a
+                // LE CHIEN, l'illustration et non plus un emoji : un emoji ne dit rien de qui parle - c'est le meme
+                // chien sur tous les telephones du monde. Celui-ci est le notre, il porte sa guitare et la nuit
+                // violette, et c'est exactement l'icone du lanceur - l'application se reconnait d'un ecran a
                 // l'autre. Il vient des ressources Qt, comme tout le contenu : un seul chemin, sur le PC et sur le
                 // telephone.
                 Image {
@@ -347,9 +345,9 @@ ApplicationWindow {
                     onClicked: ExerciseController.startSession()
                 }
 
-                // Le BILAN : une session dont les questions sont DECIDEES, du plus facile au plus difficile. Roger le veut
-                // disponible quand il veut ; l'ecran le met en avant le week-end, parce que c'est le moment ou l'on a le
-                // temps de le prendre.
+                // Le BILAN : une session dont les questions sont DECIDEES, du plus facile au plus difficile. Il reste
+                // disponible a tout moment ; l'ecran le met en avant le week-end, parce que c'est le moment ou l'on a
+                // le temps de le prendre.
                 Text {
                     Layout.preferredWidth: 0
                     Layout.minimumWidth: 0
@@ -367,8 +365,7 @@ ApplicationWindow {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 46
-                    // Dore le week-end : c'est la demande de Roger - « on pourra le rendre le bouton au dessus ou dore en
-                    // fin de semaine, pour lui dire de le faire ». La couleur suffit a le dire, et le bouton garde sa place
+                    // Dore le week-end : la couleur suffit a dire « c'est le moment », et le bouton garde sa place
                     // sous « Jouer » : c'est jouer qui doit rester la porte d'entree.
                     highlighted: ExerciseController.isWeekEnd
                     text: ExerciseController.isWeekEnd ? qsTr("★ Bilan de la semaine") : qsTr("★ Bilan")
@@ -449,8 +446,8 @@ ApplicationWindow {
 
                 }
 
-                // L'ARBRE DES ACCORDS, sur sa propre ligne : c'est une CARTE qu'on consulte, pas un reglage, et Roger la
-                // veut accessible sans chercher. Elle merite mieux qu'une quatrieme case dans une rangee de trois.
+                // L'ARBRE DES ACCORDS, sur sa propre ligne : c'est une CARTE qu'on consulte, pas un reglage, et elle se
+                // trouve sans chercher. Elle merite mieux qu'une quatrieme case dans une rangee de trois.
                 Button {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
@@ -1227,8 +1224,8 @@ ApplicationWindow {
 
         anchors.centerIn: parent
         width: Math.min(mainWindow.width * 0.96, 560)
-        // PLEIN ECRAN, ou presque : la page porte maintenant un histogramme, un camembert et une liste de points faibles,
-        // et un dialogue de 420 points de large n'a pas la place de les montrer. Roger a demande une « grosse page ».
+        // PLEIN ECRAN, ou presque : la page porte un histogramme, un camembert et une liste de points faibles, et un
+        // dialogue de 420 points de large n'a pas la place de les montrer.
         height: mainWindow.height * 0.94
         modal: true
         padding: 12
@@ -1257,9 +1254,8 @@ ApplicationWindow {
             ColumnLayout {
                 // -----------------------------------------------------------------------------------------------------
                 // LES STATISTIQUES
-                // Roger : « N'hesite pas a faire une grosse page statistique, rempli d'histogrammes, de temps de jeu,
-                // peut-etre meme des camemberts. »
-                // LE CAMEMBERT : ce que le joueur travaille vraiment, et ce qu'il delaisse sans le savoir.
+                // Ce que le joueur travaille vraiment, ce qu'il delaisse sans le savoir, et combien de temps il joue.
+                // LE CAMEMBERT : la part de chaque genre de question, pour voir d'un coup d'oeil ce qui est travaille.
 
                 width: profileScroll.availableWidth
                 spacing: 10

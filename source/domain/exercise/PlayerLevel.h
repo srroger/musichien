@@ -10,8 +10,8 @@
 //
 // The first session must not be a formality. A player who already hears a fifth and a third would otherwise
 // be asked to tell two intervals apart for three questions in a row - and would close the application before
-// discovering the rest. Roger said it in one line: "j'ai déjà une bonne connaissance des intervalles jusqu'à
-// l'octave, et les accords mineurs ou majeurs ne sont plus un problème".
+// discovering the rest. A player who already knows the intervals up to the octave, and for whom minor and major chords
+// are no longer a problem, has to be asked something else.
 //
 // It is deliberately NOT a setting, though: it is the first piece of the PROFILE - the thing the application
 // remembers about a player - and the difference matters. A setting is changed on a whim and explained in a

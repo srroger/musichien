@@ -11,8 +11,7 @@
 // The first version PUSHED one buffer at a time and stopped everything before each one. That is right for an ear
 // training interval - two overlapping notes would make the interval impossible to name - and completely wrong the
 // moment two sounds must be heard TOGETHER: the metronome click and a drum hit, a drum roll, a backing pattern.
-// Roger heard it exactly: "je lance le metronome et si j'appuie sur la batterie au meme moment que le bip, le bip du
-// metronome ne joue pas".
+// Le symptome etait exact : lance le metronome, frappe la batterie au meme instant que le bip, et le bip ne joue pas.
 //
 // So the sounds are mixed instead. The sink PULLS from this device whenever it needs samples, and this device sums
 // whatever is still playing.

@@ -19,7 +19,7 @@
 // Rien n'est calcule tant que personne ne regarde
 //
 // refresh() est appelee a l'OUVERTURE de la page. Une page de statistiques qui couterait au demarrage de l'application
-// serait une page qu'on regrette, et Roger ouvre rarement son profil en lancant le jeu.
+// serait une page qu'on regrette : on ouvre rarement son profil en lancant le jeu.
 // =====================================================================================================================
 
 #include "domain/exercise/QuestionLog.h"

@@ -3,8 +3,8 @@
 // =====================================================================================================================
 // Musichien - NotificationScheduler
 //
-// Les notifications quotidiennes, la facon dont Roger les veut : « Je veux spammer l'utilisateur comme le ferait un
-// Google Actualite, mais pour la bonne cause - s'instruire musique avec le sourire. »
+// Les notifications quotidiennes : trois anecdotes dans la journee, pour s'instruire musique avec le sourire, et un
+// rappel qui n'a rien a vendre.
 //
 // C'est un PORT, exactement comme NotePlayer : l'application demande des notifications, et elle ne sait pas si la
 // reponse est un AlarmManager Android, un silence de bureau ou un service qui n'existe pas.

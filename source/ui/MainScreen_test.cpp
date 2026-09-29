@@ -231,7 +231,7 @@ TEST( MainScreenTest, nothing_needs_to_scroll_sideways_on_a_phone )
         QCoreApplication::processEvents();
     }
 
-    // CE QUE ROGER A VU : « la page est trop large, du coup ca scroll aussi a l'horizontal, ce qui n'est pas agreable ».
+    // LE SYMPTOME : une page trop large, qui defile aussi a l'horizontal, ce qui n'est pas agreable au doigt.
     // Un contenu plus large que sa vue est exactement ce symptome, et c'est mesurable sans connaitre le type des objets :
     // un Flickable est le seul a porter un « contentWidth », donc le chercher par sa PROPRIETE marche pour tous les
     // ScrollView du fichier, presents et futurs.

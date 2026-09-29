@@ -1,8 +1,7 @@
 // =====================================================================================================================
 // ChordTreeView - l'arbre des accords, dessine UNE fois pour deux ecrans
 // Il sert a deux choses, et c'est la meme : la CARTE qu'on consulte, et la GRILLE de reponse d'une question d'accord.
-// Roger : « ce serait beaucoup mieux que de garder la grille simple un peu moche » - et il a raison, parce que repondre
-// dans un arbre, c'est deja comprendre l'accord qu'on cherche.
+// Repondre dans un arbre, c'est deja comprendre l'accord qu'on cherche : c'est mieux qu'une grille de noms.
 // Deux ecrans, un seul dessin : le composant est ecrit ici, et le dupliquer dans Main.qml et ExerciseScreen.qml serait
 // la meilleure facon de les faire diverger.
 // ---------------------------------------------------------------------------------------------------------------------
@@ -11,21 +10,17 @@
 // La PROFONDEUR d'un noeud donne sa colonne ; sa LIGNE, elle, se calcule a partir de son PARENT, et c'est ce qui rend
 // les branches visibles. Un enfant se pose sur la ligne de son parent quand la place est libre dans sa colonne : le C9
 // vient donc a droite du C7, et la chaine C - Cm - Cdim - Cm7b5 se lit d'un seul regard sur la premiere ligne.
-// Roger, apres avoir vu la premiere version : « la du coup, il ressemble vraiment a juste des colonnes empilees, on ne
-// voit plus du tout les branches. Tu as le droit de prendre un peu d'espace quand meme, genre un leger espace
-// supplementaire entre le Cm et le Csus4, mais pas entre le Cdim et Cm7. Et le C9 tu peux le mettre sur la meme ligne
-// que le C7. » Les trois demandes sont satisfaites, et elles le sont par la MEME regle : on s'aligne sur son parent, on
-// s'ecarte d'une ligne quand - et seulement quand - une grande branche se referme pour en ouvrir une autre.
+// Une seule regle suffit : on s'aligne sur son parent, et l'on s'ecarte d'une ligne quand - et seulement quand - une
+// grande branche se referme pour en ouvrir une autre. Une colonne empilee toute seule serait plus courte, mais elle ne
+// montrerait plus aucune branche.
 // =====================================================================================================================
 import Musichien
 import QtQuick
 import QtQuick.Layouts
 
 Item {
-    // Les lignes de TOUS les noeuds, calculees UNE fois - quinze noeuds, et chaque repeinture de branche les
+    // Les lignes de TOUS les noeuds, calculees UNE fois : quinze noeuds, et chaque repeinture de branche les
     // redemanderait quinze fois s'il fallait les recalculer a chaque appel.
-    // Roger : « le but etait que l'arbre prenne moins de place. Il faudrait que les Dim, m5, mMaj7 et C9 soient en haut
-    // aussi, et pas en bas. En gros il faut que l'arbre prenne le moins de place. »
 
     id: chordTreeView
 
@@ -92,11 +87,12 @@ Item {
             // Le premier enfant s'aligne sur son parent ; les suivants se rangent sous les precedents.
             var next = row;
             if (rank > 0) {
+                // L'ECART : une ligne vide entre deux branches, et jamais avant que la precedente ait fini de
+                // descendre. Sans le maximum, le Cm7 remonterait a la hauteur du Cdim et les deux branches se
+                // melangeraient ; avec lui, la fin du Cdim (donc ses deux enfants) reste un bloc lisible.
+
                 var brother = p_state.children[p_index][rank - 1];
                 if (p_state.children[brother].length > 0)
-                    // L'ECART : une ligne vide entre deux branches, et jamais avant que la precedente ait fini de
-                    // descendre. Sans le maximum, le Cm7 remonterait a la hauteur du Cdim et les deux branches se
-                    // melangeraient ; avec lui, la fin du Cdim (donc ses deux enfants) reste un bloc lisible.
                     next = Math.max(p_state.rows[brother] + 2, p_state.ends[brother]);
                 else
                     next = p_state.rows[brother] + 1;

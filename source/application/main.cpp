@@ -281,7 +281,7 @@ int main( int p_argumentCount, char * p_arguments[] )
     std::cerr << "Musichien: " << instruments.size() << " sampled instrument(s)\n";
 
     // La batterie, rendue depuis la meme banque libre que les instruments : une vraie peau vaut mieux qu'une chute de
-    // sinus, et Roger l'a entendu tout de suite.
+    // sinus.
     std::array<std::vector<float>, musichien::domain::DRUM_COUNT> drumSamples = loadDrumSamples();
 
     const auto loadedDrumCount = static_cast<std::size_t>( std::ranges::count_if(
@@ -337,7 +337,7 @@ int main( int p_argumentCount, char * p_arguments[] )
     // par copie, et garde pour le rappel.
     musichien::domain::AnecdoteBook anecdoteBook = loadAnecdoteBook();
 
-    // Le journal des questions conclues : c'est la FONDATION des statistiques (note 25 du Vault), et il est cree AVANT
+    // Le journal des questions conclues : c'est la FONDATION des statistiques, et il est cree AVANT
     // le controleur qui va l'utiliser - un pointeur vers un objet deja detruit ne se voit pas tout de suite, et se voit
     // tres mal.
     //
@@ -477,8 +477,8 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Le rappel quotidien. Le port cache la plateforme : sur le bureau, rien ne se planifie ; sur Android, de
     // VRAIES notifications sont posees.
     //
-    // QUATRE par jour, et c'est une demande de Roger : trois anecdotes - le matin, le midi, le soir - et le rappel
-    // d'entrainement a l'heure qu'il choisit. Le contenu du rappel est le livre entier, pour qu'une anecdote DIFFERENTE
+    // QUATRE par jour : trois anecdotes - le matin, le midi, le soir - et le rappel d'entrainement a l'heure choisie.
+    // Le contenu du rappel est le livre entier, pour qu'une anecdote DIFFERENTE
     // puisse tomber chaque jour ; celui des trois autres est tire ici, a chaque lancement, ce qui les fait changer d'une
     // session a l'autre sans qu'aucune alarme n'ait besoin de reveiller l'application.
 #ifdef Q_OS_ANDROID

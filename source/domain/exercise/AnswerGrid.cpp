@@ -107,10 +107,9 @@ std::vector<Interval> AnswerGrid::build( std::span<const Interval> p_palette,
 
     // Et rangés SELON LE CERCLE DES QUINTES - ce qui est le contraire d'un mélange.
     //
-    // Roger : "les intervalles placés au bon endroit du cercle". Il a mis le doigt sur quelque chose que la
-    // grille ne faisait pas : elle était mélangée à chaque question, y compris l'emplacement du bon bouton, pour
-    // que le joueur ne puisse pas reconnaître une question à la forme des boutons. C'était prudent, et c'était
-    // une occasion perdue - un bouton qui change de place ne peut pas devenir un REPÈRE.
+    // Les intervalles sont placés au bon endroit du cercle. Une grille mélangée à chaque question - y compris
+    // l'emplacement du bon bouton - empêche le joueur de reconnaître une question à la forme des boutons, mais c'est
+    // une occasion perdue : un bouton qui change de place ne peut pas devenir un REPÈRE.
     //
     // Ici, la position porte une information : deux intervalles voisins dans la grille sont voisins en musique,
     // et le joueur l'apprend sans qu'on le lui dise jamais. C'est exactement le genre de savoir qui se passe de

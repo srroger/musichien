@@ -610,9 +610,9 @@ bool ExerciseSession::canRemoveOneWrongChordChoice() const noexcept
         return false;
     }
 
-    // Les aides doivent etre autorisees, le joueur doit avoir ESSAYE - c'est la demande de Roger, « quand tu rates une
-    // fois » - et il doit rester de quoi retirer : sous trois choix il n'y a plus que la bonne reponse et un leurre, et
-    // une question a deux boutons n'est plus une question.
+    // Les aides doivent etre autorisees, le joueur doit avoir ESSAYE une fois, et il doit rester de quoi retirer : sous
+    // trois choix il n'y a plus que la bonne reponse et un leurre, et une question a deux boutons n'est plus une
+    // question.
     return m_settings.aidsAllowed && ( m_state == SessionState::Asking ) && ( m_currentQuestion.wrongAttemptCount >= 1 )
            && ( m_currentQuestion.chordChoices.size() > 2 );
 }

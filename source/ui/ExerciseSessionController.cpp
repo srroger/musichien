@@ -606,11 +606,8 @@ void ExerciseSessionController::stopSession()
 
     m_choices.clear();
 
-    // ON REVIENT SUR LA PAGE PRINCIPALE : une nouvelle anecdote y attend le joueur.
-    //
-    // Roger : « j'aimerais que les anecdotes qu'on affiche changent a chaque fois qu'on revient sur la page
-    // principale ». C'est exactement ce qui se passe ici : la page d'accueil garde la meme mise en page, mais son texte
-    // n'est jamais deux fois le meme - c'est ce qui donne envie de la relire.
+    // ON REVIENT SUR LA PAGE PRINCIPALE : une nouvelle anecdote y attend le joueur. La mise en page de l'accueil ne
+    // change pas, mais son texte n'est jamais deux fois le meme - c'est ce qui donne envie de la relire.
     refreshAnecdote();
 
     emit runningChanged();
@@ -847,9 +844,8 @@ QVariantList ExerciseSessionController::chordChoices() const
 
         // LE NOM DE L'ACCORD, en notation anglo-saxonne : « C », « Cm », « Csus4 », « C7 », « Cm7b5 ».
         //
-        // C'est la notation des recueils et des vraies partitions, et Roger l'a demandee apres avoir vu « Maj · 3 » a
-        // l'ecran - « ce qui est tres bizarre comme notation ». Un musicien lit ca sans y penser, et le nombre de notes a
-        // disparu : il n'apprenait rien qu'un musicien ne sache deja.
+        // C'est la notation des recueils et des vraies partitions : un musicien la lit sans y penser. Le nombre de notes
+        // affiche avant a disparu, parce qu'il n'apprenait rien qu'un musicien ne sache deja.
         described.insert( QStringLiteral( "name" ),
                           rootName + QString::fromUtf8( suffix.data(), static_cast<int>( suffix.size() ) ) );
 
@@ -899,9 +895,9 @@ void ExerciseSessionController::processAnswer( bool p_isCorrect )
         if( !isRhythm )
         {
             // A correct answer is heard again as a CHORD: the two notes together, one block instead of two,
-            // which is twice as short - and a genuinely different listen of the same interval, the colour
-            // without the melody. Roger asked for it to stop the success from dragging, and the reason to
-            // keep it is musical: hearing the interval both ways is what seals it.
+            // which is twice as short, and a genuinely different listen of the same interval - the colour
+            // without the melody. It keeps a success from dragging, and hearing an interval both ways is
+            // what seals it.
             playCurrentQuestionAsChord();
         }
     }
@@ -993,7 +989,8 @@ void ExerciseSessionController::continueToNextQuestion()
 
     m_session->advance();
 
-    // Une nouvelle question, donc une nouvelle anecdote : c'est le rythme que Roger a demande.
+    // Une nouvelle question, donc une nouvelle anecdote : le texte suit chaque question, et jamais la meme. Peu de
+    // choses sont gratuites et agreables dans une application : celle-ci est les deux.
     refreshQuestionAnecdote();
 
     refreshChoices();
@@ -1373,9 +1370,8 @@ void ExerciseSessionController::resetProfile()
     m_levelStore->storeSessionCount( 0 );
     m_levelStore->storeStarCount( 0 );
 
-    // ET LES STATISTIQUES AUSSI. Roger : « n'oublie pas que "Remise a zero" met a zero les statistiques aussi. » Un
-    // score remis a zero qui garderait son journal serait un demi-mensonge : la page de statistiques continuerait de
-    // raconter une histoire que le joueur vient effacer.
+    // ET LES STATISTIQUES AUSSI. Un score remis a zero qui garderait son journal serait un demi-mensonge : la page de
+    // statistiques continuerait de raconter une histoire que le joueur vient d'effacer.
     if( m_questionLog != nullptr )
     {
         m_questionLog->clear();
@@ -1592,8 +1588,8 @@ void ExerciseSessionController::stopRhythmLoop()
 
 // Le temps suivant, vise depuis LE DEBUT DE LA MESURE - et non depuis le battement precedent.
 //
-// C'est la correction du 28 septembre 2026 : un timer repetitif repart de l'instant ou il a tire, donc chaque temps
-// joue un peu en retard decalait tous les suivants, et la mesure partait a la derive sous les doigts du joueur. La
+// Un timer repetitif repart de l'instant ou il a tire, donc chaque temps joue un peu en retard decalait tous les
+// suivants, et la mesure partait a la derive sous les doigts du joueur. La
 // decision elle-meme appartient au domaine (domain::planNextBeat), qui la rend PURE : un test sait donc dire, sans
 // attendre une seconde, qu'un battement en retard ne decale pas ceux qui suivent.
 void ExerciseSessionController::scheduleNextRhythmBeat()
@@ -1981,8 +1977,8 @@ std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() cons
         return domain::QuestionTarget{ p_target.kind, p_target.target, p_target.direction };
     };
 
-    // D'ABORD ce qui va bien, du meilleur au moins bon : un bilan qui commencerait par un echec serait decourageant, et
-    // c'est l'autre sens que Roger a demande. Les cibles sont triees du PLUS FAIBLE au meilleur, donc on remonte la liste
+    // D'ABORD ce qui va bien, du meilleur au moins bon : un bilan qui commencerait par un echec serait decourageant.
+    // Les cibles sont triees du PLUS FAIBLE au meilleur, donc on remonte la liste
     // par la fin.
     const std::size_t easyCount = std::min( REVIEW_EASY_QUESTION_COUNT, byTarget.size() / 2 );
 

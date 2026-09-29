@@ -188,11 +188,8 @@ class ExerciseSessionController final : public QObject
     // A loading-screen anecdote, refreshed on demand. Empty when the content file has nothing to say.
     Q_PROPERTY( QString anecdoteText READ anecdoteText NOTIFY anecdoteChanged )
 
-    // L'anecdote de la QUESTION en cours.
-    //
-    // Roger : « je voudrais que pendant les questionnaires, a chaque question, [une anecdote s'affiche] entre les boutons
-    // d'actions et les boutons de reponses ». Elle change a chaque question, donc on apprend quelque chose en jouant au
-    // lieu d'attendre entre deux parties.
+    // L'anecdote de la QUESTION en cours. Elle change a chaque question, donc on apprend quelque chose en jouant au lieu
+    // d'attendre entre deux parties.
     Q_PROPERTY( QString questionAnecdoteText READ questionAnecdoteText NOTIFY questionAnecdoteChanged )
     Q_PROPERTY( int lives READ lives NOTIFY scoreChanged )
     Q_PROPERTY( bool hasUnlimitedLives READ hasUnlimitedLives NOTIFY scoreChanged )
@@ -208,7 +205,7 @@ class ExerciseSessionController final : public QObject
     // itself is not this object's job - the application wires the signal to the platform scheduler.
     Q_PROPERTY( bool dailyReminderEnabled READ dailyReminderEnabled WRITE setDailyReminderEnabled NOTIFY dailyReminderChanged )
 
-    // L'heure du rappel : un reglage du joueur, et il est modifiable - Roger l'a demande explicitement.
+    // L'heure du rappel : un reglage du joueur, et il est modifiable.
     Q_PROPERTY( int reminderHour READ reminderHour WRITE setReminderHour NOTIFY dailyReminderChanged )
     Q_PROPERTY( int reminderMinute READ reminderMinute WRITE setReminderMinute NOTIFY dailyReminderChanged )
 
@@ -480,8 +477,8 @@ public:
 
     [[nodiscard]] bool isChordArpeggioAvailable() const noexcept;
 
-    // L'INDICE : retire une mauvaise reponse de la grille d'accords. C'est la demande de Roger - « du style retirer une
-    // mauvaise reponse » - et la regle vit dans le DOMAINE : le controleeur ne fait que la brancher.
+    // L'INDICE : retire une mauvaise reponse de la grille d'accords. La regle vit dans le DOMAINE ; le controleur ne
+    // fait que la brancher.
     Q_INVOKABLE void useChordHint();
 
     // Rejoue l'accord en ARPEGE : les notes l'une apres l'autre, au lieu de plaquees.
@@ -499,11 +496,7 @@ public:
     [[nodiscard]] bool isWeekEnd() const;
 
     // Le BILAN : une session dont les questions sont DECIDEES, du plus facile au plus difficile, et qui finit par ce qui
-    // resiste au joueur.
-    //
-    // C'est le rendez-vous de fin de semaine decrit par Roger : « un long questionnaire qui commence par les choses
-    // faciles puis les choses qu'il ne maitrise pas. Avec des petits mots d'encouragement ». Il peut le lancer quand il
-    // veut ; l'ecran le mettra en avant le week-end.
+    // resiste au joueur. Il se lance quand on veut ; l'ecran le met en avant le week-end.
     Q_INVOKABLE void startReviewSession();
 
     // Vrai pendant un bilan : l'ecran sait alors que la session est differente, et peut le dire.
@@ -763,8 +756,8 @@ private:
 
     // Le temps a jouer dans la mesure, de 0 a beatsPerBar. La valeur beatsPerBar n'est pas un temps : c'est le signal
     // que la mesure est finie et que la phase suivante commence. C'est ce qui fait tomber le premier temps de la
-    // reproduction PILE a l'instant ou l'ecoute aurait joue le sien, au lieu d'un temps trop tot - un demi-temps de
-    // decalage par mesure, que Roger entendait comme un metronome qui boite.
+    // reproduction PILE a l'instant ou l'ecoute aurait joue le sien, au lieu d'un temps trop tot - un temps perdu a
+    // chaque mesure, qui s'entend comme un metronome qui boite.
     int m_rhythmBeatIndex{ 0 };
 
     // Vrai pendant la reproduction, faux pendant l'ecoute. C'est la seule chose que ce booleen decide, et c'est

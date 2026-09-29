@@ -9,10 +9,9 @@
 // ---------------------------------------------------------------------------------------------------------------------
 // Quatre notifications par jour, et c'est demande
 //
-// Roger : « Je veux plus d'une notification par jour : une le matin avant 9 h, une le midi et une le soir apres 18 h,
-// par defaut, si l'option "Un rappel chaque jour" est activee. Car au contraire, je veux spammer l'utilisateur comme le
-// ferait un Google Actualite, mais pour la bonne cause : celui de s'instruire musique avec le sourire grace aux
-// anecdotes, qui peuvent le pousser a lancer l'appli et faire une petite partie. »
+// Plusieurs notifications par jour : une le matin avant 9 h, une le midi, et une le soir apres 18 h. L'idee est
+// d'occuper le terrain comme le ferait un fil d'actualite - mais pour la bonne cause : s'instruire en musique avec le
+// sourire, grace aux anecdotes, qui peuvent donner envie de lancer une petite partie.
 //
 // Plus son rappel d'entrainement, cela fait QUATRE messages dans une journee.
 //
@@ -38,13 +37,13 @@ struct ReminderMoment
 //
 // 8 h 00, 12 h 30 et 20 h 30, et ces heures ne sont pas un hasard :
 //
-//   * 8 h tombe AVANT 9 h, comme Roger le demande : c'est le premier moment ou l'on regarde son telephone ;
+//   * 8 h tombe AVANT 9 h : c'est le premier moment ou l'on regarde son telephone ;
 //   * 12 h 30 tombe a table, la ou une anecdote se lit bien ;
 //   * 20 h 30 tombe APRES 18 h, apres le diner, et laisse une heure et demie libre apres le rappel d'entrainement.
 //
 // Trois moments FIXES plutot que tires au hasard : un rendez-vous regulier devient une habitude, et une heure qui bouge
-// chaque jour n'en devient jamais une. Roger l'a dit lui-meme : « on pourra rendre une part d'aleatoire sur le nombre
-// de notifications par jour, mais pour l'instant reste sur 3 par defaut. »
+// chaque jour n'en devient jamais une. Un tirage partiel sur le NOMBRE de notifications par jour reste possible plus
+// tard, mais trois par defaut est ce qui doit s'installer d'abord : c'est ce nombre qui fait une habitude.
 inline constexpr std::array<ReminderMoment, 3> ANECDOTE_REMINDER_MOMENTS{
   ReminderMoment{ 8, 0 },
   ReminderMoment{ 12, 30 },

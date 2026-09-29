@@ -70,8 +70,7 @@ private:
 
     // Combien de temps de silence fait une REPRISE.
     //
-    // Roger a trouve le defaut sur son telephone : « quand c'est un unisson, la deuxieme note n'est pas validee ». La
-    // regle demandait une deuxieme note DIFFERENTE de la premiere, ce qui rendait l'unisson - un intervalle de zero
+    // La regle demandait une deuxieme note DIFFERENTE de la premiere, ce qui rendait l'unisson - un intervalle de zero
     // demi-ton, et un exercice parfaitement juste - impossible a reussir.
     //
     // Une note REPRISE apres un vrai silence est une nouvelle note, meme si c'est la meme hauteur. Et le silence doit

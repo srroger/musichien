@@ -7,7 +7,7 @@
 // disent « enregistre ceci » sans savoir si la ligne part dans un fichier, dans une base ou dans une variable.
 //
 // ---------------------------------------------------------------------------------------------------------------------
-// Pourquoi un JOURNAL, et pas une base de donnees (decision du 2026-09-28)
+// Pourquoi un JOURNAL, et pas une base de donnees
 //
 // La question se posait serieusement, et voici la reponse retenue :
 //

@@ -7,7 +7,7 @@
 namespace musichien::domain
 {
 
-TEST( ReminderScheduleTest, the_three_anecdote_moments_respect_what_roger_asked )
+TEST( ReminderScheduleTest, the_three_anecdote_moments_are_fixed_and_ordered )
 {
     ASSERT_EQ( 3U, ANECDOTE_REMINDER_MOMENTS.size() );
 

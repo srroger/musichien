@@ -52,7 +52,7 @@ class MicrophoneController final : public QObject
 
     // --- La question chantee -----------------------------------------------------------------------------------------
     //
-    // Deux niveaux, comme Roger les a decrits :
+    // Deux niveaux :
     //   * la cible est JOUEe (debutant) : on entend l'intervalle, puis on le chante ;
     //   * la cible est seulement NOMMEE (avance) : "chante une quinte", et l'oreille se debrouille.
     // La detection, elle, est la meme dans les deux cas : deux notes tenues, et l'ecart entre elles.

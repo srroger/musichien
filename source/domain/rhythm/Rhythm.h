@@ -6,7 +6,7 @@
 // numbers, a judgement comes out.
 //
 // The windows are deliberately generous: the first loop must FEEL generous, and they will tighten as the player
-// improves - the same logic as the guided mode that turns itself off. See note 05 of the vault, section 9.
+// improves - the same logic as the guided mode that turns itself off.
 // =====================================================================================================================
 
 #pragma once

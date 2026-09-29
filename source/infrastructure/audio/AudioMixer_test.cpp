@@ -61,7 +61,8 @@ TEST( AudioMixerTest, a_new_sound_does_not_replace_the_one_playing )
 {
     TestableMixer mixer{ TEST_SAMPLE_RATE, TEST_CHANNELS };
 
-    // The bug Roger heard: a drum hit on the same instant as the metronome click silenced the click.
+    // A drum hit on the same instant as the metronome click used to silence the click: the two sounds must be MIXED,
+    // not queued.
     mixer.play( std::vector<float>( 8, 0.3F ) );
 
     const std::vector<float> firstHalf = mixer.readFrames( 4 );

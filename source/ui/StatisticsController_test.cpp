@@ -165,7 +165,7 @@ TEST( StatisticsControllerTest, every_property_the_page_reads_is_exposed_to_qml 
     controller.refresh();
 
     // CE TEST EXISTE A CAUSE D'UN VRAI BUG : la page de statistiques a affiche « undefined % » et « undefined » partout
-    // sur le telephone de Roger, sans la moindre erreur ni le moindre avertissement. La cause etait simple et invisible :
+    // sur un telephone, sans la moindre erreur ni le moindre avertissement. La cause etait simple et invisible :
     // une methode C++ sans Q_PROPERTY n'existe PAS pour QML, et QML ne se plaint pas - il ecrit « undefined » et
     // continue. Les tests de ce fichier, eux, appelaient les methodes en C++ : ils ne pouvaient pas le voir.
     //

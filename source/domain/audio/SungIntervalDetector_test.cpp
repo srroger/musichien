@@ -137,9 +137,8 @@ TEST( SungIntervalDetectorTest, the_same_note_sung_again_is_a_unison )
 
     // LA MEME NOTE, DEUX FOIS, avec un souffle entre les deux : c'est un unisson, et c'est un intervalle comme un autre.
     //
-    // Roger a trouve ce bug sur son telephone : « quand c'est un unisson, la deuxieme note n'est pas validee ». La regle
-    // demandait une deuxieme note DIFFERENTE de la premiere, ce qui rendait l'unisson impossible a reussir - alors que
-    // c'est justement l'exercice ou l'oreille apprend a rester JUSTE.
+    // La regle demandait une deuxieme note DIFFERENTE de la premiere, ce qui rendait l'unisson impossible a reussir -
+    // alors que c'est justement l'exercice ou l'oreille apprend a rester JUSTE.
     hold( detector, frequencyOf( 69 ), 2000 );
     hold( detector, 0.0, 200 );                   // le chanteur reprend son souffle...
     hold( detector, frequencyOf( 69 ), 2000 );    // ...et reprend LA MEME note

@@ -960,8 +960,7 @@ TEST( ExerciseSessionTest, a_chord_question_offers_only_the_colours_the_player_k
 
     EXPECT_EQ( QuestionKind::Chord, question.kind );
 
-    // Deux couleurs au depart, et ce sont majeur et mineur : c'est ce que Roger a demande, et c'est ce que la palette
-    // d'un debutant contient.
+    // Deux couleurs au depart, et ce sont majeur et mineur : c'est ce que la palette d'un debutant contient.
     ASSERT_EQ( 2U, question.chordChoices.size() );
     EXPECT_EQ( ChordQuality::Major, question.chordChoices.at( 0 ) );
     EXPECT_EQ( ChordQuality::Minor, question.chordChoices.at( 1 ) );
@@ -1212,8 +1211,7 @@ TEST( ExerciseSessionTest, an_exhausted_plan_goes_back_to_drawing )
 // ---------------------------------------------------------------------------------------------------------------------
 // L'indice d'accord
 //
-// Roger : « pour la reconnaissance des accords, tu peux donner un indice quand tu rates une fois ? Du style retirer une
-// mauvaise reponse ou rejouer l'accord, puis le jouer en arpege. »
+// L'indice d'accord : une mauvaise reponse retiree de la grille, ou l'accord rejoue en arpege.
 // ---------------------------------------------------------------------------------------------------------------------
 
 TEST( ExerciseSessionTest, the_chord_hint_waits_for_a_first_failed_attempt )

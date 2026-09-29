@@ -78,10 +78,8 @@ constexpr std::array<ChordDegree, 5> NINTH_DEGREES{ ChordDegree{ 1, 0 },
 // par ordre d'apprentissage. Un parent vient donc toujours avant ses enfants, et un sous-arbre n'est plus force de
 // pousser tout le reste vers le bas.
 //
-// Roger : « on voit quand meme que la deuxieme branche du C avec le Csus4, Csus2 va tres loin, car tu as laisse
-// beaucoup d'espace entre le Cm et le Csus4... tu peux rapprocher le Csus4 du Cm ». C'est exactement ce que fait cet
-// ordre : les enfants directs du majeur se suivent, et l'ecran marque la separation par une petite MARCHE au lieu de
-// laisser un trou.
+// C'est ce que fait cet ordre : les enfants directs du majeur se suivent, et l'ecran marque la separation par une petite
+// MARCHE au lieu de laisser un trou.
 //
 // Les libelles de mutation sont en minuscules et sans accent : « tierce abaissee », « septieme mineure ajoutee ». C'est
 // le GESTE qui compte, et il se lit sous le nom de l'accord comme la legende d'un arbre de competences.

@@ -72,7 +72,7 @@ void SungIntervalDetector::update( double p_frequencyHz,
     else
     {
         // The tracking: the VOICE wobbles, the tracked pitch must not. No single reading decides a note - the
-        // average of the last few does, which is what absorbs the noise and the instability Roger heard.
+        // average of the last few does, which is what absorbs the noise and the natural instability of a voice.
         m_trackedMidi += ( midiNumber - m_trackedMidi ) * TRACKING_ALPHA;
 
         // The note is the tracked pitch, rounded. Rounding is the tolerance itself: the average has to move half a
@@ -111,7 +111,7 @@ void SungIntervalDetector::update( double p_frequencyHz,
     // LA MEME NOTE, REPRISE APRES UN SILENCE : c'est un UNISSON, et c'est un intervalle comme un autre.
     //
     // Sans cette ligne, la deuxieme note devait etre differente de la premiere, et l'unisson etait impossible a reussir -
-    // ce que Roger a decouvert en jouant. C'est pourtant l'exercice le plus direct qui soit : rester JUSTE.
+    // alors que c'est l'exercice le plus direct qui soit : rester JUSTE.
     if( m_voiceRestarted )
     {
         m_reading.secondMidiNumber = m_heldMidiNumber;

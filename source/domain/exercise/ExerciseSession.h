@@ -140,8 +140,8 @@ struct SessionSettings
     // The window the note a question STARTS ON is drawn from.
     //
     // Two octaves, and the range above narrows it further depending on the size of the interval and its
-    // direction. The first version used a single octave, which meant two questions in five started on
-    // the same note - and Roger heard it, and said so.
+    // direction. A single octave made two questions in five start on the same note, which turns the exercise
+    // into a memory test.
     std::int32_t lowestRootMidiNumber{ 50 };
 
     std::int32_t highestRootMidiNumber{ 74 };
@@ -177,10 +177,8 @@ struct SessionSettings
 
     // Share of questions, in percent, that ask the player to REPRODUCE a rhythmic cell.
     //
-    // ZERO par defaut, et c'est une decision de Roger apres avoir joue : « comme la feature n'est pas propre, je
-    // prefere la rendre par defaut a 0 ». La question de rythme fonctionne, mais son horloge n'est pas encore fiable
-    // (voir la note 05 du Vault), et une question dont on ne peut pas croire le temps n'a rien a faire dans une
-    // session ordinaire. Qui veut du rythme le demande : le reglage est la, entre 0 et 100.
+    // ZERO par defaut : la question de rythme fonctionne, mais une question dont on ne peut pas croire le temps n'a
+    // rien a faire dans une session ordinaire. Qui veut du rythme le demande - le reglage est la, entre 0 et 100.
     std::int32_t rhythmQuestionShare{ 0 };
 
     // Le tempo, en battements par minute, auquel la cellule rythmique est posee.
@@ -341,9 +339,6 @@ public:
 
     // -------------------------------------------------------------------------------------------------------------
     // L'indice d'accord
-    //
-    // Roger : « pour la reconnaissance des accords, tu peux donner un indice quand tu rates une fois ? Du style
-    // retirer une mauvaise reponse ou rejouer l'accord, puis le jouer en arpege. »
     //
     // L'indice est DONNE par le domaine, et pas par l'ecran : c'est le domaine qui sait ce qui est juste, et un ecran
     // qui deciderait ce qui est faux aurait la reponse au bout de la main.

@@ -75,10 +75,8 @@ public:
 
     // Le petit arpège de l'accueil : montant, ouvert, au piano, et VOLONTAIREMENT discret.
     //
-    // Roger, après l'avoir entendu : "les sons d'introduction sont un peu forts... ça fait un peu bug, un peu
-    // dur à l'oreille". Il avait raison sur les deux points : un accord de trois notes au niveau des exercices
-    // arrive comme une porte qui claque, et l'application n'a rien à dire d'aussi fort au moment où elle
-    // s'ouvre.
+    // Il est discret pour deux raisons : un accord de trois notes au niveau des exercices arrive comme une porte qui
+    // claque, et l'application n'a rien d'aussi fort a dire au moment ou elle s'ouvre.
     //
     // Ce n'est pas un son du PORT, et c'est une décision : c'est une signature de l'application, pas quelque
     // chose que le domaine a à connaître. Le PROCHAIN son que le jeu joue est un exercice.

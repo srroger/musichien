@@ -20,7 +20,7 @@
 //     d'abord, puis la majeur, puis la mineur - qui ne different de la premiere que par une seule note.
 //
 // La source de cet ordre est la progression des cours d'harmonie (musictheory.net : les quatre triades, puis les
-// septiemes) ; elle est notee dans le Vault, note 24.
+// septiemes).
 // =====================================================================================================================
 
 #include "domain/music/Note.h"

@@ -32,7 +32,7 @@ RhythmController::RhythmController( domain::NotePlayer & p_notePlayer, QObject *
     // page feel drunk. Not sample-accurate, but close enough for the first loop.
     m_beatTimer.setTimerType( Qt::PreciseTimer );
 
-    // SINGLE SHOT, et c'est le cœur du correctif du 28 septembre 2026. Un timer REPETITIF repart de l'instant ou il a
+    // SINGLE SHOT, et c'est le cœur de la justesse du metronome. Un timer REPETITIF repart de l'instant ou il a tire :
     // tire : chaque battement joue un peu en retard ajoute son retard a tous les suivants, et le metronome prend une
     // seconde dans la vue du musicien au bout de deux minutes. Ici, chaque battement re-arme le suivant depuis
     // l'horloge de depart (voir scheduleNextBeat), et le retard ne se reporte jamais.
@@ -211,7 +211,7 @@ void RhythmController::onBeat()
 // Un QTimer repetitif repart de l'instant ou il a TIRE, et non de l'instant ou il aurait du tirer : chaque battement
 // un peu en retard decale donc tous les suivants, et le retard s'additionne. A 90 bpm, un millieme de seconde par temps
 // suffit a faire entendre un metronome qui traine au bout d'une minute ; sur un telephone, le retard d'un tir est bien
-// plus gros que cela, et Roger l'a entendu.
+// plus gros que cela, et l'oreille l'entend des les premieres mesures.
 //
 // La decision - quand, et quel battement - appartient au domaine (domain::planNextBeat), ou elle est pure et testee.
 // Ici il n'y a plus qu'a obeir : c'est ce qui rend ce correctif verifiable sans l'ecouter.

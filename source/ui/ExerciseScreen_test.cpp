@@ -471,9 +471,8 @@ TEST( ExerciseScreenTest, the_screen_is_built_and_shows_every_choice )
 
 TEST( ExerciseScreenTest, the_three_octaves_of_a_note_are_all_on_the_screen )
 {
-    // Le cas exact rapporte par Roger : a la carte entiere, l'unisson, l'octave et la quinzieme visent la MEME place
-    // du cercle. C'est le seul endroit ou trois intervalles partagent une case, et donc le seul ou l'ecran peut
-    // cacher une reponse.
+    // A la carte entiere, l'unisson, l'octave et la quinzieme visent la MEME place du cercle. C'est le seul endroit ou
+    // trois intervalles partagent une case, et donc le seul ou l'ecran peut cacher une reponse.
     const LoadedScreen screen = loadExerciseScreen();
 
     ASSERT_NE( nullptr, screen.item );
@@ -498,7 +497,7 @@ TEST( ExerciseScreenTest, the_three_octaves_of_a_note_are_all_on_the_screen )
 
 TEST( ExerciseScreenTest, the_circle_draws_each_octave_on_its_own_ring )
 {
-    // COUCHES CONCENTRIQUES, comme les electrons d'un atome : l'image de Roger, et ce que ce test verifie.
+    // COUCHES CONCENTRIQUES, comme les electrons d'un atome : c'est ce que ce test verifie.
     //
     //   * aucun chevauchement, quelle que soit la couche ;
     //   * un intervalle compose est sur le MEME RAYON que son simple - meme angle, couche plus proche ;

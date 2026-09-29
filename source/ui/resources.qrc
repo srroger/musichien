@@ -60,8 +60,8 @@
         <file alias="assets/soundfonts/drum_hihat.wav">../../assets/soundfonts/drum_hihat.wav</file>
         <file alias="assets/soundfonts/drum_tom.wav">../../assets/soundfonts/drum_tom.wav</file>
     <!--
-      Les deux clics du metronome : deux blocs de bois. Roger trouvait les temps faibles "un peu moches" ; un bloc de
-      bois est la sonorite du metronome, et l'ecart aigu/grave dit ou est le premier temps sans qu'on ait a compter.
+      Les deux clics du metronome : deux blocs de bois, la sonorite du metronome, et l'ecart aigu/grave qui dit ou est
+      le premier temps sans qu'on ait a compter.
     -->
         <file alias="assets/soundfonts/drum_click_high.wav">../../assets/soundfonts/drum_click_high.wav</file>
         <file alias="assets/soundfonts/drum_click_low.wav">../../assets/soundfonts/drum_click_low.wav</file>

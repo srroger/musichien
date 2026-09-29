@@ -51,8 +51,8 @@ TEST( RhythmTest, a_still_metronome_judges_everything_as_a_miss )
 
 // =====================================================================================================================
 // Le battement a venir
-// Ces quatre tests sont la raison d'etre de planNextBeat : ils disent, sans attendre une seule seconde, ce qui se passe
-// quand un metronome joue ses battements en retard. Roger l'a entendu avant qu'il y ait un test pour le dire.
+// Ces cinq tests sont la raison d'etre de planNextBeat : ils disent, sans attendre une seule seconde, ce qui se passe
+// quand un metronome joue ses battements en retard.
 // =====================================================================================================================
 
 TEST( RhythmTest, a_beat_on_time_is_scheduled_one_beat_later )

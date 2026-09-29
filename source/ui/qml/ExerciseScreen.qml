@@ -28,8 +28,8 @@ Item {
     // How long the verdict stays on screen before the next question arrives by itself.
     // TWO values rather than one, because the two verdicts are not the same length: a success is read in
     // a glance - and is HEARD as a chord, twice as short - while a mistake carries a longer sentence
-    // ("c'était…, tu as répondu…"). Roger found the single 1,9 s pause too long, and he was right: it
-    // was tuned for the slowest case and applied to the fastest.
+    // ("c'était…, tu as répondu…"). A single pause is tuned for the slowest case, and therefore too long
+    // for the fastest - which is the one that happens most.
     // Everything that moves is gathered here, because the whole screen shifts sideways during the shake.
     // La pause d'une question de rythme : la duree de la cellule, plus une respiration.
     // La couleur d'une COULEUR D'ACCORD, comme la couleur d'un intervalle : un code qui se lit avant le nom.
@@ -224,20 +224,18 @@ Item {
             // boutons suit l'ordre d'apprentissage, donc il ne bouge jamais d'une question a l'autre.
             // -------------------------------------------------------------------------------------------------
             // L'INDICE d'accord
-            // Roger : « pour la reconnaissance des accords, tu peux donner un indice quand tu rates une fois ? Du style
-            // retirer une mauvaise reponse ou rejouer l'accord, puis le jouer en arpege. »
-            // It says what was HEARD, never what was tapped: the two can differ, and when they do, the
-            // player has to find out. That is the whole reason the answer displayed is a fact of the domain.
+            // Il dit ce qui a ete ENTENDU, jamais ce qui a ete touche : les deux peuvent differer, et quand c'est le
+            // cas, c'est au joueur de le decouvrir. C'est la raison pour laquelle la reponse affichee est un fait du
+            // domaine, et non ce que l'ecran croit savoir.
             // -------------------------------------------------------------------------------------------------
             // Le verdict, le mot du bilan, et le prompt qui les remplace avant la reponse.
-            // Sa hauteur est FIXE, et c'est le fond du probleme que Roger a signale : cet item prenait tout l'espace
-            // libre, ce qui poussait les boutons de reponse tout en bas de l'ecran. C'est la ZONE DE REPONSE qui prend la
-            // place maintenant, et elle se pose au milieu.
+            // Sa hauteur est FIXE, et c'est ce qui compte ici : un item qui prend l'espace libre pousse les boutons de
+            // reponse hors de l'ecran. C'est la ZONE DE REPONSE qui prend la place, et elle se pose au milieu.
             // -------------------------------------------------------------------------------------------------
             // LES ACTIONS, en bas de l'ecran, et rien d'autre
-            // Roger : « il faudrait separer bien les boutons des reponses - les mettre au centre de l'ecran - et laisser
-            // les boutons d'action en bas ». Cette rangee est donc la SEULE chose sous la zone de reponse, et tout ce qui
-            // n'est pas une reponse y est : ecouter, l'indice, l'arpege, et voir la reponse.
+            // Les reponses se posent au CENTRE, les actions restent en bas : cette rangee est donc la SEULE chose sous
+            // la zone de reponse, et tout ce qui n'est pas une reponse y est - ecouter, l'indice, l'arpege, et voir la
+            // reponse.
             // Les libelles sont COURTS : trois ou quatre boutons sur la largeur d'un telephone ne tiennent pas avec des
             // phrases, et un bouton coupe en deux n'est pas un bouton.
             // Le tout TIENT DANS L'ECRAN : une page de jeu qui se fait scroller cache ses propres reponses, et un
@@ -246,20 +244,15 @@ Item {
             // etiquettes courtes, voila comment quinze reponses tiennent sur un telephone.
             // -------------------------------------------------------------------------------------------------
             // L'ARBRE DES ACCORDS, pour REPONDRE.
-            // Roger : « on affiche pas les boutons, mais c'est bien de garder les boutons vides plutot que rien du tout.
-            // Histoire de faire comme pour le cercle des quintes. Ou alors faire les boutons en gris sombre, en mode
-            // desactive, histoire qu'on voie quand meme le schema des mutations. Ce serait beaucoup mieux que de garder la
-            // grille simple un peu moche. »
-            // C'est exactement ce que fait ce composant : les couleurs de la palette sont ALLUMEES et cliquables, les
-            // autres restent visibles en sombre. Et repondre dans l'arbre, c'est deja comprendre l'accord qu'on cherche.
+            // Les couleurs de la palette sont ALLUMEES et cliquables, les autres restent visibles en sombre : le schema
+            // des mutations reste lisible, et l'oeil ne peut pas confondre une reponse possible avec un bouton eteint.
+            // Repondre dans l'arbre, c'est deja comprendre l'accord qu'on cherche - c'est mieux qu'une grille de noms.
             // L'INDICE et l'ARPEGE apparaissent apres un PREMIER essai rate, et seulement quand le domaine dit qu'ils ont
             // un sens. L'arpege est le meilleur des deux : il ne donne pas la reponse, il donne a entendre ce qui la
             // constitue.
             // -------------------------------------------------------------------------------------------------
-            // L'ANECDOTE DE LA QUESTION, juste au-dessus des actions.
-            // Roger : « pendant les questionnaires, a chaque question, entre les boutons d'actions et les boutons de
-            // reponses ». C'est la place juste : assez haute pour se lire entre deux questions, assez basse pour ne pas
-            // voler la place de la reponse - qui reste au centre, et c'est elle qui compte.
+            // L'ANECDOTE DE LA QUESTION, juste au-dessus des actions : assez haute pour se lire entre deux questions,
+            // assez basse pour ne pas voler la place de la reponse - qui reste au centre, et c'est elle qui compte.
 
             anchors.fill: parent
             anchors.margins: 16
@@ -323,10 +316,9 @@ Item {
                     id: quitButton
 
                     // A flat Material button takes its text colour from the style, and the style knows nothing
-                    // about the gradient painted behind it: the result was almost black on a night blue
-                    // background, and Roger reported it as such. The colour is therefore stated here, exactly
-                    // as the answer buttons state theirs, and a discreet outline gives the tap somewhere to
-                    // land.
+                    // about the gradient painted behind it: the default is almost black on a night blue
+                    // background. The colour is therefore stated here, exactly as the answer buttons state
+                    // theirs, and a discreet outline gives the tap somewhere to land.
                     flat: true
                     text: qsTr("← Quitter")
                     onClicked: ExerciseController.stopSession()
@@ -370,9 +362,9 @@ Item {
                 id: promptBoard
 
                 Layout.fillWidth: true
-                // La hauteur SUIT le contenu, et c'est la correction d'un vrai defaut : une hauteur fixe de 76 points
-                // laissait le verdict, le mot du bilan et le prompt se CHEVAUCHER avec ce qui suit des que l'un des trois
-                // passait a deux lignes - ce que Roger a vu tout de suite. Une zone qui s'adapte ne peut pas deborder.
+                // La hauteur SUIT le contenu : une hauteur fixe laissait le verdict, le mot du bilan et le prompt se
+                // CHEVAUCHER avec ce qui suit des que l'un des trois passait a deux lignes. Une zone qui s'adapte ne
+                // peut pas deborder.
                 Layout.preferredHeight: promptColumn.implicitHeight + 8
                 Layout.minimumHeight: 56
 
@@ -400,8 +392,8 @@ Item {
                         font.bold: true
                     }
 
-                    // Il est GROS, et c'est la demande de Roger : c'est un mot qu'on doit lire sans le chercher, au moment
-                    // ou l'on vient de repondre. Il est aussi le seul texte de l'ecran qui s'adresse directement au joueur.
+                    // Il est GROS : c'est un mot qu'on doit lire sans le chercher, au moment ou l'on vient de repondre.
+                    // Il est aussi le seul texte de l'ecran qui s'adresse directement au joueur.
                     Text {
                         Layout.fillWidth: true
                         Layout.preferredWidth: 0
@@ -557,8 +549,7 @@ Item {
             // Douze places, trente degres chacune, la premiere a midi : do en haut, puis les quintes dans le sens
             // des aiguilles d'une montre. C'est exactement la disposition d'un vrai cercle des quintes.
             // L'ESPACE DE LA REPONSE : c'est LUI qui prend la place libre de l'ecran, et la reponse se pose au MILIEU de
-            // cet espace. Roger : « les boutons des intervalles, genre en le mettant au centre de l'ecran plutot que tout
-            // tchique en bas ».
+            // cet espace, et non en bas de l'ecran.
             Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -580,11 +571,8 @@ Item {
                     anchors.centerIn: parent
 
                     Repeater {
-                        // UN SEUL Repeater, et PLAT : une entree par bouton, chacune sachant sa place, son rang dans
-                        // Un seul Repeater, PLAT : une entree par bouton. Chaque bouton porte sa place (l'angle), son octave (la
-                        // couche), et son identifiant. Le cercle des quintes se dessine comme des couches d'electrons - voir
-                        // la geometrie du delegue juste en dessous.
-                        // COUCHES CONCENTRIQUES, comme les electrons d'un atome - l'image de Roger, enfin comprise.
+                        // Un seul Repeater, PLAT : une entree par bouton. Chaque bouton porte sa place (l'angle), son octave
+                        // (la couche) et son identifiant.
                         // Chaque CLASSE d'intervalle a son ANGLE sur le cercle, et chaque OCTAVE a sa COUCHE : un
                         // rayon plus petit. Le simple vit sur la couche externe, la neuvieme sur la couche interne,
                         // au MEME angle que la seconde, juste plus proche du centre ; la quinzieme sur une troisieme

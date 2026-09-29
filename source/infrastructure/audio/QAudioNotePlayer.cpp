@@ -340,8 +340,7 @@ std::size_t QAudioNotePlayer::timbreIndexFor( std::span<const domain::Note> p_no
 
     // The same question is the same NOTES, whatever order the melody played them in: a falling fifth and its
     // feedback chord share the same two notes. Comparing them as an ORDERED sequence would re-draw the instrument
-    // between the melody and the chord - the guitar turning into a saxophone in front of the player, which is
-    // exactly the bug Roger saw.
+    // between the melody and the chord - the guitar turning into a saxophone in front of the player.
     const bool sameQuestion = ( p_notes.size() == m_lastPlayedNotes.size() )
                               && std::is_permutation( p_notes.begin(), p_notes.end(), m_lastPlayedNotes.begin() );
 
@@ -477,8 +476,8 @@ void QAudioNotePlayer::playMetronomeClick( bool p_accented )
 
     const std::vector<float> & click = p_accented ? m_accentedClick : m_plainClick;
 
-    // Le bloc de bois d'abord : c'est la sonorite d'un metronome, et c'est ce qui remplace le timbre "un peu moche" que
-    // Roger a entendu sur les temps faibles.
+    // Le bloc de bois d'abord : c'est la sonorite d'un metronome, et c'est ce qui remplace le timbre maigre des
+    // premiers temps faibles.
     if( !click.empty() )
     {
         mixSamples( click, p_accented ? ACCENTED_CLICK_GAIN : PLAIN_CLICK_GAIN );
@@ -549,7 +548,7 @@ void QAudioNotePlayer::playGreeting()
         return;
     }
 
-    // L'arpège, tel que Roger l'a décrit : "à la Zelda, montant, sur des degrés un peu éthérés".
+    // L'arpège : montant, sur des degrés ouverts - « à la Zelda ».
     //
     // Do, sol, do : une quinte et une octave, aucune tierce. C'est exactement ce qui rend un accord ouvert - il
     // n'y a pas de tierce pour dire majeur ou mineur, donc rien à comprendre, seulement quelque chose qui monte
