@@ -60,10 +60,30 @@ public:
     void playTapCue() override;
 
     // Le clic du metronome : accentue sur le premier temps d'une mesure.
+    //
+    // NOTE : le metronome de la page Rythme ne passe PLUS par ici. Il bat dans le flux audio (voir startMetronome), a
+    // l'echantillon pres. Cette methode reste pour les usages qui veulent un clic immediat, et pour les tests.
     void playMetronomeClick( bool p_accented ) override;
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Le metronome, en tant qu'HORLOGE
+    //
+    // C'est le mixage qui compte les ECHANTILLONS, et non l'interface qui compte des millisecondes : le clic tombe
+    // donc exactement ou le tempo le demande, et la gigue du thread d'interface ne peut plus l'atteindre.
+    // -----------------------------------------------------------------------------------------------------------------
+    void startMetronome( double p_bpm, int p_beatsPerBar ) override;
+
+    void stopMetronome() override;
+
+    [[nodiscard]] std::int64_t metronomeBeatIndex() const override;
+    [[nodiscard]] bool isMetronomeBeatAccented() const override;
+    [[nodiscard]] double metronomeElapsedMs() const override;
 
     // Frappe un element de la batterie, rendu par la synthese.
     void playDrum( domain::Drum p_drum ) override;
+
+    // Frappe un element de la batterie a une position, en millisecondes depuis le premier temps du metronome.
+    void playDrumAt( domain::Drum p_drum, double p_positionMs ) override;
 
     // Les sons de batterie ECHANTILLONNES, dans l'ordre de domain::Drum. Une percussion qui a son echantillon est
     // jouee telle quelle - une vraie peau, une vraie coque, une vraie baguette ; la synthese reste le repli, comme
@@ -128,7 +148,6 @@ public:
 private:
     // Opens the audio output on first use, and decides the sample format once and for all.
     void ensureAudioOutputIsOpen();
-
     // Starts the sink on the mixer on first need, and hands the device back once the mix falls silent: an output
     // left open on a phone drains the battery.
     void startSinkIfNeeded();
@@ -141,6 +160,10 @@ private:
     // ADDS a buffer to what is already playing. The right behaviour for percussion and for the metronome: a drum hit
     // and a click must be heard TOGETHER, not one instead of the other.
     void mixSamples( std::vector<float> p_samples, float p_gain = 1.0F );
+
+    // Le clic EFFECTIF d'un temps : l'echantillon s'il est la, la synthese sinon. Le mixer n'a pas a connaitre ce
+    // repli - il doit recevoir deux sons, un point c'est tout.
+    [[nodiscard]] std::vector<float> effectiveClick( bool p_accented );
 
     std::unique_ptr<QAudioSink> m_audioSink;
 

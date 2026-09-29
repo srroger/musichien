@@ -205,4 +205,136 @@ TEST( AudioMixerTest, a_loud_mix_is_clamped_rather_than_wrapped )
     }
 }
 
+// =====================================================================================================================
+// Le METRONOME
+//
+// Ces tests sont la raison d'etre du chantier : ils verifient que le clic tombe sur l'ECHANTILLON exact que le tempo
+// demande, et non « quelque part dans le tampon ». Un clic decale d'un seul echantillon passerait encore pour juste a
+// l'oreille ; ce sont les tests qui garantissent qu'il ne l'est pas, et qu'il ne le deviendra jamais.
+// =====================================================================================================================
+
+TEST( AudioMixerTest, the_click_lands_on_the_sample_the_tempo_asks_for )
+{
+    TestableMixer mixer{ TEST_SAMPLE_RATE, TEST_CHANNELS };
+
+    // Un clic d'un seul echantillon, pour que sa position se lise sans ambiguite.
+    mixer.setMetronomeClicks( { 1.0F }, { 1.0F } );
+
+    // 120 bpm a 48 kHz : un temps tous les 24000 echantillons.
+    mixer.startMetronome( 120.0, 4 );
+
+    // Le premier temps tombe a l'echantillon 0 : il sonne des la premiere frame.
+    const std::vector<float> firstBlock = mixer.readFrames( 4 );
+    EXPECT_FLOAT_EQ( 1.0F, firstBlock.at( 0 ) );
+    EXPECT_FLOAT_EQ( 0.0F, firstBlock.at( 1 ) );
+
+    // Rien pendant tout le reste du temps...
+    for( const float frame : mixer.readFrames( 23996 ) )
+    {
+        EXPECT_FLOAT_EQ( 0.0F, frame );
+    }
+
+    // ... et le deuxieme temps tombe PILE sur la 24000e frame du flux, donc sur la premiere de ce bloc.
+    const std::vector<float> secondBeat = mixer.readFrames( 4 );
+    EXPECT_FLOAT_EQ( 0.7F, secondBeat.at( 0 ) ) << "le temps faible porte le gain du clic ordinaire";
+    EXPECT_FLOAT_EQ( 0.0F, secondBeat.at( 1 ) );
+}
+
+TEST( AudioMixerTest, the_accented_click_marks_the_first_beat_of_every_bar )
+{
+    TestableMixer mixer{ TEST_SAMPLE_RATE, TEST_CHANNELS };
+
+    // Deux clics IDENTIQUES : c'est le GAIN qui distingue le premier temps des autres, et le test lit donc le gain.
+    mixer.setMetronomeClicks( { 1.0F }, { 1.0F } );
+
+    // Trois temps par mesure, et un temps tous les 4800 echantillons (600 bpm : c'est un test, pas de la musique).
+    mixer.startMetronome( 600.0, 3 );
+
+    // Un bloc d'un temps pile : sa premiere frame porte le clic, quand il y en a un.
+    const auto levelOfNextBeat = [&mixer]() { return mixer.readFrames( 4800 ).at( 0 ); };
+
+    constexpr float ACCENTED = 1.0F;    // le gain du premier temps
+    constexpr float PLAIN = 0.7F;       // celui des autres
+
+    // Le premier temps d'une mesure est accentue, les deux suivants ne le sont pas...
+    EXPECT_FLOAT_EQ( ACCENTED, levelOfNextBeat() );
+    EXPECT_FLOAT_EQ( PLAIN, levelOfNextBeat() );
+    EXPECT_FLOAT_EQ( PLAIN, levelOfNextBeat() );
+
+    // ... et la mesure suivante ramene l'accent : le rang des temps est compte depuis le DEMARRAGE, jamais remis a zero
+    // par une mesure - c'est ce qui empeche une mesure de se decaler toute seule.
+    EXPECT_FLOAT_EQ( ACCENTED, levelOfNextBeat() );
+}
+
+TEST( AudioMixerTest, the_beat_is_counted_in_samples_and_not_by_a_clock )
+{
+    TestableMixer mixer{ TEST_SAMPLE_RATE, TEST_CHANNELS };
+
+    mixer.setMetronomeClicks( { 1.0F }, { 1.0F } );
+    mixer.startMetronome( 120.0, 4 );
+
+    EXPECT_EQ( 0, mixer.framesWritten() );
+    EXPECT_EQ( 0, mixer.metronomeBeatIndex() );
+
+    // Le temps avance parce que le FLUX avance : c'est toute la difference avec un QTimer, qui avance parce que le
+    // thread d'interface a bien voulu.
+    mixer.readFrames( 24000 );
+
+    EXPECT_EQ( 24000, mixer.framesWritten() );
+    EXPECT_EQ( 1, mixer.metronomeBeatIndex() );
+
+    mixer.readFrames( 24000 );
+
+    EXPECT_EQ( 2, mixer.metronomeBeatIndex() );
+}
+
+TEST( AudioMixerTest, stopping_the_metronome_takes_back_the_clicks_that_have_not_sounded )
+{
+    TestableMixer mixer{ TEST_SAMPLE_RATE, TEST_CHANNELS };
+
+    mixer.setMetronomeClicks( { 1.0F }, { 1.0F } );
+    mixer.startMetronome( 120.0, 4 );
+
+    // Le premier temps est passe, le deuxieme est deja planifie.
+    mixer.readFrames( 1000 );
+
+    mixer.stopMetronome();
+
+    EXPECT_FALSE( mixer.isMetronomeRunning() );
+
+    for( const float frame : mixer.readFrames( 30000 ) )
+    {
+        EXPECT_FLOAT_EQ( 0.0F, frame ) << "un clic planifie avant l'arret ne doit pas sonner apres";
+    }
+}
+
+TEST( AudioMixerTest, what_is_judged_is_what_is_heard_and_not_what_is_written )
+{
+    TestableMixer mixer{ TEST_SAMPLE_RATE, TEST_CHANNELS };
+
+    mixer.setMetronomeClicks( { 1.0F }, { 1.0F } );
+    mixer.startMetronome( 120.0, 4 );
+
+    // Le tampon de sortie : ce que le mixer a ecrit et que l'oreille n'a pas encore entendu.
+    mixer.setOutputLatencyFrames( 512 );
+
+    mixer.readFrames( 512 );
+
+    // Les 512 echantillons sont ecrits, mais l'oreille est ENCORE sur le premier temps : une frappe a cet instant-la
+    // est une frappe sur le temps, et non un demi-centieme de seconde en avance.
+    EXPECT_EQ( 512, mixer.framesWritten() );
+    EXPECT_EQ( 0, mixer.metronomeBeatIndex() );
+    EXPECT_DOUBLE_EQ( 0.0, mixer.metronomeElapsedMs() );
+}
+
+TEST( AudioMixerTest, a_metronome_that_never_started_has_nothing_to_announce )
+{
+    TestableMixer mixer{ TEST_SAMPLE_RATE, TEST_CHANNELS };
+
+    // Sans metronome et sans son, le flux est vide : le peripherique peut rendre l'appareil audio, et c'est ce qui
+    // evite de vider la batterie d'un telephone entre deux exercices.
+    EXPECT_FALSE( mixer.isMetronomeRunning() );
+    EXPECT_EQ( 0, mixer.bytesAvailable() );
+}
+
 }    // namespace musichien::infrastructure
