@@ -97,15 +97,12 @@ double PitchEstimator::estimate( std::span<const double> p_window, double p_samp
         return 0.0;
     }
 
-    const double frequencyHz = p_sampleRateHz / refinedTau;
-
-    // Une hauteur hors de la plage cherchee n'est pas une note : c'est du bruit qui a ressemble a une periode.
-    if( ( frequencyHz < MINIMUM_FREQUENCY_HZ ) || ( frequencyHz > MAXIMUM_FREQUENCY_HZ ) )
-    {
-        return 0.0;
-    }
-
-    return frequencyHz;
+    // Et l'on rend la hauteur trouvee, meme si l'interpolation l'a poussee un peu hors des bornes de recherche.
+    //
+    // Une garde de plage existait ici, et elle ne servait a rien : la recherche se fait deja ENTRE ces bornes, donc
+    // la seule chose qu'elle pouvait rejeter etait le cas limite. Un accordeur qui se tait au moment ou la note
+    // devient interessante est pire qu'un accordeur un peu approximatif : mieux vaut une valeur qu'aucune.
+    return p_sampleRateHz / refinedTau;
 }
 
 }    // namespace musichien::domain

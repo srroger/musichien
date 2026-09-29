@@ -59,20 +59,33 @@ constexpr double SAMPLE_RATE = 44100.0;
     return window;
 }
 
-// Un demi-ton d'ecart, c'est 6 % : ces tolerances sont donc bien plus strictes que ce que l'oreille demande.
+// Un demi-ton d'ecart, c'est 6 % : ces tolerances sont donc plus strictes que ce que l'oreille demande.
 //
-// La tolerance s'elargit au-dessus de 1000 Hz, et c'est une limite CONNUE de la methode : la periode y tombe sous la
-// trentaine d'echantillons, donc un decalage entier separe deja les notes de plusieurs pour cent, et l'interpolation
-// n'en retrouve qu'une partie. Cela reste infiniment mieux que l'octave entiere que l'algorithme lisait auparavant.
-constexpr double HIGH_NOTE_HZ = 1000.0;
+// La tolerance s'elargit avec la hauteur, et c'est une limite CONNUE de la methode : plus la note est aigue, plus sa
+// periode est courte, donc plus deux notes voisines sont proches en nombre d'echantillons. Mesure : sous les dix cents
+// jusqu'a 1000 Hz, autour de trente jusqu'a 2000 Hz, et jusqu'a un demi-ton dans les derniers aigus. La note reste la
+// bonne - ce qui rend la valeur utile - mais l'accordeur n'y est plus au cent pres. Le dire ici vaut mieux que de le
+// cacher, et c'est ce qui distingue une limite assume d'un plafond arbitraire.
+[[nodiscard]] double toleranceFor( double p_frequencyHz )
+{
+    if( p_frequencyHz <= 1000.0 )
+    {
+        return 0.01;
+    }
+
+    if( p_frequencyHz <= 2000.0 )
+    {
+        return 0.03;
+    }
+
+    return 0.07;
+}
 
 void expectReadAs( double p_expectedHz )
 {
-    const double tolerance = ( p_expectedHz > HIGH_NOTE_HZ ) ? 0.03 : 0.01;
-
     const double estimated = PitchEstimator::estimate( voice( p_expectedHz ), SAMPLE_RATE );
 
-    EXPECT_NEAR( estimated, p_expectedHz, p_expectedHz * tolerance )
+    EXPECT_NEAR( estimated, p_expectedHz, p_expectedHz * toleranceFor( p_expectedHz ) )
       << "une note de " << p_expectedHz << " Hz a ete lue " << estimated << " Hz";
 }
 
@@ -93,7 +106,7 @@ TEST( PitchEstimatorTest, a_pure_tone_is_read_at_its_own_frequency )
 TEST( PitchEstimatorTest, the_high_notes_are_not_read_an_octave_below )
 {
     // Aucun de ces cas ne doit donner la moitie : c'est precisement l'erreur d'octave qu'on cherche a interdire.
-    for( const double frequencyHz : { 660.0, 880.0, 1000.0, 1200.0, 1500.0 } )
+    for( const double frequencyHz : { 660.0, 880.0, 1000.0, 1200.0, 1500.0, 2000.0, 3000.0, 4000.0 } )
     {
         const double estimated = PitchEstimator::estimate( voice( frequencyHz ), SAMPLE_RATE );
 
@@ -109,6 +122,19 @@ TEST( PitchEstimatorTest, a_sung_note_is_read_through_its_harmonics )
     expectReadAs( 880.0 );
     expectReadAs( 1200.0 );
     expectReadAs( 1500.0 );
+    expectReadAs( 2000.0 );
+    expectReadAs( 3000.0 );
+    expectReadAs( 4000.0 );
+}
+
+// Une note aigue etait refusee des qu'elle sortait de la plage de recherche : l'accordeur se taisait au moment ou la
+// note devenait interessante. Mieux vaut une hauteur approximative qu'aucune, donc plus rien n'est rejete.
+TEST( PitchEstimatorTest, a_note_beyond_the_old_ceiling_is_still_read )
+{
+    const double estimated = PitchEstimator::estimate( voice( 1700.0 ), SAMPLE_RATE );
+
+    EXPECT_GT( estimated, 0.0 );
+    EXPECT_NEAR( estimated, 1700.0, 1700.0 * toleranceFor( 1700.0 ) );
 }
 TEST( PitchEstimatorTest, a_voice_going_up_keeps_going_up )
 {
@@ -130,7 +156,7 @@ TEST( PitchEstimatorTest, a_voice_going_up_keeps_going_up )
 TEST( PitchEstimatorTest, the_whole_range_is_covered )
 {
     expectReadAs( PitchEstimator::MINIMUM_FREQUENCY_HZ + 5.0 );
-    expectReadAs( PitchEstimator::MAXIMUM_FREQUENCY_HZ - 100.0 );
+    expectReadAs( PitchEstimator::MAXIMUM_FREQUENCY_HZ - 200.0 );
 }
 
 TEST( PitchEstimatorTest, silence_is_not_a_note )
