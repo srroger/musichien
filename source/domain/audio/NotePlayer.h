@@ -18,6 +18,7 @@
 #include "domain/music/Temperament.h"
 
 #include <chrono>
+#include <cstdint>
 #include <span>
 
 namespace musichien::domain
@@ -77,10 +78,59 @@ public:
         playTapCue();
     }
 
+    // -------------------------------------------------------------------------------------------------------------
+    // LE METRONOME, en tant qu'HORLOGE
+    //
+    // Le domaine dit CE QU'IL VEUT - battre a tel tempo, sur telle mesure - et l'adaptateur le fait battre au rythme
+    // de son propre flux audio, ou chaque clic tombe sur un ECHANTILLON exact.
+    //
+    // Pourquoi cela ne peut pas etre un QTimer : entre deux tics d'un timer d'interface il y a le rendu de QML, les
+    // evenements du systeme et le ramasse-miettes. Le clic tombe donc la ou le thread a bien voulu, avec plusieurs
+    // millisecondes de gigue - et c'est cette gigue qui s'entend comme une instabilite. Un metronome juste compte des
+    // echantillons.
+    //
+    // Les cinq methodes ont un corps par defaut, comme playTapCue : un adaptateur sans horloge audio n'a rien a
+    // implementer, et un test qui ne parle pas de rythme n'a rien a ecrire.
+    // -------------------------------------------------------------------------------------------------------------
+
+    // Demarre le metronome. Rappeler cette methode pendant qu'il bat le RECALE sur l'instant present : c'est ce qui
+    // rend un changement de tempo immediat et propre.
+    virtual void startMetronome( double p_bpm, int p_beatsPerBar )
+    {
+        (void)p_bpm;
+        (void)p_beatsPerBar;
+    }
+
+    virtual void stopMetronome() {}
+
+    // Ou en est le metronome du point de vue de l'OREILLE : le rang du temps en cours, s'il est accentue, et combien de
+    // millisecondes se sont ecoulees depuis le premier temps.
+    //
+    // C'est ce temps-la qui juge une frappe et qui remplit l'affichage - jamais une horloge d'interface, qui
+    // mesurerait autre chose que ce que le joueur entend.
+    [[nodiscard]] virtual std::int64_t metronomeBeatIndex() const { return 0; }
+
+    [[nodiscard]] virtual bool isMetronomeBeatAccented() const { return false; }
+
+    [[nodiscard]] virtual double metronomeElapsedMs() const { return 0.0; }
+
     // Frappe un élément de la batterie. Un corps par défaut, comme le clic : un adaptateur sans batterie ne fait rien.
     virtual void playDrum( Drum p_drum )
     {
         (void)p_drum;
+    }
+
+    // Frappe un element de la batterie a une POSITION, en millisecondes depuis le premier temps du metronome en cours.
+    //
+    // C'est ce qui permet a une cellule rythmique d'etre jouee JUSTE : une frappe decalee - une syncope - doit tomber
+    // entre deux temps, et un QTimer d'interface ne sait pas viser un instant. Ici, la position se traduit en
+    // echantillons, et le son est pose exactement la.
+    //
+    // Une position deja passee se joue tout de suite : mieux vaut un son en retard qu'un son absent.
+    virtual void playDrumAt( Drum p_drum, double p_positionMs )
+    {
+        (void)p_positionMs;
+        playDrum( p_drum );
     }
 
     // The tuning every following note is heard in, until it is called again. Equal temperament and a 440 Hz diapason
