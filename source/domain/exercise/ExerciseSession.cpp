@@ -39,6 +39,43 @@ struct KindShare
     QuestionKind kind{ QuestionKind::NamedInterval };
 };
 
+bool isKindOpen( const SessionSettings & p_settings, QuestionKind p_kind ) noexcept
+{
+    switch( p_kind )
+    {
+        case QuestionKind::NamedInterval:
+            return p_settings.namedIntervalQuestionShare > 0;
+
+        case QuestionKind::Direction:
+            return p_settings.directionQuestionShare > 0;
+
+        case QuestionKind::Sing:
+            return p_settings.singQuestionShare > 0;
+
+        case QuestionKind::Chord:
+            return p_settings.chordQuestionShare > 0;
+
+        case QuestionKind::ModeColour:
+            return p_settings.modeColourQuestionShare > 0;
+
+        case QuestionKind::ModeName:
+            return p_settings.modeNameQuestionShare > 0;
+
+        case QuestionKind::ModeVamp:
+            return p_settings.modeVampQuestionShare > 0;
+
+        case QuestionKind::ForeignNote:
+            return p_settings.foreignNoteQuestionShare > 0;
+
+        case QuestionKind::Rhythm:
+            // Le rythme n'est plus un exercice de ce jeu : il n'est JAMAIS ouvert, et le dire ici evite qu'un plan
+            // l'impose un jour - c'est le genre de question que plus rien ne pose.
+            return false;
+    }
+
+    return false;
+}
+
 ExerciseSession::ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings )
   : m_randomEngine{ p_seed }
   , m_settings{ p_settings }

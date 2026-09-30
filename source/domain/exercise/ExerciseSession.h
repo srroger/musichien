@@ -385,6 +385,15 @@ struct SessionSettings
 };
 
 // A question, as the screen needs it.
+// Le genre est-il OUVERT dans ces reglages - c'est-a-dire sa part est-elle non nulle ?
+//
+// La question se pose a DEUX endroits : le tirage, qui la lit deja, et le PLAN d'un bilan, qui l'ignorait. C'est
+// exactement le defaut que Roger a signale : « j'ai beau mettre plus clair et plus sombre a 0, je l'obtiens toujours dans
+// mes parties ». Le bilan ne passe pas par le tirage - il IMPOSE son plan - donc les parts ne s'appliquaient pas a lui.
+//
+// Ecrite une fois, ici, elle ne peut plus etre oubliee a un troisieme endroit.
+[[nodiscard]] bool isKindOpen( const SessionSettings & p_settings, QuestionKind p_kind ) noexcept;
+
 struct Question
 {
     // What the question asks. The screen reads it to know whether to show the circle or the two directions.

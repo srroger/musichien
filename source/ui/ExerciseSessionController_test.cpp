@@ -566,6 +566,87 @@ void storeForeignNoteOnlyShares( domain::PlayerPreferencesFake & p_store )
     p_store.storeForeignNoteQuestionShare( 100 );
 }
 
+TEST( ExerciseSessionControllerTest, a_share_of_zero_in_the_profile_never_poses_that_kind )
+{
+    // Le chemin REEL de l'application, celui que Roger emprunte : le profil, puis le controleur, puis la session. Le
+    // domaine est deja verifie de son cote, mais c'est ce chemin-la qui decide ce que le joueur voit - et Roger voit des
+    // questions de mode alors que les trois parts de mode sont a ZERO : « j'ai beau mettre plus clair et plus sombre a 0,
+    // je l'obtiens toujours dans mes parties ».
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    levelStore.storeNamedIntervalQuestionShare( 60 );
+    levelStore.storeSingQuestionShare( 20 );
+    levelStore.storeChordQuestionShare( 20 );
+    levelStore.storeModeColourQuestionShare( 0 );
+    levelStore.storeModeNameQuestionShare( 0 );
+    levelStore.storeModeVampQuestionShare( 0 );
+    levelStore.storeForeignNoteQuestionShare( 0 );
+
+    int modeQuestionCount = 0;
+
+    constexpr std::uint32_t SEED_COUNT = 200;
+
+    for( std::uint32_t seed = 1; seed <= SEED_COUNT; ++seed )
+    {
+        ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+        controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+        controller.startSession();
+
+        if( controller.isModeQuestion() )
+        {
+            ++modeQuestionCount;
+        }
+    }
+
+    // ZERO, et c'est tout l'objet du test : une porte fermee dans le profil doit l'etre dans la partie.
+    EXPECT_EQ( 0, modeQuestionCount );
+}
+
+TEST( ExerciseSessionControllerTest, a_realistic_share_poses_foreign_note_questions )
+{
+    // La question que Roger se pose : « je n'arrive pas a acceder au nouvel exercice ». Le chemin du REGLAGE vers la
+    // QUESTION est donc verifie a une part realiste - trente, celle qu'un joueur pose vraiment - et pas a cent : une part
+    // de cent marcherait meme si le partage entre les genres etait casse.
+    //
+    // Les trois parts de reference restent la, comme chez un joueur qui les a laissees : soixante pour nommer, vingt pour
+    // le chant, vingt pour les accords. Trente sur cent trente, c'est un peu moins d'un quart des questions.
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    levelStore.storeNamedIntervalQuestionShare( 60 );
+    levelStore.storeSingQuestionShare( 20 );
+    levelStore.storeChordQuestionShare( 20 );
+    levelStore.storeModeColourQuestionShare( 0 );
+    levelStore.storeModeNameQuestionShare( 0 );
+    levelStore.storeModeVampQuestionShare( 0 );
+    levelStore.storeForeignNoteQuestionShare( 30 );
+
+    int foreignQuestionCount = 0;
+
+    constexpr std::uint32_t SEED_COUNT = 200;
+
+    for( std::uint32_t seed = 1; seed <= SEED_COUNT; ++seed )
+    {
+        // Une session par graine, et sa PREMIERE question : c'est le tirage qu'on veut voir.
+        ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+        controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+        controller.startSession();
+
+        if( controller.isForeignNoteQuestion() )
+        {
+            ++foreignQuestionCount;
+        }
+    }
+
+    // Autour du quart, et jamais zero : zero voudrait dire que le reglage ne sert a rien, et c'est exactement ce que
+    // Roger a cru voir.
+    EXPECT_GT( foreignQuestionCount, 20 );
+    EXPECT_LT( foreignQuestionCount, 70 );
+}
+
 TEST( ExerciseSessionControllerTest, a_foreign_note_question_offers_the_seven_notes_in_the_order_heard )
 {
     // L'ecran recoit les sept notes DANS L'ORDRE ENTENDU : c'est celui de l'ecoute, donc celui des boutons. Le joueur
@@ -1522,7 +1603,12 @@ TEST( ExerciseSessionControllerTest, a_review_session_plans_its_questions )
 
     fillJournalWithWorkedTargets( log );
 
-    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+    // Et le profil doit OUVRIR ce qu'il veut voir : un bilan ne pose plus une question dont la part est fermee, ce qui est
+    // la correction demandee par Roger. Le journal ne contient que des intervalles, donc le profil ouvre l'intervalle.
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
     controller.setQuestionLog( &log );
 
     controller.startReviewSession();
@@ -1535,6 +1621,51 @@ TEST( ExerciseSessionControllerTest, a_review_session_plans_its_questions )
     EXPECT_GT( controller.questionCount(), 0 );
     EXPECT_LT( controller.questionCount(), 10 );
     EXPECT_TRUE( controller.hasUnlimitedLives() );
+}
+
+TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_player_closed )
+{
+    // LE test du bug que Roger a signale, et il est critique : « j'ai beau mettre plus clair et plus sombre a 0, je
+    // l'obtiens toujours dans mes parties ».
+    //
+    // La cause : le bilan ne passe pas par le TIRAGE, il impose son plan - donc les parts ne s'appliquaient pas a lui. Il
+    // proposait au joueur de travailler exactement ce qu'il avait refuse.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    // Un journal qui contient des questions de MODE rattees : c'est ce que le bilan voudra faire travailler.
+    const auto now = std::chrono::system_clock::now();
+
+    for( int index = 0; index < 5; ++index )
+    {
+        domain::QuestionRecord record;
+
+        record.askedAt = now - std::chrono::hours{ 1 };
+        record.kind = domain::QuestionKind::ModeColour;
+        record.target = static_cast<std::int32_t>( domain::Mode::Dorian );
+        record.outcome = domain::QuestionOutcome::Failed;
+
+        log.append( record );
+    }
+
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    ASSERT_TRUE( controller.running() );
+
+    // Toute la session, question apres question : le mode est FERME, donc le bilan n'en pose aucun.
+    while( controller.running() && controller.isAsking() )
+    {
+        EXPECT_FALSE( controller.isModeQuestion() ) << "le bilan a pose une question que le joueur avait fermee";
+
+        controller.revealAnswer();
+        controller.continueToNextQuestion();
+    }
 }
 
 TEST( ExerciseSessionControllerTest, a_review_session_without_a_journal_is_an_ordinary_game )
@@ -1559,7 +1690,11 @@ TEST( ExerciseSessionControllerTest, the_encouragement_speaks_only_during_a_revi
 
     fillJournalWithWorkedTargets( log );
 
-    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
+    // Le profil ouvre ce que le bilan doit poser : un intervalle a nommer, seul genre du journal de ce test.
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
     controller.setQuestionLog( &log );
 
     // Une partie ordinaire ne dit RIEN : l'ecran reste silencieux, et c'est ce qui donne du poids aux mots du bilan.

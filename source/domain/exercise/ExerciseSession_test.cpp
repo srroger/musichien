@@ -794,6 +794,32 @@ TEST( ExerciseSessionTest, a_sung_question_can_be_passed_at_once )
 // que le domaine ne mesure pas le temps : il RECOIT la position des frappes, et il les juge.
 // ---------------------------------------------------------------------------------------------------------------------
 
+TEST( ExerciseSessionTest, a_share_of_zero_is_a_closed_door )
+{
+    // Le bug que Roger a signale, et il est critique : « j'ai beau mettre plus clair et plus sombre a 0, je l'obtiens
+    // toujours dans mes parties ». Un poids a zero doit etre une porte FERMEE - pour chaque genre, et sur toutes les
+    // graines.
+    //
+    // Le test suit exactement ce qu'un joueur fait : nommer soixante, chanter vingt, accords vingt, et RIEN d'autre.
+    SessionSettings settings;
+    pinEveryQuestionShare( settings );
+
+    settings.namedIntervalQuestionShare = 60;
+    settings.singQuestionShare = 20;
+    settings.chordQuestionShare = 20;
+
+    for( std::uint32_t seed = 1; seed <= 200; ++seed )
+    {
+        const ExerciseSession session{ seed, settings };
+
+        const QuestionKind kind = session.currentQuestion().kind;
+
+        EXPECT_TRUE( ( kind == QuestionKind::NamedInterval ) || ( kind == QuestionKind::Sing )
+                     || ( kind == QuestionKind::Chord ) )
+          << "genre inattendu alors que sa part vaut zero, graine " << seed;
+    }
+}
+
 TEST( ExerciseSessionTest, every_genre_comes_out_when_every_part_is_equal )
 {
     // Le defaut que Roger a trouve, et il etait invisible : six parts a vingt font une somme de CENT VINGT, et l'ancien

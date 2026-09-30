@@ -2524,7 +2524,16 @@ void ExerciseSessionController::startReviewSession()
 {
     domain::SessionSettings settings = m_settings;
 
-    const std::vector<domain::QuestionTarget> plan = reviewPlan();
+    std::vector<domain::QuestionTarget> plan = reviewPlan();
+
+    // Un genre FERME par le joueur n'entre pas dans un bilan.
+    //
+    // Ses reglages disent ce qu'il veut travailler, et un bilan qui les ignore lui poserait exactement les questions qu'il
+    // a refusees - c'est ce que Roger a vu : « j'ai beau mettre plus clair et plus sombre a 0, je l'obtiens toujours dans
+    // mes parties ». Le bilan ne passe pas par le tirage : il IMPOSE son plan, et il oubliait donc les parts.
+    std::erase_if( plan, [&settings]( const domain::QuestionTarget & p_target ) {
+        return !domain::isKindOpen( settings, p_target.kind );
+    } );
 
     if( plan.empty() )
     {
