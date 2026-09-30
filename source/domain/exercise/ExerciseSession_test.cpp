@@ -29,7 +29,32 @@ namespace
 
 constexpr std::uint32_t TEST_SEED = 20260926;
 
-// Des questions d'INTERVALLE, et rien d'autre.
+// AUCUNE part laissee a sa valeur par defaut.
+//
+// Les parts sont maintenant des POIDS, lus les uns par rapport aux autres : le tirage se fait sur leur SOMME, et non sur
+// cent. Une seule part oubliee a vingt suffit donc a voler un cinquieme des questions - et le piege grandit a chaque
+// genre nouveau.
+//
+// Il a mordu une fois : « rythme seulement » laissait les accords a vingt, la somme faisait cent vingt, et sept tests de
+// rythme ne tombaient justes que par l'ordre des comparaisons de l'ancien tirage. Ce helper existe pour que cela ne
+// puisse plus arriver : tous les reglages d'un genre l'appellent, puis remontent la seule part qui les interesse.
+void pinEveryQuestionShare( SessionSettings & p_settings )
+{
+    p_settings.namedIntervalQuestionShare = 0;
+    p_settings.singQuestionShare = 0;
+    p_settings.directionQuestionShare = 0;
+    p_settings.rhythmQuestionShare = 0;
+    p_settings.chordQuestionShare = 0;
+    p_settings.modeColourQuestionShare = 0;
+    p_settings.modeNameQuestionShare = 0;
+    p_settings.modeVampQuestionShare = 0;
+}
+
+// Des questions d'INTERVALLE A NOMMER, et rien d'autre.
+//
+// Aucune part n'est remontee, et c'est tout l'interet : une session sans aucune part pose la question par defaut du
+// jeu, qui est justement celle que ces tests parlent. C'est la garde de drawKind qui le garantit, et non un reglage -
+// donc un genre ajoute plus tard ne pourra pas se glisser ici sans qu'on l'ait voulu.
 //
 // Une session reelle melange les genres - chant, rythme, accords - et c'est ce qu'on veut en jouant. Un test qui parle
 // d'une GRILLE, d'une PALETTE ou des VIES doit donc savoir de quoi il parle : sans cet epeinglage, il tombe une fois
@@ -38,9 +63,7 @@ constexpr std::uint32_t TEST_SEED = 20260926;
 [[nodiscard]] SessionSettings intervalOnlySettings()
 {
     SessionSettings settings;
-    settings.singQuestionShare = 0;
-    settings.rhythmQuestionShare = 0;
-    settings.chordQuestionShare = 0;
+    pinEveryQuestionShare( settings );
     return settings;
 }
 
@@ -98,8 +121,7 @@ void playCorrectly( ExerciseSession & p_session, std::size_t p_questionCount )
 [[nodiscard]] SessionSettings rhythmOnlySettings()
 {
     SessionSettings settings;
-    settings.singQuestionShare = 0;
-    settings.directionQuestionShare = 0;
+    pinEveryQuestionShare( settings );
     settings.rhythmQuestionShare = 100;
     return settings;
 }
@@ -156,9 +178,7 @@ void playTheCellCorrectly( ExerciseSession & p_session )
 [[nodiscard]] SessionSettings chordOnlySettings()
 {
     SessionSettings settings;
-    settings.singQuestionShare = 0;
-    settings.directionQuestionShare = 0;
-    settings.rhythmQuestionShare = 0;
+    pinEveryQuestionShare( settings );
     settings.chordQuestionShare = 100;
     return settings;
 }
@@ -407,7 +427,17 @@ TEST( ExerciseSessionTest, five_wrong_answers_end_a_session_that_has_five_lives 
 
     answerWrongly( session );
 
-    // The session is over the moment the last life goes, without a feedback to read.
+    // La derniere vie s'en va, mais la question merite encore sa REPONSE : savoir ce qu'on a rate est la seule chose
+    // qui reste a apprendre quand la partie est perdue.
+    //
+    // Ce n'etait pas le comportement d'origine, et Roger l'a renverse : « quand on perds, on arrive direct a la page
+    // des scores, mais on n'a pas la reponse a la question sur laquelle on a fail ». La session passe donc en Feedback
+    // comme n'importe quelle question conclue, et c'est advance() - qui sait deja le faire - qui la termine.
+    EXPECT_FALSE( session.isFinished() );
+    EXPECT_EQ( SessionState::Feedback, session.state() );
+
+    session.advance();
+
     EXPECT_TRUE( session.isFinished() );
 }
 
@@ -719,6 +749,7 @@ TEST( ExerciseSessionTest, two_mistakes_turn_the_question_in_progress_guided )
 TEST( ExerciseSessionTest, a_session_can_ask_to_sing_instead_of_naming )
 {
     SessionSettings settings;
+    pinEveryQuestionShare( settings );
     settings.singQuestionShare = 100;    // toute la session est chantee
 
     ExerciseSession session{ 7, settings };
@@ -733,6 +764,7 @@ TEST( ExerciseSessionTest, a_session_can_ask_to_sing_instead_of_naming )
 TEST( ExerciseSessionTest, a_sung_question_can_be_passed_at_once )
 {
     SessionSettings settings;
+    pinEveryQuestionShare( settings );
     settings.singQuestionShare = 100;    // toute la session est chantee
 
     ExerciseSession session{ 7, settings };
@@ -906,6 +938,41 @@ TEST( ExerciseSessionTest, tapping_on_a_question_that_is_not_rhythmic_judges_not
     EXPECT_EQ( HitQuality::Miss, session.registerRhythmTap( 0.0 ) );
     EXPECT_FALSE( session.endRhythmLoop() );
     EXPECT_EQ( SessionState::Asking, session.state() );
+}
+
+TEST( ExerciseSessionTest, every_genre_comes_out_when_every_part_is_equal )
+{
+    // Le defaut que Roger a trouve, et il etait invisible : six parts a vingt font une somme de CENT VINGT, et l'ancien
+    // tirage - borne par cent - faisait disparaitre les deux derniers genres de la liste. On demandait du vamp dans les
+    // reglages, et il n'en venait jamais.
+    //
+    // Six parts egales doivent donc donner SEPT genres. Le test prend une centaine de graines differentes et ne lit que
+    // la PREMIERE question de chacune : avancer demanderait de savoir repondre a tous les genres, ce qui n'est pas le
+    // sujet ici - le tirage l'est.
+    SessionSettings settings;
+    pinEveryQuestionShare( settings );
+
+    settings.namedIntervalQuestionShare = 20;
+    settings.singQuestionShare = 20;
+    settings.rhythmQuestionShare = 20;
+    settings.chordQuestionShare = 20;
+    settings.modeColourQuestionShare = 20;
+    settings.modeNameQuestionShare = 20;
+    settings.modeVampQuestionShare = 20;
+
+    std::set<QuestionKind> seenKinds;
+
+    constexpr std::uint32_t SEED_COUNT = 200;
+
+    for( std::uint32_t seed = 1; seed <= SEED_COUNT; ++seed )
+    {
+        const ExerciseSession session{ seed, settings };
+
+        seenKinds.insert( session.currentQuestion().kind );
+    }
+
+    // Les sept, et pas six : c'est le VAMP qui manquait, et c'est lui qui tombe en dernier dans l'ordre du tirage.
+    EXPECT_EQ( 7U, seenKinds.size() );
 }
 
 TEST( ExerciseSessionTest, the_rhythm_share_decides_whether_a_cell_is_asked )

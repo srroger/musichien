@@ -28,6 +28,17 @@ namespace
 
 }    // namespace
 
+// Un genre de question et sa PART, dans l'ordre ou l'ecran les presente.
+//
+// Une table plutot qu'une suite de comparaisons : c'est ce qui permet de tirer sur la SOMME des parts (voir drawKind),
+// et d'ajouter un genre plus tard sans avoir a recalculer toutes les bornes des genres qui le suivent - le defaut exact
+// que la chaine de conditions portait.
+struct KindShare
+{
+    std::int32_t share{ 0 };
+    QuestionKind kind{ QuestionKind::NamedInterval };
+};
+
 ExerciseSession::ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings )
   : m_randomEngine{ p_seed }
   , m_settings{ p_settings }
@@ -376,66 +387,70 @@ bool ExerciseSession::answerChord( ChordQuality p_quality )
 
 QuestionKind ExerciseSession::drawKind()
 {
-    std::uniform_int_distribution<std::int32_t> distribution{ 0, 99 };
+    // Les parts, et leur SOMME.
+    //
+    // Le tirage se fait sur la somme, et jamais sur cent. C'etait le defaut, et Roger a mis le doigt dessus : « on
+    // commence a avoir beaucoup de spinbox 0-100 en disant que c'est des parts, mais sur dix questions, c'est plus des
+    // probabilites non ? ». Avec six parts a vingt - ce que l'ecran permet de regler - la somme fait 120, et un tirage
+    // sur [0, 100) faisait DISPARAITRE les derniers genres sans que rien ne le dise : on demandait du vamp, et il n'en
+    // venait jamais.
+    //
+    // Des parts se lisent les unes PAR RAPPORT AUX AUTRES. C'est donc leur somme qui est l'echelle, et vingt partout
+    // vaut un sixieme pour chacun, exactement comme on l'attend.
+    //
+    // L'ordre est celui de l'ecran : chaque genre prend la tranche qui suit la precedente, donc augmenter une part ne
+    // deplace que les questions d'apres.
+    const std::array<KindShare, 8> shares{ KindShare{ .share = m_settings.namedIntervalQuestionShare,
+                                                      .kind = QuestionKind::NamedInterval },
+                                           KindShare{ .share = m_settings.singQuestionShare,
+                                                      .kind = QuestionKind::Sing },
+                                           KindShare{ .share = m_settings.directionQuestionShare,
+                                                      .kind = QuestionKind::Direction },
+                                           KindShare{ .share = m_settings.rhythmQuestionShare,
+                                                      .kind = QuestionKind::Rhythm },
+                                           KindShare{ .share = m_settings.chordQuestionShare,
+                                                      .kind = QuestionKind::Chord },
+                                           KindShare{ .share = m_settings.modeColourQuestionShare,
+                                                      .kind = QuestionKind::ModeColour },
+                                           KindShare{ .share = m_settings.modeNameQuestionShare,
+                                                      .kind = QuestionKind::ModeName },
+                                           KindShare{ .share = m_settings.modeVampQuestionShare,
+                                                      .kind = QuestionKind::ModeVamp } };
+
+    std::int32_t total = 0;
+
+    for( const KindShare & entry : shares )
+    {
+        total += std::max( std::int32_t{ 0 }, entry.share );
+    }
+
+    if( total <= 0 )
+    {
+        // Aucune part : l'intervalle a nommer est la question par defaut du jeu, et c'est ce qu'elle a toujours ete.
+        return QuestionKind::NamedInterval;
+    }
+
+    std::uniform_int_distribution<std::int32_t> distribution{ 0, total - 1 };
 
     const std::int32_t draw = distribution( m_randomEngine );
 
-    if( draw < m_settings.singQuestionShare )
+    // Une TABLE, et non une chaine de comparaisons cumulees : les bornes s'additionnent d'elles-memes, chaque genre est
+    // une ligne, et un genre AJOUTE plus tard ne peut pas oublier de mettre a jour les sommes des suivants - le defaut
+    // exact que la version precedente portait.
+    std::int32_t boundary = 0;
+
+    for( const KindShare & entry : shares )
     {
-        return QuestionKind::Sing;
+        boundary += std::max( std::int32_t{ 0 }, entry.share );
+
+        if( draw < boundary )
+        {
+            return entry.kind;
+        }
     }
 
-    if( ( m_settings.directionQuestionShare > 0 )
-        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare ) )
-    {
-        return QuestionKind::Direction;
-    }
-
-    // Le rythme vient APRES les deux autres, et les parts se lisent comme des BORNES CUMULEES : chacune prend la
-    // tranche qui suit la precedente. L'ordre n'est pas une preference, c'est ce qui rend le tirage lisible d'un coup
-    // d'oeil - et ce qui fait qu'augmenter une part ne deplace que les questions qui la suivent.
-    if( ( m_settings.rhythmQuestionShare > 0 )
-        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare
-                      + m_settings.rhythmQuestionShare ) )
-    {
-        return QuestionKind::Rhythm;
-    }
-
-    // Et les accords en dernier : c'est la question la plus exigeante des quatre, donc celle qui ferme la marche.
-    if( ( m_settings.chordQuestionShare > 0 )
-        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare
-                      + m_settings.rhythmQuestionShare + m_settings.chordQuestionShare ) )
-    {
-        return QuestionKind::Chord;
-    }
-
-    // Et l'harmonie en dernier : elle demande un bourdon et deux modes, donc l'ecoute la plus longue de toutes les
-    // questions. Elle ferme la marche comme les accords, et pour la meme raison.
-    if( ( m_settings.modeColourQuestionShare > 0 )
-        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare + m_settings.rhythmQuestionShare
-                      + m_settings.chordQuestionShare + m_settings.modeColourQuestionShare ) )
-    {
-        return QuestionKind::ModeColour;
-    }
-
-    if( ( m_settings.modeNameQuestionShare > 0 )
-        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare + m_settings.rhythmQuestionShare
-                      + m_settings.chordQuestionShare + m_settings.modeColourQuestionShare
-                      + m_settings.modeNameQuestionShare ) )
-    {
-        return QuestionKind::ModeName;
-    }
-
-    // Et le VAMP ferme la marche, comme la question la plus avancee des trois : c'est la seule dont la reponse soit
-    // dans le contexte harmonique, et celle qui demande le plus de temps d'ecoute.
-    if( ( m_settings.modeVampQuestionShare > 0 )
-        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare + m_settings.rhythmQuestionShare
-                      + m_settings.chordQuestionShare + m_settings.modeColourQuestionShare
-                      + m_settings.modeNameQuestionShare + m_settings.modeVampQuestionShare ) )
-    {
-        return QuestionKind::ModeVamp;
-    }
-
+    // Inatteignable tant que la somme ci-dessus est celle qui borne le tirage : y arriver voudrait dire qu'une part a
+    // ete oubliee en chemin.
     return QuestionKind::NamedInterval;
 }
 
@@ -730,9 +745,14 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
 
     if( m_score.isOutOfLives() )
     {
-        // The session is over the moment the last life goes, without a feedback to read: there is
-        // nothing left to answer, and pretending otherwise would only delay the summary.
-        m_state = SessionState::Finished;
+        // La derniere vie s'en va, mais la question merite encore sa REPONSE.
+        //
+        // La session passe donc en Feedback comme n'importe quelle question conclue, et c'est advance() qui la termine.
+        // C'etait l'inverse, et le commentaire disait pourquoi : « the session is over the moment the last life goes,
+        // without a feedback to read ». Roger l'a vu jouer et l'a renverse : « quand on perds, on arrive direct a la page
+        // des scores, mais on n'a pas la reponse a la question sur laquelle on a fail ». Savoir ce qu'on a rate est
+        // justement ce qui reste a apprendre quand la partie est perdue.
+        m_state = SessionState::Feedback;
 
         return false;
     }

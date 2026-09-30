@@ -70,6 +70,10 @@ public:
 
     void storeReferencePitch( double p_hertz ) override;
 
+    [[nodiscard]] std::int32_t storedNamedIntervalQuestionShare() const override;
+
+    void storeNamedIntervalQuestionShare( std::int32_t p_share ) override;
+
     [[nodiscard]] std::int32_t storedSingQuestionShare() const override;
 
     void storeSingQuestionShare( std::int32_t p_share ) override;

@@ -103,13 +103,22 @@ namespace
     settings.startingPaletteSize = domain::SUPPORTED_INTERVAL_COUNT;
     settings.choiceCount = domain::SUPPORTED_INTERVAL_COUNT;
 
-    // Et RIEN d'autre : ni chant, ni rythme, ni accords, ni mode guide. L'ecran charge ici est celui de la GRILLE, et
-    // une question d'un autre genre - tiree une fois sur cinq - n'aurait aucun bouton de cercle a chercher. C'est
-    // exactement ce qui rendait ces tests intermittents, et le diagnostic est sans appel quand il arrive : "choix (0)".
+    // Et RIEN d'autre : ni nommer, ni chant, ni rythme, ni accords, ni mode guide. L'ecran charge ici est celui de la
+    // GRILLE, et une question d'un autre genre - tiree une fois sur cinq - n'aurait aucun bouton de cercle a chercher.
+    // C'est exactement ce qui rendait ces tests intermittents, et le diagnostic est sans appel quand il arrive :
+    // "choix (0)".
+    //
+    // AUCUNE part du tout, et c'est voulu : une session sans part pose la question par defaut du domaine, l'intervalle a
+    // nommer - celle dont ces tests parlent. Une part oubliee ici suffirait a voler des questions, comme partout
+    // ailleurs : c'est le prix des parts qui se lisent entre elles.
+    settings.namedIntervalQuestionShare = 0;
     settings.singQuestionShare = 0;
     settings.directionQuestionShare = 0;
     settings.rhythmQuestionShare = 0;
     settings.chordQuestionShare = 0;
+    settings.modeColourQuestionShare = 0;
+    settings.modeNameQuestionShare = 0;
+    settings.modeVampQuestionShare = 0;
 
     return settings;
 }
@@ -628,6 +637,7 @@ TEST( ExerciseScreenTest, the_cell_is_listened_to_before_it_is_reproduced )
     domain::NotePlayerFake notePlayer;
 
     domain::SessionSettings settings;
+    settings.namedIntervalQuestionShare = 0;
     settings.singQuestionShare = 0;
     settings.directionQuestionShare = 0;
     settings.rhythmQuestionShare = 100;

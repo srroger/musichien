@@ -238,6 +238,21 @@ struct SessionSettings
     // screen flips.
     std::int32_t directionQuestionShare{ 0 };
 
+    // La question historique du jeu : NOMMER l'intervalle entendu.
+    //
+    // Elle a SA part, comme les autres genres, et c'est une correction - pas un champ de plus. Avant, elle etait le
+    // seul genre SANS part : elle prenait « ce qui restait », et un reglage dont la somme depassait cent la faisait
+    // disparaitre en silence, comme il faisait disparaitre les derniers genres de la liste.
+    //
+    // Roger a mis le doigt dessus : « on commence a avoir beaucoup de spinbox 0-100 en disant que c'est des parts, mais
+    // sur dix questions, c'est plus des probabilites non ? ». C'est exactement cela, et la part qui manquait est
+    // celle-ci. Les parts sont maintenant des POIDS, lus les uns par rapport aux autres : leur somme est l'echelle, et
+    // le total n'a plus besoin de faire cent.
+    //
+    // Soixante par defaut, avec le chant et les accords a vingt : la somme fait cent, et le jeu sonne exactement comme
+    // avant que cette part existe.
+    std::int32_t namedIntervalQuestionShare{ 60 };
+
     // Share of questions, in percent, that ask the player to SING the interval instead of naming it.
     //
     // Twenty by default: enough that the voice shows up regularly in a session, small enough that the listening

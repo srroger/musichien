@@ -415,6 +415,7 @@ domain::SessionSettings ExerciseSessionController::sessionSettingsForLevel( doma
     //
     // Ce que le PROFIL en dit, lui, est applique juste apres, par applyStoredQuestionShares : c'est la que ces
     // reglages sont ranges, et le profil fait foi.
+    settings.namedIntervalQuestionShare = m_settings.namedIntervalQuestionShare;
     settings.singQuestionShare = m_settings.singQuestionShare;
     settings.rhythmQuestionShare = m_settings.rhythmQuestionShare;
     settings.chordQuestionShare = m_settings.chordQuestionShare;
@@ -429,6 +430,7 @@ void ExerciseSessionController::applyStoredQuestionShares( domain::SessionSettin
         return;
     }
 
+    p_settings.namedIntervalQuestionShare = m_levelStore->storedNamedIntervalQuestionShare();
     p_settings.singQuestionShare = m_levelStore->storedSingQuestionShare();
     p_settings.rhythmQuestionShare = m_levelStore->storedRhythmQuestionShare();
     p_settings.chordQuestionShare = m_levelStore->storedChordQuestionShare();
@@ -1458,6 +1460,34 @@ void ExerciseSessionController::setTunerGuide( domain::TunerGuide p_guide )
 int ExerciseSessionController::singQuestionShare() const
 {
     return ( m_levelStore != nullptr ) ? m_levelStore->storedSingQuestionShare() : 20;
+}
+
+int ExerciseSessionController::namedIntervalQuestionShare() const
+{
+    // SOIXANTE quand il n'y a pas de profil : le defaut du domaine et celui du fichier de reglages disent tous les deux
+    // la meme chose, sinon l'un des trois finirait par mentir a l'ecran.
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedNamedIntervalQuestionShare() : 60;
+}
+
+void ExerciseSessionController::setNamedIntervalQuestionShare( int p_share )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    // Une part est un pourcentage : hors bornes, c'est une faute de frappe, pas un reglage.
+    if( p_share < 0 || p_share > 100 )
+    {
+        return;
+    }
+
+    m_levelStore->storeNamedIntervalQuestionShare( p_share );
+
+    // La session SUIVANTE prend la nouvelle part ; une session en cours garde ses propres regles.
+    m_settings.namedIntervalQuestionShare = p_share;
+
+    emit namedIntervalQuestionShareChanged();
 }
 
 void ExerciseSessionController::setSingQuestionShare( int p_share )

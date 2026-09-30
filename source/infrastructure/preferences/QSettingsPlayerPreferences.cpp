@@ -45,6 +45,10 @@ constexpr const char * REFERENCE_PITCH_KEY = "player/reference-pitch";
 // How many questions in a hundred ask the player to SING, the rest asking him to name the interval.
 constexpr const char * SING_QUESTION_SHARE_KEY = "player/sing-question-share";
 
+// La part de la question historique du jeu : nommer l'intervalle. Soixante par defaut, comme le domaine, donc un
+// profil neuf sonne exactement comme le jeu d'avant que cette part existe.
+constexpr const char * NAMED_INTERVAL_QUESTION_SHARE_KEY = "player/named-interval-question-share";
+
 // Les deux autres parts de question, gardees avec les memes bornes et la meme valeur de repli que celle du chant :
 // trois reglages du meme genre se lisent de la meme facon, sinon l'un des trois finira par mentir.
 constexpr const char * RHYTHM_QUESTION_SHARE_KEY = "player/rhythm-question-share";
@@ -262,6 +266,27 @@ void QSettingsPlayerPreferences::storeReferencePitch( double p_hertz )
     QSettings settings;
 
     settings.setValue( REFERENCE_PITCH_KEY, p_hertz );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedNamedIntervalQuestionShare() const
+{
+    // Soixante, comme le domaine : le defaut d'un profil neuf est le jeu tel qu'il etait avant que cette part existe.
+    const std::int32_t stored = QSettings{}.value( NAMED_INTERVAL_QUESTION_SHARE_KEY, 60 ).toInt();
+
+    // Une part hors bornes est une faute de frappe dans un fichier qu'un joueur peut ouvrir, et retombe sur le defaut.
+    if( stored < 0 || stored > 100 )
+    {
+        return 60;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeNamedIntervalQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( NAMED_INTERVAL_QUESTION_SHARE_KEY, p_share );
 }
 
 std::int32_t QSettingsPlayerPreferences::storedSingQuestionShare() const

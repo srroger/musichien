@@ -274,6 +274,13 @@ class ExerciseSessionController final : public QObject
     // player can tune: from zero (no singing) to one hundred (nothing but singing).
     Q_PROPERTY( int singQuestionShare READ singQuestionShare NOTIFY singQuestionShareChanged )
 
+    // La part de la question historique du jeu : NOMMER l'intervalle entendu.
+    //
+    // Ce n'est pas un reglage de plus, c'est celui qui manquait : les autres genres avaient chacun leur part, et nommer
+    // - la question que le jeu posait a ses debuts - n'en avait aucune. Elle prenait « ce qui restait », et depuis que
+    // les parts se lisent les unes par rapport aux autres, une part qui se tait n'est plus une part.
+    Q_PROPERTY( int namedIntervalQuestionShare READ namedIntervalQuestionShare NOTIFY namedIntervalQuestionShareChanged )
+
     // Combien de questions sur cent portent sur le RYTHME, et combien sur les ACCORDS. Memes reglages, memes bornes,
     // memes raisons : au-dela d'une part, on ne choisit plus ce qu'on travaille, on le subit.
     Q_PROPERTY( int rhythmQuestionShare READ rhythmQuestionShare NOTIFY rhythmQuestionShareChanged )
@@ -411,6 +418,12 @@ public:
     [[nodiscard]] int singQuestionShare() const;
 
     Q_INVOKABLE void setSingQuestionShare( int p_share );
+
+    // La part des questions qui demandent de NOMMER l'intervalle. Meme contrat que les autres : bornee a 0-100,
+    // memorisee, et prise en compte par la session SUIVANTE.
+    [[nodiscard]] int namedIntervalQuestionShare() const;
+
+    Q_INVOKABLE void setNamedIntervalQuestionShare( int p_share );
 
     // Combien de questions sur cent portent sur le rythme, et combien sur les accords. Meme contrat que le chant :
     // borne a 0-100, memorise, et pris en compte par la session SUIVANTE.
@@ -680,6 +693,8 @@ signals:
 
     // The player has just changed how often questions ask him to sing.
     void singQuestionShareChanged();
+
+    void namedIntervalQuestionShareChanged();
 
     // Le joueur vient de changer la part du rythme, ou celle des accords.
     void rhythmQuestionShareChanged();

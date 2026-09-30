@@ -890,6 +890,8 @@ ApplicationWindow {
             ColumnLayout {
                 // Les trois parts de question : combien de questions de chaque genre sur cent. Un reglage par genre,
                 // la meme mise en page pour les trois, et une seule definition - voir QuestionShareSetting.
+                // Les parts sont des POIDS, lus les uns par rapport aux autres : leur somme est l'echelle, et le total
+                // n'a donc pas besoin de faire cent. Vingt partout vaut un sixieme pour chacun.
 
                 id: settingsColumn
 
@@ -1125,13 +1127,28 @@ ApplicationWindow {
 
                 }
 
+                // Et celle-ci est en TETE parce que c'est d'elle que les autres se detachent : on commence par demander
+                // moins de « nommer », et les parts qui suivent prennent ce qu'on lui retire. C'est la question que le
+                // jeu posait a ses debuts, et la seule qui n'avait pas de part a elle - elle prenait ce qui restait, et
+                // un total qui depassait cent la faisait disparaitre en silence.
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Nommer")
+                    hint: qsTr("Poids des questions où l'on nomme l'intervalle entendu. Les parts se lisent entre elles : 20 partout vaut un sixième chacune.")
+                    share: ExerciseController.namedIntervalQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setNamedIntervalQuestionShare(p_share);
+                    }
+                }
+
                 // Le rythme et les accords sont arrives apres le chant, et ils se sont fait brancher sans une ligne
                 // de mise en page nouvelle : c'est exactement ce que le composant promettait.
                 QuestionShareSetting {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
                     title: qsTr("Chant")
-                    hint: qsTr("Part des questions chantées, en pour cent. 0 = jamais, 100 = tout chanter.")
+                    hint: qsTr("Poids des questions chantées. Un poids, lu par rapport aux autres parts.")
                     share: ExerciseController.singQuestionShare
                     onShareEdited: (p_share) => {
                         return ExerciseController.setSingQuestionShare(p_share);
@@ -1142,7 +1159,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
                     title: qsTr("Rythme")
-                    hint: qsTr("Part des questions de rythme, en pour cent. 0 = jamais, 100 = que du rythme.")
+                    hint: qsTr("Poids des questions de rythme. Un poids, lu par rapport aux autres parts.")
                     share: ExerciseController.rhythmQuestionShare
                     onShareEdited: (p_share) => {
                         return ExerciseController.setRhythmQuestionShare(p_share);
@@ -1153,7 +1170,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
                     title: qsTr("Accords")
-                    hint: qsTr("Part des questions d'accords, en pour cent. 0 = jamais, 100 = que des accords.")
+                    hint: qsTr("Poids des questions d'accords. Un poids, lu par rapport aux autres parts.")
                     share: ExerciseController.chordQuestionShare
                     onShareEdited: (p_share) => {
                         return ExerciseController.setChordQuestionShare(p_share);

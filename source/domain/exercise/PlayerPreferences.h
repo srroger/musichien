@@ -128,6 +128,14 @@ public:
 
     // How many questions in a hundred ask the player to SING the interval, the rest asking him to name it. A rule of
     // the session, remembered so that a player who wants more singing does not ask for it every time.
+    //
+    // « Sur cent » n'est plus tout a fait vrai, et c'est une correction : les parts sont desormais des POIDS, lus les
+    // uns par rapport aux autres. Vingt partout vaut un cinquieme pour chacun, et le total n'a plus besoin de faire
+    // cent. Voir SessionSettings::namedIntervalQuestionShare pour le defaut que cela a corrige.
+    [[nodiscard]] virtual std::int32_t storedNamedIntervalQuestionShare() const = 0;
+
+    virtual void storeNamedIntervalQuestionShare( std::int32_t p_share ) = 0;
+
     [[nodiscard]] virtual std::int32_t storedSingQuestionShare() const = 0;
 
     virtual void storeSingQuestionShare( std::int32_t p_share ) = 0;
@@ -227,6 +235,13 @@ public:
 
     void storeReferencePitch( double p_hertz ) override { m_referencePitch = p_hertz; }
 
+    [[nodiscard]] std::int32_t storedNamedIntervalQuestionShare() const override
+    {
+        return m_namedIntervalQuestionShare;
+    }
+
+    void storeNamedIntervalQuestionShare( std::int32_t p_share ) override { m_namedIntervalQuestionShare = p_share; }
+
     [[nodiscard]] std::int32_t storedSingQuestionShare() const override { return m_singQuestionShare; }
 
     void storeSingQuestionShare( std::int32_t p_share ) override { m_singQuestionShare = p_share; }
@@ -277,6 +292,7 @@ private:
 
     double m_referencePitch{ 440.0 };
 
+    std::int32_t m_namedIntervalQuestionShare{ 60 };
     std::int32_t m_singQuestionShare{ 20 };
 
     // Vingt pour cent chacune, comme le chant : un premier lancement entend un peu de tout, et c'est au joueur de

@@ -37,14 +37,24 @@ constexpr std::size_t SESSION_QUESTION_COUNT = 10;
 // Les trois parts sont epinglees ENSEMBLE, et c'est le piege de ce fichier : une part laissee a sa valeur par defaut
 // fait echouer un test une fois sur cinq, et un test qui echoue au hasard n'apprend rien a personne. Le meme piege
 // existait deja pour le chant - voir l'en-tete.
+// Les parts sont des POIDS, lus les uns par rapport aux autres : une seule oubliee suffit a voler des questions. Le
+// meme piege que pour les profils, et la raison pour laquelle tous les helpers de ce fichier commencent par celui-ci.
+void pinEveryQuestionShare( domain::SessionSettings & p_settings )
+{
+    p_settings.namedIntervalQuestionShare = 0;
+    p_settings.singQuestionShare = 0;
+    p_settings.directionQuestionShare = 0;
+    p_settings.rhythmQuestionShare = 0;
+    p_settings.chordQuestionShare = 0;
+    p_settings.modeColourQuestionShare = 0;
+    p_settings.modeNameQuestionShare = 0;
+    p_settings.modeVampQuestionShare = 0;
+}
+
 [[nodiscard]] domain::SessionSettings intervalOnlySettings()
 {
     domain::SessionSettings settings;
-
-    settings.singQuestionShare = 0;
-    settings.directionQuestionShare = 0;
-    settings.rhythmQuestionShare = 0;
-    settings.chordQuestionShare = 0;
+    pinEveryQuestionShare( settings );
 
     return settings;
 }
@@ -53,11 +63,9 @@ constexpr std::size_t SESSION_QUESTION_COUNT = 10;
 [[nodiscard]] domain::SessionSettings singOnlySettings()
 {
     domain::SessionSettings settings;
+    pinEveryQuestionShare( settings );
 
     settings.singQuestionShare = 100;
-    settings.directionQuestionShare = 0;
-    settings.rhythmQuestionShare = 0;
-    settings.chordQuestionShare = 0;
 
     return settings;
 }
@@ -83,9 +91,8 @@ constexpr std::size_t SESSION_QUESTION_COUNT = 10;
 [[nodiscard]] domain::SessionSettings rhythmOnlySettings()
 {
     domain::SessionSettings settings;
+    pinEveryQuestionShare( settings );
 
-    settings.singQuestionShare = 0;
-    settings.directionQuestionShare = 0;
     settings.rhythmQuestionShare = 100;
 
     return settings;
@@ -95,25 +102,28 @@ constexpr std::size_t SESSION_QUESTION_COUNT = 10;
 [[nodiscard]] domain::SessionSettings chordOnlySettings()
 {
     domain::SessionSettings settings;
+    pinEveryQuestionShare( settings );
 
-    settings.singQuestionShare = 0;
-    settings.directionQuestionShare = 0;
-    settings.rhythmQuestionShare = 0;
     settings.chordQuestionShare = 100;
 
     return settings;
 }
 
-// Un profil qui ne veut QUE des intervalles.
+// Un profil qui ne veut QUE des intervalles A NOMMER.
 //
-// Les quatre parts de question sont epinglees ENSEMBLE : une seule laissee a sa valeur par defaut - vingt - et le test
-// qui parle de la grille tombe sur une autre question une fois sur cinq. Le piege a coute cher une fois deja, et il
-// grandit a chaque genre de question nouveau.
+// Les parts de question sont epinglees ENSEMBLE : une seule laissee a sa valeur par defaut - vingt, soixante pour
+// « nommer » - et le test qui parle de la grille tombe sur une autre question. Le piege a coute cher une fois deja, et
+// il grandit a chaque genre de question nouveau : il vient encore de mordre, quand « nommer » a recu la part qui lui
+// manquait et que ce helper ne la connaissait pas encore.
 void storeIntervalOnlyShares( domain::PlayerPreferencesFake & p_store )
 {
+    p_store.storeNamedIntervalQuestionShare( 100 );
     p_store.storeSingQuestionShare( 0 );
     p_store.storeRhythmQuestionShare( 0 );
     p_store.storeChordQuestionShare( 0 );
+    p_store.storeModeColourQuestionShare( 0 );
+    p_store.storeModeNameQuestionShare( 0 );
+    p_store.storeModeVampQuestionShare( 0 );
 }
 
 // Une couleur d'accord qui n'est PAS la bonne, prise parmi celles que le joueur peut repondre.
@@ -165,6 +175,7 @@ void storeIntervalOnlyShares( domain::PlayerPreferencesFake & p_store )
 // a sa valeur par defaut, et le test tombe sur un autre genre une fois sur cinq.
 void storeNamedModeOnlyShares( domain::PlayerPreferencesFake & p_store )
 {
+    p_store.storeNamedIntervalQuestionShare( 0 );
     p_store.storeSingQuestionShare( 0 );
     p_store.storeRhythmQuestionShare( 0 );
     p_store.storeChordQuestionShare( 0 );
@@ -858,6 +869,7 @@ TEST( ExerciseSessionControllerTest, a_guided_question_reports_its_kind_and_take
     domain::NotePlayerFake notePlayer;
 
     domain::SessionSettings settings = ascendingOnlySettings();
+    pinEveryQuestionShare( settings );
     settings.directionQuestionShare = 100;
 
     ExerciseSessionController controller{ notePlayer, settings };
@@ -1563,6 +1575,10 @@ TEST( ExerciseSessionControllerTest, resetting_the_profile_also_wipes_the_statis
     domain::QuestionLogFake log;
 
     storeIntervalOnlyShares( levelStore );
+
+    // Le profil ne veut QUE des accords : « nommer » redescend donc a zero, sinon les deux parts se partageraient la
+    // session et la moitie des questions ne seraient pas des accords.
+    levelStore.storeNamedIntervalQuestionShare( 0 );
     levelStore.storeChordQuestionShare( 100 );
 
     ExerciseSessionController controller{ notePlayer, chordOnlySettings(), {}, {}, {}, &levelStore };
