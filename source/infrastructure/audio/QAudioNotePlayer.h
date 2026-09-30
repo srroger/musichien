@@ -126,6 +126,13 @@ public:
     // Les deux clics du metronome, echantillonnes eux aussi : deux blocs de bois. Vides, la synthese les remplace.
     void useMetronomeClicks( std::vector<float> p_accented, std::vector<float> p_plain );
 
+    // Le wouf du chien. Comme une percussion, ce n'est PAS une note : elle ne se transpose pas et n'a pas de hauteur
+    // musicale, donc le fichier est lu pour ses echantillons seulement.
+    void useDogBark( std::vector<float> p_samples );
+
+    // Et il se joue quand le chien ouvre la bouche : une seule fois, sans boucle, par-dessus ce qui joue deja.
+    void playDogBark() override;
+
     // Le petit arpège de l'accueil : montant, ouvert, au piano, et VOLONTAIREMENT discret.
     //
     // Il est discret pour deux raisons : un accord de trois notes au niveau des exercices arrive comme une porte qui
@@ -260,6 +267,9 @@ private:
     // One recorded sound per piece, in the order of domain::Drum. Empty when the samples could not be read, in which
     // case the synthesiser plays.
     std::array<std::vector<float>, domain::DRUM_COUNT> m_drumSamples;
+
+    // Le wouf du chien, s'il a ete trouve au chargement. Vide, le clic de menu prend sa place.
+    std::vector<float> m_dogBark;
 
     // The two metronome clicks: the accented one, and the plain one. Empty when they could not be read.
     std::vector<float> m_accentedClick;

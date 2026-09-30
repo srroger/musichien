@@ -240,6 +240,12 @@ ApplicationWindow {
                 // cran plus loin. Un bouton par mode en ferait quatorze a l'ecran d'un telephone, pour un choix qui n'a
                 // aucune raison d'etre simultane.
                 // La ROUE du mode entendu : ses sept notes allumées sur le cercle des quintes, la tonique marquée.
+                // -----------------------------------------------------------------------------------------
+                // Le niveau, en LISTE DEROULANTE.
+                // La grille de boutons qu'elle remplace mangeait la moitie de la page : quatre options - cinq
+                // aujourd'hui - sur deux lignes, chacune de la largeur d'un bouton. Roger l'a demande tel quel :
+                // « il faudrait faire la combobox pour les niveaux, ca allegerait pas mal ».
+                // Les DEUX GRANDS OUTILS, en icones.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -329,29 +335,27 @@ ApplicationWindow {
                     text: ExerciseController.hasChosenLevel ? qsTr("Ton niveau") : qsTr("Pour commencer : tu en es où ?")
                 }
 
-                GridLayout {
+                // Le composant est celui des reglages, et il est ANCRE dans un Item de la largeur des boutons : ses
+                // propres Layout.* visent un parent qui est un Layout, et ici le parent n'en est pas un - la largeur
+                // vient donc du bouton qui la porte, ce qui est exactement ce qu'on veut.
+                Item {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
-                    columns: 2
-                    columnSpacing: 8
-                    rowSpacing: 8
+                    Layout.preferredHeight: levelCombo.implicitHeight
 
-                    Repeater {
+                    DarkComboBox {
+                        id: levelCombo
+
+                        anchors.fill: parent
                         model: ExerciseController.playerLevels
-
-                        delegate: Button {
-                            required property var modelData
-
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 44
-                            text: modelData.name
-                            font.pixelSize: 14
-                            // The chosen one stays marked, so that the screen never leaves any doubt about the
-                            // level the next session will use.
-                            highlighted: ExerciseController.playerLevel === modelData.index
-                            onClicked: ExerciseController.choosePlayerLevel(modelData.index)
+                        textRole: "name"
+                        valueRole: "index"
+                        // Le niveau choisi reste marque dans la liste : l'ecran ne laisse jamais de doute sur la
+                        // difficulte de la prochaine partie.
+                        currentIndex: ExerciseController.playerLevel
+                        onActivated: {
+                            ExerciseController.choosePlayerLevel(currentValue);
                         }
-
                     }
 
                 }
@@ -457,9 +461,16 @@ ApplicationWindow {
 
                 }
 
-                // Les OUTILS et les portes vers des PAGES, sous les modes de jeu. Deux rangees de deux plutot qu'une
-                // rangee de quatre : « Metronome » et « Accordeur » ne tiennent pas cote a cote sur la largeur d'un
-                // telephone, et un libelle coupe en deux n'est plus un libelle.
+                // Et un peu d'air SOUS cette rangee-la, avant les outils : Roger l'a demande - « je rajouterai bien un
+                // petit espace en bas de la ligne qui a : infini, chanter et survie ».
+                Item {
+                    Layout.preferredHeight: 10
+                }
+
+                // Un metronome et un diapason se reconnaissent d'un coup d'oeil, et ce sont les deux seuls outils qu'on
+                // ouvre pour TRAVAILLER - l'un donne le temps, l'autre la justesse. Un bouton qui ne porte qu'un mot
+                // demande a etre lu ; une forme se voit. Roger : « je mettrais plutot une icone avec un gros diapason,
+                // ca devrait se comprendre tout seul ».
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
@@ -467,25 +478,97 @@ ApplicationWindow {
 
                     Button {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 46
-                        text: qsTr("Métronome")
-                        onClicked: rhythmDialog.open()
+                        Layout.preferredHeight: 116
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            rhythmDialog.open();
+                        }
+
+                        // Le metronome : le boitier en trapeze, la tige inclinee et son contrepoids. C'est la
+                        // silhouette du vieil appareil a balancier, celle que tout le monde a vue sur un piano.
+                        Canvas {
+                            anchors.centerIn: parent
+                            width: 62
+                            height: 62
+                            antialiasing: true
+                            onPaint: {
+                                const ctx = getContext("2d");
+                                ctx.reset();
+                                ctx.strokeStyle = "#ffffff";
+                                ctx.lineWidth = 5;
+                                ctx.lineJoin = "round";
+                                ctx.lineCap = "round";
+                                // Le boitier, plus large en bas.
+                                ctx.beginPath();
+                                ctx.moveTo(17, 54);
+                                ctx.lineTo(45, 54);
+                                ctx.lineTo(36, 14);
+                                ctx.lineTo(26, 14);
+                                ctx.closePath();
+                                ctx.stroke();
+                                // La tige qui bat, et son contrepoids.
+                                ctx.beginPath();
+                                ctx.moveTo(31, 51);
+                                ctx.lineTo(41, 12);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.arc(38, 22, 4, 0, Math.PI * 2);
+                                ctx.stroke();
+                                // La graduation : trois crans, qui disent que ca bat.
+                                ctx.beginPath();
+                                ctx.moveTo(21, 44);
+                                ctx.lineTo(25, 44);
+                                ctx.moveTo(24, 34);
+                                ctx.lineTo(28, 34);
+                                ctx.stroke();
+                            }
+                        }
+
                     }
 
                     Button {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 46
-                        text: qsTr("Accordeur")
-                        onClicked: tunerDialog.open()
-                    }
+                        Layout.preferredHeight: 116
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            tunerDialog.open();
+                        }
 
-                    // Le cercle des quintes : la CARTE du pilier harmonie, et la seule page qui ne demande rien au
-                    // joueur - on y lit, on n'y repond pas.
-                    Button {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 46
-                        text: qsTr("Cercle")
-                        onClicked: keyCircleDialog.open()
+                        // Le diapason : la fourche et son manche. Deux traits epais qui montent, et l'oeil ne s'y
+                        // trompe pas - c'est l'objet qui donne la justesse, et le seul que l'accordeur peut montrer.
+                        Canvas {
+                            anchors.centerIn: parent
+                            width: 62
+                            height: 62
+                            antialiasing: true
+                            onPaint: {
+                                const ctx = getContext("2d");
+                                ctx.reset();
+                                ctx.strokeStyle = "#ffffff";
+                                ctx.lineWidth = 6;
+                                ctx.lineJoin = "round";
+                                ctx.lineCap = "round";
+                                // La fourche : deux branches qui montent et s'ecartent.
+                                ctx.beginPath();
+                                ctx.moveTo(21, 12);
+                                ctx.lineTo(21, 26);
+                                ctx.quadraticCurveTo(21, 40, 31, 40);
+                                ctx.quadraticCurveTo(41, 40, 41, 26);
+                                ctx.lineTo(41, 12);
+                                ctx.stroke();
+                                // Le manche, qui descend du creux de la fourche.
+                                ctx.beginPath();
+                                ctx.moveTo(31, 40);
+                                ctx.lineTo(31, 52);
+                                ctx.stroke();
+                                // Et son pied, un peu evase.
+                                ctx.beginPath();
+                                ctx.moveTo(26, 54);
+                                ctx.lineTo(36, 54);
+                                ctx.stroke();
+                            }
+                        }
+
                     }
 
                 }
@@ -495,18 +578,37 @@ ApplicationWindow {
                     Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
 
+                    // Le cercle des quintes : la CARTE du pilier harmonie, et la seule page qui ne demande rien au
+                    // joueur - on y lit, on n'y repond pas. Il descend ici, avec les deux portes, parce que les deux
+                    // grands outils au-dessus avaient besoin de toute la largeur.
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Cercle")
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            keyCircleDialog.open();
+                        }
+                    }
+
                     Button {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
                         text: qsTr("Options")
-                        onClicked: settingsDialog.open()
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            settingsDialog.open();
+                        }
                     }
 
                     Button {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
                         text: qsTr("Profil")
-                        onClicked: profileDialog.open()
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            profileDialog.open();
+                        }
                     }
 
                 }
@@ -1004,7 +1106,10 @@ ApplicationWindow {
                         Layout.preferredHeight: 34
                         text: qsTr("Un rappel chaque jour")
                         checked: ExerciseController.dailyReminderEnabled
-                        onClicked: ExerciseController.setDailyReminderEnabled(checked)
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            ExerciseController.setDailyReminderEnabled(checked);
+                        }
 
                         contentItem: Text {
                             text: parent.text
@@ -1250,14 +1355,20 @@ ApplicationWindow {
                     Button {
                         Layout.fillWidth: true
                         text: qsTr("Par défaut")
-                        onClicked: ExerciseController.resetPreferences()
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            ExerciseController.resetPreferences();
+                        }
                     }
 
                     Button {
                         Layout.fillWidth: true
                         highlighted: true
                         text: qsTr("Fermer")
-                        onClicked: settingsDialog.close()
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            settingsDialog.close();
+                        }
                     }
 
                 }
@@ -1410,7 +1521,10 @@ ApplicationWindow {
                 Button {
                     Layout.alignment: Qt.AlignRight
                     text: qsTr("Fermer")
-                    onClicked: singingDialog.close()
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        singingDialog.close();
+                    }
                 }
 
             }
@@ -1451,7 +1565,11 @@ ApplicationWindow {
             id: profileScroll
 
             clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            // Meme correction que dans les reglages : rien ne depasse en largeur, donc rien ne doit pouvoir glisser de
+            // cote. La barre cachee ne suffisait pas, et Roger l'a senti sur les deux pages.
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            contentWidth: availableWidth
 
             ColumnLayout {
                 // -----------------------------------------------------------------------------------------------------
@@ -1832,13 +1950,25 @@ ApplicationWindow {
                 Button {
                     Layout.alignment: Qt.AlignRight
                     text: qsTr("Remise à zéro complète")
-                    onClicked: ExerciseController.resetProfile()
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        ExerciseController.resetProfile();
+                    }
                 }
 
                 Button {
                     Layout.alignment: Qt.AlignRight
                     text: qsTr("Fermer")
-                    onClicked: profileDialog.close()
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        profileDialog.close();
+                    }
+                }
+
+                // De l'air sous le dernier bouton : la barre de navigation du telephone recouvrait le bas de la page, et
+                // c'est le meme reproche que Roger a fait aux reglages - « je rajouterai bien un petit espace en bas ».
+                Item {
+                    Layout.preferredHeight: 128
                 }
 
             }
@@ -1960,7 +2090,10 @@ ApplicationWindow {
                     Layout.alignment: Qt.AlignRight
                     Layout.topMargin: 8
                     text: qsTr("Fermer")
-                    onClicked: chordTreeDialog.close()
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        chordTreeDialog.close();
+                    }
                 }
 
             }
@@ -2367,7 +2500,10 @@ ApplicationWindow {
                     Button {
                         Layout.fillWidth: true
                         text: qsTr("Fermer")
-                        onClicked: tunerDialog.close()
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            tunerDialog.close();
+                        }
                     }
 
                 }
@@ -2567,7 +2703,10 @@ ApplicationWindow {
                     Button {
                         Layout.fillWidth: true
                         text: qsTr("Fermer")
-                        onClicked: rhythmDialog.close()
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            rhythmDialog.close();
+                        }
                     }
 
                 }

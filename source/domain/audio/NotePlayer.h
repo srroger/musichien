@@ -126,6 +126,13 @@ public:
     // d'obliger tous les adaptateurs du projet à répondre.
     virtual void playTapCue() {}
 
+    // Le petit wouf du chien qui raconte une anecdote.
+    //
+    // Un corps par defaut, comme le clic de menu, et il TOMBE DESSUS a dessein : Roger a donne les deux solutions dans la
+    // meme phrase - un son de chien « doux et tres court », « ou sinon, juste le meme petit son que tu avais sur les
+    // boutons de la difficulte ». Un adaptateur qui n'a pas d'aboiement continuera donc de repondre quelque chose.
+    virtual void playDogBark() { playTapCue(); }
+
     // Le clic du métronome : un temps simple, ou le PREMIER temps d'une mesure (accentué). Un corps par défaut, comme
     // le clic de menu : un adaptateur sans métronome se contente du clic ordinaire.
     virtual void playMetronomeClick( bool p_accented )

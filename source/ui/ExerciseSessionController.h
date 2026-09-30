@@ -637,6 +637,13 @@ public:
     // The player says where he is, once. His answer is remembered, and it decides where his sessions start.
     Q_INVOKABLE void choosePlayerLevel( int p_level );
 
+    // Le clic de menu, a la disposition de l'ecran.
+    //
+    // Il existe deja sur les boutons de difficulte, et Roger veut l'entendre PARTOUT ou l'on ne fait que naviguer :
+    // « ces petits sons de menu, on devrait les etendre, surtout les boutons qui ne produisent pas de musique ou de
+    // bruit ». C'est donc l'ecran qui decide - lui seul sait si un bouton va faire sonner quelque chose.
+    Q_INVOKABLE void playTapCue();
+
     // Turns one instrument on or off. The last enabled one cannot be turned off: an instrument list with nothing
     // in it is a game with no sound.
     Q_INVOKABLE void setInstrumentEnabled( int p_index, bool p_isEnabled );

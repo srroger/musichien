@@ -397,6 +397,10 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Les deux clics du metronome : deux blocs de bois, dans la meme banque libre.
     notePlayer.useMetronomeClicks( loadSample( "drum_click_high" ), loadSample( "drum_click_low" ) );
 
+    // Le petit wouf du chien, synthetise une fois pour toutes par scripts/render_dog_bark.py et charge comme le reste.
+    // Une ressource manquante coute le wouf, jamais le demarrage : le clic de menu prend sa place.
+    notePlayer.useDogBark( loadSample( "dog_bark" ) );
+
     // Les trois bourdons enregistres, charges ICI comme les instruments et pour la meme raison : une ressource
     // manquante coute un timbre, jamais le demarrage.
     constexpr std::array<const char *, 3> DRONE_NAMES{ "strings", "choir", "pad" };

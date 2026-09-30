@@ -103,6 +103,8 @@
       Une percussion n'est pas une note - elle ne se transpose pas - donc elle est jouee telle quelle.
     -->
         <file alias="assets/soundfonts/drum_kick.wav">../../assets/soundfonts/drum_kick.wav</file>
+        <!-- Le wouf du chien qui raconte une anecdote : le seul son du projet qui soit SYNTHETISE, faute de banque. -->
+        <file alias="assets/soundfonts/dog_bark.wav">../../assets/soundfonts/dog_bark.wav</file>
         <file alias="assets/soundfonts/drum_snare.wav">../../assets/soundfonts/drum_snare.wav</file>
         <file alias="assets/soundfonts/drum_hihat.wav">../../assets/soundfonts/drum_hihat.wav</file>
         <file alias="assets/soundfonts/drum_tom.wav">../../assets/soundfonts/drum_tom.wav</file>

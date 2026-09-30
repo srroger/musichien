@@ -370,6 +370,9 @@ void ExerciseSessionController::tellAnotherAnecdote()
     // les a dessinees pour ca, « histoire de varier ».
     pickChibaImage();
 
+    // Et il aboie de nouveau : c'est une nouvelle phrase, donc une nouvelle voix.
+    m_notePlayer.playDogBark();
+
     if( m_isChibaTalking )
     {
         return;
@@ -471,6 +474,13 @@ bool ExerciseSessionController::hasChosenLevel() const noexcept
 int ExerciseSessionController::playerLevel() const noexcept
 {
     return m_playerLevel.has_value() ? static_cast<int>( *m_playerLevel ) : -1;
+}
+
+void ExerciseSessionController::playTapCue()
+{
+    // Un simple relais vers le port : le controleur ne fabrique pas de son, il demande. L'ecran, lui, sait QUEL bouton
+    // ne fait rien d'autre que naviguer.
+    m_notePlayer.playTapCue();
 }
 
 void ExerciseSessionController::choosePlayerLevel( int p_level )
@@ -785,6 +795,10 @@ void ExerciseSessionController::stopSession()
         m_isChibaTalking = true;
 
         pickChibaImage();
+
+        // ET IL ABOIE : le chien annonce qu'il a quelque chose a dire, et cette annonce doit s'entendre avant qu'on lise
+        // son anecdote - sans quoi il apparaîtrait en silence, comme une image.
+        m_notePlayer.playDogBark();
 
         emit chibaTalkingChanged();
     }
