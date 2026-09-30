@@ -1243,6 +1243,21 @@ int ExerciseSessionController::modeSoundDurationMs() const
 
     const domain::DroneFraming framing{ MODE_LEAD_IN, MODE_TAIL };
 
+    // Une PHRASE a ses propres durees, et elle dure souvent PLUS longtemps qu'une gamme de sept notes. C'est donc SA
+    // duree qu'il faut annoncer : sans elle, l'ecran revelerait la reponse - ou enchainerait sur la question suivante -
+    // pendant que la melodie joue encore.
+    if( const std::optional<domain::Phrase> & phrase = m_session->currentQuestion().modePhrase; phrase.has_value() )
+    {
+        const std::int32_t bpm =
+          ( m_levelStore != nullptr ) ? m_levelStore->storedPhraseTempoBpm() : FALLBACK_PHRASE_TEMPO;
+
+        const domain::PhrasePlayback playback = domain::playbackOf( *phrase, bpm );
+
+        // La surcharge du domaine pour des durees VARIABLES : elle compte le silence une fois par note, exactement comme
+        // la version uniforme. Le calcul reste donc le meme des deux cotes, et c'est ce qui l'empeche de mentir.
+        return static_cast<int>( domain::droneDurationFor( playback.durations, PHRASE_NOTE_GAP, framing ).count() );
+    }
+
     const std::chrono::milliseconds oneMode =
       domain::droneDurationFor( domain::DEGREE_COUNT, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
 

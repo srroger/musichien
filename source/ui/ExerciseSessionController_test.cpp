@@ -806,6 +806,21 @@ TEST( ExerciseSessionControllerTest, a_name_question_is_heard_as_a_melody )
 
     // Et le bourdon est la, sous la melodie : un mode sans centre ne serait pas un mode.
     EXPECT_EQ( 2U, played.drone.size() );
+
+    // LA DUREE annoncee a l'ecran est celle de la PHRASE, et pas celle d'une gamme de sept notes : cinq temps a 60 bpm,
+    // plus un silence par note, plus l'encadrement du bourdon. Le temoin est le meme controleur SANS livre, qui pose la
+    // meme question et fait entendre une gamme - et une gamme est plus courte. Sans ce calcul, l'ecran revelerait la
+    // reponse pendant que la melodie joue encore.
+    ExerciseSessionController scaleController{ notePlayer, {}, {}, {}, {}, &levelStore };
+    scaleController.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+    scaleController.startSession();
+
+    ASSERT_EQ( static_cast<int>( domain::QuestionKind::ModeName ), scaleController.questionKind() );
+
+    // La preuve que le temoin joue bien une GAMME, et non une phrase : c'est la seule difference entre les deux seances.
+    ASSERT_FALSE( notePlayer.melodiesOverDrones().empty() );
+
+    EXPECT_GT( controller.modeSoundDurationMs(), scaleController.modeSoundDurationMs() );
 }
 
 TEST( ExerciseSessionControllerTest, a_harmony_question_offers_no_interval_hint )
