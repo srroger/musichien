@@ -25,6 +25,7 @@
 #include "domain/music/Interval.h"
 #include "domain/music/Mode.h"
 #include "domain/music/Note.h"
+#include "domain/music/PhraseBook.h"
 #include "domain/rhythm/Rhythm.h"
 
 #include <chrono>
@@ -501,6 +502,17 @@ struct Question
     // Comme pour les accords, et pour la meme raison : un mode que le joueur n'a jamais rencontre ne serait pas un
     // choix, seulement un piege.
     std::vector<Mode> modeChoices;
+
+    // LA MELODIE, quand la question en a une : sur une question de NOM, le mode s'entend dans une PHRASE plutot que
+    // dans une gamme qui monte.
+    //
+    // C'est ce que les trois cents phrases de l'atelier attendaient. Le banc d'essai l'avait ecrit d'avance : « la phrase
+    // fait aussi connaitre son MODE : l'ecran n'a pas a deviner lequel a sonne, puisque c'est justement la question que
+    // l'exercice posera un jour ».
+    //
+    // Un optional, et jamais une phrase vide : une phrase sans pas se jouerait comme un silence, alors qu'un mode sans
+    // phrase doit simplement s'entendre en gamme. Les deux sont des questions valides ; il n'y en a qu'une qui sonne.
+    std::optional<Phrase> modePhrase;
 };
 
 enum class SessionState
@@ -515,7 +527,9 @@ class ExerciseSession
 public:
     // The seed is provided, never drawn here: the domain owns no entropy source, so the same seed
     // always produces the same session, which is what makes every rule above testable.
-    explicit ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings = {} );
+    explicit ExerciseSession( std::uint32_t p_seed,
+                              SessionSettings p_settings = {},
+                              const PhraseBook * p_phraseBook = nullptr );
 
     [[nodiscard]] const Question & currentQuestion() const noexcept { return m_currentQuestion; }
     [[nodiscard]] SessionState state() const noexcept { return m_state; }
@@ -652,6 +666,15 @@ public:
     // Les modes que le joueur a rencontres, dans l'ordre d'apprentissage.
     [[nodiscard]] std::span<const Mode> modePalette() const noexcept { return m_modePalette; }
 
+    // Le LIVRE DES PHRASES, donne a la CONSTRUCTION et jamais apres.
+    //
+    // Il n'y a pas de setter, et ce n'est pas un oubli : la premiere question est construite par le constructeur lui-meme -
+    // une session qui existe est une session qui demande quelque chose - donc un livre donne ensuite ne pourrait plus rien
+    // pour elle. Un test l'a montre en echouant, et c'est exactement ce qu'un test doit faire.
+    //
+    // Il n'est pas dans SessionSettings non plus : un pointeur dans des reglages qui se copient serait un piege a
+    // proprietaire, alors que sa place est evidemment au cote de ce qui construit les questions.
+
     // Ce que le joueur a repondu en dernier a une question de mode, pour que le verdict puisse le montrer.
     [[nodiscard]] std::optional<Mode> lastModeAnswer() const noexcept { return m_lastModeAnswer; }
 
@@ -752,6 +775,9 @@ private:
     // Les modes que le joueur a rencontres : un PREFIXE de modeLearningOrder(), elargi par les MEMES reussites que le
     // reste. Une seule progression a tenir, plutot que trois compteurs dont l'un finirait par mentir.
     std::vector<Mode> m_modePalette;
+
+    // Le livre des phrases modales, s'il a ete donne. C'est lui qui fait entendre un mode en MELODIE plutot qu'en gamme.
+    const PhraseBook * m_phraseBook{ nullptr };
 
     // La derniere reponse de mode, pour que le verdict puisse dire ce qui a ete repondu.
     std::optional<Mode> m_lastModeAnswer;

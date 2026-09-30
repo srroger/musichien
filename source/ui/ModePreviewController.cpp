@@ -31,9 +31,6 @@ constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
 constexpr std::chrono::milliseconds NOTE_DURATION{ 420 };
 constexpr std::chrono::milliseconds GAP{ 70 };
 
-// Les demi-tons d'une octave, pour poser le bourdon d'une phrase SOUS elle.
-constexpr std::int32_t SEMITONES_PER_OCTAVE = 12;
-
 // Le plancher du tempo d'une phrase : sous quarante, elle traine au point de ne plus etre une phrase. C'est la meme
 // borne que celle du domaine, et elle sert ici a un seul cas - le tirage de variation qui descendrait sous elle.
 constexpr std::int32_t MINIMUM_PHRASE_TEMPO = 40;
@@ -222,8 +219,7 @@ void ModePreviewController::playPhraseOfMode( int p_index )
     // La phrase est jouee TELLE QUE le contenu l'a ecrite : sa tonique, ses DUREES. Ce qui vient du reglage, et de lui
     // seul, est le TEMPO : Roger a demande « de choisir un central et de varier autour de 20-30 bpm », et c'est ce qui
     // casse la monotonie sans changer une seule note.
-    const std::vector<domain::Note> melody = phrase->notes( phrase->tonic );
-
+    //
     // Le centre et l'amplitude, lus AU MOMENT DE JOUER : un reglage change s'entend donc a la phrase suivante, sans
     // qu'aucun cache n'ait a etre tenu a jour.
     const std::int32_t centreBpm = ( m_preferences != nullptr ) ? m_preferences->storedPhraseTempoBpm() : 72;
@@ -240,20 +236,12 @@ void ModePreviewController::playPhraseOfMode( int p_index )
         bpm = std::max( MINIMUM_PHRASE_TEMPO, centreBpm + distribution( m_randomEngine ) );
     }
 
-    const std::vector<std::chrono::milliseconds> durations = phrase->stepDurations( bpm );
+    // Comment la phrase SE JOUE - sa melodie, la duree de chaque pas, le bourdon qui la porte - est calcule par le
+    // DOMAINE. C'est ce qui a permis au jeu de poser la meme question sans recopier la moindre ligne, et c'est aussi ce
+    // qui garantit qu'une phrase ne sonne pas differemment selon la page qui la joue.
+    const domain::PhrasePlayback playback = domain::playbackOf( *phrase, bpm );
 
-    // Le bourdon : la tonique de la phrase une OCTAVE sous elle, et sa quinte juste. Jamais au-dessus, et jamais au
-    // niveau de la melodie : un bourdon est un centre, pas une seconde voix.
-    //
-    // Le plancher est la premiere note jouable : une phrase dont la tonique est deja tout en bas se poserait sinon sur
-    // un bourdon qui n'existe pas, et c'est la phrase entiere qui deviendrait inaudible.
-    const std::int32_t droneRootMidi = std::max( phrase->tonic.midiNumber() - SEMITONES_PER_OCTAVE,
-                                                 domain::Note::MINIMUM_MIDI_NUMBER );
-
-    const std::array<domain::Note, 2> drone{ domain::Note{ droneRootMidi },
-                                             domain::Note{ droneRootMidi + FIFTH_IN_SEMITONES } };
-
-    m_notePlayer.playPhraseOverDrone( melody, durations, drone, GAP );
+    m_notePlayer.playPhraseOverDrone( playback.melody, playback.durations, playback.drone, GAP );
 
     const QVariantMap description = describePhrase( *phrase );
 

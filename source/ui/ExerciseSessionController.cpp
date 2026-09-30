@@ -47,6 +47,14 @@ constexpr std::chrono::milliseconds ARPEGGIO_NOTE_GAP{ 450 };
 constexpr std::chrono::milliseconds MODE_NOTE_DURATION{ 340 };
 constexpr std::chrono::milliseconds MODE_NOTE_GAP{ 40 };
 
+// L'ecart entre deux pas d'une PHRASE, et le tempo de secours quand aucun reglage n'a ete lu.
+//
+// Les deux valeurs sont celles du banc d'essai des modes, et ce n'est pas une coincidence : c'est la MEME phrase, et elle
+// doit sonner pareil dans les deux pages. Deux valeurs differentes feraient deux musiques differentes pour une seule
+// phrase.
+constexpr std::chrono::milliseconds PHRASE_NOTE_GAP{ 70 };
+constexpr std::int32_t FALLBACK_PHRASE_TEMPO = 72;
+
 // Le bourdon sonne SEUL avant la melodie, et apres : c'est ce qui installe le centre avant que la couleur n'arrive.
 constexpr std::chrono::milliseconds MODE_LEAD_IN{ 800 };
 constexpr std::chrono::milliseconds MODE_TAIL{ 600 };
@@ -753,7 +761,10 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
     // source, on purpose.
     std::random_device entropySource;
 
-    m_session = std::make_unique<domain::ExerciseSession>( entropySource(), p_settings );
+    // Le LIVRE DES PHRASES est donne a la CONSTRUCTION de chaque seance, et pas apres : la premiere question est construite
+    // par le constructeur lui-meme, donc un livre fourni ensuite ne pourrait plus rien pour elle. C'est ce que le jeu et le
+    // banc d'essai partagent - le domaine tire la phrase, et se rabat sur une gamme quand le contenu n'en a pas.
+    m_session = std::make_unique<domain::ExerciseSession>( entropySource(), p_settings, m_phraseBook );
 
     // LE DIAGNOSTIC, en une ligne, et il reste : « pourquoi cette question-la ? » se repond avec des chiffres, jamais avec
     // une memoire. Les parts affichees par les reglages et celles qui tirent vraiment la question sont deux choses, et
@@ -2570,6 +2581,25 @@ void ExerciseSessionController::playCurrentQuestion()
     m_notePlayer.playMelody( ascendingNotes, m_session->settings().melodicGap );
 }
 
+void ExerciseSessionController::playPhraseQuestion( const domain::Phrase & p_phrase )
+{
+    // Le TEMPO vient du reglage du joueur, exactement comme au banc d'essai : c'est le meme reglage, et il porte sur les
+    // phrases des modes - Roger l'a demande la-bas, et il n'y a aucune raison qu'une meme phrase change de vitesse selon
+    // la page qui la joue.
+    //
+    // SANS la variation aleatoire, en revanche, et c'est une difference VOULUE : le banc d'essai tire un tempo autour du
+    // centre pour casser la monotonie d'une ecoute libre, tandis qu'ici le joueur peut REECOUTER la question autant de
+    // fois qu'il veut. Deux tempos pour la meme question feraient douter de ce qu'on vient d'entendre - et la question
+    // porte sur la COULEUR du mode, jamais sur la vitesse.
+    const std::int32_t bpm = ( m_levelStore != nullptr ) ? m_levelStore->storedPhraseTempoBpm() : FALLBACK_PHRASE_TEMPO;
+
+    // Comment la phrase se joue - sa melodie, la duree de chaque pas, son bourdon - vient du DOMAINE, et du meme endroit
+    // que le banc d'essai : c'est ce qui garantit les deux musiques identiques.
+    const domain::PhrasePlayback playback = domain::playbackOf( p_phrase, bpm );
+
+    m_notePlayer.playPhraseOverDrone( playback.melody, playback.durations, playback.drone, PHRASE_NOTE_GAP );
+}
+
 void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
 {
     if( m_session == nullptr )
@@ -2578,6 +2608,18 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
     }
 
     const domain::Question & question = m_session->currentQuestion();
+
+    // Une MELODIE, quand la question en porte une : sur une question de NOM, le mode s'entend dans une PHRASE du contenu
+    // au lieu d'une gamme qui monte. C'est ce que les trois cents phrases de l'atelier attendaient, et c'est le domaine
+    // qui a decide de ce qu'elle fait entendre.
+    //
+    // Le second passage d'une comparaison n'arrive jamais ici : une phrase ne se pose que sur une question de nom.
+    if( !p_secondOnly && question.modePhrase.has_value() )
+    {
+        playPhraseQuestion( *question.modePhrase );
+
+        return;
+    }
 
     // Quel mode sonne : celui de la question, ou celui qui vient d'etre entendu avant lui. Sur une question de NOM il
     // n'y a qu'un mode, et c'est celui de la question.

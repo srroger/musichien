@@ -152,4 +152,51 @@ TEST( PhraseTest, a_broken_tempo_does_not_silence_the_phrase )
     }
 }
 
+TEST( PhraseTest, the_playback_keeps_every_duration_and_poses_the_drone_under_the_melody )
+{
+    // Ce que le jeu et le banc d'essai partagent desormais : une phrase ne se joue pas de deux facons. Ce calcul vivait
+    // dans l'ecran du banc d'essai, et le jeu l'aurait recopie - ce test dit ce que le domaine garantit a la place.
+    Phrase phrase;
+    phrase.mode = Mode::Dorian;
+    phrase.tonic = Note{ 62 };
+    phrase.bpm = 72;
+    phrase.steps = { PhraseStep{ .degree = 1, .beats = 1 }, PhraseStep{ .degree = 6, .beats = 2 } };
+
+    const PhrasePlayback playback = playbackOf( phrase, 60 );
+
+    // La melodie EST la phrase : les memes notes, dans le meme ordre.
+    const std::vector<Note> expected = phrase.notes( phrase.tonic );
+
+    ASSERT_EQ( expected.size(), playback.melody.size() );
+
+    for( std::size_t index = 0; index < expected.size(); ++index )
+    {
+        EXPECT_EQ( expected.at( index ).midiNumber(), playback.melody.at( index ).midiNumber() );
+    }
+
+    // Une duree par pas, et le pas LONG reste long : c'est ce qu'une phrase a de plus qu'une gamme, et une duree moyenne
+    // le perdrait.
+    ASSERT_EQ( phrase.steps.size(), playback.durations.size() );
+    EXPECT_EQ( playback.durations.at( 0 ).count() * 2, playback.durations.at( 1 ).count() );
+
+    // Le bourdon est SOUS la melodie - jamais au niveau d'elle, il n'est pas une seconde voix - et sa quinte juste se
+    // pose au-dessus de sa tonique.
+    EXPECT_EQ( phrase.tonic.midiNumber() - SEMITONES_PER_OCTAVE, playback.drone.at( 0 ).midiNumber() );
+    EXPECT_EQ( playback.drone.at( 0 ).midiNumber() + 7, playback.drone.at( 1 ).midiNumber() );
+}
+
+TEST( PhraseTest, the_drone_never_falls_below_the_lowest_playable_note )
+{
+    // Une phrase posee tout en bas se poserait sinon sur un bourdon qui n'existe pas, et c'est la phrase ENTIERE qui
+    // deviendrait inaudible.
+    Phrase phrase;
+    phrase.tonic = Note{ 3 };
+    phrase.steps = { PhraseStep{ .degree = 1, .beats = 1 } };
+
+    const PhrasePlayback playback = playbackOf( phrase, 72 );
+
+    EXPECT_TRUE( playback.drone.at( 0 ).isValid() );
+    EXPECT_EQ( Note::MINIMUM_MIDI_NUMBER, playback.drone.at( 0 ).midiNumber() );
+}
+
 }    // namespace musichien::domain

@@ -39,6 +39,7 @@
 #include "domain/music/Mode.h"
 #include "domain/music/Note.h"
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -91,6 +92,28 @@ struct Phrase
     // plus lente reste exactement la meme phrase.
     [[nodiscard]] std::vector<std::chrono::milliseconds> stepDurations( std::int32_t p_bpm ) const;
 };
+
+// Comment une phrase SE JOUE : la melodie resolue, la duree de chaque pas, et le bourdon qui la porte.
+//
+// C'est une regle de MUSIQUE, et elle vivait a un seul endroit avant que le jeu ne s'y mette : le banc d'essai des modes
+// la calculait pour son bouton d'ecoute. Deux endroits qui la calculeraient chacun de leur cote finiraient par faire
+// sonner differemment la meme phrase - et l'oreille apprendrait deux fois la meme chose.
+struct PhrasePlayback
+{
+    std::vector<Note> melody;
+
+    std::vector<std::chrono::milliseconds> durations;
+
+    // La tonique une octave SOUS la melodie, et sa quinte juste. Jamais au-dessus, et jamais au niveau de la melodie :
+    // un bourdon est un centre, pas une seconde voix.
+    std::array<Note, 2> drone{ Note{ 48 }, Note{ 55 } };
+};
+
+// Le jeu d'une phrase, au tempo demande.
+//
+// Le plancher du bourdon est la premiere note jouable : une phrase dont la tonique est deja tout en bas se poserait
+// sinon sur un bourdon qui n'existe pas, et c'est la phrase entiere qui deviendrait inaudible.
+[[nodiscard]] PhrasePlayback playbackOf( const Phrase & p_phrase, std::int32_t p_bpm );
 
 // Ce qui regle une generation. Des valeurs par defaut, parce qu'un appelant qui ne veut rien regler doit obtenir une
 // phrase jouable - et le generateur de l'atelier les expose en options de ligne de commande.

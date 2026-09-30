@@ -556,6 +556,11 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Une question conclue est ecrite ici, une fois pour toutes les genres de question.
     exerciseController.setQuestionLog( &questionLog );
 
+    // Et le MEME livre de phrases que le banc d'essai, pour la meme raison : c'est lui qui fait entendre un mode en
+    // MELODIE quand la question demande de le nommer. Le jeu et le banc d'essai sonnent donc pareil - ce qui a demande de
+    // sortir le calcul du controleeur pour le mettre dans le domaine.
+    exerciseController.setPhraseBook( modalPhraseBook );
+
     // Les explications de la page Accordeur, lues dans leur fichier de contenu comme les indices et les anecdotes.
     exerciseController.setTunerGuide( loadTunerGuide() );
 

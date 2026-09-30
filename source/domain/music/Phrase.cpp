@@ -1,6 +1,7 @@
 #include "domain/music/Phrase.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -164,6 +165,26 @@ Phrase generatePhrase( Mode p_mode, Note p_tonic, std::mt19937 & p_randomEngine,
     phrase.steps = std::move( steps );
 
     return phrase;
+}
+
+PhrasePlayback playbackOf( const Phrase & p_phrase, std::int32_t p_bpm )
+{
+    // La quinte juste, ecrite ici comme partout ailleurs dans le projet : elle appartient a la musique, pas a un en-tete.
+    constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
+
+    PhrasePlayback playback;
+
+    // La phrase est jouee TELLE QUE le contenu l'a ecrite : sa tonique, ses DEGRES. Ce qui peut venir de l'exterieur est
+    // le TEMPO, et lui seul - changer une note ferait entendre autre chose que la phrase que l'oreille a choisie.
+    playback.melody = p_phrase.notes( p_phrase.tonic );
+    playback.durations = p_phrase.stepDurations( p_bpm );
+
+    const std::int32_t droneRootMidi =
+      std::max( p_phrase.tonic.midiNumber() - SEMITONES_PER_OCTAVE, Note::MINIMUM_MIDI_NUMBER );
+
+    playback.drone = { Note{ droneRootMidi }, Note{ droneRootMidi + FIFTH_IN_SEMITONES } };
+
+    return playback;
 }
 
 }    // namespace musichien::domain

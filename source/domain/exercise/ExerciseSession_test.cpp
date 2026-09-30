@@ -1259,6 +1259,28 @@ TEST( ExerciseSessionTest, only_the_three_first_kinds_are_about_an_interval )
     return p_question.previousMode.has_value() && isBrighterThan( p_question.mode, *p_question.previousMode );
 }
 
+// Un livre qui porte UNE phrase par mode : le tirage tombe alors toujours juste, et c'est ce qui permet de verifier
+// qu'une question de nom entend bien une melodie - sans dependre du hasard du tirage.
+[[nodiscard]] PhraseBook bookWithOnePhrasePerMode()
+{
+    PhraseBook book;
+
+    for( std::size_t index = 0; index < MODE_COUNT; ++index )
+    {
+        Phrase phrase;
+        phrase.mode = static_cast<Mode>( index );
+        phrase.tonic = Note{ 50 };
+        phrase.bpm = 72;
+        phrase.steps = { PhraseStep{ .degree = 1, .beats = 1 },
+                         PhraseStep{ .degree = 3, .beats = 2 },
+                         PhraseStep{ .degree = 1, .beats = 2 } };
+
+        book.add( std::move( phrase ) );
+    }
+
+    return book;
+}
+
 // Les classes de hauteur d'une suite de notes : c'est ce qui permet de dire « ce sont les MEMES notes » sans se soucier
 // des octaves. Un vamp ne se verifie pas autrement.
 [[nodiscard]] std::set<std::int32_t> pitchClassesOf( std::span<const Note> p_notes )
@@ -1367,6 +1389,38 @@ TEST( ExerciseSessionTest, a_name_question_poses_one_mode_and_remembers_the_answ
     // Ce que le joueur a repondu est garde, pour que le verdict puisse le montrer : meme role que la derniere reponse
     // d'accord.
     EXPECT_EQ( std::optional<Mode>{ question.mode }, session.lastModeAnswer() );
+}
+
+TEST( ExerciseSessionTest, a_name_question_hears_a_melody_when_the_book_has_one )
+{
+    // Les trois cents phrases de l'atelier attendaient leur question. Le banc d'essai l'avait annonce : « la phrase fait
+    // aussi connaitre son MODE, puisque c'est justement la question que l'exercice posera un jour ».
+    const PhraseBook book = bookWithOnePhrasePerMode();
+
+    ExerciseSession session{ TEST_SEED, modeNameOnlySettings(), &book };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_EQ( QuestionKind::ModeName, question.kind );
+    ASSERT_TRUE( question.modePhrase.has_value() );
+
+    // Et c'est la phrase du mode DEMANDE : une melodie d'un autre mode serait une question sans reponse juste.
+    EXPECT_EQ( question.mode, question.modePhrase->mode );
+}
+
+TEST( ExerciseSessionTest, a_name_question_stays_a_question_without_a_book )
+{
+    // Un contenu absent coute une MELODIE, jamais une question : la seance se joue, en gamme. C'est la regle du projet,
+    // et elle vaut aussi pour un livre vide, garde par une autre page.
+    ExerciseSession session{ TEST_SEED, modeNameOnlySettings() };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_EQ( QuestionKind::ModeName, question.kind );
+    EXPECT_FALSE( question.modePhrase.has_value() );
+
+    // Et elle a une reponse : c'est la seule chose qui compte pour qu'une question soit une question.
+    EXPECT_TRUE( session.answerModeName( question.mode ) );
 }
 
 TEST( ExerciseSessionTest, a_same_colour_question_is_answered_by_saying_so )

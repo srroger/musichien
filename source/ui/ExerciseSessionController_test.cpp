@@ -1,6 +1,7 @@
 #include "ui/ExerciseSessionController.h"
 
 #include "domain/audio/NotePlayerFake.h"
+#include "domain/music/PhraseBook.h"
 #include "domain/music/Temperament.h"
 #include "ui/MicrophoneController.h"
 
@@ -748,6 +749,63 @@ TEST( ExerciseSessionControllerTest, a_two_mode_question_announces_twice_the_sou
     intervalController.startSession();
 
     EXPECT_EQ( 0, intervalController.modeSoundDurationMs() );
+}
+
+TEST( ExerciseSessionControllerTest, a_name_question_is_heard_as_a_melody )
+{
+    // Le jeu fait ecouter une PHRASE la ou il faisait monter une gamme. C'est la question que les trois cents phrases de
+    // l'atelier attendaient, et le fake dit laquelle des deux lectures a eu lieu - ce qu'aucun test d'ecran ne saurait
+    // verifier.
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    storeNamedModeOnlyShares( levelStore );
+
+    // UN TEMPO QUI DIVISE JUSTE : a 60 bpm, un temps vaut exactement mille millisecondes, donc deux temps valent
+    // exactement le double. A 72, chaque pas est arrondi pour lui-meme (833 ms et 1667 ms), et le test comparerait deux
+    // arrondis au lieu de comparer une duree. C'est aussi l'occasion de verifier que le tempo du REGLAGE est bien lu.
+    levelStore.storePhraseTempoBpm( 60 );
+
+    // Un livre qui porte une phrase par mode : le tirage tombe donc toujours juste, quel que soit le mode demande.
+    domain::PhraseBook phraseBook;
+
+    for( std::size_t index = 0; index < domain::MODE_COUNT; ++index )
+    {
+        domain::Phrase phrase;
+        phrase.mode = static_cast<domain::Mode>( index );
+        phrase.tonic = domain::Note{ 50 };
+        phrase.bpm = 72;
+        phrase.steps = { domain::PhraseStep{ .degree = 1, .beats = 1 },
+                         domain::PhraseStep{ .degree = 3, .beats = 2 },
+                         domain::PhraseStep{ .degree = 1, .beats = 2 } };
+
+        phraseBook.add( std::move( phrase ) );
+    }
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+    controller.setPhraseBook( phraseBook );
+
+    controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+    controller.startSession();
+
+    ASSERT_EQ( static_cast<int>( domain::QuestionKind::ModeName ), controller.questionKind() );
+
+    // UNE phrase a sonne, et une seule : c'est la question elle-meme.
+    ASSERT_EQ( 1U, notePlayer.phrasesOverDrones().size() );
+
+    // Et aucune gamme : une phrase jouee comme une gamme reguliere serait la meme question posee deux fois, et le joueur
+    // entendrait autre chose que ce que l'atelier a choisi.
+    EXPECT_TRUE( notePlayer.melodiesOverDrones().empty() );
+
+    // Les DUREES viennent de la phrase : la troisieme note dure deux fois la premiere, et c'est exactement ce qui
+    // distingue une melodie d'une gamme aux notes egales.
+    const domain::NotePlayerFake::PlayedPhraseOverDrone & played = notePlayer.phrasesOverDrones().front();
+
+    ASSERT_EQ( 3U, played.durations.size() );
+    EXPECT_EQ( played.durations.at( 0 ).count() * 2, played.durations.at( 1 ).count() );
+
+    // Et le bourdon est la, sous la melodie : un mode sans centre ne serait pas un mode.
+    EXPECT_EQ( 2U, played.drone.size() );
 }
 
 TEST( ExerciseSessionControllerTest, a_harmony_question_offers_no_interval_hint )

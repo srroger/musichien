@@ -635,6 +635,12 @@ public:
     Q_INVOKABLE void startSession();
 
     // The player says where he is, once. His answer is remembered, and it decides where his sessions start.
+    // Le LIVRE DES PHRASES : donne par la couche de cablage, comme le diapason.
+    //
+    // C'est lui qui fait entendre un mode en MELODIE, et l'ecran n'a rien a en savoir : le domaine tire la phrase au
+    // moment ou il pose la question, et se rabat sur une gamme quand le contenu n'en porte pas pour ce mode.
+    void setPhraseBook( const domain::PhraseBook & p_phraseBook ) { m_phraseBook = &p_phraseBook; }
+
     Q_INVOKABLE void choosePlayerLevel( int p_level );
 
     // Le clic de menu, a la disposition de l'ecran.
@@ -990,6 +996,10 @@ private:
     // et le second par le minuteur, quand le premier a fini de sonner. Sur une question de nom, un seul appel suffit.
     void playModeQuestion( bool p_secondOnly );
 
+    // Fait entendre une PHRASE du contenu, avec le bourdon qui la porte : la question de NOM y gagne une melodie la ou
+    // une gamme montante disait la meme chose en moins de musique.
+    void playPhraseQuestion( const domain::Phrase & p_phrase );
+
     // La note etrangere : la gamme montee sur son bourdon, avec l'intrus a sa place.
     void playForeignNoteQuestion();
     // Whether the player still gets the answer played for him: a beginner hears the interval first, everyone else
@@ -1018,6 +1028,10 @@ private:
 
     // May be null: a test, or an application that has nowhere to remember anything, must still run.
     domain::PlayerPreferences * m_levelStore{ nullptr };
+
+    // Le livre des phrases modales, s'il a ete donne. C'est le DOMAINE qui y tire la phrase d'une question ; le controleeur
+    // ne le garde que pour le passer a la session, et il ne le lit jamais lui-meme.
+    const domain::PhraseBook * m_phraseBook{ nullptr };
 
     // May be null too, et pour la meme raison : un journal absent coute des statistiques, jamais une partie.
     domain::QuestionLog * m_questionLog{ nullptr };

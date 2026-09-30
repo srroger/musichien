@@ -76,18 +76,22 @@ bool isKindOpen( const SessionSettings & p_settings, QuestionKind p_kind ) noexc
     return false;
 }
 
-ExerciseSession::ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings )
+ExerciseSession::ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings, const PhraseBook * p_phraseBook )
   : m_randomEngine{ p_seed }
   , m_settings{ p_settings }
   , m_palette{ beginnerPalette( m_settings.startingPaletteSize ) }
   , m_chordPalette{ beginnerChordPalette( m_settings.startingChordQualityCount ) }
   , m_modePalette{ beginnerModePalette( m_settings.startingModeCount ) }
+  , m_phraseBook{ p_phraseBook }
   , m_score{ m_settings.lives }
   , m_currentQuestion{ buildQuestion() }
 {
     // The first question is built HERE rather than on a start() call: a session that exists is a
     // session that is asking something, and the screen therefore never has to handle a state where
     // there is nothing to play.
+    //
+    // Et c'est aussi pourquoi le LIVRE DES PHRASES arrive par la liste d'initialisation : la premiere question est deja
+    // construite quand ce corps s'execute, donc un livre donne apres coup ne pourrait plus rien pour elle.
 }
 
 Question ExerciseSession::buildQuestion()
@@ -610,6 +614,17 @@ void ExerciseSession::buildModeQuestion( Question & p_question, bool p_compare )
 
             p_question.previousMode = previousMode;
         }
+    }
+
+    // Et une MELODIE, quand le contenu en porte une pour ce mode : la question de NOM devient alors « quel est le mode
+    // de cette phrase ? », au lieu d'une gamme qui monte.
+    //
+    // Le tirage a lieu ICI, dans le domaine, et non dans un ecran : c'est la question qui decide de ce qu'elle fait
+    // entendre, et une phrase tiree par l'affichage serait une question que le domaine ne connait pas. Sans phrase pour
+    // ce mode - un contenu absent, ou trie autrement - la question reste entierement posee, en gamme.
+    if( !p_compare && ( m_phraseBook != nullptr ) )
+    {
+        p_question.modePhrase = m_phraseBook->drawPhraseFor( p_question.mode, m_randomEngine );
     }
 
     // Ce que le joueur peut repondre : SA palette, dans l'ordre d'apprentissage, et rien d'autre. Un mode qu'il n'a
