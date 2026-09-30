@@ -410,7 +410,7 @@ void MicrophoneController::onPitch( float p_frequencyHz )
 
     // The ball's exact place on the staff: rounded to the nearest note, so a C is always on its space, then folded
     // onto the octave. The cents and the colour carry the fine tuning, the ball carries WHICH note it is.
-    const std::int32_t nearestMidi = static_cast<std::int32_t>( std::lround( m_detectedMidi ) );
+    const auto nearestMidi = static_cast<std::int32_t>( std::lround( m_detectedMidi ) );
 
     m_detectedStaffFraction = ( m_detectedFrequencyHz > 0.0 ) ? domain::StaffPosition::fraction( nearestMidi ) : 0.5;
 

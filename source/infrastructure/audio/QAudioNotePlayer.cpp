@@ -70,10 +70,15 @@ void QAudioNotePlayer::reopenAudioOutput()
 
     // The sink and the two synthesisers were built for the OLD device's sample rate: they are discarded, and the
     // next ensure opens whatever is now the default device and rebuilds them at its own rate.
-    m_audioSink.reset();
+    //
+    // ASSIGNED rather than reset() for the sink and the mixer, exactly as lower down in this file: QAudioSink and
+    // QIODevice both have a reset() method of their own, so "m_audioSink.reset()" would read as if it acted on the
+    // sound stream rather than on the pointer. clang-tidy says the same thing
+    // (readability-ambiguous-smartptr-reset-call), which is how the two lines below were found.
+    m_audioSink = nullptr;
     m_synthesizer.reset();
     m_drumSynthesizer.reset();
-    m_mixer.reset();
+    m_mixer = nullptr;
     m_isSinkRunning = false;
     m_outputDescription = "not opened yet";
 
@@ -334,6 +339,15 @@ void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_
     m_lastPlayedNotes.clear();
 }
 
+void QAudioNotePlayer::useDroneInstruments( std::vector<domain::SampledInstrument> p_drones )
+{
+    m_drones = std::move( p_drones );
+
+    m_droneIndex = 0;
+
+    m_lastDroneNotes.clear();
+}
+
 std::size_t QAudioNotePlayer::timbreIndexFor( std::span<const domain::Note> p_notes )
 {
     const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
@@ -427,6 +441,61 @@ std::vector<float> QAudioNotePlayer::renderMelodyFor( std::span<const domain::No
                                             p_noteDuration,
                                             p_gap,
                                             m_tuning );
+}
+
+void QAudioNotePlayer::playMelodyOverDrone( std::span<const domain::Note> p_melody,
+                                            std::span<const domain::Note> p_drone,
+                                            std::chrono::milliseconds p_noteDuration,
+                                            std::chrono::milliseconds p_gap,
+                                            domain::DroneFraming p_framing )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // Un bourdon ENREGISTRE, quand il y en a un.
+    //
+    // Le domaine a deja dit QUELLE quinte doit sonner : p_drone est fait des notes du bourdon, pas d'un numero de
+    // timbre. L'echantillonneur les joue donc telles quelles, avec la transposition, la normalisation et le fondu de
+    // queue de toutes les notes du jeu - le bourdon n'est pas un cas particulier.
+    if( !m_drones.empty() )
+    {
+        // Le timbre est TIRE, et il reste le meme tant que le bourdon ne change pas : entendre le meme mode sur un
+        // autre bourdon serait une autre question. C'est exactement la regle des instruments de melodie.
+        const bool sameDrone = ( p_drone.size() == m_lastDroneNotes.size() )
+                               && std::is_permutation( p_drone.begin(), p_drone.end(), m_lastDroneNotes.begin() );
+
+        if( !sameDrone )
+        {
+            m_lastDroneNotes.assign( p_drone.begin(), p_drone.end() );
+
+            std::uniform_int_distribution<std::size_t> distribution{ 0, m_drones.size() - 1 };
+
+            m_droneIndex = distribution( m_instrumentRandomEngine );
+        }
+
+        const domain::SampledInstrument & drone = m_drones.at( m_droneIndex );
+
+        // La duree du bourdon vient du DOMAINE, et non d'un calcul ecrit ici : c'est la seule facon de garantir que le
+        // bourdon enregistre et celui de la synthese tiennent exactement le meme temps.
+        const std::vector<float> droneSamples =
+          drone.renderChord( p_drone,
+                             domain::droneDurationFor( p_melody.size(), p_noteDuration, p_gap, p_framing ),
+                             m_audioFormat.sampleRate(),
+                             m_tuning );
+
+        playSamples(
+          m_synthesizer->mixMelodyOverDrone( p_melody, droneSamples, p_noteDuration, p_gap, m_tuning, p_framing ) );
+
+        return;
+    }
+
+    // Le REPLI, et il n'est pas decoratif : un appareil dont les echantillons n'ont pas pu etre lus doit quand meme
+    // entendre la question. La synthese fabrique alors son propre bourdon (Waveform::Organ).
+    playSamples( m_synthesizer->renderMelodyOverDrone( p_melody, p_drone, p_noteDuration, p_gap, m_tuning, p_framing ) );
 }
 
 void QAudioNotePlayer::playMistakeCue()

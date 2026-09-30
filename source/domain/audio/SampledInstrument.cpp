@@ -233,8 +233,8 @@ std::vector<bool> defaultEnabledInstruments()
     // Le piano et la guitare : les deux premiers de la liste, et les deux plus neutres a l'oreille. Par INDEX plutot que
     // par nom, parce qu'un nom se traduit et qu'un index est un contrat (voir INSTRUMENT_NAMES - l'ordre ne bouge
     // jamais, les nouveaux instruments vont a la fin).
-    instruments[0] = true;
-    instruments[1] = true;
+    instruments.at( 0 ) = true;
+    instruments.at( 1 ) = true;
 
     return instruments;
 }

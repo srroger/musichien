@@ -137,6 +137,36 @@ class ExerciseSessionController final : public QObject
     // ---------------------------------------------------------------------------------------------------------------
     Q_PROPERTY( bool isChordQuestion READ isChordQuestion NOTIFY questionChanged )
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // Le pilier harmonie : le degrade
+    //
+    // Une question de mode se joue comme aucune autre : DEUX modes sur le MEME bourdon, l'un apres l'autre. L'ecran a
+    // donc besoin de savoir laquelle des deux questions il pose, et quels modes il peut proposer.
+    // -----------------------------------------------------------------------------------------------------------------
+
+    // Le mode a comparer ou a nommer, et celui qui vient d'etre entendu avant lui.
+    Q_PROPERTY( bool isModeQuestion READ isModeQuestion NOTIFY questionChanged )
+
+    // Vrai sur la question de COULEUR : deux modes, et une reponse « plus clair / plus sombre ».
+    Q_PROPERTY( bool isModeColourQuestion READ isModeColourQuestion NOTIFY questionChanged )
+
+    // Les modes que le joueur peut repondre : SA palette, dans l'ordre d'apprentissage, du plus clair au plus sombre.
+    // Chaque entree porte un index, un identifiant, un nom, la note qui colore, et une CLARTE entre 0 et 1.
+    Q_PROPERTY( QVariantList modeChoices READ modeChoices NOTIFY questionChanged )
+
+    // Le mode qui vient d'etre joue, decrit comme une entree de la liste ci-dessus - et vide tant que rien n'a sonne.
+    Q_PROPERTY( QVariantMap heardMode READ heardMode NOTIFY sessionChanged )
+
+    // Le mode entendu JUSTE AVANT, sur une question de couleur, et vide sur une question de nom.
+    Q_PROPERTY( QVariantMap previousMode READ previousMode NOTIFY questionChanged )
+
+    // Les deux parts de l'harmonie, en pour cent : comparer deux modes, et nommer un mode. Deux reglages, parce que ce
+    // sont deux competences - un joueur peut vouloir la comparaison sans le vocabulaire, et l'inverse.
+    Q_PROPERTY( int modeColourQuestionShare READ modeColourQuestionShare WRITE setModeColourQuestionShare NOTIFY
+                  modeQuestionShareChanged )
+    Q_PROPERTY( int modeNameQuestionShare READ modeNameQuestionShare WRITE setModeNameQuestionShare NOTIFY
+                  modeQuestionShareChanged )
+
     // L'accord qui vient d'etre joue, pret a afficher : son nom ("Minor"), son symbole ("Cm") et sa tonique, deja
     // ecrite avec son nom de note - l'ecran n'assemble rien.
     Q_PROPERTY( QVariantMap heardChord READ heardChord NOTIFY sessionChanged )
@@ -279,6 +309,20 @@ public:
     [[nodiscard]] QVariantMap heardChord() const;
     [[nodiscard]] QVariantMap answeredChord() const;
     [[nodiscard]] QVariantList chordChoices() const;
+
+    [[nodiscard]] bool isModeQuestion() const noexcept;
+
+    [[nodiscard]] bool isModeColourQuestion() const noexcept;
+
+    [[nodiscard]] QVariantList modeChoices() const;
+
+    [[nodiscard]] QVariantMap heardMode() const;
+
+    [[nodiscard]] QVariantMap previousMode() const;
+
+    [[nodiscard]] int modeColourQuestionShare() const;
+
+    [[nodiscard]] int modeNameQuestionShare() const;
 
     // The name the player gave himself, empty before the first time he writes one.
     [[nodiscard]] QString playerName() const;
@@ -475,6 +519,20 @@ public:
     // symbole : il renvoie l'index de ce qu'il a affiche.
     Q_INVOKABLE void answerChord( int p_quality );
 
+    // Repond a une question de COULEUR : le second mode etait-il plus clair que le premier ?
+    //
+    // Un booleen, comme le domaine le demande : la reponse n'est pas un ecart, c'est un SENS, et c'est le domaine qui
+    // calcule lequel des deux modes est le plus clair.
+    Q_INVOKABLE void answerModeColour( bool p_secondIsBrighter );
+
+    // Repond a une question de NOM : l'index du mode joue, dans la liste de modeChoices().
+    Q_INVOKABLE void answerModeName( int p_modeIndex );
+
+    // Les deux parts de l'harmonie, reglables comme celles du chant, du rythme et des accords.
+    Q_INVOKABLE void setModeColourQuestionShare( int p_share );
+
+    Q_INVOKABLE void setModeNameQuestionShare( int p_share );
+
     // Vrai quand il y a un indice a proposer : une question d'accord, des aides, un essai deja rate, et de quoi retirer
     // une reponse fausse.
     Q_PROPERTY( bool isChordHintAvailable READ isChordHintAvailable NOTIFY questionChanged )
@@ -612,6 +670,10 @@ signals:
     void rhythmQuestionShareChanged();
     void chordQuestionShareChanged();
 
+    // Un seul signal pour les deux parts de l'harmonie : elles se reglent ensemble, dans le meme ecran, et un signal
+    // par part n'apporterait qu'une occasion d'en oublier un.
+    void modeQuestionShareChanged();
+
     // The player has just pressed the "test the notification" button.
     void testReminderRequested();
 
@@ -737,6 +799,12 @@ private:
     // question ou pour la confirmer.
     void playChordNotes( const domain::Chord & p_chord );
 
+    // Joue la question d'harmonie en cours.
+    //
+    // p_secondOnly est ce qui permet les DEUX temps d'une question de couleur : le premier mode est pose tout de suite,
+    // et le second par le minuteur, quand le premier a fini de sonner. Sur une question de nom, un seul appel suffit.
+    void playModeQuestion( bool p_secondOnly );
+
     // Whether the player still gets the answer played for him: a beginner hears the interval first, everyone else
     // has to ask for it (and pays for the asking).
     [[nodiscard]] bool isBeginner() const noexcept;
@@ -800,6 +868,17 @@ private:
     static constexpr int NO_RHYTHM_TAP = -1;
 
     QTimer m_rhythmTimer;
+
+    // Le minuteur qui pose le SECOND mode d'une question de couleur, apres le premier.
+    //
+    // Deux modes ne peuvent pas tenir dans un seul appel au port : chaque appel rend une melodie sur un bourdon, tenu du
+    // debut a la fin. Le second mode est donc joue par ce minuteur, et le bourdon est repose a l'identique - la meme
+    // tonique, donc l'oreille entend une continuite et non deux questions.
+    QTimer m_modeTimer;
+
+    // Le mode qui vient de sonner, decrit comme une entree de modeChoices(). Vide tant que rien n'a sonne, ce qui est
+    // exactement ce que l'ecran doit savoir pour n'allumer aucun bouton.
+    QVariantMap m_heardMode;
     QElapsedTimer m_rhythmClock;
 
     // Le temps a jouer dans la mesure, de 0 a beatsPerBar. La valeur beatsPerBar n'est pas un temps : c'est le signal

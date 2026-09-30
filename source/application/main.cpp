@@ -23,6 +23,7 @@
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
 #include "ui/MicrophoneController.h"
+#include "ui/ModePreviewController.h"
 #include "ui/RhythmController.h"
 #include "ui/StatisticsController.h"
 
@@ -204,6 +205,50 @@ constexpr const char * TUNER_GUIDE_RESOURCE = ":/assets/content/tuner.json";
 // The instruments the game plays with, in the order they are offered.
 constexpr std::array<const char *, 3> INSTRUMENT_NAMES{ "piano", "guitare", "saxo" };
 
+// Les trois bourdons enregistres, et l'ordre dans lequel ils sont offerts.
+//
+// Ce ne sont PAS des instruments de melodie : ce sont les sons qui tiennent SOUS une gamme, et c'est une autre
+// fonction. Ils sont joues en QUINTE (la tonique et sa quinte), ce que Roger a demande deux fois de suite - une note
+// seule dit « ceci est la tonique », une quinte dit « ceci est le CENTRE », et ce n'est pas la meme information.
+//
+// Ils viennent de scripts/render_drone_samples.py, donc de la meme banque libre que le piano, la guitare et la batterie.
+[[nodiscard]] musichien::domain::SampledInstrument loadDroneInstrument( const QString & p_droneName )
+{
+    // DEUX notes, et deux seulement : re 2 et la 2, soit une quinte juste. Le bourdon ne change de tonique qu'a
+    // quelques demi-tons, donc cette paire couvre tout ce dont un exercice modal a besoin.
+    constexpr std::array<std::int32_t, 2> ROOT_MIDI_NUMBERS{ 38, 45 };
+    constexpr std::array<const char *, 2> NOTE_NAMES{ "d2", "a2" };
+
+    musichien::domain::SampledInstrument drone;
+
+    for( std::size_t noteIndex = 0; noteIndex < ROOT_MIDI_NUMBERS.size(); ++noteIndex )
+    {
+        QFile sampleFile{ QStringLiteral( ":/assets/soundfonts/drone_%1_%2.wav" )
+                            .arg( p_droneName, QString::fromLatin1( NOTE_NAMES.at( noteIndex ) ) ) };
+
+        if( !sampleFile.open( QIODevice::ReadOnly ) )
+        {
+            continue;
+        }
+
+        const QByteArray content = sampleFile.readAll();
+
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        const std::span<const std::byte> bytes{ reinterpret_cast<const std::byte *>( content.constData() ),
+                                                static_cast<std::size_t>( content.size() ) };
+
+        const std::optional<musichien::domain::SampledNote> note =
+          musichien::domain::sampledNoteFromWave( bytes, ROOT_MIDI_NUMBERS.at( noteIndex ) );
+
+        if( note.has_value() )
+        {
+            drone.addNote( *note );
+        }
+    }
+
+    return drone;
+}
+
 // Reads one embedded wave file as mono samples.
 //
 // Empty when the file is missing or unreadable, which costs a sound and never the application: the synthesiser takes
@@ -321,6 +366,28 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Les deux clics du metronome : deux blocs de bois, dans la meme banque libre.
     notePlayer.useMetronomeClicks( loadSample( "drum_click_high" ), loadSample( "drum_click_low" ) );
 
+    // Les trois bourdons enregistres, charges ICI comme les instruments et pour la meme raison : une ressource
+    // manquante coute un timbre, jamais le demarrage.
+    constexpr std::array<const char *, 3> DRONE_NAMES{ "strings", "choir", "pad" };
+
+    std::vector<musichien::domain::SampledInstrument> drones;
+
+    for( const char * droneName : DRONE_NAMES )
+    {
+        musichien::domain::SampledInstrument drone = loadDroneInstrument( QString::fromLatin1( droneName ) );
+
+        if( !drone.isEmpty() )
+        {
+            drones.push_back( std::move( drone ) );
+        }
+    }
+
+    // Le journal de demarrage dit ce qui a ete LU, comme pour les intervalles et la batterie : c'est la preuve la plus
+    // courte que les fichiers ont suivi jusqu'au binaire.
+    std::cerr << "Musichien: " << drones.size() << " drone timbre(s) read\n";
+
+    notePlayer.useDroneInstruments( std::move( drones ) );
+
     notePlayer.useInstruments( instruments, {} );
 
     // Opening the output now, rather than at the first note, means a machine without a sound card is
@@ -352,6 +419,17 @@ int main( int p_argumentCount, char * p_arguments[] )
                                   QML_MODULE_MINOR_VERSION,
                                   "IntervalController",
                                   &intervalController );
+
+    // Le banc d'essai des modes : le MEME port, et rien de plus. Sept boutons qui font entendre une couleur sur un
+    // bourdon tenu - c'est exactement ce que l'exercice du degrade demandera, jusqu'au timbre du bourdon, qui est tire
+    // par l'adaptateur. Un banc d'essai qui sonnerait autrement que le jeu serait pire qu'inutile.
+    musichien::ui::ModePreviewController modePreviewController{ notePlayer };
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "ModeController",
+                                  &modePreviewController );
 
     // The exercise screen has its own view model. It receives the SAME port, and neither controller
     // knows the other exists: the bench and the loop are two independent uses of the same domain.
@@ -485,13 +563,14 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Le réglage descend jusqu'à la couche audio, et il descend à CHAQUE changement : basculer le tempérament ou le
     // diapason s'entend à la note suivante, pas au prochain lancement. La TONIQUE n'en fait pas partie - la couche
     // audio connaît toujours la sienne (la première note qu'elle joue) ; seul l'accordeur a besoin d'une tonique à lui.
-    const auto applyTuning = [&playerLevelStore, &notePlayer, &intervalController]() {
+    const auto applyTuning = [&playerLevelStore, &notePlayer, &intervalController, &modePreviewController]() {
         const musichien::domain::TuningContext tuning{ playerLevelStore.storedTemperament(),
                                                        playerLevelStore.storedReferencePitch() };
 
         notePlayer.setTuning( tuning );
 
         intervalController.setTuning( tuning );
+        modePreviewController.setTuning( tuning );
     };
 
     QObject::connect( &exerciseController,

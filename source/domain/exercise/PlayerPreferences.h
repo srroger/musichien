@@ -147,6 +147,22 @@ public:
     [[nodiscard]] virtual std::int32_t storedChordQuestionShare() const = 0;
 
     virtual void storeChordQuestionShare( std::int32_t p_share ) = 0;
+
+    // Part des questions, en pour cent, qui demandent de COMPARER deux modes sur un bourdon.
+    //
+    // ZERO par defaut, comme le rythme : le pilier harmonie se demande, il ne s'impose pas. Un joueur qui veut entendre
+    // des modes met ce reglage a trente, et sa session change de nature sans qu'aucun ecran n'ait a le decider.
+    [[nodiscard]] virtual std::int32_t storedModeColourQuestionShare() const = 0;
+
+    virtual void storeModeColourQuestionShare( std::int32_t p_share ) = 0;
+
+    // Part des questions, en pour cent, qui demandent de NOMMER un mode entendu sur un bourdon.
+    //
+    // Separee de la precedente parce que ce sont deux competences : comparer est une affaire d'oreille, nommer une
+    // affaire de vocabulaire - et l'application doit pouvoir dire laquelle des deux resiste.
+    [[nodiscard]] virtual std::int32_t storedModeNameQuestionShare() const = 0;
+
+    virtual void storeModeNameQuestionShare( std::int32_t p_share ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -215,6 +231,14 @@ public:
 
     void storeChordQuestionShare( std::int32_t p_share ) override { m_chordQuestionShare = p_share; }
 
+    [[nodiscard]] std::int32_t storedModeColourQuestionShare() const override { return m_modeColourQuestionShare; }
+
+    void storeModeColourQuestionShare( std::int32_t p_share ) override { m_modeColourQuestionShare = p_share; }
+
+    [[nodiscard]] std::int32_t storedModeNameQuestionShare() const override { return m_modeNameQuestionShare; }
+
+    void storeModeNameQuestionShare( std::int32_t p_share ) override { m_modeNameQuestionShare = p_share; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -233,7 +257,7 @@ private:
     // 19 h par defaut : apres le diner, quand la journee de travail est finie et qu'une partie de dix questions est
     // encore possible. C'est le meme genre de choix que les trois moments d'anecdotes - une heure ou l'on est
     // disponible, pas une heure ou l'on est occupe.
-    ReminderMoment m_reminderMoment{ 19, 0 };
+    ReminderMoment m_reminderMoment{ .hour = 19, .minute = 0 };
 
     Temperament m_temperament{ Temperament::Equal };
 
@@ -251,6 +275,11 @@ private:
     std::int32_t m_rhythmQuestionShare{ 0 };
 
     std::int32_t m_chordQuestionShare{ 20 };
+
+    // L'harmonie : zero par defaut, donc une session d'intervalles reste une session d'intervalles tant que le joueur
+    // n'a pas demande autre chose. C'est un REGLAGE, et un reglage se demande.
+    std::int32_t m_modeColourQuestionShare{ 0 };
+    std::int32_t m_modeNameQuestionShare{ 0 };
 };
 
 }    // namespace musichien::domain

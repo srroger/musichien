@@ -1273,4 +1273,158 @@ TEST( ExerciseSessionTest, the_chord_hint_stops_when_only_a_hint_would_be_left )
     EXPECT_TRUE( session.canHearChordAsArpeggio() );
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// Le pilier harmonie : le degrade
+//
+// Ces tests ne verifient pas un son, mais la seule chose qui puisse etre FAUSSE dans une question de mode : le SENS.
+// « Plus clair ou plus sombre ? » n'a de reponse que si le domaine sait lui-meme comparer deux couleurs, et si la
+// tonique qu'il donne au bourdon tombe dans la fenetre des enregistrements.
+// ---------------------------------------------------------------------------------------------------------------------
+
+namespace
+{
+
+// Une session qui ne pose QUE des questions de modes, et de couleur : sans cet epeinglage, la session melange les
+// genres et les tests echoueraient au hasard - exactement comme pour les accords et le rythme.
+[[nodiscard]] SessionSettings modeColourOnlySettings()
+{
+    SessionSettings settings = intervalOnlySettings();
+    settings.modeColourQuestionShare = 100;
+    return settings;
+}
+
+[[nodiscard]] SessionSettings modeNameOnlySettings()
+{
+    SessionSettings settings = intervalOnlySettings();
+    settings.modeNameQuestionShare = 100;
+    return settings;
+}
+
+// La reponse juste a une question de couleur, telle que le DOMAINE la calcule.
+[[nodiscard]] bool expectedColourAnswer( const Question & p_question )
+{
+    return p_question.previousMode.has_value() && isBrighterThan( p_question.mode, *p_question.previousMode );
+}
+
+}    // namespace
+
+TEST( ExerciseSessionTest, a_colour_question_poses_two_different_modes_on_one_drone )
+{
+    ExerciseSession session{ TEST_SEED, modeColourOnlySettings() };
+
+    // La boucle suit la LONGUEUR d'une session, et non un nombre ecrit a la main : repondre au-dela de la derniere
+    // question est refuse par le domaine - la session est finie - et un test qui l'ignorerait echouerait sur sa propre
+    // borne plutot que sur la regle qu'il verifie.
+    for( std::size_t questionIndex = 0; questionIndex < session.settings().questionCount; ++questionIndex )
+    {
+        const Question & question = session.currentQuestion();
+
+        ASSERT_EQ( QuestionKind::ModeColour, question.kind );
+
+        // Deux modes, et deux modes DIFFERENTS : comparer un mode avec lui-meme n'aurait pas de reponse, donc la
+        // question serait impossible plutot que difficile.
+        ASSERT_TRUE( question.previousMode.has_value() );
+        EXPECT_NE( *question.previousMode, question.mode );
+
+        // UNE seule tonique, tenue par le bourdon sous les deux : c'est elle qui donne un centre, et sans elle deux
+        // modes ne seraient que deux gammes.
+        EXPECT_TRUE( question.modeTonic.isValid() );
+
+        // Et elle tombe dans la fenetre des enregistrements - 35 a 41. Ce n'est pas un gout : la tonique ET sa quinte
+        // doivent rester a moins de trois demi-tons d'un echantillon de bourdon, sinon un enregistrement serait
+        // transpose au-dela de ce qui s'entend.
+        EXPECT_GE( question.modeTonic.midiNumber(), 35 );
+        EXPECT_LE( question.modeTonic.midiNumber(), 41 );
+
+        // Les choix sont ceux de la palette, ni plus ni moins.
+        EXPECT_EQ( session.modePalette().size(), question.modeChoices.size() );
+
+        EXPECT_TRUE( session.answerModeColour( expectedColourAnswer( question ) ) );
+        EXPECT_EQ( SessionState::Feedback, session.state() );
+
+        session.advance();
+    }
+}
+
+TEST( ExerciseSessionTest, a_wrong_colour_answer_leaves_the_question_posed )
+{
+    ExerciseSession session{ TEST_SEED, modeColourOnlySettings() };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_EQ( QuestionKind::ModeColour, question.kind );
+
+    const bool wrongAnswer = !expectedColourAnswer( question );
+
+    EXPECT_FALSE( session.answerModeColour( wrongAnswer ) );
+
+    // La question reste posee et le joueur peut repondre encore : exactement le comportement d'une question
+    // d'intervalle ratee, donc rien de particulier a faire dans l'ecran.
+    EXPECT_EQ( SessionState::Asking, session.state() );
+    EXPECT_TRUE( session.answerModeColour( !wrongAnswer ) );
+    EXPECT_EQ( SessionState::Feedback, session.state() );
+}
+
+TEST( ExerciseSessionTest, a_mode_question_refuses_an_answer_of_another_kind )
+{
+    // Trois langues, trois questions : dire « plus clair » la ou un nom est demande ne repond a rien, et nommer un mode
+    // la ou deux couleurs venaient de sonner non plus. C'est le meme refus que la direction oppose a une question qui
+    // demandait un nom.
+    ExerciseSession colourSession{ TEST_SEED, modeColourOnlySettings() };
+    ExerciseSession nameSession{ TEST_SEED, modeNameOnlySettings() };
+    ExerciseSession intervalSession{ TEST_SEED, intervalOnlySettings() };
+
+    EXPECT_FALSE( colourSession.answerModeName( Mode::Ionian ) );
+    EXPECT_FALSE( nameSession.answerModeColour( true ) );
+
+    EXPECT_FALSE( intervalSession.answerModeColour( true ) );
+    EXPECT_FALSE( intervalSession.answerModeName( Mode::Ionian ) );
+}
+
+TEST( ExerciseSessionTest, a_name_question_poses_one_mode_and_remembers_the_answer )
+{
+    ExerciseSession session{ TEST_SEED, modeNameOnlySettings() };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_EQ( QuestionKind::ModeName, question.kind );
+
+    // Rien a comparer sur une question de NOM : c'est pour cela que le mode precedent est un optional, et non un mode
+    // « vide » qu'un lecteur finirait par lire.
+    EXPECT_FALSE( question.previousMode.has_value() );
+
+    EXPECT_EQ( session.modePalette().size(), question.modeChoices.size() );
+
+    EXPECT_TRUE( session.answerModeName( question.mode ) );
+
+    // Ce que le joueur a repondu est garde, pour que le verdict puisse le montrer : meme role que la derniere reponse
+    // d'accord.
+    EXPECT_EQ( std::optional<Mode>{ question.mode }, session.lastModeAnswer() );
+}
+
+TEST( ExerciseSessionTest, the_mode_palette_starts_with_the_known_ones_and_grows_on_successes )
+{
+    SessionSettings settings = modeColourOnlySettings();
+    settings.startingModeCount = 2;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    // Le majeur et le mineur : le seul ecart que toute oreille connait deja, et la seule premiere question possible.
+    EXPECT_EQ( 2, session.modePalette().size() );
+    EXPECT_EQ( Mode::Ionian, session.modePalette().front() );
+    EXPECT_EQ( Mode::Aeolian, session.modePalette().at( 1 ) );
+
+    // Trois reussites de suite ouvrent le mode SUIVANT de l'ordre d'apprentissage, et non un mode tire au hasard :
+    // c'est ce qui rend la progression previsible, du connu vers les extremes.
+    for( int successIndex = 0; successIndex < 3; ++successIndex )
+    {
+        EXPECT_TRUE( session.answerModeColour( expectedColourAnswer( session.currentQuestion() ) ) );
+
+        session.advance();
+    }
+
+    EXPECT_EQ( 3, session.modePalette().size() );
+    EXPECT_EQ( Mode::Mixolydian, session.modePalette().at( 2 ) );
+}
+
 }    // namespace musichien::domain

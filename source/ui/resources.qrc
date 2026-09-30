@@ -58,6 +58,19 @@
         <file alias="assets/soundfonts/saxo_c4.wav">../../assets/soundfonts/saxo_c4.wav</file>
         <file alias="assets/soundfonts/saxo_c5.wav">../../assets/soundfonts/saxo_c5.wav</file>
     <!--
+      Les bourdons enregistres : trois timbres tenus (cordes, choeur, nappe), rendus depuis la meme banque libre que
+      les instruments, par scripts/render_drone_samples.py. Deux notes chacun (re 2 et la 2), de quoi transposer le
+      bourdon dans les toniques voisines.
+
+      Meme motif que les instruments, alias compris : le chemin de ressource est celui du disque.
+    -->
+        <file alias="assets/soundfonts/drone_strings_d2.wav">../../assets/soundfonts/drone_strings_d2.wav</file>
+        <file alias="assets/soundfonts/drone_strings_a2.wav">../../assets/soundfonts/drone_strings_a2.wav</file>
+        <file alias="assets/soundfonts/drone_choir_d2.wav">../../assets/soundfonts/drone_choir_d2.wav</file>
+        <file alias="assets/soundfonts/drone_choir_a2.wav">../../assets/soundfonts/drone_choir_a2.wav</file>
+        <file alias="assets/soundfonts/drone_pad_d2.wav">../../assets/soundfonts/drone_pad_d2.wav</file>
+        <file alias="assets/soundfonts/drone_pad_a2.wav">../../assets/soundfonts/drone_pad_a2.wav</file>
+    <!--
       Les sons de batterie : rendus depuis la meme banque libre, par scripts/render_drum_samples.py.
       Une percussion n'est pas une note - elle ne se transpose pas - donc elle est jouee telle quelle.
     -->

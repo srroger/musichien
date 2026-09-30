@@ -63,6 +63,38 @@ on ne peut pas refaire la recette est un son qu'on ne pourra plus justifier dans
 
 ---
 
+## 🎻 Les bourdons (même banque, autre usage)
+
+| Timbre | Programme General MIDI | Notes | Fichiers |
+|---|---|---|---|
+| **Cordes** | String Ensemble 1 | ré 2, la 2 | `drone_strings_d2.wav`, `drone_strings_a2.wav` |
+| **Chœur** | Choir Aahs | ré 2, la 2 | `drone_choir_d2.wav`, `drone_choir_a2.wav` |
+| **Nappe** | Pad 2 (warm) | ré 2, la 2 | `drone_pad_d2.wav`, `drone_pad_a2.wav` |
+
+**Six fichiers, 12 s chacun, mono, 48 kHz, 16 bits — 6,9 Mo.** Ils ne servent pas à jouer une mélodie : ils tiennent
+**sous** une gamme, et c'est ce qui donne un CENTRE à un mode. Sans bourdon, sept notes ne sont que sept notes — et
+« écoute cette gamme et nomme le mode » n'est pas une question difficile, c'est une question sans réponse. Voir
+[[27 - Les modes - la couleur et le cercle des quintes]] §4.
+
+> [!note] Pourquoi une quinte, et pourquoi deux notes séparées
+> Le bourdon est **la tonique et sa quinte**, tenues ensemble : une note seule dit « ceci est la tonique », une quinte
+> dit « ceci est le centre ». Les deux notes sont enregistrées **séparément** pour que le bourdon puisse être
+> **transposé** : le domaine tire sa tonique entre 35 et 41, et un échantillon déplacé de plus de trois demi-tons
+> s'entend comme un ralentissement.
+
+### Régénérer les bourdons
+
+```bash
+# la même banque que la batterie et les instruments
+scripts/render_drone_samples.py /tmp/MuseScore_General.sf3
+```
+
+Le dossier de sortie par défaut est celui de l'atelier (`~/Musichien-atelier/drones`), et **pas** `assets/soundfonts` :
+un candidat s'écoute **avant** d'entrer dans le dépôt. Quand un timbre est retenu, ses fichiers passent dans
+`assets/soundfonts/` et sont déclarés dans `source/ui/resources.qrc`.
+
+---
+
 ## 1. 📜 D'où ils viennent, et ce qu'on a le droit d'en faire
 
 | Quoi | Détail |

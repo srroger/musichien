@@ -50,6 +50,11 @@ constexpr const char * SING_QUESTION_SHARE_KEY = "player/sing-question-share";
 constexpr const char * RHYTHM_QUESTION_SHARE_KEY = "player/rhythm-question-share";
 constexpr const char * CHORD_QUESTION_SHARE_KEY = "player/chord-question-share";
 
+// L'harmonie : deux parts, et deux cles distinctes. « Entendre une couleur » et « savoir la nommer » sont deux
+// competences, donc deux reglages - un joueur peut vouloir l'une sans l'autre.
+constexpr const char * MODE_COLOUR_QUESTION_SHARE_KEY = "player/mode-colour-question-share";
+constexpr const char * MODE_NAME_QUESTION_SHARE_KEY = "player/mode-name-question-share";
+
 // L'heure du rappel, en deux nombres separes : une heure et une minute se lisent dans un fichier de reglages plus
 // facilement qu'un instant encode, et un joueur curieux doit pouvoir comprendre ce qu'il lit.
 constexpr const char * REMINDER_HOUR_KEY = "player/reminder-hour";
@@ -317,6 +322,47 @@ void QSettingsPlayerPreferences::storeChordQuestionShare( std::int32_t p_share )
     QSettings settings;
 
     settings.setValue( CHORD_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedModeColourQuestionShare() const
+{
+    // ZERO par defaut, comme le rythme : un reglage qui n'a jamais ete touche ne doit pas changer la nature du jeu.
+    const std::int32_t stored = QSettings{}.value( MODE_COLOUR_QUESTION_SHARE_KEY, 0 ).toInt();
+
+    if( stored < 0 || stored > 100 )
+    {
+        // Un fichier de reglages est un fichier qu'un humain peut editer : une valeur absurde doit couter le reglage,
+        // jamais le lancement.
+        return 0;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeModeColourQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( MODE_COLOUR_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedModeNameQuestionShare() const
+{
+    const std::int32_t stored = QSettings{}.value( MODE_NAME_QUESTION_SHARE_KEY, 0 ).toInt();
+
+    if( stored < 0 || stored > 100 )
+    {
+        return 0;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeModeNameQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( MODE_NAME_QUESTION_SHARE_KEY, p_share );
 }
 
 }    // namespace musichien::infrastructure

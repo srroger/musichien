@@ -81,6 +81,14 @@ public:
     [[nodiscard]] std::int32_t storedChordQuestionShare() const override;
 
     void storeChordQuestionShare( std::int32_t p_share ) override;
+
+    [[nodiscard]] std::int32_t storedModeColourQuestionShare() const override;
+
+    void storeModeColourQuestionShare( std::int32_t p_share ) override;
+
+    [[nodiscard]] std::int32_t storedModeNameQuestionShare() const override;
+
+    void storeModeNameQuestionShare( std::int32_t p_share ) override;
 };
 
 }    // namespace musichien::infrastructure

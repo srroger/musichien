@@ -61,9 +61,12 @@ ApplicationWindow {
     // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
     // Un champ numerique aux couleurs du jeu.
     // Les couleurs des parts du camembert : un vert pour l'oreille, un bleu pour le sens, un dore pour le chant, un rose
-    // pour le rythme et un violet pour les accords. Elles sont choisies pour rester distinctes sur une nuit violette -
-    // un camembert ou deux parts se ressemblent ne dit rien.
-    readonly property var kindColours: ["#8ef2b0", "#7bb0ff", "#ffd479", "#ff8fb0", "#c9a0ff"]
+    // pour le rythme, un violet pour les accords, un turquoise pour la couleur des modes et un orange pour leur nom.
+    //
+    // Le NOMBRE compte : une part prend sa couleur par son RANG, donc une palette plus courte que la liste des genres
+    // ferait reapparaitre les premieres couleurs sur les derniers genres - et deux parts de la meme teinte dans un
+    // camembert ne disent plus rien.
+    readonly property var kindColours: ["#8ef2b0", "#7bb0ff", "#ffd479", "#ff8fb0", "#c9a0ff", "#6fe3d2", "#ffb066"]
     // Width shared by the standalone controls, so that they line up without each repeating the rule.
     readonly property real buttonWidth: Math.min(width * 0.82, 340)
     // What the domain said about the interval heard last, and whether there is anything to say at
@@ -224,6 +227,8 @@ ApplicationWindow {
                 // Asked right here, and right before "Jouer", because it is the only thing the landing screen
                 // needs to know before a session starts - and it decides where the sessions begin. It is NOT a
                 // setting: the answer is remembered, and it is the first piece of the profile.
+                // -------------------------------------------------------------------------------------------------
+                // Les sept modes, du plus clair au plus sombre
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -661,6 +666,94 @@ ApplicationWindow {
                     text: qsTr("Écoute bien, puis nomme ce que tu entends.")
                 }
 
+                // Un mode ne s'entend PAS tout seul : il lui faut un CENTRE. Chaque bouton fait donc entendre la gamme
+                // montee puis descendue SUR UN BOURDON tenu, et c'est le domaine qui decide quelle quinte tenir et
+                // combien de temps. C'est le meme chemin que l'exercice du degrade, donc le meme son.
+                // -------------------------------------------------------------------------------------------------
+                Rectangle {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 1
+                    color: "#4a3170"
+                }
+
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 8
+                    text: qsTr("Les sept modes, du plus clair au plus sombre")
+                    color: "#ffffff"
+                    font.pixelSize: 17
+                    font.bold: true
+                }
+
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    text: qsTr("Touche un mode : la gamme monte et descend sur un bourdon, pour entendre sa couleur. Les plus clairs sont en haut.")
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    wrapMode: Text.WordWrap
+                }
+
+                Flow {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: Math.min(scrollView.availableWidth - 24, 360)
+                    Layout.topMargin: 8
+                    spacing: 6
+
+                    Repeater {
+                        // La liste vient du domaine, exactement comme celle des intervalles : ajouter un mode au
+                        // domaine est ce qui fait apparaitre un bouton ici.
+                        model: ModeController.modes
+
+                        delegate: Button {
+                            required property var modelData
+                            // Le bouton allume est celui qui a vraiment ete ENTENDU, et non celui qui a ete touche.
+                            readonly property bool wasHeard: ModeController.lastPlayedMode.index !== undefined && modelData.index === ModeController.lastPlayedMode.index
+                            // La CLARTE peint le bouton : plus le mode est clair, plus il est lumineux. C'est l'axe du
+                            // cercle des quintes, et il prepare l'exercice du degrade - ou les cases s'assombrissent a
+                            // mesure qu'on eteint des notes.
+                            readonly property bool isBright: modelData.brightness > 0.5
+
+                            width: 104
+                            height: 46
+                            leftPadding: 6
+                            rightPadding: 6
+                            text: modelData.name
+                            font.pixelSize: 14
+                            highlighted: wasHeard
+                            Material.background: Qt.rgba(0.18 + (0.62 * modelData.brightness), 0.14 + (0.56 * modelData.brightness), 0.3 + (0.48 * modelData.brightness), 1)
+                            Material.foreground: isBright ? "#1d1033" : "#ffffff"
+                            onClicked: ModeController.playMode(modelData.index)
+                        }
+
+                    }
+
+                }
+
+                // Ce qui vient de sonner, et la note qui colore ce mode : c'est le lien entre ce que l'oreille entend et
+                // ce que la theorie en dit, au moment ou elle l'entend.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#8ef2b0"
+                    font.pixelSize: 14
+                    wrapMode: Text.WordWrap
+                    visible: ModeController.lastPlayedMode.index !== undefined
+                    text: ModeController.lastPlayedMode.index !== undefined ? qsTr("%1 — %2").arg(ModeController.lastPlayedMode.name).arg(ModeController.lastPlayedMode.characteristic) : ""
+                }
+
                 Item {
                     Layout.preferredHeight: 16
                 }
@@ -727,7 +820,6 @@ ApplicationWindow {
         height: Math.min(mainWindow.height * 0.9, settingsColumn.implicitHeight + 32)
         modal: true
         padding: 16
-
         // Les reglages contiennent la page du micro : l'ouvrir ouvre l'ecoute, le fermer la referme. C'est le meme
         // reglage que dans l'accordeur, avec la meme regle - pas de microphone ouvert pour rien.
         onOpened: MicrophoneController.ensureListening()
@@ -1021,6 +1113,31 @@ ApplicationWindow {
                     share: ExerciseController.chordQuestionShare
                     onShareEdited: (p_share) => {
                         return ExerciseController.setChordQuestionShare(p_share);
+                    }
+                }
+
+                // Les deux marches de l'harmonie, et elles sont bien DEUX : comparer deux couleurs est un travail
+                // d'oreille, nommer un mode un travail de vocabulaire. Un joueur peut vouloir la premiere sans la
+                // seconde, et l'application doit pouvoir dire laquelle resiste.
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Modes : plus clair, plus sombre")
+                    hint: qsTr("Part des questions qui font comparer deux modes sur un bourdon. 0 = jamais. C'est la première marche de l'harmonie : de l'oreille, aucun vocabulaire.")
+                    share: ExerciseController.modeColourQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setModeColourQuestionShare(p_share);
+                    }
+                }
+
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Modes : leur nom")
+                    hint: qsTr("Part des questions qui font nommer un mode entendu sur un bourdon. 0 = jamais. La même couleur, mais dite avec un mot.")
+                    share: ExerciseController.modeNameQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setModeNameQuestionShare(p_share);
                     }
                 }
 

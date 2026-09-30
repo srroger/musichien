@@ -14,6 +14,7 @@
 // =====================================================================================================================
 
 #include "domain/audio/DrumSynthesizer.h"
+#include "domain/audio/ToneSynthesizer.h"
 #include "domain/music/Note.h"
 #include "domain/music/Temperament.h"
 
@@ -52,7 +53,41 @@ public:
     // A default body, like playTapCue: an adapter that has no use for a sustained chord keeps the natural duration.
     virtual void playChordFor( std::span<const Note> p_notes, std::chrono::milliseconds p_duration )
     {
+        (void)p_duration;
+
         playChord( p_notes );
+    }
+
+    // Plays a melody heard OVER a drone held under it: the two sound TOGETHER, from the first note to the last.
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // Pourquoi le domaine demande cela, et pourquoi c'est une question de MUSIQUE avant d'etre d'audio
+    //
+    // Un mode n'est pas un jeu de notes, c'est un jeu de notes PLUS UN CENTRE : les sept memes notes sur re sont du
+    // re dorien, sur si bemol elles sont du si bemol majeur. Sans centre, l'oreille entend une gamme et aucun mode -
+    // donc « ecoute cette gamme et nomme le mode » n'est pas une question difficile, c'est une question sans reponse.
+    //
+    // Le bourdon EST ce centre. C'est pour cela que le domaine le demande ici, plutot que de laisser chaque
+    // adaptateur decider d'en jouer un : le bourdon n'est pas un ornement de restitution, c'est la moitie de la
+    // question posee au joueur.
+    //
+    // Ce qui reste a l'adaptateur : le TIMBRE et le niveau relatif des deux voix, exactement comme pour un clic de
+    // metronome. Ce que le domaine decide : que les deux s'entendent ENSEMBLE - deux appels successifs, un accord
+    // puis une melodie, donneraient deux questions au lieu d'une.
+    //
+    // A default body, like playChordFor: an adapter with no use for a drone falls back on playing the melody, which
+    // is what it would have done alone. A test that only checks the MELODY still gets it.
+    virtual void playMelodyOverDrone( std::span<const Note> p_melody,
+                                      std::span<const Note> p_drone,
+                                      std::chrono::milliseconds p_noteDuration,
+                                      std::chrono::milliseconds p_gap,
+                                      DroneFraming p_framing = {} )
+    {
+        (void)p_drone;
+        (void)p_noteDuration;
+        (void)p_framing;
+
+        playMelody( p_melody, p_gap );
     }
 
     // Plays the short cue that marks a mistake.

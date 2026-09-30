@@ -23,6 +23,7 @@
 #include "domain/exercise/SessionScore.h"
 #include "domain/music/Chord.h"
 #include "domain/music/Interval.h"
+#include "domain/music/Mode.h"
 #include "domain/music/Note.h"
 #include "domain/rhythm/Rhythm.h"
 
@@ -63,7 +64,27 @@ enum class QuestionKind
     //
     // La question la plus simple du jeu a poser, et la plus difficile a repondre : un accord, c'est plusieurs notes,
     // et l'oreille doit entendre leur RAPPORT plutot que les notes elles-memes.
-    Chord = 4
+    Chord = 4,
+
+    // Le DEGRADE : deux modes sont joues l'un apres l'autre sur le meme bourdon, et le joueur dit si le second est
+    // plus CLAIR ou plus SOMBRE que le premier.
+    //
+    // C'est la premiere question du pilier harmonie, et elle est volontairement la plus simple des deux : comparer deux
+    // couleurs entendues dans la foulee ne demande aucun nom, donc aucun vocabulaire - seulement une oreille. Roger :
+    // « l'exercice peut etre simple pour le joueur, mais reste un bon exercice pour s'imprégner des modes et des
+    // couleurs ».
+    //
+    // Le BOURDON est ce qui la rend possible : sans centre, deux gammes ne sont pas deux modes, et la question n'aurait
+    // pas de reponse. Voir la note 27 du vault, §4.
+    ModeColour = 5,
+
+    // Et le NOM, ensuite : un seul mode est joue sur le bourdon, et le joueur le nomme parmi ceux de sa palette.
+    //
+    // La meme couleur, mais dite avec un mot. Les deux genres sont SEPARES parce qu'ils ne sont pas difficiles de la
+    // meme facon : comparer est une affaire d'oreille, nommer une affaire de vocabulaire - et un joueur qui reussit la
+    // premiere en ratant la seconde apprend quelque chose de lui-meme. Il faut, pour le voir, que leurs statistiques
+    // soient distinctes.
+    ModeName = 6
 };
 
 // Une question DECIDEE a l'avance : quel genre, quelle cible, dans quel sens.
@@ -210,6 +231,26 @@ struct SessionSettings
     // l'ordre de chordLearningOrder() - les triades d'abord, les accords a quatre notes a la fin.
     std::size_t startingChordQualityCount{ 2 };
 
+    // Share of questions, in percent, that ask the player to COMPARE two modes : « le second est-il plus clair ou plus
+    // sombre que le premier ? ».
+    //
+    // ZERO par defaut, comme le rythme et pour la meme raison : une question d'harmonie dans une session d'intervalles
+    // doit se DEMANDER, jamais s'imposer. Le pilier harmonie se dose comme les autres.
+    std::int32_t modeColourQuestionShare{ 0 };
+
+    // Share of questions, in percent, that ask the player to NAME a mode heard on a drone.
+    //
+    // SEPAREE de la part de couleur, et c'est tout l'interet : entendre qu'une couleur a change est une chose, savoir
+    // la nommer en est une autre. Un joueur qui reussit la premiere en ratant la seconde apprend quelque chose de son
+    // oreille - et il faut, pour le voir, que les deux questions soient comptees separement.
+    std::int32_t modeNameQuestionShare{ 0 };
+
+    // Combien de modes le joueur a rencontres au depart.
+    //
+    // DEUX, et ce sont le majeur et le mineur : le seul ecart que toute oreille connait deja, et la premiere question
+    // possible. La palette s'elargit ensuite d'un mode tous les trois succes, du connu vers les extremes.
+    std::size_t startingModeCount{ 2 };
+
     // Les questions a poser, dans l'ORDRE, quand la session doit suivre un plan.
     //
     // Vide pour une partie ordinaire : le tirage decide. Rempli pour un Bilan, ou l'ordre EST le sujet - du plus facile
@@ -294,6 +335,29 @@ struct Question
     // voisins (une seconde majeure contre une mineure), une qualite d'accord n'en a pas. Cacher une qualite que le
     // joueur connait ne rendrait pas la question plus juste, seulement plus sournoise.
     std::vector<ChordQuality> chordChoices;
+
+    // -------------------------------------------------------------------------------------------------------------
+    // Le mode
+    //
+    // Ces champs ne veulent dire quelque chose que sur une question d'HARMONIE. Le domaine les remplit, l'ecran les lit.
+    // -------------------------------------------------------------------------------------------------------------
+
+    // La tonique, celle que le BOURDON tient. C'est elle qui donne un centre aux modes : sans elle, deux modes ne sont
+    // que deux gammes, et la question n'a pas de reponse.
+    Note modeTonic{ 62 };
+
+    // Le mode pose, et celui qui vient d'etre entendu juste avant - sur une question de COULEUR seulement.
+    //
+    // Le precedent est un optional, et pas un mode « vide » : sur une question de NOM il n'y a rien a comparer, et un
+    // champ qui contiendrait une valeur sans signification finirait par etre lu par quelqu'un.
+    Mode mode{ Mode::Ionian };
+    std::optional<Mode> previousMode;
+
+    // Ce que le joueur a le droit de repondre : les modes de sa palette, dans l'ordre d'apprentissage.
+    //
+    // Comme pour les accords, et pour la meme raison : un mode que le joueur n'a jamais rencontre ne serait pas un
+    // choix, seulement un piege.
+    std::vector<Mode> modeChoices;
 };
 
 enum class SessionState
@@ -420,6 +484,21 @@ public:
     // mauvaise reponse ne ferme pas la question - on retente, et l'accord est rejoue.
     bool answerChord( ChordQuality p_quality );
 
+    // Repond a une question de DEGRADE : le second mode etait-il plus CLAIR que le premier ?
+    //
+    // Un booleen, et non une distance : la reponse n'est pas un ecart, c'est un SENS. Le domaine compare les deux modes
+    // par leur RANG dans l'ordre de couleur, ce qui garantit qu'il ne peut pas se tromper de direction.
+    bool answerModeColour( bool p_secondIsBrighter );
+
+    // Repond a une question de NOM : quel mode a ete joue ?
+    bool answerModeName( Mode p_mode );
+
+    // Les modes que le joueur a rencontres, dans l'ordre d'apprentissage.
+    [[nodiscard]] std::span<const Mode> modePalette() const noexcept { return m_modePalette; }
+
+    // Ce que le joueur a repondu en dernier a une question de mode, pour que le verdict puisse le montrer.
+    [[nodiscard]] std::optional<Mode> lastModeAnswer() const noexcept { return m_lastModeAnswer; }
+
     // Les qualites que le joueur a rencontrees, dans l'ordre d'apprentissage. C'est ce que sa palette d'accords
     // contient, et ce que l'ecran a le droit de proposer.
     [[nodiscard]] std::span<const ChordQuality> chordPalette() const noexcept { return m_chordPalette; }
@@ -447,7 +526,23 @@ private:
     void buildRhythmicCell( Question & p_question );
 
     // Remplit la part "accord" d'une question : quelle couleur, quelle tonique, et ce que le joueur peut repondre.
+    // Construit une question d'accord : sa couleur, sa tonique, et les choix de la palette.
     void buildChordQuestion( Question & p_question );
+
+    // Construit une question d'harmonie : la tonique du bourdon, le ou les modes, et les choix de la palette.
+    //
+    // p_compare dit laquelle des deux : deux modes a comparer, ou un seul a nommer. Une seule fonction, parce que les
+    // deux questions partagent tout - la tonique, le bourdon, la palette, la facon de tirer un mode - et que deux
+    // constructions separees finiraient par tirer differemment.
+    void buildModeQuestion( Question & p_question, bool p_compare );
+
+    [[nodiscard]] Mode drawMode();
+
+    // La tonique du bourdon. Tiree dans la fenetre jouable, et choisie BASSE : c'est le bourdon qui la tient, et un
+    // bourdon aigu n'a plus rien d'un bourdon.
+    [[nodiscard]] Note drawModeTonic();
+
+    void widenModePalette();
 
     // La question decidee pour ce rang, quand la session suit un plan.
     //
@@ -491,6 +586,13 @@ private:
     // Les couleurs d'accord que le joueur a rencontrees. Un PREFIXE de chordLearningOrder(), elargi avec les
     // reussites - exactement comme la palette d'intervalles, et pour la meme raison : une couleur a la fois.
     std::vector<ChordQuality> m_chordPalette;
+
+    // Les modes que le joueur a rencontres : un PREFIXE de modeLearningOrder(), elargi par les MEMES reussites que le
+    // reste. Une seule progression a tenir, plutot que trois compteurs dont l'un finirait par mentir.
+    std::vector<Mode> m_modePalette;
+
+    // La derniere reponse de mode, pour que le verdict puisse dire ce qui a ete repondu.
+    std::optional<Mode> m_lastModeAnswer;
     SessionScore m_score;
 
     // Wrong answers in a row. Two of them, and the next question becomes a guided one - a smaller question the

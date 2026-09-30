@@ -376,11 +376,116 @@ std::vector<float> ToneSynthesizer::renderMelody( std::span<const Note> p_notes,
     return melodySamples;
 }
 
+std::chrono::milliseconds droneDurationFor( std::size_t p_noteCount,
+                                            std::chrono::milliseconds p_noteDuration,
+                                            std::chrono::milliseconds p_gap,
+                                            DroneFraming p_framing ) noexcept
+{
+    return p_framing.leadIn + ( ( p_noteDuration + p_gap ) * static_cast<std::int64_t>( p_noteCount ) ) + p_framing.tail;
+}
+
+std::vector<float> ToneSynthesizer::renderMelodyOverDrone( std::span<const Note> p_melody,
+                                                           std::span<const Note> p_drone,
+                                                           std::chrono::milliseconds p_noteDuration,
+                                                           std::chrono::milliseconds p_gap,
+                                                           TuningContext p_tuning,
+                                                           DroneFraming p_framing ) const
+{
+    if( p_melody.empty() || p_drone.empty() )
+    {
+        return renderMelody( p_melody, p_noteDuration, p_gap, p_tuning );
+    }
+
+    // Le bourdon tient PLUS LONGTEMPS que la melodie, des deux cotes : c'est ce qui installe le centre avant que la
+    // couleur n'arrive, et ce qui le laisse sonner apres la derniere note. Le verdict d'ecoute du 30/09/2026 l'a
+    // demande exactement ainsi : « le bourdon est au bon volume, mais on ne l'entend pas assez longtemps ».
+    const std::chrono::milliseconds droneDuration = droneDurationFor( p_melody.size(), p_noteDuration, p_gap, p_framing );
+
+    // LE BOURDON EST UNE ONDE ENTRETENUE, et non une corde frappee : un test l'a montre apres que l'oreille l'avait
+    // dit. Une corde frappee DECROIT - mesure faite, 1,85 s apres son depart, elle etait trente decibels sous son
+    // attaque - et un bourdon qui s'eteint n'est plus un bourdon.
+    //
+    // Ici, et SEULEMENT ici, le bourdon est fabrique par la synthese : c'est le REPLI. Un ensemble a cordes enregistre
+    // le remplace des que l'adaptateur en fournit un, et il passe alors par mixMelodyOverDrone, qui applique la meme
+    // regle d'assemblage. Waveform::Organ garde ses harmoniques sous la huitieme, donc rien ne se replie et le son ne
+    // gresille pas - ce que la dents de scie de la version precedente ne savait pas faire.
+    const std::vector<float> droneSamples = renderWaveChord( p_drone, Waveform::Organ, droneDuration, p_tuning );
+
+    return mixMelodyOverDrone( p_melody, droneSamples, p_noteDuration, p_gap, p_tuning, p_framing );
+}
+
+std::vector<float> ToneSynthesizer::mixMelodyOverDrone( std::span<const Note> p_melody,
+                                                        std::span<const float> p_droneSamples,
+                                                        std::chrono::milliseconds p_noteDuration,
+                                                        std::chrono::milliseconds p_gap,
+                                                        TuningContext p_tuning,
+                                                        DroneFraming p_framing ) const
+{
+    // PAS de const ici : un tampon const ne peut plus etre DEPLACE au retour, donc il serait copie - une copie de
+    // 200 000 echantillons pour rien, dans la fonction la plus appelee de l'exercice.
+    std::vector<float> melodySamples = renderMelody( p_melody, p_noteDuration, p_gap, p_tuning );
+
+    if( melodySamples.empty() )
+    {
+        return melodySamples;
+    }
+
+    const std::size_t leadInSampleCount = sampleCountFor( p_framing.leadIn );
+
+    const std::size_t sampleCount = std::max( p_droneSamples.size(), leadInSampleCount + melodySamples.size() );
+
+    std::vector<float> mixedSamples( sampleCount, 0.0F );
+
+    for( const std::size_t index : std::views::iota( std::size_t{ 0 }, mixedSamples.size() ) )
+    {
+        // L'index est verifie AVANT d'etre utilise, et l'acces se fait donc par l'operateur : std::span::at() n'existe
+        // que dans un C++26 tres recent, et le compilateur du NDK Android ne l'a pas encore. Ce qui compile sur le
+        // bureau ne compile donc pas forcement sur le telephone - une lecon apprise par un build Android en echec.
+        const float droneSample = ( index < p_droneSamples.size() ) ? p_droneSamples[index] : 0.0F;
+
+        float melodySample = 0.0F;
+
+        // La melodie est DECALEE du temps ou le bourdon sonne seul. C'est ce decalage qui fait entendre le centre
+        // avant la couleur, et c'est tout l'interet de l'encadrement.
+        if( ( index >= leadInSampleCount ) && ( ( index - leadInSampleCount ) < melodySamples.size() ) )
+        {
+            melodySample = melodySamples.at( index - leadInSampleCount );
+        }
+
+        mixedSamples.at( index ) = melodySample + ( droneSample * DRONE_GAIN );
+    }
+
+    // PAS de normalisation d'ensemble : chaque voix arrive deja normalisee - la melodie comme une note, le bourdon
+    // comme ce qu'il est. Renormaliser la SOMME prendrait son energie au DEBUT du tampon, c'est-a-dire au bourdon SEUL,
+    // qui deviendrait alors aussi fort qu'une note et noierait la melodie.
+    //
+    // Il ne reste donc qu'un garde-fou : si les deux voix depassent ensemble ce que le materiel accepte, on baisse TOUT
+    // d'un meme facteur. Le rapport entre les voix est conserve, donc l'equilibre entendu aussi.
+    constexpr float MAXIMUM_MIX_AMPLITUDE = 0.99F;
+
+    const float peak = peakAmplitude( mixedSamples );
+
+    if( peak > MAXIMUM_MIX_AMPLITUDE )
+    {
+        const float factor = MAXIMUM_MIX_AMPLITUDE / peak;
+
+        for( float & sample : mixedSamples )
+        {
+            sample *= factor;
+        }
+    }
+
+    return mixedSamples;
+}
+
 // One sample of a pure waveform at a given phase (a fraction of a cycle, 0 to 1).
 //
 // The three spectra are the POINT: the sine has no harmonic, the sawtooth has every harmonic falling as 1/n, the
 // square only the odd ones. They are the honest tools for hearing a temperament, because nothing else is in the way.
-[[nodiscard]] float waveformSample( Waveform p_waveform, double p_phase ) noexcept
+// La forme d'onde d'un "Waveform", calculée à une phase donnée. STATIQUE, et non libre : clang-tidy le demande, et il a
+// raison - elle n'est appelée que par ce fichier, donc tout autre nom qu'un lien interne invite un autre fichier à
+// croire qu'elle existe, et à en dépendre un jour.
+[[nodiscard]] static float waveformSample( Waveform p_waveform, double p_phase ) noexcept
 {
     const double cycle = p_phase - std::floor( p_phase );
 
@@ -394,6 +499,30 @@ std::vector<float> ToneSynthesizer::renderMelody( std::span<const Note> p_notes,
 
         case Waveform::Square:
             return ( cycle < 0.5 ) ? 1.0F : -1.0F;
+
+        case Waveform::Organ: {
+            // Les tirettes basses d'un orgue : la fondamentale et six harmoniques, chacune plus faible. Rien au-dessus
+            // de la huitieme, donc RIEN qui puisse se replier - et c'est ce qui rend le son tenu ET doux, la ou une
+            // dents de scie gresille.
+            constexpr std::array<double, 7> ORGAN_DRAW_BARS{ 1.0, 0.5, 1.0 / 3.0, 0.25, 0.2, 1.0 / 6.0, 0.125 };
+
+            // La somme des tirettes est CALCULEE, et jamais ecrite a la main : ajouter ou retirer une tirette ne peut
+            // donc pas desynchroniser la normalisation, qui ramenerait le son a un niveau faux sans que rien ne casse.
+            constexpr double ORGAN_DRAW_BAR_SUM =
+              std::accumulate( ORGAN_DRAW_BARS.begin(), ORGAN_DRAW_BARS.end(), 0.0 );
+
+            double harmonicSum = 0.0;
+
+            for( const std::size_t harmonicIndex : std::views::iota( std::size_t{ 0 }, ORGAN_DRAW_BARS.size() ) )
+            {
+                const double harmonicNumber = static_cast<double>( harmonicIndex ) + 1.0;
+
+                harmonicSum +=
+                  ORGAN_DRAW_BARS.at( harmonicIndex ) * std::sin( 2.0 * std::numbers::pi * cycle * harmonicNumber );
+            }
+
+            return static_cast<float>( harmonicSum / ORGAN_DRAW_BAR_SUM );
+        }
     }
 
     return 0.0F;

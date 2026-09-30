@@ -54,6 +54,28 @@ public:
 
     // The sustained chord: the same notes, held for the given duration, so the beating between them can be counted.
     void playChordFor( std::span<const domain::Note> p_notes, std::chrono::milliseconds p_duration ) override;
+
+    // Les timbres du bourdon, charges depuis les ressources.
+    //
+    // PLUSIEURS peuvent etre offerts, et c'est un TIRAGE qui decide lequel accompagne une question - exactement comme
+    // pour les instruments de melodie. Le choix reste stable tant que la question ne change pas : entendre le meme mode
+    // sur un autre bourdon serait une autre question.
+    //
+    // Le bourdon est une donnee de RESTITUTION, pas une regle de musique : le domaine dit QUELLE quinte doit sonner
+    // (playMelodyOverDrone), et l'adaptateur choisit avec quel son. Un appareil sans echantillons garde la synthese.
+    void useDroneInstruments( std::vector<domain::SampledInstrument> p_drones );
+
+    // La melodie sur un bourdon tenu : les deux voix sont rendues dans UN SEUL tampon, donc elles s'entendent
+    // vraiment ensemble. Les jouer l'une apres l'autre donnerait deux questions au lieu d'une.
+    //
+    // p_framing dit combien de temps le bourdon sonne SEUL avant et apres : c'est ce qui installe le centre avant la
+    // couleur, et c'est le domaine qui en fixe les valeurs par defaut.
+    void playMelodyOverDrone( std::span<const domain::Note> p_melody,
+                              std::span<const domain::Note> p_drone,
+                              std::chrono::milliseconds p_noteDuration,
+                              std::chrono::milliseconds p_gap,
+                              domain::DroneFraming p_framing = {} ) override;
+
     void playMistakeCue() override;
 
     // Le clic de menu : un accuse de reception, pas une reponse.
@@ -195,6 +217,14 @@ private:
 
     // The sampled instruments, empty when there are none.
     std::vector<domain::SampledInstrument> m_instruments;
+
+    // Les timbres du bourdon, vides quand aucun echantillon n'a pu etre lu - auquel cas la synthese prend le relais.
+    std::vector<domain::SampledInstrument> m_drones;
+
+    // Le timbre de bourdon tire pour la question en cours, et le bourdon qu'elle accompagnait : c'est ce qui garde le
+    // meme son tant que la question ne change pas.
+    std::size_t m_droneIndex{ 0 };
+    std::vector<domain::Note> m_lastDroneNotes;
 
     // The pure waveforms that join the drawing, empty when there are none.
     std::vector<domain::Waveform> m_waveforms;

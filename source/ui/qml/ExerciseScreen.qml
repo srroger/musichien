@@ -105,7 +105,6 @@ Item {
             sungVerdict += qsTr(" — écart %1 cents").arg((sungCents > 0 ? "+" : "") + sungCents);
             return sungVerdict;
         }
-
         var verdict = qsTr("%1 (%2)").arg(heard.name).arg(heard.identifier);
         if (exerciseScreen.hasAnswered && !ExerciseController.wasLastAnswerCorrect)
             verdict += qsTr(" — tu as répondu %1").arg(exerciseScreen.answeredInterval.identifier);
@@ -265,6 +264,13 @@ Item {
             // -------------------------------------------------------------------------------------------------
             // L'ANECDOTE DE LA QUESTION, juste au-dessus des actions : assez haute pour se lire entre deux questions,
             // assez basse pour ne pas voler la place de la reponse - qui reste au centre, et c'est elle qui compte.
+            // -------------------------------------------------------------------------------------------------
+            // LA QUESTION D'HARMONIE
+            // Deux formes, et deux seulement, parce que ce sont DEUX questions :
+            //   * la COULEUR : deux boutons, « plus clair » et « plus sombre ». Rien a nommer, rien a savoir d'avance :
+            //     comparer deux choses entendues dans la foulee est un travail d'oreille, et c'est la premiere marche ;
+            //   * le NOM : un bouton par mode de la palette, peints par leur CLARTE - l'ecran montre alors exactement ce
+            //     que l'oreille vient d'entendre, et l'oeil apprend l'axe en meme temps que l'oreille.
 
             anchors.fill: parent
             anchors.margins: 16
@@ -420,13 +426,25 @@ Item {
                     }
 
                     Text {
+                        // Le "Écoute bien…" est le prompt des questions d'OREILLE. Sur une question de rythme, c'est la
+                        // zone rythmique qui dit ou en est la boucle, et le meme mot y serait faux la moitie du temps.
+
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.WordWrap
-                        // Le "Écoute bien…" est le prompt des questions d'OREILLE. Sur une question de rythme, c'est la
-                        // zone rythmique qui dit ou en est la boucle, et le meme mot y serait faux la moitie du temps.
+                        // Sur une question d'HARMONIE, il faut dire QUOI ecouter : deux modes a comparer, ou un seul a
+                        // nommer. Un prompt generique laisserait le joueur chercher ce qu'on lui demande, et c'est
+                        // exactement ce qu'une consigne ne doit pas faire.
                         visible: !ExerciseController.isFeedbackVisible && ExerciseController.questionKind !== 3 && ExerciseController.questionKind !== 4
-                        text: qsTr("Écoute bien…")
+                        text: {
+                            if (ExerciseController.isModeColourQuestion)
+                                return qsTr("Écoute les deux modes : le second est-il plus clair, ou plus sombre ?");
+
+                            if (ExerciseController.isModeQuestion)
+                                return qsTr("Écoute ce mode sur son bourdon : lequel est-ce ?");
+
+                            return qsTr("Écoute bien…");
+                        }
                         color: "#cbb8e8"
                         font.pixelSize: 17
                     }
@@ -487,7 +505,6 @@ Item {
                 Layout.fillWidth: true
                 visible: ExerciseController.questionKind === 2
                 spacing: 10
-
                 // Le micro suit l'ecran qui s'en sert : il s'ouvre quand la question se chante, et se referme quand
                 // elle se tait. Un exercice passe la plupart de son temps sans chant, et un micro ouvert pour rien
                 // vide la batterie.
@@ -838,6 +855,91 @@ Item {
                         anchors.fill: parent
                         enabled: ExerciseController.isRhythmPlaying
                         onPressed: ExerciseController.tapRhythm()
+                    }
+
+                }
+
+            }
+
+            // Le mode qui vient de sonner est affiche au-dessus, en vert : c'est le lien entre ce que l'oreille entend et
+            // ce que la theorie en dit, au moment ou elle l'entend.
+            // -------------------------------------------------------------------------------------------------
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.alignment: Qt.AlignVCenter
+                visible: ExerciseController.isModeQuestion
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8ef2b0"
+                    font.pixelSize: 14
+                    visible: ExerciseController.heardMode.name !== undefined
+                    text: ExerciseController.heardMode.name !== undefined ? ExerciseController.heardMode.name + " — " + ExerciseController.heardMode.characteristic : ""
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    visible: ExerciseController.isModeColourQuestion && ExerciseController.previousMode.name !== undefined
+                    text: ExerciseController.previousMode.name !== undefined ? qsTr("Le premier était : %1").arg(ExerciseController.previousMode.name) : ""
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    visible: ExerciseController.isModeColourQuestion
+
+                    Button {
+                        Layout.fillWidth: true
+                        height: 56
+                        text: qsTr("Plus clair")
+                        enabled: ExerciseController.isAsking
+                        onClicked: ExerciseController.answerModeColour(true)
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        height: 56
+                        text: qsTr("Plus sombre")
+                        enabled: ExerciseController.isAsking
+                        onClicked: ExerciseController.answerModeColour(false)
+                    }
+
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    visible: !ExerciseController.isModeColourQuestion
+
+                    Repeater {
+                        model: ExerciseController.modeChoices
+
+                        delegate: Button {
+                            required property var modelData
+                            readonly property bool isBright: modelData.brightness > 0.5
+                            readonly property bool wasHeard: ExerciseController.heardMode.index !== undefined && modelData.index === ExerciseController.heardMode.index
+
+                            width: 104
+                            height: 48
+                            text: modelData.name
+                            font.pixelSize: 14
+                            enabled: ExerciseController.isAsking
+                            highlighted: wasHeard
+                            Material.background: Qt.rgba(0.18 + (0.62 * modelData.brightness), 0.14 + (0.56 * modelData.brightness), 0.3 + (0.48 * modelData.brightness), 1)
+                            Material.foreground: isBright ? "#1d1033" : "#ffffff"
+                            onClicked: ExerciseController.answerModeName(modelData.index)
+                        }
+
                     }
 
                 }

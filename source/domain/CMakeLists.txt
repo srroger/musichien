@@ -25,6 +25,10 @@ musichienFunction_AddLibrary(domain
     music/Chord.h
     music/Chord.cpp
 
+    # Clavier musical : la gamme majeure, et les sept modes obtenus par rotation de celle-ci
+    music/Mode.h
+    music/Mode.cpp
+
     # L'arbre des accords : comment chaque couleur s'obtient d'une autre, en un geste
     music/ChordTree.h
     music/ChordTree.cpp
@@ -110,6 +114,7 @@ if(MUSICHIEN_BUILD_TESTING)
         music/TunerGuide_test.cpp
         music/StaffPosition_test.cpp
         music/Chord_test.cpp
+        music/Mode_test.cpp
         music/ChordTree_test.cpp
         audio/ToneSynthesizer_test.cpp
         audio/PitchEstimator_test.cpp

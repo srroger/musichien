@@ -7,6 +7,7 @@
 #include "domain/rhythm/RhythmPattern.h"
 #include "ui/IntervalDescription.h"
 #include "ui/MicrophoneController.h"
+#include "ui/ModeDescription.h"
 
 #include <QColor>
 #include <QDate>
@@ -37,6 +38,28 @@ constexpr int NO_LIFE_LIMIT = -1;
 // L'ecart entre deux notes d'un arpege. Assez lent pour que l'oreille entende chaque note, assez court pour qu'on
 // reconnaisse encore l'accord d'ou elles viennent.
 constexpr std::chrono::milliseconds ARPEGGIO_NOTE_GAP{ 450 };
+
+// Le DEGRADE : les durees d'une question d'harmonie.
+//
+// Plus courtes que celles du banc d'essai, et c'est voulu : dans une session, une question doit tenir en quelques
+// secondes - et deux modes, c'est deja le double d'une question ordinaire.
+constexpr std::chrono::milliseconds MODE_NOTE_DURATION{ 340 };
+constexpr std::chrono::milliseconds MODE_NOTE_GAP{ 40 };
+
+// Le bourdon sonne SEUL avant la melodie, et apres : c'est ce qui installe le centre avant que la couleur n'arrive.
+constexpr std::chrono::milliseconds MODE_LEAD_IN{ 800 };
+constexpr std::chrono::milliseconds MODE_TAIL{ 600 };
+
+// Le silence entre les DEUX modes d'une question de couleur : assez long pour que l'oreille entende deux choses, assez
+// court pour qu'elle les COMPARE - et comparer est tout l'exercice.
+constexpr std::chrono::milliseconds MODE_COMPARISON_GAP{ 250 };
+
+// La quinte du bourdon, en demi-tons : c'est ce qui fait qu'une note tenue devient un CENTRE.
+constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
+
+// Deux octaves entre le bourdon et la melodie. Le bourdon tient les graves, et une melodie qui partagerait son octave se
+// battrait avec lui au lieu de se poser dessus.
+constexpr std::int32_t MODE_MELODY_OCTAVE_OFFSET = 24;
 
 // Combien de questions FACILES ouvrent un bilan : assez pour se mettre en confiance, pas assez pour lasser.
 constexpr std::size_t REVIEW_EASY_QUESTION_COUNT = 3;
@@ -166,6 +189,14 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
     m_rhythmTimer.setSingleShot( true );
 
     QObject::connect( &m_rhythmTimer, &QTimer::timeout, this, &ExerciseSessionController::onRhythmBeat );
+
+    // Le SECOND mode d'une question de couleur : le minuteur le pose quand le premier a fini de sonner. Un minuteur a un
+    // seul tir, comme celui de la repetition d'un accord.
+    m_modeTimer.setSingleShot( true );
+
+    QObject::connect( &m_modeTimer, &QTimer::timeout, this, [this]() {
+        playModeQuestion( true );
+    } );
 }
 
 bool ExerciseSessionController::running() const noexcept
@@ -398,6 +429,11 @@ void ExerciseSessionController::applyStoredQuestionShares( domain::SessionSettin
     p_settings.singQuestionShare = m_levelStore->storedSingQuestionShare();
     p_settings.rhythmQuestionShare = m_levelStore->storedRhythmQuestionShare();
     p_settings.chordQuestionShare = m_levelStore->storedChordQuestionShare();
+
+    // L'harmonie se pose avec les autres, et vaut zero tant que le joueur ne l'a pas demandee : une session ordinaire
+    // reste donc une session d'intervalles, exactement comme avant que ce pilier existe.
+    p_settings.modeColourQuestionShare = m_levelStore->storedModeColourQuestionShare();
+    p_settings.modeNameQuestionShare = m_levelStore->storedModeNameQuestionShare();
 }
 
 QVariantList ExerciseSessionController::playerLevels()
@@ -863,6 +899,91 @@ QVariantList ExerciseSessionController::chordChoices() const
     }
 
     return choices;
+}
+
+bool ExerciseSessionController::isModeQuestion() const noexcept
+{
+    if( m_session == nullptr )
+    {
+        return false;
+    }
+
+    const domain::QuestionKind kind = m_session->currentQuestion().kind;
+
+    return ( kind == domain::QuestionKind::ModeColour ) || ( kind == domain::QuestionKind::ModeName );
+}
+
+bool ExerciseSessionController::isModeColourQuestion() const noexcept
+{
+    return ( m_session != nullptr ) && ( m_session->currentQuestion().kind == domain::QuestionKind::ModeColour );
+}
+
+QVariantList ExerciseSessionController::modeChoices() const
+{
+    QVariantList choices;
+
+    if( m_session == nullptr )
+    {
+        return choices;
+    }
+
+    // Chaque entree est decrite par la MEME fonction que le banc d'essai des modes : un bouton de choix et un bouton de
+    // banc d'essai portent donc exactement le meme nom et la meme couleur. Deux descriptions ecrites a la main
+    // finiraient par diverger.
+    for( const domain::Mode mode : m_session->currentQuestion().modeChoices )
+    {
+        choices.append( describeMode( mode ) );
+    }
+
+    return choices;
+}
+
+QVariantMap ExerciseSessionController::heardMode() const
+{
+    return m_heardMode;
+}
+
+QVariantMap ExerciseSessionController::previousMode() const
+{
+    if( ( m_session == nullptr ) || !m_session->currentQuestion().previousMode.has_value() )
+    {
+        // Une question de NOM n'a rien a comparer : l'ecran recoit une carte VIDE, et c'est ce qui lui dit de ne rien
+        // afficher sous les boutons.
+        return {};
+    }
+
+    return describeMode( *m_session->currentQuestion().previousMode );
+}
+
+void ExerciseSessionController::answerModeColour( bool p_secondIsBrighter )
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    processAnswer( m_session->answerModeColour( p_secondIsBrighter ) );
+}
+
+void ExerciseSessionController::answerModeName( int p_modeIndex )
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    // Le signe d'abord, la borne ensuite : meme regle que dans le banc d'essai des modes, et pour la meme raison.
+    if( p_modeIndex < 0 )
+    {
+        return;
+    }
+
+    if( static_cast<std::size_t>( p_modeIndex ) >= domain::MODE_COUNT )
+    {
+        return;
+    }
+
+    processAnswer( m_session->answerModeName( static_cast<domain::Mode>( p_modeIndex ) ) );
 }
 
 void ExerciseSessionController::answerChord( int p_quality )
@@ -1386,6 +1507,44 @@ void ExerciseSessionController::setChordQuestionShare( int p_share )
     emit chordQuestionShareChanged();
 }
 
+int ExerciseSessionController::modeColourQuestionShare() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedModeColourQuestionShare() : 0;
+}
+
+int ExerciseSessionController::modeNameQuestionShare() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedModeNameQuestionShare() : 0;
+}
+
+void ExerciseSessionController::setModeColourQuestionShare( int p_share )
+{
+    if( ( m_levelStore == nullptr ) || ( p_share < 0 ) || ( p_share > 100 ) )
+    {
+        return;
+    }
+
+    m_levelStore->storeModeColourQuestionShare( p_share );
+
+    m_settings.modeColourQuestionShare = p_share;
+
+    emit modeQuestionShareChanged();
+}
+
+void ExerciseSessionController::setModeNameQuestionShare( int p_share )
+{
+    if( ( m_levelStore == nullptr ) || ( p_share < 0 ) || ( p_share > 100 ) )
+    {
+        return;
+    }
+
+    m_levelStore->storeModeNameQuestionShare( p_share );
+
+    m_settings.modeNameQuestionShare = p_share;
+
+    emit modeQuestionShareChanged();
+}
+
 void ExerciseSessionController::listenToTarget()
 {
     if( m_session == nullptr )
@@ -1866,6 +2025,16 @@ void ExerciseSessionController::playCurrentQuestion()
         return;
     }
 
+    // Une question d'harmonie, elle, se joue en DEUX temps : le mode entendu AVANT, puis le mode pose. C'est la
+    // comparaison qui est la question, donc c'est la SUITE qui compte - et c'est playModeQuestion qui la gere, avec le
+    // minuteur qui pose le second.
+    if( ( question.kind == domain::QuestionKind::ModeColour ) || ( question.kind == domain::QuestionKind::ModeName ) )
+    {
+        playModeQuestion( false );
+
+        return;
+    }
+
     // Toute autre question met fin a la boucle de rythme, et c'est ce qui garantit qu'une cellule ne continue pas a
     // battre sous une question d'intervalle.
     stopRhythmLoop();
@@ -1906,6 +2075,64 @@ void ExerciseSessionController::playCurrentQuestion()
     m_notePlayer.playMelody( ascendingNotes, m_session->settings().melodicGap );
 }
 
+void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    // Quel mode sonne : celui de la question, ou celui qui vient d'etre entendu avant lui. Sur une question de NOM il
+    // n'y a qu'un mode, et c'est celui de la question.
+    const bool hasPrevious = question.previousMode.has_value();
+
+    const domain::Mode mode = ( p_secondOnly || !hasPrevious ) ? question.mode : *question.previousMode;
+
+    // La gamme MONTE, et rien de plus.
+    //
+    // Le banc d'essai la fait monter ET descendre, parce qu'on y ecoute une couleur a loisir. Ici une question doit tenir
+    // en quelques secondes, et c'est le BOURDON qui donne le centre - pas le retour sur la tonique. Monter suffit donc a
+    // faire entendre la note qui colore le mode.
+    //
+    // La melodie est posee DEUX OCTAVES au-dessus de la tonique : le bourdon tient les graves, et une melodie qui
+    // partagerait son octave se battrait avec lui au lieu de se poser dessus.
+    const std::vector<domain::Note> melody =
+      domain::notesOfMode( question.modeTonic.transposedBy( MODE_MELODY_OCTAVE_OFFSET ), mode );
+
+    // Le bourdon : la tonique tenue, et sa QUINTE. La MEME pour les deux modes d'une question de couleur, et c'est
+    // exactement ce qui les rend comparables.
+    const std::array<domain::Note, 2> drone{ question.modeTonic,
+                                             question.modeTonic.transposedBy( FIFTH_IN_SEMITONES ) };
+
+    const domain::DroneFraming framing{ MODE_LEAD_IN, MODE_TAIL };
+
+    m_notePlayer.playMelodyOverDrone( melody, drone, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+
+    // Sur une question de COULEUR, le second mode est programme pour quand le premier a fini de sonner.
+    //
+    // La duree vient du DOMAINE, et n'est pas recalculee ici : c'est la seule facon de garantir que le minuteur ne coupe
+    // pas le son en deux, ou ne laisse pas un trou avant le second mode.
+    if( !p_secondOnly && hasPrevious )
+    {
+        const auto modeDuration =
+          domain::droneDurationFor( domain::DEGREE_COUNT, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+
+        m_modeTimer.start( static_cast<int>( ( modeDuration + MODE_COMPARISON_GAP ).count() ) );
+    }
+
+    // Ce que l'ecran peut montrer : le mode qui vient de sonner, decrit exactement comme les choix qu'il offre.
+    const QVariantMap description = describeMode( mode );
+
+    if( m_heardMode != description )
+    {
+        m_heardMode = description;
+
+        emit sessionChanged();
+    }
+}
+
 void ExerciseSessionController::playChordNotes( const domain::Chord & p_chord )
 {
     // Les notes viennent du domaine, l'accord entier d'un coup : c'est la COULEUR qu'on fait entendre, pas une suite
@@ -1944,6 +2171,15 @@ void ExerciseSessionController::recordCurrentQuestion( bool p_wasCorrect, bool p
 
         case domain::QuestionKind::Chord:
             record.target = static_cast<std::int32_t>( question.chord.quality );
+            break;
+
+        case domain::QuestionKind::ModeColour:
+        case domain::QuestionKind::ModeName:
+            // Pour les deux questions d'harmonie, la cible est l'INDEX du mode pose.
+            //
+            // Le genre dit laquelle des deux, et c'est ce qui permettra aux statistiques de separer « entendre une
+            // couleur » de « savoir la nommer » - deux competences distinctes, et deux facons distinctes d'echouer.
+            record.target = static_cast<std::int32_t>( domain::modeIndex( question.mode ) );
             break;
 
         case domain::QuestionKind::NamedInterval:
@@ -2175,7 +2411,11 @@ QString ExerciseSessionController::chordColourName( int p_quality ) const
 
     // Une saturation moderee et une clarte elevee : le texte pose dessus est sombre, et c'est ce contraste qui rend le
     // bouton lisible d'un coup d'oeil.
-    return QColor::fromHslF( hue, 0.45, 0.70 ).name();
+    //
+    // Les suffixes F ne sont pas cosmetiques : fromHslF prend des qreal, qui sont des FLOAT dans Qt 6, et deux
+    // litteraux double y seraient une conversion retrecissante - ce que clang-tidy signale a juste titre
+    // (bugprone-narrowing-conversions).
+    return QColor::fromHslF( hue, 0.45F, 0.70F ).name();
 }
 
 bool ExerciseSessionController::isChordHintAvailable() const noexcept
@@ -2227,6 +2467,17 @@ void ExerciseSessionController::playCurrentQuestionAsChord()
     if( question.kind == domain::QuestionKind::Chord )
     {
         playChordNotes( question.chord );
+
+        return;
+    }
+
+    // Sur une question d'harmonie, la confirmation est LE MODE POSE, rejoue seul, sur son bourdon.
+    //
+    // C'est la reponse, et l'entendre une seconde fois juste apres l'avoir trouvee est ce qui la fixe. Le mode d'AVANT
+    // n'etait que la question : le rejouer melerait la reponse a ce qu'elle repond.
+    if( ( question.kind == domain::QuestionKind::ModeColour ) || ( question.kind == domain::QuestionKind::ModeName ) )
+    {
+        playModeQuestion( true );
 
         return;
     }

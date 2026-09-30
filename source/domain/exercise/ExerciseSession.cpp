@@ -33,6 +33,7 @@ ExerciseSession::ExerciseSession( std::uint32_t p_seed, SessionSettings p_settin
   , m_settings{ p_settings }
   , m_palette{ beginnerPalette( m_settings.startingPaletteSize ) }
   , m_chordPalette{ beginnerChordPalette( m_settings.startingChordQualityCount ) }
+  , m_modePalette{ beginnerModePalette( m_settings.startingModeCount ) }
   , m_score{ m_settings.lives }
   , m_currentQuestion{ buildQuestion() }
 {
@@ -91,6 +92,15 @@ Question ExerciseSession::buildQuestion()
         // Un accord a une tonique et une couleur, mais ni direction ni grille de choix tires au hasard : il a sa
         // propre palette, et sa propre facon de se repondre.
         buildChordQuestion( question );
+
+        return question;
+    }
+
+    if( ( question.kind == QuestionKind::ModeColour ) || ( question.kind == QuestionKind::ModeName ) )
+    {
+        // Une question d'harmonie ne se decide pas par un plan : le Bilan ne la connait pas encore. Elle se construit
+        // donc entierement ici - la tonique du bourdon, le ou les modes, et les choix de la palette du joueur.
+        buildModeQuestion( question, question.kind == QuestionKind::ModeColour );
 
         return question;
     }
@@ -390,6 +400,23 @@ QuestionKind ExerciseSession::drawKind()
         return QuestionKind::Chord;
     }
 
+    // Et l'harmonie en dernier : elle demande un bourdon et deux modes, donc l'ecoute la plus longue de toutes les
+    // questions. Elle ferme la marche comme les accords, et pour la meme raison.
+    if( ( m_settings.modeColourQuestionShare > 0 )
+        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare + m_settings.rhythmQuestionShare
+                      + m_settings.chordQuestionShare + m_settings.modeColourQuestionShare ) )
+    {
+        return QuestionKind::ModeColour;
+    }
+
+    if( ( m_settings.modeNameQuestionShare > 0 )
+        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare + m_settings.rhythmQuestionShare
+                      + m_settings.chordQuestionShare + m_settings.modeColourQuestionShare
+                      + m_settings.modeNameQuestionShare ) )
+    {
+        return QuestionKind::ModeName;
+    }
+
     return QuestionKind::NamedInterval;
 }
 
@@ -402,6 +429,110 @@ void ExerciseSession::buildChordQuestion( Question & p_question )
     // Ce que le joueur peut repondre : SA palette, dans l'ordre d'apprentissage, et rien d'autre. Une couleur qu'il
     // n'a jamais rencontree ne lui serait d'aucun secours - elle ne serait pas un choix, seulement un piege.
     p_question.chordChoices.assign( m_chordPalette.begin(), m_chordPalette.end() );
+}
+
+bool ExerciseSession::answerModeColour( bool p_secondIsBrighter )
+{
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::ModeColour ) )
+    {
+        // Comparer deux couleurs la ou il n'y en a pas eu deux ne repond a rien : c'est le meme refus que le nom
+        // d'intervalle oppose a une question chantee, et la frappe a une question d'intervalle.
+        return false;
+    }
+
+    // Le sens attendu est calcule par le DOMAINE, a partir des deux modes de la question : l'ecran ne peut donc pas se
+    // tromper de sens en lisant la question, et il n'a rien a recalculer.
+    const bool secondIsBrighter = m_currentQuestion.previousMode.has_value()
+                                  && isBrighterThan( m_currentQuestion.mode, *m_currentQuestion.previousMode );
+
+    return resolveAnswer( p_secondIsBrighter == secondIsBrighter, std::nullopt );
+}
+
+bool ExerciseSession::answerModeName( Mode p_mode )
+{
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::ModeName ) )
+    {
+        return false;
+    }
+
+    // Comme pour un accord : rien a enregistrer comme « repondu », parce qu'il n'y a pas de distance a montrer dans le
+    // verdict - seulement une couleur, et un nom.
+    m_lastModeAnswer = p_mode;
+
+    return resolveAnswer( p_mode == m_currentQuestion.mode, std::nullopt );
+}
+
+void ExerciseSession::buildModeQuestion( Question & p_question, bool p_compare )
+{
+    p_question.modeTonic = drawModeTonic();
+
+    p_question.mode = drawMode();
+
+    if( p_compare )
+    {
+        // Un mode DIFFERENT du premier, et tire dans la meme palette : comparer un mode avec lui-meme n'aurait pas de
+        // reponse, donc la question serait impossible plutot que difficile.
+        //
+        // La boucle se termine, et c'est une garantie du DOMAINE et non un espoir : beginnerModePalette rend toujours
+        // deux modes au moins, donc il existe toujours un mode different a tirer.
+        Mode previousMode = drawMode();
+
+        while( previousMode == p_question.mode )
+        {
+            previousMode = drawMode();
+        }
+
+        p_question.previousMode = previousMode;
+    }
+
+    // Ce que le joueur peut repondre : SA palette, dans l'ordre d'apprentissage, et rien d'autre. Un mode qu'il n'a
+    // jamais rencontre ne serait pas un choix, seulement un piege.
+    p_question.modeChoices.assign( m_modePalette.begin(), m_modePalette.end() );
+}
+
+Mode ExerciseSession::drawMode()
+{
+    // Chaque mode de la palette a la meme chance, y compris le dernier arrive : la meme regle que les intervalles et les
+    // accords, et pour la meme raison - ponderer vers ce que le joueur rate ferait un meilleur exercice et un pire jeu.
+    if( m_modePalette.empty() )
+    {
+        // Ne peut pas arriver (voir beginnerModePalette), et rend tout de meme un mode valide : une question posee sur
+        // une palette vide serait un plantage, et le domaine n'en merite pas.
+        return Mode::Ionian;
+    }
+
+    std::uniform_int_distribution<std::size_t> distribution{ 0, m_modePalette.size() - 1 };
+
+    return m_modePalette.at( distribution( m_randomEngine ) );
+}
+
+Note ExerciseSession::drawModeTonic()
+{
+    // La tonique du BOURDON, donc grave, et dans une fenetre ETROITE.
+    //
+    // Trois demi-tons de chaque cote du re 2, ce qui n'est pas un gout : les echantillons du bourdon sont enregistres en
+    // re 2 et en la 2, et un echantillon transpose de plus de trois demi-tons s'entend comme un ralentissement. Une
+    // tonique entre 35 et 41, et sa quinte a sept demi-tons au-dessus, tiennent donc TOUJOURS a moins de trois
+    // demi-tons de l'un des deux enregistrements.
+    constexpr std::int32_t LOWEST_TONIC_MIDI_NUMBER = 35;
+    constexpr std::int32_t HIGHEST_TONIC_MIDI_NUMBER = 41;
+
+    std::uniform_int_distribution<std::int32_t> distribution{ LOWEST_TONIC_MIDI_NUMBER, HIGHEST_TONIC_MIDI_NUMBER };
+
+    return Note{ distribution( m_randomEngine ) };
+}
+
+void ExerciseSession::widenModePalette()
+{
+    if( m_modePalette.size() >= modeLearningOrder().size() )
+    {
+        // Tous les modes du jeu sont deja en place : il n'y a plus rien a elargir.
+        return;
+    }
+
+    // Toujours le mode SUIVANT de l'ordre d'apprentissage, jamais un tire au hasard : c'est ce qui rend la progression
+    // previsible, du majeur et du mineur vers les extremes.
+    m_modePalette = beginnerModePalette( m_modePalette.size() + 1 );
 }
 
 ChordQuality ExerciseSession::drawChordQuality()
@@ -489,6 +620,10 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
             // Les accords s'elargissent sur les MEMES reussites : une seule progression a tenir, plutot que deux
             // compteurs dont l'un finirait par mentir. Une couleur de plus tous les trois succes, comme un intervalle.
             widenChordPalette();
+
+            // Et les modes aussi, pour la meme raison exactement : le pilier harmonie avance sur les reussites de la
+            // session en cours, sans compteur a lui.
+            widenModePalette();
         }
 
         m_state = SessionState::Feedback;
@@ -590,6 +725,7 @@ void ExerciseSession::advance()
 
     m_lastAnswer.reset();
     m_lastChordAnswer.reset();
+    m_lastModeAnswer.reset();
     m_lastAnswerWasCorrect = false;
 
     m_state = SessionState::Asking;

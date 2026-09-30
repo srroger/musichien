@@ -45,9 +45,9 @@ struct ReminderMoment
 // chaque jour n'en devient jamais une. Un tirage partiel sur le NOMBRE de notifications par jour reste possible plus
 // tard, mais trois par defaut est ce qui doit s'installer d'abord : c'est ce nombre qui fait une habitude.
 inline constexpr std::array<ReminderMoment, 3> ANECDOTE_REMINDER_MOMENTS{
-  ReminderMoment{ 8, 0 },
-  ReminderMoment{ 12, 30 },
-  ReminderMoment{ 20, 30 },
+  ReminderMoment{ .hour = 8, .minute = 0 },
+  ReminderMoment{ .hour = 12, .minute = 30 },
+  ReminderMoment{ .hour = 20, .minute = 30 },
 };
 
 // Combien de creneaux une journee peut occuper, anecdotes et rappel compris.
@@ -63,7 +63,8 @@ inline constexpr std::size_t REMINDER_SLOT_COUNT = 8;
 // coute une heure, jamais le rappel.
 [[nodiscard]] constexpr ReminderMoment clampedReminderMoment( ReminderMoment p_moment ) noexcept
 {
-    return ReminderMoment{ std::clamp( p_moment.hour, 0, 23 ), std::clamp( p_moment.minute, 0, 59 ) };
+    return ReminderMoment{ .hour = std::clamp( p_moment.hour, 0, 23 ),
+                           .minute = std::clamp( p_moment.minute, 0, 59 ) };
 }
 
 }    // namespace musichien::domain

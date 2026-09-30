@@ -35,6 +35,21 @@ public:
         std::chrono::milliseconds gap{ 0 };
     };
 
+    // Un appel a playMelodyOverDrone : la melodie ET le bourdon, gardes ENSEMBLE.
+    //
+    // Et c'est le point : ce que le domaine demande, c'est leur simultaneite. Un fake qui les enregistrerait dans
+    // deux listes separees ne pourrait pas la verifier - et c'est justement elle qui fait la question posee.
+    struct PlayedOverDrone
+    {
+        std::vector<Note> melody;
+        std::vector<Note> drone;
+        std::chrono::milliseconds gap{ 0 };
+
+        // L'encadrement demande : c'est lui qui dit combien de temps le bourdon sonne SEUL, avant et apres la
+        // melodie. Un test peut donc verifier que le centre est installe avant la couleur.
+        DroneFraming framing{};
+    };
+
     explicit NotePlayerFake( std::chrono::milliseconds p_noteDuration = std::chrono::milliseconds{ 600 } )
       : m_noteDuration{ p_noteDuration }
     {
@@ -54,6 +69,20 @@ public:
     {
         m_playedChords.push_back( PlayedGroup{ std::vector<Note>{ p_notes.begin(), p_notes.end() },
                                                std::chrono::milliseconds{ 0 } } );
+    }
+
+    void playMelodyOverDrone( std::span<const Note> p_melody,
+                              std::span<const Note> p_drone,
+                              std::chrono::milliseconds p_noteDuration,
+                              std::chrono::milliseconds p_gap,
+                              DroneFraming p_framing = {} ) override
+    {
+        (void)p_noteDuration;
+
+        m_melodiesOverDrones.push_back( PlayedOverDrone{ std::vector<Note>{ p_melody.begin(), p_melody.end() },
+                                                         std::vector<Note>{ p_drone.begin(), p_drone.end() },
+                                                         p_gap,
+                                                         p_framing } );
     }
 
     void playMistakeCue() override
@@ -129,6 +158,13 @@ public:
     [[nodiscard]] const std::vector<Note> & playedNotes() const noexcept { return m_playedNotes; }
     [[nodiscard]] const std::vector<PlayedGroup> & playedMelodies() const noexcept { return m_playedMelodies; }
     [[nodiscard]] const std::vector<PlayedGroup> & playedChords() const noexcept { return m_playedChords; }
+
+    // Les appels « melodie sur bourdon », avec les deux voix : c'est ce qu'un test lit pour verifier que le bourdon
+    // a bien ete demande EN MEME TEMPS que la melodie.
+    [[nodiscard]] const std::vector<PlayedOverDrone> & melodiesOverDrones() const noexcept
+    {
+        return m_melodiesOverDrones;
+    }
     [[nodiscard]] int mistakeCueCount() const noexcept { return m_mistakeCueCount; }
     [[nodiscard]] int stopCount() const noexcept { return m_stopCount; }
 
@@ -175,6 +211,7 @@ public:
         m_playedNotes.clear();
         m_playedMelodies.clear();
         m_playedChords.clear();
+        m_melodiesOverDrones.clear();
         m_mistakeCueCount = 0;
         m_stopCount = 0;
         m_metronomeClickCount = 0;
@@ -193,6 +230,7 @@ private:
     std::vector<Note> m_playedNotes;
     std::vector<PlayedGroup> m_playedMelodies;
     std::vector<PlayedGroup> m_playedChords;
+    std::vector<PlayedOverDrone> m_melodiesOverDrones;
     int m_mistakeCueCount{ 0 };
     int m_stopCount{ 0 };
     int m_metronomeClickCount{ 0 };

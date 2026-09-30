@@ -1,0 +1,75 @@
+#pragma once
+
+// =====================================================================================================================
+// Musichien - ModePreviewController
+//
+// Le banc d'essai des modes : sept boutons, un par mode, ranges du plus clair au plus sombre.
+//
+// Il suit exactement le modele de IntervalPlaybackController, et pour la meme raison : c'est une classe FINE. Elle ne
+// compose pas une gamme, elle demande au domaine de la composer ; elle ne nomme pas un mode, elle demande au domaine
+// son identifiant ; elle ne fabrique aucun son, elle demande au PORT de le jouer.
+//
+// ---------------------------------------------------------------------------------------------------------------------
+// Ce que ce banc d'essai a de particulier, et c'est tout l'interet
+//
+// Un mode ne s'entend pas tout seul : il lui faut un CENTRE. C'est la raison pour laquelle le banc d'essai ne joue pas
+// une gamme nue - il demande au port une melodie SUR UN BOURDON, et c'est le domaine qui decide quelle quinte tenir et
+// combien de temps la tenir. Le banc d'essai se contente de dire : « ce mode, s'il te plait ».
+//
+// Consequence heureuse : ce que le banc d'essai fait entendre est EXACTEMENT ce que l'exercice fera entendre, jusqu'au
+// timbre du bourdon, qui est tire par l'adaptateur. Un banc d'essai qui sonnerait autrement que le jeu serait pire
+// qu'inutile.
+// =====================================================================================================================
+
+#include "domain/audio/NotePlayer.h"
+#include "domain/music/Mode.h"
+#include "domain/music/Temperament.h"
+
+#include <QObject>
+#include <QVariantList>
+#include <QVariantMap>
+
+namespace musichien::ui
+{
+
+class ModePreviewController final : public QObject
+{
+    Q_OBJECT
+
+    // Les sept modes, dans l'ordre de clarte : la liste vient du DOMAINE, et l'ecran ne fait que la lire.
+    Q_PROPERTY( QVariantList modes READ modes CONSTANT )
+
+    // Le mode entendu en dernier, ou une carte vide tant que rien n'a sonne. C'est ce qui permet a l'ecran de colorer
+    // le bouton qui a vraiment ete JOUE, et non celui qui a ete touche.
+    Q_PROPERTY( QVariantMap lastPlayedMode READ lastPlayedMode NOTIFY lastPlayedModeChanged )
+
+public:
+    explicit ModePreviewController( domain::NotePlayer & p_notePlayer, QObject * p_parent = nullptr );
+
+    [[nodiscard]] QVariantList modes() const;
+    [[nodiscard]] QVariantMap lastPlayedMode() const;
+
+    // Le temperament et le diapason, donnes par la couche de cablage - comme pour les intervalles.
+    void setTuning( domain::TuningContext p_tuning );
+
+    // Fait entendre un mode : la gamme montee puis descendue, sur un bourdon TENU.
+    //
+    // L'index est celui de la liste ci-dessus, donc aussi celui de domain::Mode : un ecran qui lit la liste ne peut pas
+    // demander un mode qui n'existe pas.
+    Q_INVOKABLE void playMode( int p_index );
+
+    Q_INVOKABLE void stopPlayback();
+
+signals:
+    void lastPlayedModeChanged();
+
+private:
+    domain::NotePlayer & m_notePlayer;
+    QVariantList m_modes;
+    QVariantMap m_lastPlayedMode;
+
+    // Equal temperament at 440 Hz until the wiring layer says otherwise.
+    domain::TuningContext m_tuning;
+};
+
+}    // namespace musichien::ui
