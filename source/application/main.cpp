@@ -22,6 +22,7 @@
 #include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
+#include "ui/KeyCircleController.h"
 #include "ui/MicrophoneController.h"
 #include "ui/ModePreviewController.h"
 #include "ui/RhythmController.h"
@@ -430,6 +431,16 @@ int main( int p_argumentCount, char * p_arguments[] )
                                   QML_MODULE_MINOR_VERSION,
                                   "ModeController",
                                   &modePreviewController );
+
+    // L'ecran du cercle des quintes : une page de REFERENCE, qui ne joue rien. Elle n'a donc meme pas besoin du
+    // lecteur de notes - seulement du domaine, qui sait tout ce qu'elle affiche.
+    musichien::ui::KeyCircleController keyCircleController;
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "KeyCircleController",
+                                  &keyCircleController );
 
     // The exercise screen has its own view model. It receives the SAME port, and neither controller
     // knows the other exists: the bench and the loop are two independent uses of the same domain.

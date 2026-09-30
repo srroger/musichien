@@ -50,6 +50,10 @@ musichienFunction_AddLibrary(ui
     ModeDescription.cpp
     ModePreviewController.h
     ModePreviewController.cpp
+
+    # L'ecran du cercle des quintes : une page de reference, ou l'on ne repond a rien
+    KeyCircleController.h
+    KeyCircleController.cpp
     MicrophoneController.h
     MicrophoneController.cpp
     RhythmController.h

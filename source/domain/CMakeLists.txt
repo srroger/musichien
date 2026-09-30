@@ -29,6 +29,10 @@ musichienFunction_AddLibrary(domain
     music/Mode.h
     music/Mode.cpp
 
+    # Le cercle des quintes : les armures, les relatives mineures, et la qualite des degres
+    music/KeySignature.h
+    music/KeySignature.cpp
+
     # L'arbre des accords : comment chaque couleur s'obtient d'une autre, en un geste
     music/ChordTree.h
     music/ChordTree.cpp
@@ -115,6 +119,7 @@ if(MUSICHIEN_BUILD_TESTING)
         music/StaffPosition_test.cpp
         music/Chord_test.cpp
         music/Mode_test.cpp
+        music/KeySignature_test.cpp
         music/ChordTree_test.cpp
         audio/ToneSynthesizer_test.cpp
         audio/PitchEstimator_test.cpp

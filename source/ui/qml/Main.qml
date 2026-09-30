@@ -458,6 +458,15 @@ ApplicationWindow {
                         onClicked: tunerDialog.open()
                     }
 
+                    // Le cercle des quintes : la CARTE du pilier harmonie, et la seule page qui ne demande rien au
+                    // joueur - on y lit, on n'y repond pas.
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Cercle")
+                        onClicked: keyCircleDialog.open()
+                    }
+
                 }
 
                 RowLayout {
@@ -1850,6 +1859,26 @@ ApplicationWindow {
 
         }
 
+    }
+
+    // =================================================================================================================
+    // LE CERCLE DES QUINTES
+    //
+    // Plein ecran, comme l'accordeur, et pour la meme raison : c'est une page qu'on LIT, pas un message qu'on acquitte.
+    // La roue a besoin de la place pour que ses douze cases respirent, chacune portant trois informations.
+    // =================================================================================================================
+    Dialog {
+        id: keyCircleDialog
+
+        anchors.centerIn: parent
+        width: mainWindow.width
+        height: mainWindow.height
+        modal: true
+        padding: 0
+
+        KeyCircleScreen {
+            anchors.fill: parent
+        }
     }
 
     // Les textes viennent d'un fichier de contenu (assets/content/tuner.json), comme les anecdotes et les indices : ils
