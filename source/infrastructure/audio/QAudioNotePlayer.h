@@ -126,9 +126,12 @@ public:
     // Les deux clics du metronome, echantillonnes eux aussi : deux blocs de bois. Vides, la synthese les remplace.
     void useMetronomeClicks( std::vector<float> p_accented, std::vector<float> p_plain );
 
-    // Le wouf du chien. Comme une percussion, ce n'est PAS une note : elle ne se transpose pas et n'a pas de hauteur
-    // musicale, donc le fichier est lu pour ses echantillons seulement.
-    void useDogBark( std::vector<float> p_samples );
+    // Les woufs du chien. Comme une percussion, ce n'est PAS une note : ils ne se transposent pas et n'ont pas de
+    // hauteur musicale, donc les fichiers sont lus pour leurs echantillons seulement.
+    //
+    // Ils sont QUATRE, et ils TOURNENT a chaque aboiement : le chien ne repete pas la meme phrase deux fois de suite.
+    // Un fichier vide est simplement saute - une ressource manquante coute une variante, jamais le wouf entier.
+    void useDogBarks( std::vector<std::vector<float>> p_samples );
 
     // Et il se joue quand le chien ouvre la bouche : une seule fois, sans boucle, par-dessus ce qui joue deja.
     void playDogBark() override;
@@ -268,8 +271,10 @@ private:
     // case the synthesiser plays.
     std::array<std::vector<float>, domain::DRUM_COUNT> m_drumSamples;
 
-    // Le wouf du chien, s'il a ete trouve au chargement. Vide, le clic de menu prend sa place.
-    std::vector<float> m_dogBark;
+    // Les woufs du chien, s'ils ont ete trouves au chargement. Vides, le clic de menu prend leur place ; et c'est
+    // l'INDEX qui avance, pas l'ordre du tableau : c'est ce qui les fait tourner au lieu de reprendre le premier.
+    std::vector<std::vector<float>> m_dogBarks;
+    std::size_t m_nextDogBark{ 0 };
 
     // The two metronome clicks: the accented one, and the plain one. Empty when they could not be read.
     std::vector<float> m_accentedClick;

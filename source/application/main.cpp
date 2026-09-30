@@ -32,6 +32,8 @@
 #include <QAudioDevice>
 #include <QDir>
 #include <QFile>
+#include <QFont>
+#include <QFontDatabase>
 #include <QGuiApplication>
 #include <QMediaDevices>
 #include <QQmlApplicationEngine>
@@ -341,6 +343,28 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     QGuiApplication::setOrganizationName( "Musichien" );
 
+    // LA POLICE DE L'INTERFACE. Une police ne se devine pas d'apres le systeme : elle voyage avec l'application, comme
+    // la police musicale voyage deja avec elle. Le style Material peint ses controles avec la police de
+    // l'application, donc ce seul appel habille TOUTE l'interface, y compris les boutons que le style dessine
+    // lui-meme - c'est ce qui evite d'ecrire un font.family dans chacun des quelque trois cents Text du projet.
+    //
+    // C'est une RESSOURCE : si elle manque, on garde la police du systeme et l'application s'ouvre quand meme. Une
+    // jolie police ne vaut pas un demarrage rate.
+    const int uiFontIdentifier = QFontDatabase::addApplicationFont( ":/assets/fonts/Quicksand-Variable.ttf" );
+    const QStringList uiFontFamilies = QFontDatabase::applicationFontFamilies( uiFontIdentifier );
+
+    if( !uiFontFamilies.isEmpty() )
+    {
+        QFont uiFont{ uiFontFamilies.constFirst() };
+
+        // Medium, et pas Regular : Quicksand est une police fine, et un texte fin sur la nuit violette se lit mal de
+        // loin. Elle reste ronde - c'est sa forme, pas son epaisseur, qui fait sa douceur.
+        uiFont.setWeight( QFont::Medium );
+        QGuiApplication::setFont( uiFont );
+
+        std::cerr << "Musichien: interface font \"" << uiFontFamilies.constFirst().toStdString() << "\"\n";
+    }
+
     // Material is the style Qt Quick Controls maps onto the Android look and feel. Using it from the
     // first line guarantees that what is developed on the desktop looks like what runs on the phone.
     QQuickStyle::setStyle( "Material" );
@@ -397,9 +421,20 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Les deux clics du metronome : deux blocs de bois, dans la meme banque libre.
     notePlayer.useMetronomeClicks( loadSample( "drum_click_high" ), loadSample( "drum_click_low" ) );
 
-    // Le petit wouf du chien, synthetise une fois pour toutes par scripts/render_dog_bark.py et charge comme le reste.
-    // Une ressource manquante coute le wouf, jamais le demarrage : le clic de menu prend sa place.
-    notePlayer.useDogBark( loadSample( "dog_bark" ) );
+    // Les quatre woufs du chien, synthetises une fois pour toutes par scripts/render_dog_bark.py et charges comme le
+    // reste. Ils TOURNENT a chaque aboiement : c'est ce qui fait que le chien ne repete pas la meme phrase.
+    // Une ressource manquante coute une variante, jamais le demarrage : le clic de menu prend sa place.
+    constexpr std::array<const char *, 4> DOG_BARK_NAMES{ "dog_bark", "dog_bark_2", "dog_bark_3", "dog_bark_4" };
+
+    std::vector<std::vector<float>> dogBarks;
+    dogBarks.reserve( DOG_BARK_NAMES.size() );
+
+    for( const char * dogBarkName : DOG_BARK_NAMES )
+    {
+        dogBarks.push_back( loadSample( dogBarkName ) );
+    }
+
+    notePlayer.useDogBarks( std::move( dogBarks ) );
 
     // Les trois bourdons enregistres, charges ICI comme les instruments et pour la meme raison : une ressource
     // manquante coute un timbre, jamais le demarrage.

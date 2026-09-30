@@ -49,6 +49,14 @@
         -->
         <file alias="assets/fonts/NotoMusic-Regular.ttf">../../assets/fonts/NotoMusic-Regular.ttf</file>
         <!--
+          LA POLICE DE L'INTERFACE. Roger l'a demandee « plus sympa, plus douce et plus ronde », et une police ne se
+          devine pas : elle voyage avec l'application, comme la police musicale voyage deja avec elle. C'est
+          Quicksand (licence SIL Open Font License, libre y compris pour un usage commercial), une police ronde dont
+          les majuscules restent lisibles - ce qui compte, parce que les boutons de la page de garde sont en
+          capitales.
+        -->
+        <file alias="assets/fonts/Quicksand-Variable.ttf">../../assets/fonts/Quicksand-Variable.ttf</file>
+        <!--
           Le chien de l'application, en illustration. Il est lu par le meme chemin que les autres ressources de
           contenu (:/assets/images/...), avec son alias : c'est ce qui garantit qu'il suit jusqu'au telephone.
         -->
@@ -105,6 +113,10 @@
         <file alias="assets/soundfonts/drum_kick.wav">../../assets/soundfonts/drum_kick.wav</file>
         <!-- Le wouf du chien qui raconte une anecdote : le seul son du projet qui soit SYNTHETISE, faute de banque. -->
         <file alias="assets/soundfonts/dog_bark.wav">../../assets/soundfonts/dog_bark.wav</file>
+        <!-- Les trois autres woufs : ils TOURNENT, donc le chien ne repete pas la meme phrase deux fois de suite. -->
+        <file alias="assets/soundfonts/dog_bark_2.wav">../../assets/soundfonts/dog_bark_2.wav</file>
+        <file alias="assets/soundfonts/dog_bark_3.wav">../../assets/soundfonts/dog_bark_3.wav</file>
+        <file alias="assets/soundfonts/dog_bark_4.wav">../../assets/soundfonts/dog_bark_4.wav</file>
         <file alias="assets/soundfonts/drum_snare.wav">../../assets/soundfonts/drum_snare.wav</file>
         <file alias="assets/soundfonts/drum_hihat.wav">../../assets/soundfonts/drum_hihat.wav</file>
         <file alias="assets/soundfonts/drum_tom.wav">../../assets/soundfonts/drum_tom.wav</file>

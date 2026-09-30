@@ -66,6 +66,18 @@ ApplicationWindow {
     // Il vit ICI, au niveau de la fenetre et non d'une page : c'est ce qui lui permet de se poser par-dessus n'importe
     // quoi - l'accueil, les reglages, le cercle - sans que chaque page ait a le connaitre. Roger l'a demande comme ca :
     // « ce serait le Musichien qui s'invite pour raconter des trucs ».
+    // =================================================================================================================
+    // LA COULEUR DIT LA FAMILLE
+    // =================================================================================================================
+    // Roger a demande que la couleur range les boutons par famille plutot que de les decorer : on JOUE en rouge, les
+    // variantes du jeu dans un rouge eteint, les deux OUTILS dans une couleur a eux, et tout le reste en gris. Une
+    // famille, une couleur, un endroit ou la changer.
+    // =================================================================================================================
+    // UN BOUTON QUI PARLE LA LANGUE DE LA PAGE
+    // =================================================================================================================
+    // Tous les boutons de l'accueil portent le mot de la meme facon : en capitales, dans la police ronde, et avec un
+    // peu plus de poids qu'un texte courant. C'est une decision d'ECRAN, pas une propriete de chaque bouton - et c'est
+    // ici qu'elle se change.
 
     id: mainWindow
 
@@ -75,6 +87,20 @@ ApplicationWindow {
     readonly property var kindColours: ["#8ef2b0", "#7bb0ff", "#ffd479", "#ff8fb0", "#c9a0ff", "#6fe3d2", "#ffb066"]
     // Width shared by the standalone controls, so that they line up without each repeating the rule.
     readonly property real buttonWidth: Math.min(width * 0.82, 340)
+    // Le rouge du bouton « Jouer » n'est PAS ici : c'est celui du style Material, et Roger l'a trouve bon du premier
+    // coup - le reecrire serait le seul moyen de le perdre.
+    readonly property color questColour: "#8c3a48"
+    // le rouge du jeu, eteint : ce sont des variantes, elles s'annoncent sans crier
+    readonly property color questLabelColour: "#ffe3e6"
+    // Et le duo des outils. Le metronome est FROID et le diapason CHAUD, et c'est ce qui les distingue : l'un donne le
+    // temps, l'autre la justesse. Ce qui les relie, ce n'est pas la teinte mais le TRAITEMENT - le meme fond profond,
+    // la meme icone en neon, la meme intensite. Un cyan et un magenta qui se repondent, sur la nuit violette : c'est
+    // le duo que porte deja tout le reste de l'ecran, et c'est pour ca qu'ils ont l'air d'aller ensemble.
+    readonly property color rhythmColour: "#123f47"
+    // le metronome : le temps, froid
+    readonly property color rhythmNeon: "#5fe3e8"
+    readonly property color pitchColour: "#3f1c4e" // le diapason : la justesse, chaud
+    readonly property color pitchNeon: "#d98cff"
     // What the domain said about the interval heard last, and whether there is anything to say at
     // all. An empty map is what a single note produces, because a single note is not an interval.
     readonly property var heardInterval: IntervalController.lastPlayedInterval
@@ -381,10 +407,14 @@ ApplicationWindow {
 
                 // The way into the loop. It sits above the bench on purpose: the bench is a tool for
                 // building the project, and playing is what the application is FOR.
-                Button {
+                // La porte d'entree du jeu. Elle garde le rouge du style, que Roger a trouve bon du premier coup, et
+                // c'est le seul bouton dont le mot est plus grand que les autres : c'est celui que l'oeil doit
+                // trouver en premier, et une taille plus grande le dit mieux qu'une phrase.
+                MenuButton {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 58
+                    font.pixelSize: 23
                     highlighted: true
                     text: qsTr("▶ Jouer")
                     onClicked: ExerciseController.startSession()
@@ -406,10 +436,14 @@ ApplicationWindow {
                     text: qsTr("C'est le week-end : l'heure du bilan.")
                 }
 
-                Button {
+                TintedMenuButton {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 46
+                    // Le meme rouge que les variantes du jeu, mais eteint : c'est une porte du jeu, pas le jeu.
+                    tintColour: mainWindow.questColour
+                    labelColour: mainWindow.questLabelColour
+                    labelSize: 20
                     // Dore le week-end : la couleur suffit a dire « c'est le moment », et le bouton garde sa place
                     // sous « Jouer » : c'est jouer qui doit rester la porte d'entree.
                     highlighted: ExerciseController.isWeekEnd
@@ -435,16 +469,20 @@ ApplicationWindow {
                     Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
 
-                    Button {
+                    TintedMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
+                        tintColour: mainWindow.questColour
+                        labelColour: mainWindow.questLabelColour
                         text: qsTr("Mode infini")
                         onClicked: ExerciseController.startInfiniteSession()
                     }
 
-                    Button {
+                    TintedMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
+                        tintColour: mainWindow.questColour
+                        labelColour: mainWindow.questLabelColour
                         text: qsTr("Chanter")
                         onClicked: {
                             MicrophoneController.startSingingSession();
@@ -452,9 +490,11 @@ ApplicationWindow {
                         }
                     }
 
-                    Button {
+                    TintedMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
+                        tintColour: mainWindow.questColour
+                        labelColour: mainWindow.questLabelColour
                         text: qsTr("Survie")
                         onClicked: ExerciseController.startSurvivalSession()
                     }
@@ -476,25 +516,49 @@ ApplicationWindow {
                     Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
 
-                    Button {
+                    // Le metronome, en cyan : c'est le TEMPS, et le temps est froid. Le fond profond et l'icone en
+                    // neon disent que c'est un outil, pas une decoration - et l'icone se dessine dans la couleur du
+                    // bouton, donc les deux ne peuvent pas se desaccorder.
+                    TintedMenuButton {
+                        id: metroButton
+
                         Layout.fillWidth: true
                         Layout.preferredHeight: 116
+                        tintColour: mainWindow.rhythmColour
+                        iconColour: mainWindow.rhythmNeon
                         onClicked: {
                             ExerciseController.playTapCue();
                             rhythmDialog.open();
+                        }
+
+                        // Le MOT reste, sous l'icone. Une forme se reconnait, mais un outil qui n'est plus nomme
+                        // n'est plus une promesse : l'ecran ne dit plus ce qu'il ouvre, et c'est un test qui l'a
+                        // fait remarquer avant qu'un joueur ne s'en apercoive.
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 9
+                            text: qsTr("Métronome")
+                            color: "#cbb8e8"
+                            font.capitalization: Font.AllUppercase
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
                         }
 
                         // Le metronome : le boitier en trapeze, la tige inclinee et son contrepoids. C'est la
                         // silhouette du vieil appareil a balancier, celle que tout le monde a vue sur un piano.
                         Canvas {
                             anchors.centerIn: parent
+                            // L'icone remonte de 10 points : le mot est en bas du bouton, et les deux doivent tenir
+                            // ensemble plutot que se chevaucher.
+                            anchors.verticalCenterOffset: -10
                             width: 62
                             height: 62
                             antialiasing: true
                             onPaint: {
                                 const ctx = getContext("2d");
                                 ctx.reset();
-                                ctx.strokeStyle = "#ffffff";
+                                ctx.strokeStyle = metroButton.iconColour;
                                 ctx.lineWidth = 5;
                                 ctx.lineJoin = "round";
                                 ctx.lineCap = "round";
@@ -526,25 +590,45 @@ ApplicationWindow {
 
                     }
 
-                    Button {
+                    // Et le diapason, en magenta : c'est la JUSTESSE, et elle est chaude. Le meme traitement que le
+                    // metronome - fond profond, icone en neon - avec une teinte opposee sur la roue : le cyan et le
+                    // magenta se repondent, et c'est ce qui fait tenir les deux boutons ensemble sans les confondre.
+                    TintedMenuButton {
+                        id: tunerButton
+
                         Layout.fillWidth: true
                         Layout.preferredHeight: 116
+                        tintColour: mainWindow.pitchColour
+                        iconColour: mainWindow.pitchNeon
                         onClicked: {
                             ExerciseController.playTapCue();
                             tunerDialog.open();
+                        }
+
+                        // Et son mot, comme le metronome : l'accordeur nomme l'outil qu'il ouvre.
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 9
+                            text: qsTr("Accordeur")
+                            color: "#cbb8e8"
+                            font.capitalization: Font.AllUppercase
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
                         }
 
                         // Le diapason : la fourche et son manche. Deux traits epais qui montent, et l'oeil ne s'y
                         // trompe pas - c'est l'objet qui donne la justesse, et le seul que l'accordeur peut montrer.
                         Canvas {
                             anchors.centerIn: parent
+                            anchors.verticalCenterOffset: -10
                             width: 62
                             height: 62
                             antialiasing: true
                             onPaint: {
                                 const ctx = getContext("2d");
                                 ctx.reset();
-                                ctx.strokeStyle = "#ffffff";
+                                ctx.strokeStyle = tunerButton.iconColour;
                                 ctx.lineWidth = 6;
                                 ctx.lineJoin = "round";
                                 ctx.lineCap = "round";
@@ -581,7 +665,7 @@ ApplicationWindow {
                     // Le cercle des quintes : la CARTE du pilier harmonie, et la seule page qui ne demande rien au
                     // joueur - on y lit, on n'y repond pas. Il descend ici, avec les deux portes, parce que les deux
                     // grands outils au-dessus avaient besoin de toute la largeur.
-                    Button {
+                    MenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
                         text: qsTr("Cercle")
@@ -591,7 +675,7 @@ ApplicationWindow {
                         }
                     }
 
-                    Button {
+                    MenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
                         text: qsTr("Options")
@@ -601,7 +685,7 @@ ApplicationWindow {
                         }
                     }
 
-                    Button {
+                    MenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
                         text: qsTr("Profil")
@@ -615,7 +699,7 @@ ApplicationWindow {
 
                 // L'ARBRE DES ACCORDS, sur sa propre ligne : c'est une CARTE qu'on consulte, pas un reglage, et elle se
                 // trouve sans chercher. Elle merite mieux qu'une quatrieme case dans une rangee de trois.
-                Button {
+                MenuButton {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     Layout.preferredHeight: 46
@@ -2927,6 +3011,38 @@ ApplicationWindow {
 
     }
 
+    // Roger : « les textes des boutons devraient avoir une police d'ecriture plus sympa et plus douce et ronde », et
+    // « les autres boutons en gris comme ils sont actuellement, c'est parfait ». Le gris ne bouge donc pas d'un
+    // pixel : seule la maniere de dire le mot change.
+    component MenuButton: Button {
+        font.capitalization: Font.AllUppercase
+        font.pixelSize: 15
+        font.weight: Font.DemiBold
+        // Le style Material garde 24 points de marge de chaque cote, ce qui suffit a elider un mot : « MODE INFINI »
+        // en capitales est plus large que « Mode infini » en minuscules, et trois de ces boutons se partagent la
+        // largeur de l'ecran. Ces mots sont courts, ils n'ont pas besoin de cette marge - ils ont besoin de la place.
+        leftPadding: 6
+        rightPadding: 6
+    }
+
+    // Le meme, quand sa famille a une couleur. La teinte se peint avec NOS couleurs et jamais avec celles du style :
+    // c'est la seule facon qu'un rouge eteint, un cyan et un magenta cohabitent sous le meme bouton sans que le style
+    // ait son mot a dire.
+    component TintedMenuButton: MenuButton {
+        id: tintedButton
+
+        property color tintColour: "transparent"
+        property color labelColour: "#ffffff"
+        property int labelSize: 15
+        // La couleur du trait des icones dessinees au Canvas. La plupart de ces boutons n'en ont pas ; ceux qui en ont
+        // une la lisent ici, pour que le dessin et le fond ne puissent pas se desaccorder.
+        property color iconColour: "#ffffff"
+
+        font.pixelSize: tintedButton.labelSize
+        Material.background: tintedButton.tintColour
+        Material.foreground: tintedButton.labelColour
+    }
+
     // Un grand chiffre, avec ce qu'il veut dire. Trois par page suffisent : au-dela, on ne lit plus, on survole.
     component BigStat: ColumnLayout {
         id: bigStat
@@ -3069,6 +3185,21 @@ ApplicationWindow {
 
         id: combo
 
+        // LE TEXTE D'UNE LIGNE, et c'est la fonction qui compte : selon que le modele est une liste de mots (les
+        // appareils audio, les temperaments) ou une liste de FICHES (les niveaux de jeu, qui portent un nom, un
+        // nombre de questions et une description), ce que le delegate recoit n'est pas de la meme nature. Lire
+        // « modelData » sans regarder faisait disparaitre les libelles de la liste des niveaux : une fiche n'est pas
+        // un mot, et un mot vide s'affiche tres bien - c'est-a-dire pas du tout.
+        function itemLabel(item) {
+            if (item === undefined || item === null)
+                return "";
+
+            if (typeof item === "object" && combo.textRole !== "")
+                return item[combo.textRole] !== undefined ? item[combo.textRole] : "";
+
+            return item;
+        }
+
         // QtQuick.Layouts respecte l'implicitWidth d'un item comme un MINIMUM : une seule entree longue - « Aucune entree
         // audio detectee, verifie le profil de ta carte son » - elargissait donc tout le dialogue des reglages, bien plus
         // large que l'ecran, et faisait apparaitre un defilement horizontal dont personne ne voulait. Le texte trop long
@@ -3076,22 +3207,31 @@ ApplicationWindow {
         Layout.minimumWidth: 0
         Layout.preferredWidth: 0
         Layout.fillWidth: true
+        // Une liste deroulante qui arrive a la cheville des boutons qui l'entourent ne se lit pas comme une commande :
+        // Roger l'a dit tout de suite - « il est tout fin ». Elle fait maintenant la hauteur d'un bouton, et c'est la
+        // meme pour toutes : la liste des niveaux de la page de garde, celle des appareils audio, celle des
+        // temperaments. C'est l'implicitHeight, et non un Layout.preferredHeight : la liste des niveaux vit dans un
+        // Item qui prend sa hauteur d'elle, donc la regle doit tenir en dehors d'un Layout aussi bien que dedans.
+        implicitHeight: 52
 
         contentItem: Text {
             text: combo.displayText
             color: "#ffffff"
             verticalAlignment: Text.AlignVCenter
-            leftPadding: 10
+            leftPadding: 12
+            font.pixelSize: 16
             elide: Text.ElideRight
         }
 
         delegate: ItemDelegate {
             width: combo.width
+            height: 46
 
             contentItem: Text {
-                text: modelData
+                text: combo.itemLabel(modelData)
                 color: "#e8dcff"
                 verticalAlignment: Text.AlignVCenter
+                font.pixelSize: 16
             }
 
             // La ligne survolee : sans ca, on ne sait pas ce qu'on est en train de choisir.

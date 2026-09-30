@@ -795,30 +795,40 @@ void QAudioNotePlayer::playDrum( domain::Drum p_drum )
     }
 }
 
-void QAudioNotePlayer::useDogBark( std::vector<float> p_samples )
+void QAudioNotePlayer::useDogBarks( std::vector<std::vector<float>> p_samples )
 {
-    m_dogBark = std::move( p_samples );
+    m_dogBarks = std::move( p_samples );
 }
 
 void QAudioNotePlayer::playDogBark()
 {
     ensureAudioOutputIsOpen();
 
-    // Pas d'aboiement charge : le clic de menu prend sa place. Roger avait donne les deux solutions dans la MEME phrase
-    // - « un son doux et tres court de chien... ou sinon, juste le meme petit son que tu avais sur les boutons » - donc
-    // tomber sur l'une quand l'autre manque est exactement ce qu'il a demande.
-    if( m_dogBark.empty() )
-    {
-        playTapCue();
-
-        return;
-    }
-
     // Un aboiement s'entend, et il doit s'entendre : c'est le chien qui annonce qu'il a quelque chose a dire. Il reste
     // pourtant SOUS le niveau d'une note, parce qu'il ne fait pas partie de la musique.
     constexpr float DOG_BARK_GAIN = 0.45F;
 
-    mixSamples( m_dogBark, DOG_BARK_GAIN );
+    // Les variantes TOURNENT : l'index avance a chaque aboiement, et repart au debut quand il a fait le tour. Roger
+    // voulait « trois autres qui tourneraient » - et une rotation vaut mieux qu'un tirage au hasard, qui peut tomber
+    // deux fois de suite sur le meme wouf et donner l'impression qu'il n'y en a qu'un.
+    for( std::size_t attempt = 0; attempt < m_dogBarks.size(); ++attempt )
+    {
+        const std::size_t index = m_nextDogBark % m_dogBarks.size();
+        ++m_nextDogBark;
+
+        // Un fichier qui n'a pas ete lu ne compte pas comme une phrase : on passe au suivant.
+        if( !m_dogBarks[index].empty() )
+        {
+            mixSamples( m_dogBarks[index], DOG_BARK_GAIN );
+
+            return;
+        }
+    }
+
+    // Pas un seul aboiement charge : le clic de menu prend sa place. Roger avait donne les deux solutions dans la MEME
+    // phrase - « un son doux et tres court de chien... ou sinon, juste le meme petit son que tu avais sur les boutons »
+    // - donc tomber sur l'une quand l'autre manque est exactement ce qu'il a demande.
+    playTapCue();
 }
 
 void QAudioNotePlayer::playGreeting()
