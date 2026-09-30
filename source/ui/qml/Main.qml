@@ -61,6 +61,11 @@ ApplicationWindow {
     // pour le rythme, un violet pour les accords, un turquoise pour la couleur des modes et un orange pour leur nom.
     // =================================================================================================================
     // LE CERCLE DES QUINTES
+    // =================================================================================================================
+    // LE MUSICHIEN QUI S'INVITE
+    // Il vit ICI, au niveau de la fenetre et non d'une page : c'est ce qui lui permet de se poser par-dessus n'importe
+    // quoi - l'accueil, les reglages, le cercle - sans que chaque page ait a le connaitre. Roger l'a demande comme ca :
+    // « ce serait le Musichien qui s'invite pour raconter des trucs ».
 
     id: mainWindow
 
@@ -695,7 +700,7 @@ ApplicationWindow {
                 Text {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 8
-                    text: qsTr("Les sept modes, du plus clair au plus sombre")
+                    text: qsTr("Les sept modes, du plus clair au plus obscur")
                     color: "#ffffff"
                     font.pixelSize: 17
                     font.bold: true
@@ -1196,7 +1201,7 @@ ApplicationWindow {
                 QuestionShareSetting {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
-                    title: qsTr("Modes : plus clair, plus sombre")
+                    title: qsTr("Modes : plus clair, plus obscur")
                     hint: qsTr("Part des questions qui font comparer deux modes sur un bourdon. 0 = jamais. C'est la première marche de l'harmonie : de l'oreille, aucun vocabulaire.")
                     share: ExerciseController.modeColourQuestionShare
                     onShareEdited: (p_share) => {
@@ -2649,6 +2654,88 @@ ApplicationWindow {
 
                 }
 
+            }
+
+        }
+
+    }
+
+    // Il arrive quand on revient d'une partie FINIE (voir stopSession, cote controleur), avec l'anecdote du moment, et il
+    // ne part que sur un clic : un texte qu'on n'a pas fini de lire est un texte qu'on n'aurait pas du montrer.
+    // =================================================================================================================
+    Item {
+        id: chibaPopup
+
+        anchors.fill: parent
+        z: 1000
+        visible: ExerciseController.isChibaTalking
+
+        // Un voile : il dit que la page est en pause, et il est cliquable EN ENTIER - y compris a cote du chien, parce
+        // qu'un bouton qu'il faut viser est un bouton qu'on rate.
+        Rectangle {
+            anchors.fill: parent
+            color: "#990b0620"
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: ExerciseController.dismissChiba()
+            }
+
+        }
+
+        // Le chien parle : sa bulle est au-dessus de lui, et elle porte l'anecdote. La hauteur du chien est bornee a la
+        // fenetre, sinon il deborderait sur un telephone en paysage.
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: Math.min(chibaPopup.width - 48, 420)
+            spacing: 0
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: musichienLabel.implicitHeight + 36
+                color: "#fdf8ff"
+                radius: 18
+                border.width: 2
+                border.color: "#3a1f5c"
+
+                Text {
+                    id: musichienLabel
+
+                    anchors.centerIn: parent
+                    width: parent.width - 32
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#2a1548"
+                    font.pixelSize: 16
+                    text: ExerciseController.anecdoteText
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: ExerciseController.dismissChiba()
+                }
+
+            }
+
+            Image {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredHeight: Math.min(chibaPopup.height * 0.34, 190)
+                fillMode: Image.PreserveAspectFit
+                source: "qrc:/assets/images/chibaSpeak.png"
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: ExerciseController.dismissChiba()
+                }
+
+            }
+
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 8
+                color: "#cbb8e8"
+                font.pixelSize: 12
+                text: qsTr("touche l'écran pour continuer")
             }
 
         }

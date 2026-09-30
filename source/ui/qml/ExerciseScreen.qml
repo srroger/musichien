@@ -445,14 +445,14 @@ Item {
                             // Le VAMP : deux fois la meme gamme, sur deux centres differents. La consigne doit le dire,
                             // parce que c'est justement ce que le joueur ne peut pas deviner - il entend deux fois les
                             // memes notes, et c'est pourtant deux modes.
-                            if (ExerciseController.questionKind === 7)
-                                return qsTr("Deux fois la même gamme, sur deux centres différents : le second passage est-il plus clair, ou plus sombre ?");
+                            if (ExerciseController.isModeVampQuestion)
+                                return qsTr("Deux fois la même gamme, sur deux centres différents : le second passage est-il plus clair, ou plus obscur ?");
 
                             if (ExerciseController.isForeignNoteQuestion)
                                 return qsTr("Sept notes montent sur le bourdon : l'une n'appartient pas à la gamme. Laquelle ?");
 
                             if (ExerciseController.isModeColourQuestion)
-                                return qsTr("Écoute les deux modes : le second est-il plus clair, plus sombre, ou pareil ?");
+                                return qsTr("Écoute les deux modes : le second est-il plus clair, plus obscur, ou pareil ?");
 
                             if (ExerciseController.isModeQuestion)
                                 return qsTr("Écoute ce mode sur son bourdon : lequel est-ce ?");
@@ -989,12 +989,17 @@ Item {
                 }
 
                 RowLayout {
+                    // Le « neutre » au MILIEU, comme Roger le demandait : plus clair d'un cote, plus obscur de l'autre, et
+                    // « pareil » entre les deux. Une reponse qui ne prend pas parti se lit mieux la ou elle est.
+
                     Layout.fillWidth: true
                     spacing: 10
                     visible: ExerciseController.isModeColourQuestion
 
-                    // Le « neutre » au MILIEU, comme Roger le demandait : plus clair d'un cote, plus sombre de l'autre, et
-                    // « pareil » entre les deux. Une reponse qui ne prend pas parti se lit mieux la ou elle est.
+                    // SAUF SUR UN VAMP, ou « pareil » n'existe pas : les deux passages y portent deux centres differents,
+                    // donc deux modes, donc la reponse est TOUJOURS clair ou obscur. Un bouton qu'on ne peut pas gagner
+                    // n'est pas un choix, c'est un piege - et c'est aussi ce qui permet de reconnaitre un vamp au premier
+                    // coup d'oeil, ce que Roger ne pouvait pas faire : les deux questions se ressemblaient trop.
                     Button {
                         Layout.fillWidth: true
                         height: 56
@@ -1006,6 +1011,7 @@ Item {
                     Button {
                         Layout.fillWidth: true
                         height: 56
+                        visible: !ExerciseController.isModeVampQuestion
                         text: qsTr("Pareil")
                         enabled: ExerciseController.isAsking
                         onClicked: ExerciseController.answerSameColour()
@@ -1014,7 +1020,7 @@ Item {
                     Button {
                         Layout.fillWidth: true
                         height: 56
-                        text: qsTr("Plus sombre")
+                        text: qsTr("Plus obscur")
                         enabled: ExerciseController.isAsking
                         onClicked: ExerciseController.answerModeColour(false)
                     }
@@ -1199,6 +1205,16 @@ Item {
                     loops: 1
                 }
 
+            }
+            // Le chien de la fin : content quand la partie est gagnee, triste quand elle est perdue.
+
+            // Il vient APRES l'etoile et AVANT les chiffres : l'etoile est la recompense du domaine, le chien est le mot
+            // qu'on y ajoute, et un dessin dit « bravo » ou « pas cette fois » plus vite qu'une ligne de score.
+            Image {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredHeight: 150
+                fillMode: Image.PreserveAspectFit
+                source: ExerciseController.wasSessionWon ? "qrc:/assets/images/chibaWin.png" : "qrc:/assets/images/chibaLose.png"
             }
 
             Text {

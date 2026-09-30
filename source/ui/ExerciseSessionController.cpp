@@ -296,9 +296,23 @@ bool ExerciseSessionController::isAsking() const noexcept
     return ( m_session != nullptr ) && ( m_session->state() == domain::SessionState::Asking );
 }
 
-bool ExerciseSessionController::isFinished() const noexcept
+bool ExerciseSessionController::wasSessionWon() const noexcept
 {
-    return ( m_session != nullptr ) && m_session->isFinished();
+    // Gagnee = arrivee au bout, et c'est tout : c'est le score qui dira comment. Une partie finie avec une seule vie est
+    // une partie gagnee - et si l'on demandait « sans faute », il n'y aurait presque jamais de chien content.
+    return isFinished() && ( hasUnlimitedLives() || ( lives() > 0 ) );
+}
+
+void ExerciseSessionController::dismissChiba()
+{
+    if( !m_isChibaTalking )
+    {
+        return;
+    }
+
+    m_isChibaTalking = false;
+
+    emit chibaTalkingChanged();
 }
 
 bool ExerciseSessionController::isFeedbackVisible() const noexcept
@@ -671,6 +685,17 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
 
 void ExerciseSessionController::stopSession()
 {
+    // LE CHIEN S'INVITE : le joueur revient de sa partie, et c'est LE moment ou une anecdote se lit - juste apres avoir
+    // joue. Il ne parle que d'une partie TERMINEE : quitter en cours de route n'a rien a raconter.
+    //
+    // Le drapeau est pose AVANT la remise a zero ci-dessous, parce que c'est la session qui porte « finie ou non ».
+    if( isFinished() && !m_isChibaTalking )
+    {
+        m_isChibaTalking = true;
+
+        emit chibaTalkingChanged();
+    }
+
     stopRhythmLoop();
 
     stopPlayback();
@@ -958,12 +983,16 @@ bool ExerciseSessionController::isModeColourQuestion() const noexcept
         return false;
     }
 
-    // Vrai pour les DEUX questions qui se repondent par un SENS : la comparaison de deux modes, et le vamp - qui pose
-    // exactement la meme question, sous une autre lumiere. L'ecran offre donc les memes deux boutons, et c'est voulu :
-    // la reponse est la meme, seul ce qu'on entend change.
+    // Vrai pour les DEUX questions qui se repondent par un SENS : la comparaison de deux modes, et le vamp - qui pose la
+    // meme question, sous une autre lumiere. L'ecran offre donc les memes reponses, a une pres : voir isModeVampQuestion.
     const domain::QuestionKind kind = m_session->currentQuestion().kind;
 
     return ( kind == domain::QuestionKind::ModeColour ) || ( kind == domain::QuestionKind::ModeVamp );
+}
+
+bool ExerciseSessionController::isModeVampQuestion() const noexcept
+{
+    return ( m_session != nullptr ) && ( m_session->currentQuestion().kind == domain::QuestionKind::ModeVamp );
 }
 
 QVariantList ExerciseSessionController::modeChoices() const

@@ -1668,6 +1668,102 @@ TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_pla
     }
 }
 
+TEST( ExerciseSessionControllerTest, only_the_vamp_comes_out_when_only_the_vamp_is_open )
+{
+    // Le diagnostic de Roger, et il etait exact : « je pense que les modes "deux centre" et "plus clair, plus sombre" se
+    // confondent ». Ce test verrouille les deux moities de la reponse :
+    //
+    //   1. le REGLAGE marchait : seul le vamp ouvert ne pose QUE des vamps - il n'y avait pas de melange cache ;
+    //   2. mais l'ecran les affichait pareil, et l'ecran doit donc savoir reconnaitre un vamp (voir isModeVampQuestion).
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings;
+    settings.namedIntervalQuestionShare = 0;
+    settings.singQuestionShare = 0;
+    settings.chordQuestionShare = 0;
+    settings.modeColourQuestionShare = 0;
+    settings.modeNameQuestionShare = 0;
+    settings.modeVampQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+
+    int questionCount = 0;
+    int vampCount = 0;
+
+    // Bornée : une boucle qui dépend de l'état du jeu doit toujours avoir un plafond, sans quoi un test qui échoue se
+    // transforme en test qui ne rend jamais la main.
+    for( int index = 0; ( index < 200 ) && controller.running(); ++index )
+    {
+        ++questionCount;
+
+        EXPECT_TRUE( controller.isModeQuestion() );
+
+        // Toute question de mode est ICI un vamp : la comparaison de deux modes n'a aucune part ouverte.
+        EXPECT_TRUE( controller.isModeVampQuestion() );
+
+        if( controller.isModeVampQuestion() )
+        {
+            ++vampCount;
+        }
+
+        // « pareil » n'existe pas sur un vamp : on répond un sens, juste ou faux, et les vies font le reste.
+        controller.answerModeColour( true );
+        controller.continueToNextQuestion();
+    }
+
+    EXPECT_GT( questionCount, 0 );
+    EXPECT_EQ( questionCount, vampCount );
+}
+
+TEST( ExerciseSessionControllerTest, the_dog_only_talks_after_a_session_that_ended )
+{
+    // Le Musichien qui s'invite : il arrive quand le joueur REVIENT d'une partie finie, avec une anecdote a raconter.
+    //
+    // Quitter en pleine partie n'a rien a raconter - c'est meme le contraire d'un moment ou l'on veut lire. Et il ne part
+    // que sur le clic du joueur : un texte qu'on n'a pas fini de lire est un texte qu'on n'aurait pas du montrer.
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    EXPECT_FALSE( controller.isChibaTalking() );
+
+    // Une partie qu'on quitte en cours : le chien se tait.
+    controller.startSession();
+    controller.stopSession();
+
+    EXPECT_FALSE( controller.isChibaTalking() );
+
+    // Une partie menee jusqu'au bout : il parle, et une seule fois par partie.
+    controller.startSession();
+
+    for( int index = 0; ( index < 500 ) && !controller.isFinished(); ++index )
+    {
+        if( controller.isAsking() )
+        {
+            controller.revealAnswer();
+        }
+
+        controller.continueToNextQuestion();
+    }
+
+    ASSERT_TRUE( controller.isFinished() );
+
+    controller.stopSession();
+
+    EXPECT_TRUE( controller.isChibaTalking() );
+    EXPECT_TRUE( controller.running() == false );
+
+    // Et il se tait des que le joueur a lu.
+    controller.dismissChiba();
+
+    EXPECT_FALSE( controller.isChibaTalking() );
+}
+
 TEST( ExerciseSessionControllerTest, a_plain_game_after_a_review_is_not_a_review )
 {
     // Le drapeau du bilan doit RETOMBER quand on repart pour une partie ordinaire.

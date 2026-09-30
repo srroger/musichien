@@ -149,6 +149,7 @@ class ExerciseSessionController final : public QObject
 
     // Vrai sur la question de COULEUR : deux modes, et une reponse « plus clair / plus sombre ».
     Q_PROPERTY( bool isModeColourQuestion READ isModeColourQuestion NOTIFY questionChanged )
+    Q_PROPERTY( bool isModeVampQuestion READ isModeVampQuestion NOTIFY questionChanged )
 
     // Les modes que le joueur peut repondre : SA palette, dans l'ordre d'apprentissage, du plus clair au plus sombre.
     // Chaque entree porte un index, un identifiant, un nom, la note qui colore, et une CLARTE entre 0 et 1.
@@ -271,6 +272,15 @@ class ExerciseSessionController final : public QObject
     // A loading-screen anecdote, refreshed on demand. Empty when the content file has nothing to say.
     Q_PROPERTY( QString anecdoteText READ anecdoteText NOTIFY anecdoteChanged )
 
+    // LE MUSICHIEN QUI S'INVITE : il apparait quand le joueur revient de sa partie, avec une anecdote a raconter.
+    //
+    // Il vit au-dessus de TOUTES les pages, et il ne s'efface que sur un clic : un texte qu'on n'a pas fini de lire est un
+    // texte qu'on n'aurait pas du montrer. Le drapeau est arme par la fin d'une partie, jamais par une page.
+    Q_PROPERTY( bool isChibaTalking READ isChibaTalking NOTIFY chibaTalkingChanged )
+
+    // Vrai quand la partie est finie et gagnee : c'est ce qui decide quel chien vient a la fin.
+    Q_PROPERTY( bool wasSessionWon READ wasSessionWon NOTIFY sessionChanged )
+
     // L'anecdote de la QUESTION en cours. Elle change a chaque question, donc on apprend quelque chose en jouant au lieu
     // d'attendre entre deux parties.
     Q_PROPERTY( QString questionAnecdoteText READ questionAnecdoteText NOTIFY questionAnecdoteChanged )
@@ -376,6 +386,11 @@ public:
     [[nodiscard]] bool isModeQuestion() const noexcept;
 
     [[nodiscard]] bool isModeColourQuestion() const noexcept;
+
+    // Le vamp : la MEME gamme sur deux centres. Il se repond comme une comparaison de couleurs - la reponse est un sens -
+    // mais il n'a PAS de reponse « pareil » : ses deux passages portent deux modes, toujours. L'ecran a donc besoin de le
+    // reconnaitre pour ne pas offrir une reponse qu'on ne peut pas gagner.
+    [[nodiscard]] bool isModeVampQuestion() const noexcept;
 
     [[nodiscard]] QVariantList modeChoices() const;
 
@@ -547,7 +562,21 @@ public:
     [[nodiscard]] QVariantList choices() const;
     [[nodiscard]] QVariantList gridPositions() const;
     [[nodiscard]] bool isAsking() const noexcept;
-    [[nodiscard]] bool isFinished() const noexcept;
+    [[nodiscard]] bool isFinished() const noexcept { return ( m_session != nullptr ) && m_session->isFinished(); }
+
+    // LA PARTIE EST-ELLE GAGNEE ?
+    //
+    // Gagnee veut dire ARRIVEE AU BOUT : c'est le score qui dira comment. Une partie qui finit avec une seule vie est une
+    // partie gagnee, et une partie dont les vies ont saute est une partie perdue - les deux se ressemblent quand on ne
+    // regarde que les questions posees, et c'est ce qui rend la question utile. Elle choisit le dessin de la fin.
+    [[nodiscard]] bool wasSessionWon() const noexcept;
+
+    // Le chien qui s'invite : vrai quand il a quelque chose a raconter. Il ne s'efface que sur un clic du joueur, jamais
+    // tout seul - un texte qu'on n'a pas fini de lire est un texte qu'on n'aurait pas du montrer.
+    [[nodiscard]] bool isChibaTalking() const noexcept { return m_isChibaTalking; }
+
+    // Le joueur a lu : la popup s'efface, et ne revient pas avant la prochaine fin de partie.
+    Q_INVOKABLE void dismissChiba();
     [[nodiscard]] bool isFeedbackVisible() const noexcept;
     [[nodiscard]] bool wasLastAnswerCorrect() const noexcept;
     [[nodiscard]] int lastSungCentsOffset() const noexcept { return m_lastSungCentsOffset; }
@@ -802,6 +831,9 @@ signals:
     // A new anecdote was drawn.
     void anecdoteChanged();
 
+    // Le chien s'invite, ou s'en va.
+    void chibaTalkingChanged();
+
     // L'anecdote de la question a change : une question de plus, donc une anecdote de plus.
     void questionAnecdoteChanged();
 
@@ -957,6 +989,9 @@ private:
     // Le bilan en cours, et le nombre de questions qui l'ont ouvert. Ces deux valeurs suffisent a dire au joueur ou il
     // en est : l'echauffement est passe, ce qui suit est ce qui lui resiste.
     bool m_isReviewRunning{ false };
+
+    // Le chien qui s'invite : arme par la fin d'une partie, desarme par le clic du joueur.
+    bool m_isChibaTalking{ false };
 
     // L'ecart mesure du dernier chant juge, mis de cote au moment de la reponse : le micro est resynchronise juste
     // apres, et la mesure serait perdue avec lui.

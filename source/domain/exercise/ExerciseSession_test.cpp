@@ -820,6 +820,29 @@ TEST( ExerciseSessionTest, a_share_of_zero_is_a_closed_door )
     }
 }
 
+TEST( ExerciseSessionTest, a_vamp_is_never_pareil )
+{
+    // Le diagnostic de Roger : « je pense que les modes "deux centre" et "plus clair, plus sombre" se confondent ».
+    // Il avait raison, et ce test tient la moitie de la reponse qui appartient au domaine.
+    //
+    // Un vamp porte DEUX modes - les deux passages ont la meme gamme et deux centres differents, par construction - donc
+    // « pareil » ne peut jamais etre la bonne reponse. L'ecran, lui, offrait quand meme le bouton : un bouton qu'aucun
+    // joueur ne peut gagner n'est pas un choix, c'est un piege.
+    SessionSettings settings;
+    pinEveryQuestionShare( settings );
+
+    settings.modeVampQuestionShare = 100;
+
+    for( std::uint32_t seed = 1; seed <= 200; ++seed )
+    {
+        ExerciseSession session{ seed, settings };
+
+        ASSERT_EQ( QuestionKind::ModeVamp, session.currentQuestion().kind ) << "graine " << seed;
+
+        EXPECT_FALSE( session.answerModeColour( ModeColourAnswer::Same ) ) << "graine " << seed;
+    }
+}
+
 TEST( ExerciseSessionTest, every_genre_comes_out_when_every_part_is_equal )
 {
     // Le defaut que Roger a trouve, et il etait invisible : six parts a vingt font une somme de CENT VINGT, et l'ancien
