@@ -56,13 +56,13 @@ using musichien::domain::Note;
 using musichien::domain::Phrase;
 using musichien::domain::ToneSynthesizer;
 
-// Le taux d'echantillonnage des phrases : 22050 Hz, soit DEUX FOIS moins de place que les 48 kHz du jeu.
+// Le taux d'echantillonnage des phrases : 48000 Hz, celui du jeu.
 //
-// Roger a demande si l'on pouvait compresser : « la musique n'est pas hyper riche ». Il a raison, et c'est ici que ca se
-// paie. Une phrase est faite d'une corde frappee et d'un bourdon d'orgue : rien au-dessus de 11 kHz ne porte quoi que ce
-// soit, et un WAV a 22050 Hz garde tout ce qui s'entend en divisant le poids par deux. Le jeu, lui, garde ses 48 kHz :
-// c'est l'ATELIER qui travaille a l'economie, pas ce qui est embarque.
-constexpr std::int32_t PHRASE_SAMPLE_RATE = 22050;
+// Roger avait demande si l'on pouvait compresser - « la musique n'est pas hyper riche » - et il a lui-meme tranche :
+// puisque les phrases ne voyagent JAMAIS en audio dans l'application (elles y entrent en degres, et c'est le moteur du
+// jeu qui les joue), l'atelier n'a aucune raison de s'economiser. Le tri se fait sur ce qu'on entend : il doit donc
+// entendre EXACTEMENT ce que le jeu jouera, et une bande coupee a 11 kHz ferait juger un autre son que le vrai.
+constexpr std::int32_t PHRASE_SAMPLE_RATE = 48000;
 
 // La tonique des phrases ecoutees : re 3, donc un bourdon en re 2 sous la melodie. C'est la tonique de tous les
 // tableaux de la note 27, et celle pour laquelle les echantillons de bourdon sont enregistres.
@@ -215,22 +215,16 @@ void writeIndexHtml( const std::filesystem::path & p_path, const std::vector<Ren
     html << "<p>Ecoute, puis garde ce qui te parle. Le tri se fait en deplacant les WAV retenus vers "
             "assets/content.</p>\n";
 
-    // Le repli OGG : la page essaie le fichier compresse, et retombe sur le WAV s'il n'existe pas.
-    //
-    // C'est ce qui rend scripts/compress_phrases.sh utilisable sans rien casser : comprimer remplace un fichier par un
-    // autre dix fois plus petit, et la page continue de jouer la meme phrase.
+    // Un bouton plutot qu'un lecteur audio : trier trois cents phrases se fait a la chaine, et le lecteur integre du
+    // navigateur ajoute deux gestes par phrase. Le fichier joue est le WAV, tel quel - aucun format compresse n'entre
+    // dans cet atelier, puisque ce qu'on y entend doit etre exactement ce que le jeu jouera.
     html << "<script>\n";
-    html << "function play(target){\n";
-    html << "  var ogg = new Audio(target + '.ogg');\n";
-    html << "  ogg.onerror = function(){ new Audio(target + '.wav').play(); };\n";
-    html << "  ogg.play();\n";
-    html << "}\n</script>\n<ul>\n";
+    html << "function play(target){ new Audio(target).play(); }\n";
+    html << "</script>\n<ul>\n";
 
     for( const RenderedPhrase & rendered : p_rendered )
     {
-        const std::string stem = rendered.fileName.substr( 0, rendered.fileName.find_last_of( '.' ) );
-
-        html << "<li><button onclick=\"play('" << stem << "')\">▶</button> ";
+        html << "<li><button onclick=\"play('" << rendered.fileName << "')\">▶</button> ";
         html << "<span class='mode'>" << rendered.modeIdentifier << "</span> ";
         html << "<span class='degres'>" << rendered.degrees << "</span></li>\n";
     }
