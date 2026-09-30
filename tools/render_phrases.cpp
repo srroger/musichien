@@ -164,6 +164,11 @@ struct RenderedPhrase
 }
 
 // Le fichier JSON des phrases : ce que l'atelier garde, et ce qu'un humain peut editer.
+//
+// Il porte DEUX facons de dire la tonique, et c'est voulu : « tonique » est un nom de note, pour l'oreille qui relit le
+// fichier ; « tonique_midi » est un numero, pour le domaine qui doit la jouer. C'est exactement ce que fait deja
+// interval-hints.json en gardant un « id » lisible a cote des « demi_tons » que le code comprend - un fichier de contenu
+// parle aux deux, et personne n'a a traduire.
 void writePhraseJson( const std::filesystem::path & p_path,
                       const std::vector<Phrase> & p_phrases,
                       const std::vector<RenderedPhrase> & p_rendered )
@@ -178,7 +183,8 @@ void writePhraseJson( const std::filesystem::path & p_path,
         const RenderedPhrase & rendered = p_rendered.at( index );
 
         json << "    { \"fichier\": \"" << rendered.fileName << "\", \"mode\": \"" << rendered.modeIdentifier
-             << "\", \"tonique\": \"" << rendered.tonicName << "\", \"bpm\": " << rendered.bpm << ", \"degres\": [";
+             << "\", \"tonique\": \"" << rendered.tonicName << "\", \"tonique_midi\": " << phrase.tonic.midiNumber()
+             << ", \"bpm\": " << rendered.bpm << ", \"degres\": [";
 
         for( std::size_t stepIndex = 0; stepIndex < phrase.steps.size(); ++stepIndex )
         {
