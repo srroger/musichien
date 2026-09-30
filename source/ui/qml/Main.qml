@@ -902,6 +902,8 @@ ApplicationWindow {
                 // la meme mise en page pour les trois, et une seule definition - voir QuestionShareSetting.
                 // Les parts sont des POIDS, lus les uns par rapport aux autres : leur somme est l'echelle, et le total
                 // n'a donc pas besoin de faire cent. Vingt partout vaut un sixieme pour chacun.
+                // Le TEMPO des phrases de mode, et son amplitude. Roger : « on pourrait choisir de l'augmenter, d'en choisir
+                // un central et de varier autour de 20-30 bpm. Histoire de rendre moins monotone. »
 
                 id: settingsColumn
 
@@ -1223,6 +1225,67 @@ ApplicationWindow {
                     onShareEdited: (p_share) => {
                         return ExerciseController.setModeVampQuestionShare(p_share);
                     }
+                }
+
+                // Le premier est le CENTRE, le second l'amplitude du tirage : chaque phrase est jouée à centre ± tirage,
+                // donc aucune ne sonne exactement comme la précédente. Le tempo écrit dans le contenu ne décide plus.
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 16
+                    spacing: 6
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        text: qsTr("Tempo des phrases :")
+                    }
+
+                    DarkSpinBox {
+                        Layout.preferredWidth: 86
+                        from: 40
+                        to: 160
+                        stepSize: 2
+                        value: ExerciseController.phraseTempoBpm
+                        onValueModified: ExerciseController.setPhraseTempoBpm(value)
+                    }
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        text: qsTr("bpm")
+                    }
+
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    spacing: 6
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        text: qsTr("Variation :")
+                    }
+
+                    DarkSpinBox {
+                        Layout.preferredWidth: 86
+                        from: 0
+                        to: 40
+                        stepSize: 5
+                        value: ExerciseController.phraseTempoVariation
+                        onValueModified: ExerciseController.setPhraseTempoVariation(value)
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 0
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        text: qsTr("± bpm, tiré à chaque phrase")
+                    }
+
                 }
 
                 // Le micro : choisir le peripherique et le tester. Le MEME panneau sert ici et sur la page

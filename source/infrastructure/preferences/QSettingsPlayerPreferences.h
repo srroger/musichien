@@ -70,6 +70,14 @@ public:
 
     void storeReferencePitch( double p_hertz ) override;
 
+    [[nodiscard]] std::int32_t storedPhraseTempoBpm() const override;
+
+    void storePhraseTempoBpm( std::int32_t p_bpm ) override;
+
+    [[nodiscard]] std::int32_t storedPhraseTempoVariation() const override;
+
+    void storePhraseTempoVariation( std::int32_t p_variation ) override;
+
     [[nodiscard]] std::int32_t storedNamedIntervalQuestionShare() const override;
 
     void storeNamedIntervalQuestionShare( std::int32_t p_share ) override;

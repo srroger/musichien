@@ -76,11 +76,16 @@ std::vector<Note> Phrase::notes( Note p_tonic ) const
 
 std::vector<std::chrono::milliseconds> Phrase::stepDurations() const
 {
+    return stepDurations( bpm );
+}
+
+std::vector<std::chrono::milliseconds> Phrase::stepDurations( std::int32_t p_bpm ) const
+{
     // Un temps vaut une noire, et c'est le tempo qui dit combien de millisecondes dure ce temps. Le plancher a un n'est
     // pas une precaution de style : un bpm nul - un contenu edite a la main peut en porter un - produirait une division
     // par zero, et un pas de zero temps une note d'une longueur nulle. La phrase reste alors audible, simplement lente,
     // ce qui vaut mieux qu'un silence qu'aucun ecran ne saurait expliquer.
-    const std::int32_t safeBpm = std::max( std::int32_t{ 1 }, bpm );
+    const std::int32_t safeBpm = std::max( std::int32_t{ 1 }, p_bpm );
 
     const double millisecondsPerBeat = 60000.0 / static_cast<double>( safeBpm );
 

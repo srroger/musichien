@@ -93,13 +93,24 @@ TEST( ModePreviewControllerTest, playing_a_phrase_keeps_the_mode_and_the_duratio
     domain::NotePlayerFake notePlayer;
     ModePreviewController controller{ notePlayer };
 
+    // Le tempo vient du REGLAGE, et non plus du contenu : c'est ce que Roger a demande - « d'en choisir un central et de
+    // varier autour ». Soixante ici, sans variation, pour que les durees se lisent sans calcul.
+    domain::PlayerPreferencesFake preferences;
+    preferences.storePhraseTempoBpm( 60 );
+    preferences.storePhraseTempoVariation( 0 );
+
+    controller.setPreferences( preferences );
+
     domain::PhraseBook phraseBook;
 
     // Deux phrases, dont une seule nous interesse : le livre doit rendre celle du mode DEMANDE, et jamais celle d'a cote.
+    //
+    // Et la premiere porte un tempo de CONTENU tout autre (cent vingt) : il ne doit pas decider, sinon le reglage ne
+    // servirait a rien.
     domain::Phrase slowDorian;
     slowDorian.mode = domain::Mode::Dorian;
     slowDorian.tonic = domain::Note{ 50 };
-    slowDorian.bpm = 60;    // un temps par seconde : les durees se lisent alors sans calcul
+    slowDorian.bpm = 120;
     slowDorian.steps = { domain::PhraseStep{ .degree = 1, .beats = 1 },
                          domain::PhraseStep{ .degree = 3, .beats = 2 },
                          domain::PhraseStep{ .degree = 1, .beats = 1 } };
@@ -129,8 +140,8 @@ TEST( ModePreviewControllerTest, playing_a_phrase_keeps_the_mode_and_the_duratio
     // La phrase a ete jouee SUR un bourdon, comme une gamme : c'est ce qui en fait un mode, et non une suite de notes.
     ASSERT_EQ( 2U, played.front().drone.size() );
 
-    // Et chaque pas a garde SA duree, dans l'ordre. C'est tout ce qu'une phrase a de plus qu'une gamme : la perdre
-    // reviendrait a faire ecouter autre chose que ce que l'oreille avait choisi a l'atelier.
+    // Et chaque pas a garde SA duree, dans l'ordre, au tempo du REGLAGE. C'est tout ce qu'une phrase a de plus qu'une
+    // gamme : la perdre reviendrait a faire ecouter autre chose que ce que l'oreille avait choisi a l'atelier.
     ASSERT_EQ( 3U, played.front().durations.size() );
     EXPECT_EQ( 1000, played.front().durations.at( 0 ).count() );
     EXPECT_EQ( 2000, played.front().durations.at( 1 ).count() );
@@ -141,7 +152,6 @@ TEST( ModePreviewControllerTest, playing_a_phrase_keeps_the_mode_and_the_duratio
 
     // Et ce que l'ecran affichera, dans l'ecriture de l'atelier : ce que l'oreille a juge peut se relire ici.
     EXPECT_EQ( "1 3(2) 1", controller.lastPlayedPhrase().value( "degrees" ).toString() );
-    EXPECT_EQ( 60, controller.lastPlayedPhrase().value( "bpm" ).toInt() );
     EXPECT_EQ( "dorian", controller.lastPlayedMode().value( "identifier" ).toString() );
 }
 

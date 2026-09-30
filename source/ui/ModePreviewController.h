@@ -22,6 +22,7 @@
 // =====================================================================================================================
 
 #include "domain/audio/NotePlayer.h"
+#include "domain/exercise/PlayerPreferences.h"
 #include "domain/music/Mode.h"
 #include "domain/music/PhraseBook.h"
 #include "domain/music/Temperament.h"
@@ -82,6 +83,11 @@ public:
     // laisser un banc d'essai qui fonctionne, simplement sans phrases.
     void setPhraseBook( const domain::PhraseBook & p_phraseBook );
 
+    // Les REGLAGES du joueur, quand il y en a : le tempo des phrases de mode vit la, et c'est la seule chose que le banc
+    // d'essai ait besoin de savoir du profil. Un pointeur nul est normal - un banc d'essai sans profil joue au tempo du
+    // contenu.
+    void setPreferences( const domain::PlayerPreferences & p_preferences );
+
     Q_INVOKABLE void stopPlayback();
 
     // Joue une PHRASE de ce mode, tiree dans le contenu.
@@ -105,6 +111,9 @@ private:
     QVariantMap m_lastPlayedMode;
     QVariantMap m_lastPlayedPhrase;
     QVariantList m_playedModeCircle;
+
+    // Les reglages du joueur : nul tant qu'ils n'ont pas ete donnes, et c'est un cas normal.
+    const domain::PlayerPreferences * m_preferences{ nullptr };
 
     // Allume le cercle d'un mode sur une tonique donnee, et ne notifie que s'il a change : rejouer le meme mode ne doit
     // pas faire redessiner l'ecran pour rien.

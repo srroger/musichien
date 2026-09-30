@@ -49,6 +49,10 @@ constexpr const char * SING_QUESTION_SHARE_KEY = "player/sing-question-share";
 // profil neuf sonne exactement comme le jeu d'avant que cette part existe.
 constexpr const char * NAMED_INTERVAL_QUESTION_SHARE_KEY = "player/named-interval-question-share";
 
+// Le tempo des phrases de mode, et son amplitude de variation. Soixante-douze par defaut, comme le contenu de l'atelier.
+constexpr const char * PHRASE_TEMPO_BPM_KEY = "player/phrase-tempo-bpm";
+constexpr const char * PHRASE_TEMPO_VARIATION_KEY = "player/phrase-tempo-variation";
+
 // Les deux autres parts de question, gardees avec les memes bornes et la meme valeur de repli que celle du chant :
 // trois reglages du meme genre se lisent de la meme facon, sinon l'un des trois finira par mentir.
 constexpr const char * RHYTHM_QUESTION_SHARE_KEY = "player/rhythm-question-share";
@@ -266,6 +270,48 @@ void QSettingsPlayerPreferences::storeReferencePitch( double p_hertz )
     QSettings settings;
 
     settings.setValue( REFERENCE_PITCH_KEY, p_hertz );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedPhraseTempoBpm() const
+{
+    // Soixante-douze par defaut, comme l'atelier : un profil neuf entend ce que Roger a valide a l'oreille. Les bornes
+    // tiennent la phrase jouable - a quarante, elle traine ; a cent soixante, elle n'est plus une phrase.
+    const std::int32_t stored = QSettings{}.value( PHRASE_TEMPO_BPM_KEY, 72 ).toInt();
+
+    if( stored < 40 || stored > 160 )
+    {
+        return 72;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storePhraseTempoBpm( std::int32_t p_bpm )
+{
+    QSettings settings;
+
+    settings.setValue( PHRASE_TEMPO_BPM_KEY, p_bpm );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedPhraseTempoVariation() const
+{
+    // Vingt par defaut : Roger demandait « varier autour de 20-30 bpm », et vingt suffit a casser la monotonie sans
+    // rendre un mode plus dur qu'un autre - toutes les phrases du jeu varient de la meme facon.
+    const std::int32_t stored = QSettings{}.value( PHRASE_TEMPO_VARIATION_KEY, 20 ).toInt();
+
+    if( stored < 0 || stored > 40 )
+    {
+        return 20;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storePhraseTempoVariation( std::int32_t p_variation )
+{
+    QSettings settings;
+
+    settings.setValue( PHRASE_TEMPO_VARIATION_KEY, p_variation );
 }
 
 std::int32_t QSettingsPlayerPreferences::storedNamedIntervalQuestionShare() const

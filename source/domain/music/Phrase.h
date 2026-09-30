@@ -82,6 +82,14 @@ struct Phrase
     // bpm qui dit combien de temps dure ce temps. La calculer ailleurs aurait laisse chaque appelant choisir son
     // arrondi, et deux phrases identiques auraient pu sonner differemment selon l'endroit qui les joue.
     [[nodiscard]] std::vector<std::chrono::milliseconds> stepDurations() const;
+
+    // Les memes durees, mais a un tempo CHOISI par l'appelant.
+    //
+    // Le tempo d'une phrase est une donnee du contenu - celle que l'atelier a ecrite - et il ne peut pas convenir a tout
+    // le monde : Roger l'a demande, « on pourrait faire varier les bpm des phrases, d'en choisir un central et de varier
+    // autour de 20-30 ». Le reglage remplace donc le tempo du contenu, sans rien changer aux PROPORTIONS : une phrase
+    // plus lente reste exactement la meme phrase.
+    [[nodiscard]] std::vector<std::chrono::milliseconds> stepDurations( std::int32_t p_bpm ) const;
 };
 
 // Ce qui regle une generation. Des valeurs par defaut, parce qu'un appelant qui ne veut rien regler doit obtenir une

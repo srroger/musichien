@@ -1,5 +1,6 @@
 #include "ui/ModePreviewController.h"
 
+#include "domain/exercise/PlayerPreferences.h"
 #include "ui/ModeDescription.h"
 
 #include <algorithm>
@@ -32,6 +33,10 @@ constexpr std::chrono::milliseconds GAP{ 70 };
 
 // Les demi-tons d'une octave, pour poser le bourdon d'une phrase SOUS elle.
 constexpr std::int32_t SEMITONES_PER_OCTAVE = 12;
+
+// Le plancher du tempo d'une phrase : sous quarante, elle traine au point de ne plus etre une phrase. C'est la meme
+// borne que celle du domaine, et elle sert ici a un seul cas - le tirage de variation qui descendrait sous elle.
+constexpr std::int32_t MINIMUM_PHRASE_TEMPO = 40;
 
 }    // namespace
 
@@ -130,6 +135,11 @@ QVariantList ModePreviewController::playedModeCircle() const
     return m_playedModeCircle;
 }
 
+void ModePreviewController::setPreferences( const domain::PlayerPreferences & p_preferences )
+{
+    m_preferences = &p_preferences;
+}
+
 void ModePreviewController::showCircleFor( domain::Mode p_mode, std::int32_t p_tonicPitchClass )
 {
     const QVariantList circle = describeModeCircle( p_mode, p_tonicPitchClass );
@@ -182,11 +192,28 @@ void ModePreviewController::playPhraseOfMode( int p_index )
 
     m_notePlayer.setTuning( m_tuning );
 
-    // La phrase est jouee TELLE QUE le contenu l'a ecrite : sa tonique, son tempo, ses DUREES. C'est tout le point -
-    // ce que l'oreille a choisi a l'atelier doit etre ce qu'elle retrouve ici, sans transposition ni arrangement.
+    // La phrase est jouee TELLE QUE le contenu l'a ecrite : sa tonique, ses DUREES. Ce qui vient du reglage, et de lui
+    // seul, est le TEMPO : Roger a demande « de choisir un central et de varier autour de 20-30 bpm », et c'est ce qui
+    // casse la monotonie sans changer une seule note.
     const std::vector<domain::Note> melody = phrase->notes( phrase->tonic );
 
-    const std::vector<std::chrono::milliseconds> durations = phrase->stepDurations();
+    // Le centre et l'amplitude, lus AU MOMENT DE JOUER : un reglage change s'entend donc a la phrase suivante, sans
+    // qu'aucun cache n'ait a etre tenu a jour.
+    const std::int32_t centreBpm = ( m_preferences != nullptr ) ? m_preferences->storedPhraseTempoBpm() : 72;
+    const std::int32_t variation = ( m_preferences != nullptr ) ? m_preferences->storedPhraseTempoVariation() : 0;
+
+    std::int32_t bpm = centreBpm;
+
+    if( variation > 0 )
+    {
+        std::uniform_int_distribution<std::int32_t> distribution{ -variation, variation };
+
+        // Un plancher, parce qu'un tirage qui descendrait sous le plancher du domaine ferait une phrase que personne
+        // n'a demandee - et la borne haute, elle, est tenue par la borne du reglage.
+        bpm = std::max( MINIMUM_PHRASE_TEMPO, centreBpm + distribution( m_randomEngine ) );
+    }
+
+    const std::vector<std::chrono::milliseconds> durations = phrase->stepDurations( bpm );
 
     // Le bourdon : la tonique de la phrase une OCTAVE sous elle, et sa quinte juste. Jamais au-dessus, et jamais au
     // niveau de la melodie : un bourdon est un centre, pas une seconde voix.

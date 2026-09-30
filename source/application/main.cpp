@@ -462,6 +462,9 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     modePreviewController.setPhraseBook( modalPhraseBook );
 
+    // Le tempo des phrases est un REGLAGE du joueur : le banc d'essai le lit donc la ou il vit, au moment de jouer.
+    modePreviewController.setPreferences( playerLevelStore );
+
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,
                                   QML_MODULE_MINOR_VERSION,

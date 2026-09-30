@@ -126,6 +126,22 @@ public:
 
     virtual void storeReferencePitch( double p_hertz ) = 0;
 
+    // Le TEMPO des phrases de mode, et de combien il varie d'une phrase a l'autre.
+    //
+    // Roger l'a demande en jouant : « on pourrait faire varier les bpm des phrases des modes ? Genre dans les reglages,
+    // le 72 bpm est pas mal par defaut, mais on pourrait choisir de l'augmenter, d'en choisir un central et de varier
+    // autour de 20-30 bpm. Histoire de rendre moins monotone. »
+    //
+    // Le premier est le CENTRE, le second l'amplitude du tirage : une phrase est jouee a centre ± tirage. Memorises,
+    // comme tous les reglages.
+    [[nodiscard]] virtual std::int32_t storedPhraseTempoBpm() const = 0;
+
+    virtual void storePhraseTempoBpm( std::int32_t p_bpm ) = 0;
+
+    [[nodiscard]] virtual std::int32_t storedPhraseTempoVariation() const = 0;
+
+    virtual void storePhraseTempoVariation( std::int32_t p_variation ) = 0;
+
     // How many questions in a hundred ask the player to SING the interval, the rest asking him to name it. A rule of
     // the session, remembered so that a player who wants more singing does not ask for it every time.
     //
@@ -235,6 +251,14 @@ public:
 
     void storeReferencePitch( double p_hertz ) override { m_referencePitch = p_hertz; }
 
+    [[nodiscard]] std::int32_t storedPhraseTempoBpm() const override { return m_phraseTempoBpm; }
+
+    void storePhraseTempoBpm( std::int32_t p_bpm ) override { m_phraseTempoBpm = p_bpm; }
+
+    [[nodiscard]] std::int32_t storedPhraseTempoVariation() const override { return m_phraseTempoVariation; }
+
+    void storePhraseTempoVariation( std::int32_t p_variation ) override { m_phraseTempoVariation = p_variation; }
+
     [[nodiscard]] std::int32_t storedNamedIntervalQuestionShare() const override
     {
         return m_namedIntervalQuestionShare;
@@ -293,6 +317,11 @@ private:
     double m_referencePitch{ 440.0 };
 
     std::int32_t m_namedIntervalQuestionShare{ 60 };
+
+    // Le tempo des phrases de mode : 72 par defaut, celui que l'atelier ecrit dans le contenu, donc un profil neuf
+    // entend exactement ce que Roger a valide a l'oreille.
+    std::int32_t m_phraseTempoBpm{ 72 };
+    std::int32_t m_phraseTempoVariation{ 20 };
     std::int32_t m_singQuestionShare{ 20 };
 
     // Vingt pour cent chacune, comme le chant : un premier lancement entend un peu de tout, et c'est au joueur de
