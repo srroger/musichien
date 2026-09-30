@@ -231,4 +231,101 @@ TEST( ModeTest, brightness_follows_the_colour_order )
     EXPECT_FALSE( isBrighterThan( Mode::Dorian, Mode::Dorian ) );
 }
 
+TEST( ModeTest, the_circle_of_fifths_holds_the_seven_notes_of_a_mode_in_one_arc )
+{
+    // La propriete qui rend le dessin utile : sur le cercle des quintes, les sept notes d'un mode sont VOISINES. L'arc
+    // des cases allumees est donc toujours CONTIGU - c'est exactement ce qu'est une armure - et il ne reste plus qu'a
+    // lire ou se trouve la tonique dedans.
+    constexpr std::array<std::int32_t, 6> TONICS{ 0, 2, 4, 5, 7, 9 };
+
+    for( std::size_t modeIndex = 0; modeIndex < MODE_COUNT; ++modeIndex )
+    {
+        for( const std::int32_t tonic : TONICS )
+        {
+            const std::array<CircleNote, SEMITONES_PER_OCTAVE> circle =
+              modeCircleNotes( static_cast<Mode>( modeIndex ), tonic );
+
+            // La tonique ouvre le cercle, et elle en fait partie : un mode sans sa tonique ne serait pas un mode.
+            EXPECT_TRUE( circle.front().isTonic );
+            EXPECT_TRUE( circle.front().belongsToMode );
+            EXPECT_EQ( ( tonic % SEMITONES_PER_OCTAVE ), circle.front().pitchClassIndex );
+
+            std::size_t litCount = 0;
+            std::size_t arcStart = 0;
+            bool sawArcStart = false;
+
+            for( std::size_t index = 0; index < circle.size(); ++index )
+            {
+                if( circle.at( index ).belongsToMode )
+                {
+                    ++litCount;
+                }
+
+                // Le debut de l'arc est la case allumee dont la PRECEDENTE est eteinte, en tournant : un arc peut
+                // enjamber la case 0 - c'est le cas des que la tonique n'est pas la premiere note de son armure - et
+                // une recherche qui ne tourne pas prendrait la tonique pour le debut de l'arc.
+                const std::size_t previous = ( index + circle.size() - 1 ) % circle.size();
+
+                if( !sawArcStart && circle.at( index ).belongsToMode && !circle.at( previous ).belongsToMode )
+                {
+                    arcStart = index;
+                    sawArcStart = true;
+                }
+            }
+
+            EXPECT_EQ( 7U, litCount );
+            ASSERT_TRUE( sawArcStart );
+
+            // SEPT cases allumees d'affilee depuis le debut de l'arc, en tournant : c'est la definition d'une armure.
+            for( std::size_t step = 0; step < 7; ++step )
+            {
+                const std::size_t position = ( arcStart + step ) % circle.size();
+
+                EXPECT_TRUE( circle.at( position ).belongsToMode )
+                  << "l'arc se casse apres " << step << " cases";
+            }
+
+            // Et la case qui SUIT l'arc est eteinte : sans quoi l'arc ne serait pas un arc, mais le cercle entier.
+            EXPECT_FALSE( circle.at( ( arcStart + 7 ) % circle.size() ).belongsToMode );
+        }
+    }
+}
+
+TEST( ModeTest, the_rank_of_the_tonic_in_its_own_arc_is_what_tells_the_modes_apart )
+{
+    // La lecture qu'un joueur fera du dessin, et la seule qui compte.
+    //
+    // Do ionien et re dorien ont exactement les MEMES sept notes : meme armure, meme arc. Ce qui change est la place de
+    // la tonique DANS cet arc - deuxieme rang pour l'un, quatrieme pour l'autre. Le mode cesse alors d'etre une liste de
+    // notes pour devenir une POSITION, ce qui est la facon dont une oreille le reconnait.
+    const auto rankOfTheTonicInItsArc = []( const std::array<CircleNote, SEMITONES_PER_OCTAVE> & p_circle ) {
+        // On remonte depuis la derniere case : chacune qui appartient au mode est une note de l'arc qui precede la
+        // tonique. La premiere qui n'y appartient pas marque le debut de l'arc.
+        std::size_t rank = 1;
+
+        for( std::size_t index = p_circle.size() - 1; p_circle.at( index ).belongsToMode; --index )
+        {
+            ++rank;
+
+            if( index == 0 )
+            {
+                break;
+            }
+        }
+
+        return rank;
+    };
+
+    EXPECT_EQ( 2U, rankOfTheTonicInItsArc( modeCircleNotes( Mode::Ionian, 0 ) ) );
+    EXPECT_EQ( 3U, rankOfTheTonicInItsArc( modeCircleNotes( Mode::Mixolydian, 7 ) ) );
+    EXPECT_EQ( 4U, rankOfTheTonicInItsArc( modeCircleNotes( Mode::Dorian, 2 ) ) );
+    EXPECT_EQ( 5U, rankOfTheTonicInItsArc( modeCircleNotes( Mode::Aeolian, 9 ) ) );
+    EXPECT_EQ( 6U, rankOfTheTonicInItsArc( modeCircleNotes( Mode::Phrygian, 4 ) ) );
+
+    // Et l'ordre de ces rangs EST l'ordre de couleur des modes : c'est ce qui fait du dessin une image de l'axe qu'on
+    // demande a l'oreille de suivre.
+    EXPECT_TRUE( rankOfTheTonicInItsArc( modeCircleNotes( Mode::Lydian, 5 ) )
+                 < rankOfTheTonicInItsArc( modeCircleNotes( Mode::Ionian, 0 ) ) );
+}
+
 }    // namespace musichien::domain

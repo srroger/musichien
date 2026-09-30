@@ -14,6 +14,10 @@ namespace musichien::domain
 namespace
 {
 
+// La quinte juste : le pas du cercle des quintes, et il ne depend d'aucun mode. Douze quintes font sept octaves, donc
+// la marche fait le tour des DOUZE classes de hauteur sans jamais repasser deux fois sur la meme.
+constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
+
 // Les identifiants, dans l'ORDRE DE L'ENUMERATION.
 //
 // Une seule liste, lue dans les deux sens (le nom d'un mode, et le mode d'un nom) : c'est ce qui garantit qu'un nom
@@ -63,6 +67,43 @@ std::vector<Mode> beginnerModePalette( std::size_t p_modeCount )
     const std::size_t count = std::clamp( p_modeCount, std::size_t{ 2 }, order.size() );
 
     return std::vector<Mode>{ order.begin(), order.begin() + static_cast<std::ptrdiff_t>( count ) };
+}
+
+std::array<CircleNote, SEMITONES_PER_OCTAVE> modeCircleNotes( Mode p_mode, std::int32_t p_tonicPitchClass ) noexcept
+{
+    // Une classe de hauteur est ramenee dans [0, 12) une fois pour toutes : une tonique donnee par un numero MIDI peut
+    // etre negative ou depasser l'octave, et la suite du calcul n'a plus a s'en soucier.
+    const auto wrapPitchClass = []( std::int32_t p_pitchClass ) noexcept {
+        return ( ( p_pitchClass % SEMITONES_PER_OCTAVE ) + SEMITONES_PER_OCTAVE ) % SEMITONES_PER_OCTAVE;
+    };
+
+    const std::int32_t tonicPitchClass = wrapPitchClass( p_tonicPitchClass );
+
+    // Les sept notes du mode, ramenees a des classes de hauteur : c'est tout ce dont le cercle a besoin.
+    std::array<bool, SEMITONES_PER_OCTAVE> belongsToMode{};
+
+    for( const std::int32_t offset : modeDegreeOffsets( p_mode ) )
+    {
+        belongsToMode.at( static_cast<std::size_t>( wrapPitchClass( tonicPitchClass + offset ) ) ) = true;
+    }
+
+    std::array<CircleNote, SEMITONES_PER_OCTAVE> circle{};
+
+    std::int32_t pitchClass = tonicPitchClass;
+
+    for( std::size_t index = 0; index < circle.size(); ++index )
+    {
+        const auto position = static_cast<std::size_t>( pitchClass );
+
+        circle.at( index ) = CircleNote{ .pitchClassIndex = pitchClass,
+                                         .belongsToMode = belongsToMode.at( position ),
+                                         .isTonic = ( index == 0 ) };
+
+        // La quinte juste, et le retour dans [0, 12) : c'est ce qui fait le tour du cercle une fois et une seule.
+        pitchClass = wrapPitchClass( pitchClass + FIFTH_IN_SEMITONES );
+    }
+
+    return circle;
 }
 
 std::optional<Mode> modeFromIdentifier( std::string_view p_identifier ) noexcept

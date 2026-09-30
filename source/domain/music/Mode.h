@@ -183,6 +183,38 @@ struct ModeDifference
     return ModeDifference{};
 }
 
+// Une case du cercle des quintes, vue depuis une tonique.
+struct CircleNote
+{
+    // La classe de hauteur : 0 pour do, 1 pour do diese, ... 11 pour si. C'est la seule chose que le domaine ait a dire
+    // de la note : la nommer en francais est une affaire d'affichage.
+    std::int32_t pitchClassIndex{ 0 };
+
+    // Vrai pour les SEPT notes du mode : elles allument leur case.
+    bool belongsToMode{ false };
+
+    // Vrai pour la tonique, qui est aussi la case de depart du cercle.
+    bool isTonic{ false };
+};
+
+// Les DOUZE cases du cercle des quintes, dans l'ordre des QUINTES, en partant de la tonique.
+//
+// ---------------------------------------------------------------------------------------------------------------------
+// Pourquoi cet ordre, et pourquoi c'est la bonne facon de voir un mode
+//
+// Sur un cercle des quintes, les sept notes d'un mode sont VOISINES : c'est exactement ce qu'est une armure - sept notes
+// qui se suivent de quinte en quinte. L'arc des sept cases allumees est donc toujours CONTIGU, et ce qui change d'un
+// mode a l'autre est la place de la TONIQUE dans cet arc.
+//
+// C'est ce qui rend le dessin utile : do ionien met la tonique au deuxieme rang de son armure, re dorien au quatrieme,
+// et ainsi de suite. Le mode cesse d'etre une liste de notes pour devenir une POSITION, ce qui est justement la facon
+// dont une oreille le reconnait.
+//
+// L'index de la case EST son rang de quinte depuis la tonique : la case 0 est la tonique, la case 1 sa quinte, et la
+// case 11 sa quarte (la quinte en dessous).
+[[nodiscard]] std::array<CircleNote, SEMITONES_PER_OCTAVE> modeCircleNotes( Mode p_mode,
+                                                                            std::int32_t p_tonicPitchClass ) noexcept;
+
 // L'ordre d'apprentissage des modes : celui dans lequel ils entrent dans la palette d'un joueur.
 //
 // C'est une decision MUSICALE, ecrite ici pour pouvoir etre discutee, et elle suit le meme principe que l'ordre des
