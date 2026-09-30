@@ -175,8 +175,8 @@ struct ModeDifference
     {
         if( fromOffsets.at( index ) != toOffsets.at( index ) )
         {
-            return ModeDifference{ static_cast<std::int32_t>( index ) + 1,
-                                   toOffsets.at( index ) - fromOffsets.at( index ) };
+            return ModeDifference{ .degree = static_cast<std::int32_t>( index ) + 1,
+                                   .semitones = toOffsets.at( index ) - fromOffsets.at( index ) };
         }
     }
 
