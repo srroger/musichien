@@ -1042,6 +1042,25 @@ QString ExerciseSessionController::modeCircleLabel() const
     return modeName.isEmpty() ? tr( "Le second passage" ) : tr( "Le second passage : %1" ).arg( modeName );
 }
 
+int ExerciseSessionController::modeSoundDurationMs() const
+{
+    if( ( m_session == nullptr ) || !isModeQuestion() )
+    {
+        return 0;
+    }
+
+    const domain::DroneFraming framing{ MODE_LEAD_IN, MODE_TAIL };
+
+    const std::chrono::milliseconds oneMode =
+      domain::droneDurationFor( domain::DEGREE_COUNT, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+
+    // Le vamp et la couleur font entendre DEUX modes, separes par le meme silence que celui du minuteur qui les enchaine.
+    // Une question de nom n'en fait entendre qu'un.
+    const bool twoModes = m_session->currentQuestion().previousMode.has_value();
+
+    return static_cast<int>( ( twoModes ? ( ( oneMode * 2 ) + MODE_COMPARISON_GAP ) : oneMode ).count() );
+}
+
 void ExerciseSessionController::answerModeColour( bool p_secondIsBrighter )
 {
     if( m_session == nullptr )

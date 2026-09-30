@@ -543,6 +543,53 @@ TEST( ExerciseSessionControllerTest, an_interval_without_a_hint_shows_nothing )
     EXPECT_TRUE( controller.hintText().isEmpty() );
 }
 
+// Un profil qui ne veut QUE des questions de couleur (le degrade).
+void storeColourOnlyShares( domain::PlayerPreferencesFake & p_store )
+{
+    p_store.storeNamedIntervalQuestionShare( 0 );
+    p_store.storeSingQuestionShare( 0 );
+    p_store.storeChordQuestionShare( 0 );
+    p_store.storeModeColourQuestionShare( 100 );
+    p_store.storeModeNameQuestionShare( 0 );
+    p_store.storeModeVampQuestionShare( 0 );
+}
+
+TEST( ExerciseSessionControllerTest, a_two_mode_question_announces_twice_the_sound )
+{
+    // L'ecran se sert de cette duree pour ne PAS couper la lecture : Roger a vu le minuteur avancer au milieu du son -
+    // « pour les modes, ca va beaucoup trop vite, le son se coupe en plein milieu ». Une question de couleur fait
+    // entendre DEUX modes, une question de nom un seul, et la duree doit le dire.
+    domain::NotePlayerFake notePlayer;
+
+    domain::PlayerPreferencesFake nameStore;
+    storeNamedModeOnlyShares( nameStore );
+
+    ExerciseSessionController nameController{ notePlayer, {}, {}, {}, {}, &nameStore };
+    nameController.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+    nameController.startSession();
+
+    const int oneMode = nameController.modeSoundDurationMs();
+
+    ASSERT_GT( oneMode, 0 );
+
+    domain::PlayerPreferencesFake colourStore;
+    storeColourOnlyShares( colourStore );
+
+    ExerciseSessionController colourController{ notePlayer, {}, {}, {}, {}, &colourStore };
+    colourController.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+    colourController.startSession();
+
+    // Plus du double : les deux modes, ET le silence qui les separe.
+    EXPECT_GT( colourController.modeSoundDurationMs(), oneMode * 2 );
+
+    // Et une question qui ne parle pas de mode n'annonce aucune duree : la pause de l'ecran est alors celle des
+    // intervalles, et une valeur inventee ici la rallongerait sans raison.
+    ExerciseSessionController intervalController{ notePlayer, { intervalOnlySettings() } };
+    intervalController.startSession();
+
+    EXPECT_EQ( 0, intervalController.modeSoundDurationMs() );
+}
+
 TEST( ExerciseSessionControllerTest, a_harmony_question_offers_no_interval_hint )
 {
     // Roger : « pour les bourdons quand je fail, je vois l'indice des intervalles apparaitre ».

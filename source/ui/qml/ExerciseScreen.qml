@@ -45,6 +45,11 @@ Item {
     // Elle vient du CONTROLEUR, donc du domaine et de son tempo : une mesure a 90 bpm dure deux secondes et demie, et
     // aucune constante ecrite ici ne saurait le dire sans mentir le jour ou le tempo change.
     readonly property int rhythmPause: ExerciseController.rhythmCellDurationMs + 600
+    // Les modes ont BEAUCOUP plus de son que les autres questions : une gamme entiere, encadree par son bourdon, et deux
+    // fois quand deux modes se comparent. La pause doit donc couvrir la LECTURE ENTIERE plus le temps de lire le verdict -
+    // sinon elle avance au milieu du son, ce que Roger a vu tout de suite : « pour les modes, ca va beaucoup trop vite,
+    // le son se coupe en plein milieu, t'as pas le temps de lire ».
+    readonly property int modePause: ExerciseController.modeSoundDurationMs + 3000
     // Horizontal offset of the whole screen during the shake. Zero is the resting state, and it is both
     // where the animation starts and where it ends.
     property real shakeOffset: 0
@@ -120,7 +125,7 @@ Item {
 
         // Une question de rythme a la sienne, et elle est plus longue : le feedback y est la CELLULE elle-meme, qui
         // dure une mesure entiere. Couper avant la fin couperait le son qui vient d'etre donne en reponse.
-        interval: ExerciseController.questionKind === 3 ? exerciseScreen.rhythmPause : (ExerciseController.wasLastAnswerCorrect ? exerciseScreen.successPause : exerciseScreen.mistakePause)
+        interval: ExerciseController.isModeQuestion ? exerciseScreen.modePause : (ExerciseController.questionKind === 3 ? exerciseScreen.rhythmPause : (ExerciseController.wasLastAnswerCorrect ? exerciseScreen.successPause : exerciseScreen.mistakePause))
         onTriggered: ExerciseController.continueToNextQuestion()
     }
 
@@ -971,6 +976,19 @@ Item {
                     font.pixelSize: 12
                     visible: ExerciseController.modeCircleLabel !== ""
                     text: ExerciseController.modeCircleLabel
+                }
+
+                // Le geste pour passer existe depuis toujours - un tap n'importe ou - mais personne ne peut le deviner,
+                // et Roger ne l'a pas vu : « est-ce que c'est complique de rajouter du temps pour la reponse ? skipable
+                // quand on appuie dessus ». La reponse est donc oui, et on le dit.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#6f5b93"
+                    font.pixelSize: 11
+                    visible: ExerciseController.isFeedbackVisible
+                    text: qsTr("touche l'écran pour passer")
                 }
 
                 RowLayout {

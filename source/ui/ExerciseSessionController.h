@@ -184,6 +184,16 @@ class ExerciseSessionController final : public QObject
     // question nomme. Le nom lui-meme n'arrive qu'avec le verdict : avant, ce serait la reponse de la question de nom.
     Q_PROPERTY( QString modeCircleLabel READ modeCircleLabel NOTIFY questionChanged )
 
+    // Combien de temps DURE le son d'une question de mode, en millisecondes.
+    //
+    // L'ecran s'en sert pour ne pas couper la lecture : Roger a vu le defaut en jouant - « pour les modes, ca va beaucoup
+    // trop vite, le son se coupe en plein milieu ». C'est le minuteur de pause qui avancait, et il ne pouvait pas savoir
+    // qu'un mode dure plus longtemps qu'un intervalle.
+    //
+    // La valeur vient du DOMAINE, par la meme fonction qui decide combien de temps le bourdon tient : deux calculs qui
+    // doivent coincider finissent toujours par diverger.
+    Q_PROPERTY( int modeSoundDurationMs READ modeSoundDurationMs NOTIFY questionChanged )
+
     // Les deux parts de l'harmonie, en pour cent : comparer deux modes, et nommer un mode. Deux reglages, parce que ce
     // sont deux competences - un joueur peut vouloir la comparaison sans le vocabulaire, et l'inverse.
     Q_PROPERTY( int modeColourQuestionShare READ modeColourQuestionShare WRITE setModeColourQuestionShare NOTIFY
@@ -365,6 +375,8 @@ public:
     [[nodiscard]] QVariantList modeCircle() const;
 
     [[nodiscard]] QString modeCircleLabel() const;
+
+    [[nodiscard]] int modeSoundDurationMs() const;
 
     [[nodiscard]] int modeColourQuestionShare() const;
 
