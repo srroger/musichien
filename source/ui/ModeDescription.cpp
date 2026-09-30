@@ -62,6 +62,48 @@ QVariantMap describeMode( domain::Mode p_mode )
     return description;
 }
 
+QVariantMap describeModeDifference( domain::Mode p_from, domain::Mode p_to )
+{
+    const domain::ModeDifference difference = domain::modeDifference( p_from, p_to );
+
+    QVariantMap description;
+
+    description.insert( QStringLiteral( "degree" ), difference.degree );
+    description.insert( QStringLiteral( "semitones" ), difference.semitones );
+
+    if( difference.degree == 0 )
+    {
+        // Deux fois le meme mode : il n'y a aucune note a montrer, et l'ecran recoit des chaines vides plutot qu'un cas
+        // particulier a gerer.
+        description.insert( QStringLiteral( "label" ), QString{} );
+        description.insert( QStringLiteral( "sentence" ), QString{} );
+
+        return description;
+    }
+
+    // Le NOM du degre, en francais, et dans l'ordre ou un musicien les dit.
+    static const std::array<const char *, domain::DEGREE_COUNT> DEGREE_WORDS{ "la tonique", "la seconde", "la tierce", "la quarte", "la quinte", "la sixte", "la septième" };
+
+    const auto degreeIndex = static_cast<std::size_t>( difference.degree - 1 );
+
+    // Le LABEL court, celui que Roger a demande : « 3♭ », « 3♯ ». Il dit le degre ET le sens en deux caracteres, et il
+    // se lit d'un coup d'oeil - ce qu'un nom de mode ne fait pas quand il n'est affiche qu'une seconde.
+    const QString accidental = ( difference.semitones < 0 ) ? QStringLiteral( "♭" ) : QStringLiteral( "♯" );
+    const QString label = accidental + QString::number( difference.degree );
+
+    // Et la phrase, parce qu'un verdict qui n'apprend rien est un verdict perdu.
+    //
+    // QObject::tr et non tr : cette fonction est LIBRE, et c'est une classe qui porte la traduction dans ce projet.
+    const QString sentence = QStringLiteral( "%1 %2 d'un demi-ton" )
+                               .arg( QString::fromUtf8( DEGREE_WORDS.at( degreeIndex ) ),
+                                     ( difference.semitones < 0 ) ? QObject::tr( "a baissé" ) : QObject::tr( "a monté" ) );
+
+    description.insert( QStringLiteral( "label" ), label );
+    description.insert( QStringLiteral( "sentence" ), sentence );
+
+    return description;
+}
+
 QVariantList describeAllModes()
 {
     QVariantList modes;

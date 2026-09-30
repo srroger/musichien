@@ -160,6 +160,13 @@ class ExerciseSessionController final : public QObject
     // Le mode entendu JUSTE AVANT, sur une question de couleur, et vide sur une question de nom.
     Q_PROPERTY( QVariantMap previousMode READ previousMode NOTIFY questionChanged )
 
+    // La DIFFERENCE entre les deux modes d'une question de comparaison : le degre qui a bouge, et son accidental.
+    //
+    // C'est ce qui remplace un verdict qui ne disait rien. « De dorien a ionien, la tierce a monte » se lit, s'entend et
+    // s'apprend ; deux noms poses cote a cote ne laissent aucun souvenir - Roger : « on voit ecrit 1 mode, on ne sait
+    // pas lequel, le temps de lecture est trop court ».
+    Q_PROPERTY( QVariantMap modeDifference READ modeDifference NOTIFY questionChanged )
+
     // Les deux parts de l'harmonie, en pour cent : comparer deux modes, et nommer un mode. Deux reglages, parce que ce
     // sont deux competences - un joueur peut vouloir la comparaison sans le vocabulaire, et l'inverse.
     Q_PROPERTY( int modeColourQuestionShare READ modeColourQuestionShare WRITE setModeColourQuestionShare NOTIFY
@@ -321,6 +328,8 @@ public:
     [[nodiscard]] QVariantMap heardMode() const;
 
     [[nodiscard]] QVariantMap previousMode() const;
+
+    [[nodiscard]] QVariantMap modeDifference() const;
 
     [[nodiscard]] int modeColourQuestionShare() const;
 

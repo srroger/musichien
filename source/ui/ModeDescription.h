@@ -30,6 +30,12 @@ namespace musichien::ui
 
 [[nodiscard]] QVariantMap describeMode( domain::Mode p_mode );
 
+// La difference entre deux modes, telle qu'un verdict la dit : le degre qui a bouge, et son accidental.
+//
+// « De dorien a ionien : la tierce a monte d'un demi-ton » vaut mieux que deux noms poses cote a cote : c'est la seule
+// chose qu'on ait vraiment entendue, et c'est donc la seule qui s'apprenne.
+[[nodiscard]] QVariantMap describeModeDifference( domain::Mode p_from, domain::Mode p_to );
+
 // Les sept modes, dans l'ordre de clarte, du plus clair au plus sombre.
 //
 // Une seule fonction, parce que deux ecrans lisent la meme forme de donnees : le banc d'essai aujourd'hui, et le

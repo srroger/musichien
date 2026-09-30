@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
@@ -163,6 +164,22 @@ TEST( ModeTest, moving_the_mode_towards_the_bright_and_the_tonic_down_keeps_the_
     // Un pas de DEUX, et pas seulement d'un demi-ton : re mixolydien et do lydien ont les memes notes.
     EXPECT_EQ( pitchClassesOf( notesOfMode( Note{ 62 }, Mode::Mixolydian ) ),
                pitchClassesOf( notesOfMode( Note{ 60 }, Mode::Lydian ) ) );
+}
+
+TEST( ModeTest, two_neighbouring_modes_differ_by_exactly_one_note )
+{
+    // La propriete du §2.2 de la note 27, verifiee ici parce que le domaine s'en sert maintenant pour DIRE un verdict :
+    // « la tierce a monte d'un demi-ton » n'a de sens que si une seule note a bouge.
+    for( std::size_t index = 0; index + 1 < MODE_COUNT; ++index )
+    {
+        const ModeDifference difference = modeDifference( static_cast<Mode>( index ), static_cast<Mode>( index + 1 ) );
+
+        EXPECT_NE( 0, difference.degree ) << modeIdentifier( static_cast<Mode>( index ) );
+        EXPECT_EQ( 1, std::abs( difference.semitones ) ) << modeIdentifier( static_cast<Mode>( index ) );
+    }
+
+    // Et deux fois le meme mode ne different de rien du tout.
+    EXPECT_EQ( 0, modeDifference( Mode::Dorian, Mode::Dorian ).degree );
 }
 
 TEST( ModeTest, the_learning_order_holds_every_mode_exactly_once_and_starts_with_the_known_ones )

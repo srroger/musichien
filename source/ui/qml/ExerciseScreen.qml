@@ -879,6 +879,11 @@ Item {
 
                 Text {
                     // Le mode qui vient de sonner n'est NOMME que la ou le nom ne donne pas la reponse.
+                    // RIEN PENDANT LA QUESTION, ni le nom ni la note qui colore.
+                    // J'avais cru qu'un nom etait inoffensif sur une question de comparaison, parce que la reponse y est
+                    // un SENS et non un nom. Mais un joueur qui lit « dorien » et « mixolydien » peut les situer sur
+                    // l'axe des clartes et repondre sans ecouter : le nom EST la reponse, d'une autre facon. Roger l'a
+                    // vu tout de suite - « je crois toujours voir le texte du mode pendant la question ».
 
                     Layout.fillWidth: true
                     Layout.preferredWidth: 0
@@ -886,13 +891,6 @@ Item {
                     wrapMode: Text.WordWrap
                     color: "#8ef2b0"
                     font.pixelSize: 14
-                    // RIEN PENDANT LA QUESTION, ni le nom ni la note qui colore.
-                    //
-                    // J'avais cru qu'un nom etait inoffensif sur une question de comparaison, parce que la reponse y est
-                    // un SENS et non un nom. Mais un joueur qui lit « dorien » et « mixolydien » peut les situer sur
-                    // l'axe des clartes et repondre sans ecouter : le nom EST la reponse, d'une autre facon. Roger l'a
-                    // vu tout de suite - « je crois toujours voir le texte du mode pendant la question ».
-                    //
                     // Le mode se dit donc APRES, comme tout ce qui aide : c'est a ce moment-la que cela fixe ce qu'on
                     // vient d'entendre.
                     visible: !ExerciseController.isAsking && ExerciseController.heardMode.name !== undefined
@@ -900,16 +898,30 @@ Item {
                 }
 
                 Text {
+                    // Le VERDICT, et il est en GRAS parce que le temps de lecture est court.
+
                     Layout.fillWidth: true
                     Layout.preferredWidth: 0
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
-                    color: "#cbb8e8"
+                    color: "#ffd479"
+                    font.pixelSize: 19
+                    font.bold: true
+                    // Deux noms poses cote a cote ne disent rien : ce qu'on a entendu, c'est UNE NOTE qui a bouge, et
+                    // c'est donc cela qu'il faut ecrire - « de dorien a ionien, la tierce a monte ».
+                    visible: !ExerciseController.isAsking && ExerciseController.modeDifference.label !== undefined
+                    text: ExerciseController.modeDifference.label !== undefined ? ExerciseController.previousMode.name + " → " + ExerciseController.heardMode.name + "  ·  " + ExerciseController.modeDifference.label : ""
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8ef2b0"
                     font.pixelSize: 14
-                    // Le premier mode est une AIDE a la comparaison, jamais une information de question : on le dit donc
-                    // une fois la reponse donnee, pas pendant.
-                    visible: !ExerciseController.isAsking && ExerciseController.previousMode.name !== undefined
-                    text: ExerciseController.previousMode.name !== undefined ? qsTr("Le premier était : %1").arg(ExerciseController.previousMode.name) : ""
+                    visible: !ExerciseController.isAsking && ExerciseController.modeDifference.sentence !== undefined
+                    text: ExerciseController.modeDifference.sentence !== undefined ? ExerciseController.modeDifference.sentence : ""
                 }
 
                 RowLayout {

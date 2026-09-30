@@ -967,6 +967,17 @@ QVariantMap ExerciseSessionController::previousMode() const
     return describeMode( *m_session->currentQuestion().previousMode );
 }
 
+QVariantMap ExerciseSessionController::modeDifference() const
+{
+    if( ( m_session == nullptr ) || !m_session->currentQuestion().previousMode.has_value() )
+    {
+        // Une question de NOM n'a rien a comparer : l'ecran recoit une carte vide, comme pour le mode precedent.
+        return {};
+    }
+
+    return describeModeDifference( *m_session->currentQuestion().previousMode, m_session->currentQuestion().mode );
+}
+
 void ExerciseSessionController::answerModeColour( bool p_secondIsBrighter )
 {
     if( m_session == nullptr )

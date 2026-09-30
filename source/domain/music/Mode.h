@@ -150,6 +150,39 @@ inline constexpr std::array<std::int32_t, MODE_COUNT> MODE_ROTATION_INDEX{ 3, 0,
     return degreeOf( p_to ) - degreeOf( p_from );
 }
 
+// La difference entre deux modes : le degre qui bouge, et de combien.
+//
+// C'est la propriete du §2.2 de la note 27, et elle vaut mieux qu'un tableau : deux modes VOISINS dans l'ordre de
+// couleur ne different que d'UNE SEULE NOTE. C'est ce qui rend le degrade audible en un geste, et c'est aussi ce qu'un
+// verdict peut dire - « de dorien a ionien, la tierce a monte » - au lieu d'un nom qu'on lit trop vite pour apprendre.
+struct ModeDifference
+{
+    // De 1 a 7. ZERO quand les deux modes sont identiques : il n'y a alors aucune note a montrer.
+    std::int32_t degree{ 0 };
+
+    // L'ecart, en demi-tons, de la note du SECOND mode au-dessus de celle du premier. Un demi-ton sous la note
+    // naturelle se lit « bemol », un demi-ton au-dessus se lit « diese ».
+    std::int32_t semitones{ 0 };
+};
+
+// Le premier degre ou deux modes different, dans l'ordre des degres.
+[[nodiscard]] constexpr ModeDifference modeDifference( Mode p_from, Mode p_to ) noexcept
+{
+    const std::array<std::int32_t, DEGREE_COUNT> fromOffsets = modeDegreeOffsets( p_from );
+    const std::array<std::int32_t, DEGREE_COUNT> toOffsets = modeDegreeOffsets( p_to );
+
+    for( std::size_t index = 0; index < DEGREE_COUNT; ++index )
+    {
+        if( fromOffsets.at( index ) != toOffsets.at( index ) )
+        {
+            return ModeDifference{ static_cast<std::int32_t>( index ) + 1,
+                                   toOffsets.at( index ) - fromOffsets.at( index ) };
+        }
+    }
+
+    return ModeDifference{};
+}
+
 // L'ordre d'apprentissage des modes : celui dans lequel ils entrent dans la palette d'un joueur.
 //
 // C'est une decision MUSICALE, ecrite ici pour pouvoir etre discutee, et elle suit le meme principe que l'ordre des
