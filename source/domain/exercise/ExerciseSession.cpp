@@ -491,7 +491,7 @@ bool ExerciseSession::answerModeColour( ModeColourAnswer p_answer )
     const ModeColourAnswer expected =
       sameness ? ModeColourAnswer::Same
                : ( isBrighterThan( m_currentQuestion.mode, *m_currentQuestion.previousMode ) ? ModeColourAnswer::Brighter
-                                                                                            : ModeColourAnswer::Darker );
+                                                                                             : ModeColourAnswer::Darker );
 
     return resolveAnswer( p_answer == expected, std::nullopt );
 }
