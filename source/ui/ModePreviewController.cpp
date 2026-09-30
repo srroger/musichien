@@ -87,6 +87,33 @@ void ModePreviewController::playMode( int p_index )
 
     const domain::Note tonic{ TONIC_MIDI_NUMBER };
 
+    // Le TEMPO vient du reglage du joueur, et pas d'une constante ecrite ici.
+    //
+    // Roger a vu le defaut en jouant : « le changement de bpm n'a pas l'air de fonctionner pour les modes ». Il avait
+    // raison, et pour une bonne raison : le reglage ne s'appliquait qu'aux PHRASES. Une gamme et une phrase sont la meme
+    // chose pour l'oreille - une melodie sur un bourdon - donc un reglage qui ne s'entendirait que sur l'une des deux
+    // serait un reglage a moitie fait.
+    //
+    // La duree d'un pas garde le RAPPORT du banc d'essai : une demi-seconde de note pour un temps a 72 bpm, et un
+    // silence six fois plus court. Changer le tempo change la vitesse, jamais l'articulation.
+    const std::int32_t bpm = ( m_preferences != nullptr ) ? m_preferences->storedPhraseTempoBpm() : 72;
+
+    const std::int32_t variation = ( m_preferences != nullptr ) ? m_preferences->storedPhraseTempoVariation() : 0;
+
+    std::int32_t playedBpm = bpm;
+
+    if( variation > 0 )
+    {
+        std::uniform_int_distribution<std::int32_t> distribution{ -variation, variation };
+
+        playedBpm = std::max( MINIMUM_PHRASE_TEMPO, bpm + distribution( m_randomEngine ) );
+    }
+
+    const auto millisecondsPerBeat = std::chrono::milliseconds{ 60000 / playedBpm };
+
+    const auto noteDuration = millisecondsPerBeat / 2;
+    const auto gap = noteDuration / 6;
+
     // La gamme MONTEE puis DESCENDUE.
     //
     // Une couleur s'entend mieux quand elle va et vient, et la descente est ce qui fait entendre ou se trouve le
@@ -109,7 +136,7 @@ void ModePreviewController::playMode( int p_index )
     // Le bourdon est demande au PORT, avec sa quinte : c'est le DOMAINE qui decide combien de temps il tient, et
     // l'adaptateur qui choisit avec quel timbre. Le banc d'essai ne dit rien d'autre que le mode qu'il veut entendre -
     // et c'est pour cela que ce qu'il fait entendre est exactement ce que l'exercice fera entendre.
-    m_notePlayer.playMelodyOverDrone( melody, drone, NOTE_DURATION, GAP );
+    m_notePlayer.playMelodyOverDrone( melody, drone, noteDuration, gap );
 
     const QVariantMap description = describeMode( mode );
 

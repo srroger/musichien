@@ -2793,11 +2793,19 @@ ApplicationWindow {
     // UNE seule definition pour les trois reglages - chant, rythme, accords - parce que trois copies identiques
     // finissent toujours par diverger, et parce que le prochain genre de question en aura une quatrieme a brancher.
     component QuestionShareSetting: ColumnLayout {
+        // Le pourcentage EFFECTIF de cette part : la part divisee par la SOMME des parts.
+
         id: questionShareSetting
 
         property string title: ""
         property string hint: ""
         property int share: 0
+        // C'est ce que le joueur veut savoir - « quelle chance a cette question de tomber ? » - et le calcul ne doit pas
+        // etre le sien. Roger l'a demande exactement comme ca : « l'utilisateur ne va pas faire le calcul lui-meme pour
+        // obtenir 100% au total ». Il a raison, et c'est meme pire que ca : les parts sont des POIDS, donc leur somme
+        // n'est pas cent - un reglage a 20 partout ne donne pas 20 % mais un septieme, et personne ne peut le deviner.
+        readonly property int total: ExerciseController.namedIntervalQuestionShare + ExerciseController.singQuestionShare + ExerciseController.chordQuestionShare + ExerciseController.modeColourQuestionShare + ExerciseController.modeNameQuestionShare + ExerciseController.modeVampQuestionShare + ExerciseController.foreignNoteQuestionShare
+        readonly property int percent: total > 0 ? Math.round((100 * share) / total) : 0
 
         signal shareEdited(real p_share)
 
@@ -2821,14 +2829,27 @@ ApplicationWindow {
             text: questionShareSetting.hint
         }
 
-        DarkSpinBox {
-            Layout.preferredWidth: 150
-            Layout.alignment: Qt.AlignLeft
-            from: 0
-            to: 100
-            stepSize: 5
-            value: questionShareSetting.share
-            onValueModified: questionShareSetting.shareEdited(value)
+        RowLayout {
+            spacing: 10
+
+            DarkSpinBox {
+                Layout.preferredWidth: 150
+                Layout.alignment: Qt.AlignLeft
+                from: 0
+                to: 100
+                stepSize: 5
+                value: questionShareSetting.share
+                onValueModified: questionShareSetting.shareEdited(value)
+            }
+
+            // Le chiffre qui compte vraiment. Il est en vert parce qu'il BOUGE quand on regle : c'est lui qu'on regarde.
+            Text {
+                color: questionShareSetting.percent > 0 ? "#8ef2b0" : "#6f5b93"
+                font.pixelSize: 15
+                font.bold: true
+                text: questionShareSetting.percent + " %"
+            }
+
         }
 
     }
