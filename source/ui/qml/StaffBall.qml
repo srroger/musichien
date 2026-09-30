@@ -17,6 +17,17 @@ Item {
     // boule dessine. Faux par defaut, et c'est delibere : sur une portee de jeu, ce signe n'apprendrait rien au
     // joueur et lui ferait croire qu'il chante faux d'une octave. Il est reserve a l'accordeur.
     property bool showOctaveShift: false
+    // La geometrie de la portee, et rien d'autre. La cle de sol est PLUS HAUTE que la portee - sept interlignes
+    // contre quatre - donc c'est elle qui donne sa hauteur au composant : la portee est posee dans la partie basse,
+    // et l'espace au-dessus lui appartient. Un composant qui n'aurait reserve que la portee aurait vu sa cle deborder
+    // sur ce qui l'entoure.
+    readonly property real lineSpacing: height * 0.135
+    // La ligne INFERIEURE, celle du mi : le bas de la portee.
+    readonly property real bottomLineY: height * 0.76
+    // La portee entiere : quatre interlignes, de la ligne du bas a celle du haut.
+    readonly property real staffSpan: staffBall.lineSpacing * 4
+    // Le signe qui dit de quel cote la vraie note se trouve, et rien quand la boule dit la verite entiere.
+    readonly property int octaveShift: (staffBall.showOctaveShift && MicrophoneController.detectedFrequencyHz > 0) ? MicrophoneController.detectedOctaveShift : 0
 
     // Green when in tune, yellow when close, red beyond - the same colours the tuner page uses.
     function ballColor() {
@@ -33,26 +44,10 @@ Item {
         return "#f2848e";
     }
 
-    // La geometrie de la portee, et rien d'autre. La cle de sol est PLUS HAUTE que la portee - sept interlignes
-    // contre quatre - donc c'est elle qui donne sa hauteur au composant : la portee est posee dans la partie basse,
-    // et l'espace au-dessus lui appartient. Un composant qui n'aurait reserve que la portee aurait vu sa cle deborder
-    // sur ce qui l'entoure.
-    readonly property real lineSpacing: height * 0.135
-
-    // La ligne INFERIEURE, celle du mi : le bas de la portee.
-    readonly property real bottomLineY: height * 0.76
-
-    // La portee entiere : quatre interlignes, de la ligne du bas a celle du haut.
-    readonly property real staffSpan: staffBall.lineSpacing * 4
-
     // Ou tombe la boule, en pixels, pour une note de position 0 (ligne du bas) a 1 (ligne du haut).
     function ballY(p_position) {
         return staffBall.bottomLineY - (p_position * staffBall.staffSpan);
     }
-
-    // Le signe qui dit de quel cote la vraie note se trouve, et rien quand la boule dit la verite entiere.
-    readonly property int octaveShift:
-        (staffBall.showOctaveShift && MicrophoneController.detectedFrequencyHz > 0) ? MicrophoneController.detectedOctaveShift : 0
 
     Layout.fillWidth: true
     Layout.preferredHeight: 100
@@ -75,7 +70,6 @@ Item {
         font.pixelSize: staffBall.lineSpacing * 4
         text: "\uD834\uDD1E"
         x: 2
-
         // La ligne de base du glyphe se pose sur la ligne INFERIEURE de la portee - c'est la convention, et c'est
         // elle qui met la boucle de la cle autour du sol.
         y: staffBall.bottomLineY - baselineOffset
@@ -88,7 +82,6 @@ Item {
             required property int index
 
             x: 0
-
             // L'index zero est la ligne du BAS, comme sur une portee : on monte d'un interligne a chaque fois.
             y: staffBall.bottomLineY - (index * staffBall.lineSpacing)
             width: parent.width
