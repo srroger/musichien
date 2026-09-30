@@ -1668,6 +1668,43 @@ TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_pla
     }
 }
 
+TEST( ExerciseSessionControllerTest, the_dog_barks_when_the_session_ends )
+{
+    // Roger : « quand le corgi anecdote apparait, ce serait bien qu'il fasse un petit son ». Le controle porte sur les
+    // deux moities de la phrase : il aboie QUAND il apparait, et il se tait tout le reste du temps - un chien qui
+    // aboierait a chaque question serait pire que pas de chien du tout.
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings = ascendingOnlySettings();
+
+    settings.questionCount = 2;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+
+    EXPECT_EQ( 0, notePlayer.dogBarkCount() );
+
+    while( !controller.isFinished() )
+    {
+        answerCorrectly( controller );
+        controller.continueToNextQuestion();
+    }
+
+    // Tant que le joueur est encore devant l'ecran de fin, le chien se tait : c'est le RETOUR qui le fait parler, et
+    // c'est l'ecran qui le declenche.
+    EXPECT_EQ( 0, notePlayer.dogBarkCount() );
+
+    controller.stopSession();
+
+    EXPECT_EQ( 1, notePlayer.dogBarkCount() );
+
+    // Et un second retour ne le fait pas aboyer une deuxieme fois : il a deja parle, et il parle une fois par partie.
+    controller.stopSession();
+
+    EXPECT_EQ( 1, notePlayer.dogBarkCount() );
+}
+
 TEST( ExerciseSessionControllerTest, the_circle_carries_the_step_of_each_note )
 {
     // La roue est rangée par QUINTES, la gamme par DEGRÉS : « appuyer sur une pastille pour répondre » n'a donc de sens

@@ -117,6 +117,13 @@ public:
         ++m_mistakeCueCount;
     }
 
+    // Le wouf du chien, compte a part : c'est ce qui permet a un test de dire QUAND il aboie - a la fin d'une partie, et
+    // pas pendant.
+    void playDogBark() override
+    {
+        ++m_dogBarkCount;
+    }
+
     // Le metronome et la batterie sont des sons A PART : les compter separement est ce qui permet a un test de dire
     // "le clic ET la caisse claire ont ete demandes", et donc de tenir le bug du mixage ferme.
     void playMetronomeClick( bool p_accented ) override
@@ -200,6 +207,11 @@ public:
         return m_phrasesOverDrones;
     }
     [[nodiscard]] int mistakeCueCount() const noexcept { return m_mistakeCueCount; }
+
+    // Le nombre de woufs demandes. Un chien qui aboie a chaque question serait pire que pas de chien du tout : c'est ce
+    // compteur qui permet de le verifier.
+    [[nodiscard]] int dogBarkCount() const noexcept { return m_dogBarkCount; }
+
     [[nodiscard]] int stopCount() const noexcept { return m_stopCount; }
 
     [[nodiscard]] int metronomeClickCount() const noexcept { return m_metronomeClickCount; }
@@ -248,6 +260,7 @@ public:
         m_melodiesOverDrones.clear();
         m_phrasesOverDrones.clear();
         m_mistakeCueCount = 0;
+        m_dogBarkCount = 0;
         m_stopCount = 0;
         m_metronomeClickCount = 0;
         m_accentedClickCount = 0;
@@ -268,6 +281,7 @@ private:
     std::vector<PlayedOverDrone> m_melodiesOverDrones;
     std::vector<PlayedPhraseOverDrone> m_phrasesOverDrones;
     int m_mistakeCueCount{ 0 };
+    int m_dogBarkCount{ 0 };
     int m_stopCount{ 0 };
     int m_metronomeClickCount{ 0 };
     int m_accentedClickCount{ 0 };
