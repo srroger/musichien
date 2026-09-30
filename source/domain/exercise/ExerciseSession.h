@@ -84,7 +84,23 @@ enum class QuestionKind
     // meme facon : comparer est une affaire d'oreille, nommer une affaire de vocabulaire - et un joueur qui reussit la
     // premiere en ratant la seconde apprend quelque chose de lui-meme. Il faut, pour le voir, que leurs statistiques
     // soient distinctes.
-    ModeName = 6
+    // Et le NOM, ensuite : un seul mode est joue sur le bourdon, et le joueur le nomme parmi ceux de sa palette.
+    //
+    // La meme couleur, mais dite avec un mot. Les deux genres sont SEPARES parce qu'ils ne sont pas difficiles de la
+    // meme facon : comparer est une affaire d'oreille, nommer une affaire de vocabulaire - et un joueur qui reussit la
+    // premiere en ratant la seconde apprend quelque chose de lui-meme. Il faut, pour le voir, que leurs statistiques
+    // soient distinctes.
+    ModeName = 6,
+
+    // Le VAMP : la MEME gamme, posee sur deux centres differents.
+    //
+    // C'est la demonstration la plus directe du §4 de la note 27, et la plus utile : do dorien et si bemol majeur ont
+    // exactement les MEMES sept notes, et ce n'est pas la meme musique. Le joueur entend deux fois la meme suite de
+    // notes, sur deux bourdons differents, et il doit dire si la couleur a bouge.
+    //
+    // C'est aussi la seule question ou la reponse est dans le CONTEXTE et non dans les notes : le meme materiau,
+    // deux modes. Un joueur qui a compris cela a compris ce qu'un mode est.
+    ModeVamp = 7
 };
 
 // Une question DECIDEE a l'avance : quel genre, quelle cible, dans quel sens.
@@ -245,6 +261,13 @@ struct SessionSettings
     // oreille - et il faut, pour le voir, que les deux questions soient comptees separement.
     std::int32_t modeNameQuestionShare{ 0 };
 
+    // Share of questions, in percent, that play the SAME scale on TWO different centres.
+    //
+    // La plus avancee des trois questions d'harmonie, et la seule dont la reponse soit dans le CONTEXTE : les notes ne
+    // bougent pas d'un passage a l'autre, et le mode, si. C'est ce qu'un mode veut dire, et il faut l'entendre une fois
+    // pour le croire.
+    std::int32_t modeVampQuestionShare{ 0 };
+
     // Combien de modes le joueur a rencontres au depart.
     //
     // DEUX, et ce sont le majeur et le mineur : le seul ecart que toute oreille connait deja, et la premiere question
@@ -345,6 +368,10 @@ struct Question
     // La tonique, celle que le BOURDON tient. C'est elle qui donne un centre aux modes : sans elle, deux modes ne sont
     // que deux gammes, et la question n'a pas de reponse.
     Note modeTonic{ 62 };
+
+    // La tonique du PREMIER passage d'un VAMP. Le jeu en joue deux, et ce sont deux centres differents sous la MEME
+    // gamme : c'est le centre qui change, et rien d'autre.
+    Note previousModeTonic{ 62 };
 
     // Le mode pose, et celui qui vient d'etre entendu juste avant - sur une question de COULEUR seulement.
     //
@@ -541,6 +568,9 @@ private:
     // La tonique du bourdon. Tiree dans la fenetre jouable, et choisie BASSE : c'est le bourdon qui la tient, et un
     // bourdon aigu n'a plus rien d'un bourdon.
     [[nodiscard]] Note drawModeTonic();
+
+    // Construit un VAMP : la MEME gamme, posee sur deux centres differents.
+    void buildVampQuestion( Question & p_question );
 
     void widenModePalette();
 

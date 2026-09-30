@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <span>
 
 namespace musichien::domain
 {
@@ -1306,6 +1307,20 @@ namespace
     return p_question.previousMode.has_value() && isBrighterThan( p_question.mode, *p_question.previousMode );
 }
 
+// Les classes de hauteur d'une suite de notes : c'est ce qui permet de dire « ce sont les MEMES notes » sans se soucier
+// des octaves. Un vamp ne se verifie pas autrement.
+[[nodiscard]] std::set<std::int32_t> pitchClassesOf( std::span<const Note> p_notes )
+{
+    std::set<std::int32_t> classes;
+
+    for( const Note & note : p_notes )
+    {
+        classes.insert( note.pitchClassIndex() );
+    }
+
+    return classes;
+}
+
 }    // namespace
 
 TEST( ExerciseSessionTest, a_colour_question_poses_two_different_modes_on_one_drone )
@@ -1425,6 +1440,57 @@ TEST( ExerciseSessionTest, the_mode_palette_starts_with_the_known_ones_and_grows
 
     EXPECT_EQ( 3, session.modePalette().size() );
     EXPECT_EQ( Mode::Mixolydian, session.modePalette().at( 2 ) );
+}
+
+TEST( ExerciseSessionTest, a_vamp_plays_the_same_notes_on_two_different_centres )
+{
+    SessionSettings settings = intervalOnlySettings();
+    settings.modeVampQuestionShare = 100;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    for( std::size_t questionIndex = 0; questionIndex < session.settings().questionCount; ++questionIndex )
+    {
+        const Question & question = session.currentQuestion();
+
+        ASSERT_EQ( QuestionKind::ModeVamp, question.kind );
+        ASSERT_TRUE( question.previousMode.has_value() );
+
+        // Deux modes DIFFERENTS...
+        EXPECT_NE( *question.previousMode, question.mode );
+
+        // ...et deux passages qui ont EXACTEMENT les memes notes.
+        //
+        // C'est tout le vamp, et c'est ce qui en fait une lecon sur le CONTEXTE plutot qu'une seconde question de
+        // couleur : le joueur entend le meme materiau deux fois, et pourtant deux modes. Do dorien et si bemol majeur,
+        // en une phrase.
+        const std::set<std::int32_t> first =
+          pitchClassesOf( notesOfMode( question.previousModeTonic, *question.previousMode ) );
+
+        const std::set<std::int32_t> second = pitchClassesOf( notesOfMode( question.modeTonic, question.mode ) );
+
+        // Le message d'echec porte les VALEURS : sans elles, un test de tirage dit seulement « ca ne va pas ».
+        ASSERT_EQ( first, second ) << "premier mode " << static_cast<int>( *question.previousMode ) << " sur "
+                                   << question.previousModeTonic.midiNumber() << ", second mode "
+                                   << static_cast<int>( question.mode ) << " sur " << question.modeTonic.midiNumber();
+
+        // Et les DEUX toniques restent a portee des enregistrements de bourdon.
+        //
+        // La fenetre est PLUS LARGE que celle d'une question simple - 35 a 48 au lieu de 35 a 41 - parce qu'un vamp
+        // tient deux centres a la fois, et qu'ils sont a une quinte l'un de l'autre : c'est le prix du meme jeu de notes
+        // sur deux hauteurs, et les deux echantillons (re 2 et la 2) le couvrent a trois demi-tons pres.
+        EXPECT_GE( question.previousModeTonic.midiNumber(), 35 );
+        EXPECT_LE( question.previousModeTonic.midiNumber(), 48 );
+
+        EXPECT_GE( question.modeTonic.midiNumber(), 35 );
+        EXPECT_LE( question.modeTonic.midiNumber(), 48 );
+
+        // La reponse se donne comme celle d'une comparaison : c'est la meme question, posee sur un autre materiau.
+        EXPECT_TRUE( session.answerModeColour( expectedColourAnswer( question ) ) );
+        EXPECT_EQ( SessionState::Feedback, session.state() );
+
+        session.advance();
+    }
 }
 
 }    // namespace musichien::domain

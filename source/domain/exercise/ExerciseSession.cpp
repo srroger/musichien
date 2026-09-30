@@ -105,6 +105,15 @@ Question ExerciseSession::buildQuestion()
         return question;
     }
 
+    if( question.kind == QuestionKind::ModeVamp )
+    {
+        // Le vamp a sa propre construction, parce qu'il a sa propre contrainte : les deux passages doivent avoir
+        // EXACTEMENT les memes notes, et c'est ce qui demande de deplacer la tonique ET le mode ensemble.
+        buildVampQuestion( question );
+
+        return question;
+    }
+
     if( !planned.has_value() )
     {
         // Le SENS n'est tire que si personne ne l'a decide : un plan le porte deja.
@@ -417,6 +426,16 @@ QuestionKind ExerciseSession::drawKind()
         return QuestionKind::ModeName;
     }
 
+    // Et le VAMP ferme la marche, comme la question la plus avancee des trois : c'est la seule dont la reponse soit
+    // dans le contexte harmonique, et celle qui demande le plus de temps d'ecoute.
+    if( ( m_settings.modeVampQuestionShare > 0 )
+        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare + m_settings.rhythmQuestionShare
+                      + m_settings.chordQuestionShare + m_settings.modeColourQuestionShare
+                      + m_settings.modeNameQuestionShare + m_settings.modeVampQuestionShare ) )
+    {
+        return QuestionKind::ModeVamp;
+    }
+
     return QuestionKind::NamedInterval;
 }
 
@@ -433,10 +452,15 @@ void ExerciseSession::buildChordQuestion( Question & p_question )
 
 bool ExerciseSession::answerModeColour( bool p_secondIsBrighter )
 {
-    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::ModeColour ) )
+    if( ( m_state != SessionState::Asking )
+        || ( ( m_currentQuestion.kind != QuestionKind::ModeColour )
+             && ( m_currentQuestion.kind != QuestionKind::ModeVamp ) ) )
     {
         // Comparer deux couleurs la ou il n'y en a pas eu deux ne repond a rien : c'est le meme refus que le nom
         // d'intervalle oppose a une question chantee, et la frappe a une question d'intervalle.
+        //
+        // Le VAMP se repond de la meme facon, et c'est deliberé : la question qu'il pose - « le second passage est-il
+        // plus clair ? » - est la meme. Ce qui change est ce qu'il fait entendre, pas ce qu'il demande.
         return false;
     }
 
@@ -520,6 +544,60 @@ Note ExerciseSession::drawModeTonic()
     std::uniform_int_distribution<std::int32_t> distribution{ LOWEST_TONIC_MIDI_NUMBER, HIGHEST_TONIC_MIDI_NUMBER };
 
     return Note{ distribution( m_randomEngine ) };
+}
+
+void ExerciseSession::buildVampQuestion( Question & p_question )
+{
+    const Mode firstMode = drawMode();
+
+    const auto firstIndex = static_cast<std::int32_t>( modeIndex( firstMode ) );
+
+    // UN cran, et un seul.
+    //
+    // Ce n'est pas une precaution, c'est la musique : monter d'un cran vers le clair demande de deplacer la tonique
+    // d'une QUINTE, et deux crans la deplaceraient de deux quintes - soit sept demi-tons de plus, hors de la fenetre des
+    // enregistrements de bourdon. Un cran donne deja l'ecart le plus riche : « re dorien » et « sol mixolydien » sont la
+    // MEME gamme.
+    constexpr std::int32_t VAMP_OFFSET = 1;
+
+    // Si le mode est deja le plus clair, il n'y a pas de cran a monter : on descend alors d'un cran, et c'est la seule
+    // asymetrie de cette question. La palette commence par le majeur et le mineur, donc elle ne s'y trouve pas au
+    // debut - mais elle s'elargit, et le locrien finit par y arriver.
+    const bool goBrighter = firstIndex >= VAMP_OFFSET;
+
+    const std::int32_t secondIndex = goBrighter ? ( firstIndex - VAMP_OFFSET ) : ( firstIndex + VAMP_OFFSET );
+
+    p_question.previousMode = firstMode;
+
+    // La tonique du PREMIER passage, et sa fenetre depend du SENS.
+    //
+    // Le second passage est a une quinte du premier, et les deux doivent rester a portee des deux enregistrements de
+    // bourdon (re 2 et la 2, soit 35 a 48 a trois demi-tons pres). On tire donc le premier du cote ou il reste de la
+    // place : vers le grave si la seconde monte, vers l'aigu si elle descend.
+    constexpr std::int32_t LOW_RANGE_MIDI_NUMBER = 35;
+    constexpr std::int32_t HIGH_RANGE_MIDI_NUMBER = 48;
+
+    // Le deplacement REEEL de la tonique, calcule par le domaine : deux modes n'ont pas le meme degre dans la gamme, et
+    // c'est ce degre qui decide de combien la tonique bouge. Le lydien est le quatrieme degre, le mixolydien le
+    // cinquieme : la meme gamme posee sur l'un ou sur l'autre ne se deplace donc pas du meme nombre de demi-tons.
+    const std::int32_t tonicShift = modeTonicShift( firstMode, static_cast<Mode>( secondIndex ) );
+
+    const std::int32_t lowest = LOW_RANGE_MIDI_NUMBER + ( ( tonicShift < 0 ) ? -tonicShift : 0 );
+    const std::int32_t highest = HIGH_RANGE_MIDI_NUMBER - ( ( tonicShift > 0 ) ? tonicShift : 0 );
+
+    p_question.previousModeTonic = Note{ std::uniform_int_distribution<std::int32_t>{ lowest, highest }( m_randomEngine ) };
+
+    p_question.mode = static_cast<Mode>( secondIndex );
+
+    // La tonique suit le mode, du deplacement que le domaine vient de calculer - et les deux passages ont donc
+    // EXACTEMENT les memes sept notes.
+    //
+    // C'est le §3.3 de la note 27 mis en musique : les centres montent le cercle des quintes, les notes eteintes le
+    // descendent. Le joueur entend deux fois le meme materiau, et pourtant deux modes - voila ce que « un mode, c'est un
+    // jeu de notes plus un centre » veut dire.
+    p_question.modeTonic = p_question.previousModeTonic.transposedBy( tonicShift );
+
+    p_question.modeChoices.assign( m_modePalette.begin(), m_modePalette.end() );
 }
 
 void ExerciseSession::widenModePalette()

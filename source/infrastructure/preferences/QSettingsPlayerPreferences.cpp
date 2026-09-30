@@ -54,6 +54,7 @@ constexpr const char * CHORD_QUESTION_SHARE_KEY = "player/chord-question-share";
 // competences, donc deux reglages - un joueur peut vouloir l'une sans l'autre.
 constexpr const char * MODE_COLOUR_QUESTION_SHARE_KEY = "player/mode-colour-question-share";
 constexpr const char * MODE_NAME_QUESTION_SHARE_KEY = "player/mode-name-question-share";
+constexpr const char * MODE_VAMP_QUESTION_SHARE_KEY = "player/mode-vamp-question-share";
 
 // L'heure du rappel, en deux nombres separes : une heure et une minute se lisent dans un fichier de reglages plus
 // facilement qu'un instant encode, et un joueur curieux doit pouvoir comprendre ce qu'il lit.
@@ -363,6 +364,25 @@ void QSettingsPlayerPreferences::storeModeNameQuestionShare( std::int32_t p_shar
     QSettings settings;
 
     settings.setValue( MODE_NAME_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedModeVampQuestionShare() const
+{
+    const std::int32_t stored = QSettings{}.value( MODE_VAMP_QUESTION_SHARE_KEY, 0 ).toInt();
+
+    if( stored < 0 || stored > 100 )
+    {
+        return 0;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeModeVampQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( MODE_VAMP_QUESTION_SHARE_KEY, p_share );
 }
 
 }    // namespace musichien::infrastructure

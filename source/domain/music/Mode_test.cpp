@@ -149,6 +149,22 @@ TEST( ModeTest, the_characteristic_note_is_where_a_mode_is_told_apart )
     EXPECT_EQ( 3, degreeOffset( Mode::Aeolian, 3 ) );
 }
 
+TEST( ModeTest, moving_the_mode_towards_the_bright_and_the_tonic_down_keeps_the_same_notes )
+{
+    // La regle sur laquelle un VAMP est bati : monter d'un cran vers le clair, c'est poser la MEME gamme un demi-ton
+    // plus bas. Do dorien et si bemol majeur ont exactement les memes sept notes.
+    EXPECT_EQ( pitchClassesOf( notesOfMode( Note{ 60 }, Mode::Dorian ) ),
+               pitchClassesOf( notesOfMode( Note{ 58 }, Mode::Ionian ) ) );
+
+    // Et l'autre sens, evidemment : descendre vers le sombre, c'est monter la tonique.
+    EXPECT_EQ( pitchClassesOf( notesOfMode( Note{ 58 }, Mode::Ionian ) ),
+               pitchClassesOf( notesOfMode( Note{ 60 }, Mode::Dorian ) ) );
+
+    // Un pas de DEUX, et pas seulement d'un demi-ton : re mixolydien et do lydien ont les memes notes.
+    EXPECT_EQ( pitchClassesOf( notesOfMode( Note{ 62 }, Mode::Mixolydian ) ),
+               pitchClassesOf( notesOfMode( Note{ 60 }, Mode::Lydian ) ) );
+}
+
 TEST( ModeTest, the_learning_order_holds_every_mode_exactly_once_and_starts_with_the_known_ones )
 {
     const std::span<const Mode> order = modeLearningOrder();

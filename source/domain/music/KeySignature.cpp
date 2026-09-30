@@ -15,8 +15,7 @@ namespace
 // Indexee par le rang de quinte DECALE de sept : l'entree 0 est do bemol (sept bemols), l'entree 7 est do majeur, et
 // l'entree 14 est do diese (sept dieses). L'orthographe est celle de l'ARMURE, et non celle de la touche : re bemol et
 // do diese sont la meme case du clavier, et deux tonalites differentes.
-constexpr std::array<std::string_view, 15> KEY_NAMES{ "do♭", "sol♭", "ré♭", "la♭", "mi♭", "si♭", "fa",  "do",
-                                                      "sol", "ré",   "la",  "mi",  "si",  "fa♯", "do♯" };
+constexpr std::array<std::string_view, 15> KEY_NAMES{ "do♭", "sol♭", "ré♭", "la♭", "mi♭", "si♭", "fa", "do", "sol", "ré", "la", "mi", "si", "fa♯", "do♯" };
 
 // La quinte la plus basse de la table.
 constexpr std::int32_t LOWEST_KEY_FIFTHS = -7;
@@ -26,8 +25,7 @@ constexpr std::int32_t LOWEST_KEY_FIFTHS = -7;
 // « do » et « la » ne sont pas separees par trois quintes : elles partagent la MEME armure, et c'est ce qui fait qu'elles
 // sont relatives. Cette table est donc une table de noms, et pas une seconde table de rangs - la seule chose qui change
 // est l'orthographe de la tonique.
-constexpr std::array<std::string_view, 15> RELATIVE_MINOR_NAMES{ "la♭", "mi♭", "si♭", "fa",  "do",  "sol", "ré", "la",
-                                                                 "mi",  "si",  "fa♯", "do♯", "sol♯", "ré♯", "la♯" };
+constexpr std::array<std::string_view, 15> RELATIVE_MINOR_NAMES{ "la♭", "mi♭", "si♭", "fa", "do", "sol", "ré", "la", "mi", "si", "fa♯", "do♯", "sol♯", "ré♯", "la♯" };
 
 }    // namespace
 

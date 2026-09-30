@@ -437,6 +437,12 @@ Item {
                         // exactement ce qu'une consigne ne doit pas faire.
                         visible: !ExerciseController.isFeedbackVisible && ExerciseController.questionKind !== 3 && ExerciseController.questionKind !== 4
                         text: {
+                            // Le VAMP : deux fois la meme gamme, sur deux centres differents. La consigne doit le dire,
+                            // parce que c'est justement ce que le joueur ne peut pas deviner - il entend deux fois les
+                            // memes notes, et c'est pourtant deux modes.
+                            if (ExerciseController.questionKind === 7)
+                                return qsTr("Deux fois la même gamme, sur deux centres différents : le second passage est-il plus clair, ou plus sombre ?");
+
                             if (ExerciseController.isModeColourQuestion)
                                 return qsTr("Écoute les deux modes : le second est-il plus clair, ou plus sombre ?");
 
@@ -872,14 +878,14 @@ Item {
                 spacing: 10
 
                 Text {
+                    // Le mode qui vient de sonner n'est NOMME que la ou le nom ne donne pas la reponse.
+
                     Layout.fillWidth: true
                     Layout.preferredWidth: 0
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
                     color: "#8ef2b0"
                     font.pixelSize: 14
-                    // Le mode qui vient de sonner n'est NOMME que la ou le nom ne donne pas la reponse.
-                    //
                     // Sur une question de COMPARAISON, savoir lequel des deux on vient d'entendre n'aide pas a dire
                     // s'il est plus clair : la reponse est un SENS, pas un nom. Mais sur une question de NOM, l'ecrire
                     // pendant la question serait donner la reponse - et c'est ce que faisait la premiere version.

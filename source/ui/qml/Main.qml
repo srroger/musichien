@@ -59,6 +59,8 @@ ApplicationWindow {
     // Un champ numerique aux couleurs du jeu.
     // Les couleurs des parts du camembert : un vert pour l'oreille, un bleu pour le sens, un dore pour le chant, un rose
     // pour le rythme, un violet pour les accords, un turquoise pour la couleur des modes et un orange pour leur nom.
+    // =================================================================================================================
+    // LE CERCLE DES QUINTES
 
     id: mainWindow
 
@@ -1149,6 +1151,19 @@ ApplicationWindow {
                     }
                 }
 
+                // La plus avancee des trois : la MEME gamme sur deux centres differents. C'est la seule question dont la
+                // reponse soit dans le contexte - les notes ne bougent pas, le mode si.
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Modes : deux centres")
+                    hint: qsTr("Part des questions qui font entendre la même gamme sur deux centres différents. 0 = jamais. Les notes sont identiques, le mode change.")
+                    share: ExerciseController.modeVampQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setModeVampQuestionShare(p_share);
+                    }
+                }
+
                 // Le micro : choisir le peripherique et le tester. Le MEME panneau sert ici et sur la page
                 // Accordeur - deux copies finiraient par montrer deux accordeurs differents.
                 MicrophonePanel {
@@ -1861,9 +1876,6 @@ ApplicationWindow {
 
     }
 
-    // =================================================================================================================
-    // LE CERCLE DES QUINTES
-    //
     // Plein ecran, comme l'accordeur, et pour la meme raison : c'est une page qu'on LIT, pas un message qu'on acquitte.
     // La roue a besoin de la place pour que ses douze cases respirent, chacune portant trois informations.
     // =================================================================================================================
@@ -1879,6 +1891,7 @@ ApplicationWindow {
         KeyCircleScreen {
             anchors.fill: parent
         }
+
     }
 
     // Les textes viennent d'un fichier de contenu (assets/content/tuner.json), comme les anecdotes et les indices : ils

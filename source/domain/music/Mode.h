@@ -133,7 +133,24 @@ inline constexpr std::array<std::int32_t, MODE_COUNT> MODE_ROTATION_INDEX{ 3, 0,
 // dire dans la langue du code. Le nom AFFICHE, lui, se traduit dans l'interface, comme le reste.
 [[nodiscard]] std::string_view modeIdentifier( Mode p_mode ) noexcept;
 
-// L'ORDRE D'APPRENTISSAGE des modes : celui dans lequel ils entrent dans la palette d'un joueur.
+// L'ecart, en demi-tons, entre la tonique d'un mode et celle d'un autre, quand les deux partagent la MEME gamme.
+//
+// C'est la difference de leurs degres dans la gamme majeure : le dorien en est le deuxieme, le mixolydien le cinquieme,
+// donc poser la meme gamme sur l'un puis sur l'autre deplace la tonique de deux demi-tons, ou de sept. Rien de plus.
+//
+// C'est cette fonction qui rend un VAMP possible, et c'est aussi la raison pour laquelle un mode ne se transpose PAS
+// comme un intervalle : la meme gamme sur un autre degre est un autre mode, a une autre hauteur.
+[[nodiscard]] constexpr std::int32_t modeTonicShift( Mode p_from, Mode p_to ) noexcept
+{
+    const auto degreeOf = []( Mode p_mode ) {
+        return MAJOR_SCALE_DEGREE_OFFSETS.at(
+          static_cast<std::size_t>( MODE_ROTATION_INDEX.at( modeIndex( p_mode ) ) ) );
+    };
+
+    return degreeOf( p_to ) - degreeOf( p_from );
+}
+
+// L'ordre d'apprentissage des modes : celui dans lequel ils entrent dans la palette d'un joueur.
 //
 // C'est une decision MUSICALE, ecrite ici pour pouvoir etre discutee, et elle suit le meme principe que l'ordre des
 // intervalles : ON PART DE CE QUI EST DEJA CONNU, puis on s'eloigne.

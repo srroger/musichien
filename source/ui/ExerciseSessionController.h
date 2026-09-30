@@ -166,6 +166,8 @@ class ExerciseSessionController final : public QObject
                   modeQuestionShareChanged )
     Q_PROPERTY( int modeNameQuestionShare READ modeNameQuestionShare WRITE setModeNameQuestionShare NOTIFY
                   modeQuestionShareChanged )
+    Q_PROPERTY( int modeVampQuestionShare READ modeVampQuestionShare WRITE setModeVampQuestionShare NOTIFY
+                  modeQuestionShareChanged )
 
     // L'accord qui vient d'etre joue, pret a afficher : son nom ("Minor"), son symbole ("Cm") et sa tonique, deja
     // ecrite avec son nom de note - l'ecran n'assemble rien.
@@ -323,6 +325,8 @@ public:
     [[nodiscard]] int modeColourQuestionShare() const;
 
     [[nodiscard]] int modeNameQuestionShare() const;
+
+    [[nodiscard]] int modeVampQuestionShare() const;
 
     // The name the player gave himself, empty before the first time he writes one.
     [[nodiscard]] QString playerName() const;
@@ -532,6 +536,8 @@ public:
     Q_INVOKABLE void setModeColourQuestionShare( int p_share );
 
     Q_INVOKABLE void setModeNameQuestionShare( int p_share );
+
+    Q_INVOKABLE void setModeVampQuestionShare( int p_share );
 
     // Vrai quand il y a un indice a proposer : une question d'accord, des aides, un essai deja rate, et de quoi retirer
     // une reponse fausse.

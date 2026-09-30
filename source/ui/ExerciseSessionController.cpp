@@ -434,6 +434,7 @@ void ExerciseSessionController::applyStoredQuestionShares( domain::SessionSettin
     // reste donc une session d'intervalles, exactement comme avant que ce pilier existe.
     p_settings.modeColourQuestionShare = m_levelStore->storedModeColourQuestionShare();
     p_settings.modeNameQuestionShare = m_levelStore->storedModeNameQuestionShare();
+    p_settings.modeVampQuestionShare = m_levelStore->storedModeVampQuestionShare();
 }
 
 QVariantList ExerciseSessionController::playerLevels()
@@ -910,12 +911,23 @@ bool ExerciseSessionController::isModeQuestion() const noexcept
 
     const domain::QuestionKind kind = m_session->currentQuestion().kind;
 
-    return ( kind == domain::QuestionKind::ModeColour ) || ( kind == domain::QuestionKind::ModeName );
+    return ( kind == domain::QuestionKind::ModeColour ) || ( kind == domain::QuestionKind::ModeName )
+           || ( kind == domain::QuestionKind::ModeVamp );
 }
 
 bool ExerciseSessionController::isModeColourQuestion() const noexcept
 {
-    return ( m_session != nullptr ) && ( m_session->currentQuestion().kind == domain::QuestionKind::ModeColour );
+    if( m_session == nullptr )
+    {
+        return false;
+    }
+
+    // Vrai pour les DEUX questions qui se repondent par un SENS : la comparaison de deux modes, et le vamp - qui pose
+    // exactement la meme question, sous une autre lumiere. L'ecran offre donc les memes deux boutons, et c'est voulu :
+    // la reponse est la meme, seul ce qu'on entend change.
+    const domain::QuestionKind kind = m_session->currentQuestion().kind;
+
+    return ( kind == domain::QuestionKind::ModeColour ) || ( kind == domain::QuestionKind::ModeVamp );
 }
 
 QVariantList ExerciseSessionController::modeChoices() const
@@ -1517,6 +1529,25 @@ int ExerciseSessionController::modeNameQuestionShare() const
     return ( m_levelStore != nullptr ) ? m_levelStore->storedModeNameQuestionShare() : 0;
 }
 
+int ExerciseSessionController::modeVampQuestionShare() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedModeVampQuestionShare() : 0;
+}
+
+void ExerciseSessionController::setModeVampQuestionShare( int p_share )
+{
+    if( ( m_levelStore == nullptr ) || ( p_share < 0 ) || ( p_share > 100 ) )
+    {
+        return;
+    }
+
+    m_levelStore->storeModeVampQuestionShare( p_share );
+
+    m_settings.modeVampQuestionShare = p_share;
+
+    emit modeQuestionShareChanged();
+}
+
 void ExerciseSessionController::setModeColourQuestionShare( int p_share )
 {
     if( ( m_levelStore == nullptr ) || ( p_share < 0 ) || ( p_share > 100 ) )
@@ -2028,7 +2059,8 @@ void ExerciseSessionController::playCurrentQuestion()
     // Une question d'harmonie, elle, se joue en DEUX temps : le mode entendu AVANT, puis le mode pose. C'est la
     // comparaison qui est la question, donc c'est la SUITE qui compte - et c'est playModeQuestion qui la gere, avec le
     // minuteur qui pose le second.
-    if( ( question.kind == domain::QuestionKind::ModeColour ) || ( question.kind == domain::QuestionKind::ModeName ) )
+    if( ( question.kind == domain::QuestionKind::ModeColour ) || ( question.kind == domain::QuestionKind::ModeName )
+        || ( question.kind == domain::QuestionKind::ModeVamp ) )
     {
         playModeQuestion( false );
 
@@ -2090,6 +2122,10 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
 
     const domain::Mode mode = ( p_secondOnly || !hasPrevious ) ? question.mode : *question.previousMode;
 
+    // Et la TONIQUE qui va avec, qui n'est pas la meme sur un vamp : les deux passages y ont les memes notes, donc deux
+    // centres differents. Prendre toujours celle de la question ferait entendre deux fois le meme accord.
+    const domain::Note tonic = ( p_secondOnly || !hasPrevious ) ? question.modeTonic : question.previousModeTonic;
+
     // La gamme MONTE, et rien de plus.
     //
     // Le banc d'essai la fait monter ET descendre, parce qu'on y ecoute une couleur a loisir. Ici une question doit tenir
@@ -2099,12 +2135,11 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
     // La melodie est posee DEUX OCTAVES au-dessus de la tonique : le bourdon tient les graves, et une melodie qui
     // partagerait son octave se battrait avec lui au lieu de se poser dessus.
     const std::vector<domain::Note> melody =
-      domain::notesOfMode( question.modeTonic.transposedBy( MODE_MELODY_OCTAVE_OFFSET ), mode );
+      domain::notesOfMode( tonic.transposedBy( MODE_MELODY_OCTAVE_OFFSET ), mode );
 
     // Le bourdon : la tonique tenue, et sa QUINTE. La MEME pour les deux modes d'une question de couleur, et c'est
-    // exactement ce qui les rend comparables.
-    const std::array<domain::Note, 2> drone{ question.modeTonic,
-                                             question.modeTonic.transposedBy( FIFTH_IN_SEMITONES ) };
+    // exactement ce qui les rend comparables - tandis qu'un vamp la DEPLACE, parce que c'est le centre qui y change.
+    const std::array<domain::Note, 2> drone{ tonic, tonic.transposedBy( FIFTH_IN_SEMITONES ) };
 
     const domain::DroneFraming framing{ MODE_LEAD_IN, MODE_TAIL };
 

@@ -163,6 +163,14 @@ public:
     [[nodiscard]] virtual std::int32_t storedModeNameQuestionShare() const = 0;
 
     virtual void storeModeNameQuestionShare( std::int32_t p_share ) = 0;
+
+    // Part des questions, en pour cent, qui font entendre la MEME gamme sur deux CENTRES differents.
+    //
+    // C'est la question la plus avancee des trois, et la seule dont la reponse soit dans le contexte : les notes ne
+    // bougent pas, le mode si.
+    [[nodiscard]] virtual std::int32_t storedModeVampQuestionShare() const = 0;
+
+    virtual void storeModeVampQuestionShare( std::int32_t p_share ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -239,6 +247,10 @@ public:
 
     void storeModeNameQuestionShare( std::int32_t p_share ) override { m_modeNameQuestionShare = p_share; }
 
+    [[nodiscard]] std::int32_t storedModeVampQuestionShare() const override { return m_modeVampQuestionShare; }
+
+    void storeModeVampQuestionShare( std::int32_t p_share ) override { m_modeVampQuestionShare = p_share; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -280,6 +292,7 @@ private:
     // n'a pas demande autre chose. C'est un REGLAGE, et un reglage se demande.
     std::int32_t m_modeColourQuestionShare{ 0 };
     std::int32_t m_modeNameQuestionShare{ 0 };
+    std::int32_t m_modeVampQuestionShare{ 0 };
 };
 
 }    // namespace musichien::domain
