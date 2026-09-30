@@ -41,6 +41,7 @@ constexpr std::uint32_t TEST_SEED = 20260926;
 void pinEveryQuestionShare( SessionSettings & p_settings )
 {
     p_settings.namedIntervalQuestionShare = 0;
+    p_settings.sameColourQuestionShare = 0;
     p_settings.singQuestionShare = 0;
     p_settings.directionQuestionShare = 0;
     p_settings.rhythmQuestionShare = 0;
@@ -1498,6 +1499,73 @@ TEST( ExerciseSessionTest, a_name_question_poses_one_mode_and_remembers_the_answ
     // Ce que le joueur a repondu est garde, pour que le verdict puisse le montrer : meme role que la derniere reponse
     // d'accord.
     EXPECT_EQ( std::optional<Mode>{ question.mode }, session.lastModeAnswer() );
+}
+
+TEST( ExerciseSessionTest, a_same_colour_question_is_answered_by_saying_so )
+{
+    // Le bouton que Roger a demande - « rajouter un bouton egal » - et la regle qui le rend utile : pour que « pareil »
+    // soit une BONNE reponse de temps en temps, le jeu doit parfois poser deux fois la meme couleur.
+    SessionSettings settings = modeColourOnlySettings();
+    settings.sameColourQuestionShare = 100;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_TRUE( question.previousMode.has_value() );
+    EXPECT_EQ( *question.previousMode, question.mode );
+
+    // Les deux autres reponses sont FAUSSES : un bouton juste tout le temps n'apprendrait rien a personne.
+    EXPECT_FALSE( session.answerModeColour( ModeColourAnswer::Brighter ) );
+    EXPECT_TRUE( session.answerModeColour( ModeColourAnswer::Same ) );
+}
+
+TEST( ExerciseSessionTest, a_question_of_two_different_colours_refuses_sameness )
+{
+    SessionSettings settings = modeColourOnlySettings();
+    settings.sameColourQuestionShare = 0;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    ASSERT_TRUE( session.currentQuestion().previousMode.has_value() );
+    ASSERT_NE( *session.currentQuestion().previousMode, session.currentQuestion().mode );
+
+    EXPECT_FALSE( session.answerModeColour( ModeColourAnswer::Same ) );
+    EXPECT_TRUE( session.answerModeColour( expectedColourAnswer( session.currentQuestion() ) ) );
+}
+
+TEST( ExerciseSessionTest, the_same_colour_share_poses_both_kinds_of_question )
+{
+    // La part par defaut (vingt) doit donner les DEUX cas sur une centaine de questions : sans cela, le bouton « pareil »
+    // serait un piege permanent, et un piege ne s'apprend pas.
+    SessionSettings settings = modeColourOnlySettings();
+    settings.sameColourQuestionShare = 50;
+
+    bool sawSameness = false;
+    bool sawDifference = false;
+
+    // Une session par graine, et la premiere question de chacune : c'est le TIRAGE qu'on veut voir, et avancer
+    // demanderait de savoir repondre - ce qui n'est pas le sujet ici.
+    for( std::uint32_t seed = 1; seed <= 100; ++seed )
+    {
+        const ExerciseSession session{ seed, settings };
+
+        const Question & question = session.currentQuestion();
+
+        ASSERT_TRUE( question.previousMode.has_value() );
+
+        if( *question.previousMode == question.mode )
+        {
+            sawSameness = true;
+        }
+        else
+        {
+            sawDifference = true;
+        }
+    }
+
+    EXPECT_TRUE( sawSameness );
+    EXPECT_TRUE( sawDifference );
 }
 
 TEST( ExerciseSessionTest, the_mode_palette_starts_with_the_known_ones_and_grows_on_successes )

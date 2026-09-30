@@ -167,6 +167,16 @@ class ExerciseSessionController final : public QObject
     // pas lequel, le temps de lecture est trop court ».
     Q_PROPERTY( QVariantMap modeDifference READ modeDifference NOTIFY questionChanged )
 
+    // Le cercle des quintes du mode de la question : ses sept notes allumees, le reste eteint, la tonique marquee.
+    //
+    // VIDE tant que la question est posee, et ce n'est pas une precaution d'affichage : la fenetre de sept notes PLUS la
+    // tonique DONNE le mode, donc l'afficher pendant la question serait donner la reponse. C'est ce qui distingue cette
+    // aide de l'indice des intervalles, qui aide sans repondre.
+    //
+    // Roger l'a voulue apres la reponse, dans l'exercice comme dans le banc d'essai : « la roue apparait avec le verdict,
+    // pour relier ce qu'on a entendu a ce qu'on a vu - jamais pendant la question ».
+    Q_PROPERTY( QVariantList modeCircle READ modeCircle NOTIFY questionChanged )
+
     // Les deux parts de l'harmonie, en pour cent : comparer deux modes, et nommer un mode. Deux reglages, parce que ce
     // sont deux competences - un joueur peut vouloir la comparaison sans le vocabulaire, et l'inverse.
     Q_PROPERTY( int modeColourQuestionShare READ modeColourQuestionShare WRITE setModeColourQuestionShare NOTIFY
@@ -337,6 +347,8 @@ public:
     [[nodiscard]] QVariantMap previousMode() const;
 
     [[nodiscard]] QVariantMap modeDifference() const;
+
+    [[nodiscard]] QVariantList modeCircle() const;
 
     [[nodiscard]] int modeColourQuestionShare() const;
 
@@ -550,6 +562,11 @@ public:
     // Un booleen, comme le domaine le demande : la reponse n'est pas un ecart, c'est un SENS, et c'est le domaine qui
     // calcule lequel des deux modes est le plus clair.
     Q_INVOKABLE void answerModeColour( bool p_secondIsBrighter );
+
+    // Le bouton « pareil » : la troisieme reponse d'une question de couleur, celle qui dit qu'il n'y a rien a entendre.
+    //
+    // Demande par Roger, et c'est une vraie question d'oreille : ne pas inventer une difference quand il n'y en a pas.
+    Q_INVOKABLE void answerSameColour();
 
     // Repond a une question de NOM : l'index du mode joue, dans la liste de modeChoices().
     Q_INVOKABLE void answerModeName( int p_modeIndex );
@@ -906,9 +923,6 @@ private:
     // tonique, donc l'oreille entend une continuite et non deux questions.
     QTimer m_modeTimer;
 
-    // Le mode qui vient de sonner, decrit comme une entree de modeChoices(). Vide tant que rien n'a sonne, ce qui est
-    // exactement ce que l'ecran doit savoir pour n'allumer aucun bouton.
-    QVariantMap m_heardMode;
     QElapsedTimer m_rhythmClock;
 
     // Le temps a jouer dans la mesure, de 0 a beatsPerBar. La valeur beatsPerBar n'est pas un temps : c'est le signal

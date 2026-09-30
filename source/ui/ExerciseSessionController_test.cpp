@@ -42,6 +42,7 @@ constexpr std::size_t SESSION_QUESTION_COUNT = 10;
 void pinEveryQuestionShare( domain::SessionSettings & p_settings )
 {
     p_settings.namedIntervalQuestionShare = 0;
+    p_settings.sameColourQuestionShare = 0;
     p_settings.singQuestionShare = 0;
     p_settings.directionQuestionShare = 0;
     p_settings.rhythmQuestionShare = 0;
@@ -594,6 +595,41 @@ TEST( ExerciseSessionControllerTest, a_harmony_question_offers_no_interval_hint 
 
     // L'indice existe - le livre en a un pour tous les intervalles - et il doit pourtant rester absent.
     EXPECT_TRUE( controller.hintText().isEmpty() );
+
+    // La roue non plus n'est pas donnee : la fenetre des sept notes PLUS la tonique donne le mode, donc l'afficher tant
+    // que la question est posee serait donner la reponse. C'est la seule aide du jeu qui doive attendre le verdict.
+    EXPECT_TRUE( controller.modeCircle().isEmpty() );
+
+    controller.answerModeName( heardIndex );
+
+    ASSERT_TRUE( controller.wasLastAnswerCorrect() );
+
+    // Reponse donnee : la roue arrive avec le verdict.
+    const QVariantList circle = controller.modeCircle();
+
+    ASSERT_EQ( 12, circle.size() );
+
+    int litCount = 0;
+    int tonicCount = 0;
+
+    for( const QVariant & entry : circle )
+    {
+        const QVariantMap note = entry.toMap();
+
+        if( note.value( "inMode" ).toBool() )
+        {
+            ++litCount;
+        }
+
+        if( note.value( "isTonic" ).toBool() )
+        {
+            ++tonicCount;
+        }
+    }
+
+    // Sept notes allumees dont UNE tonique : c'est une armure, et c'est tout le dessin.
+    EXPECT_EQ( 7, litCount );
+    EXPECT_EQ( 1, tonicCount );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

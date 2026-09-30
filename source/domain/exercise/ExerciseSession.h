@@ -45,6 +45,24 @@ namespace musichien::domain
 //
 // La definition vit ICI, avant les reglages, parce qu'un PLAN de questions (le Bilan) s'exprime avec elle : un plan se
 // pose dans les reglages, et une enumeration utilisee par eux doit venir avant eux.
+// Ce qu'un joueur peut repondre a une question de COULEUR : le second passage est-il plus clair, plus sombre, ou le
+// meme ?
+//
+// La troisieme reponse est une demande de Roger - « bug dans le plus clair plus sombre, si les 2 modes sont identiques,
+// erreur. rajouter un bouton egal » - et elle a amene une regle : pour que « pareil » soit une BONNE reponse de temps en
+// temps, il faut que le jeu pose parfois deux fois la meme couleur. Voir SessionSettings::sameColourQuestionShare.
+//
+// C'est un exercice qui a du sens, et pas seulement une reponse de plus : entendre qu'il n'y a PAS de difference est une
+// competence d'oreille, et c'est celle qu'on perd en cherchant toujours quelque chose a entendre.
+enum class ModeColourAnswer : std::int32_t
+{
+    // Les valeurs sont explicites : l'interface les lit comme un nombre, et une enumeration qui se renumerote toute seule
+    // deplacerait les boutons sans que rien ne casse au build.
+    Brighter = 0,
+    Darker = 1,
+    Same = 2
+};
+
 enum class QuestionKind
 {
     // Les valeurs sont EXPLICITES parce que l'interface les lit comme un nombre : la page compare questionKind a 0, 1,
@@ -300,6 +318,13 @@ struct SessionSettings
     //
     // ZERO par defaut, comme le rythme et pour la meme raison : une question d'harmonie dans une session d'intervalles
     // doit se DEMANDER, jamais s'imposer. Le pilier harmonie se dose comme les autres.
+    // Part des questions de couleur ou les DEUX passages ont la meme couleur, en poids comme les autres parts.
+    //
+    // C'est ce qui donne une bonne reponse au bouton « pareil » de Roger : sans cela, le bouton serait un piege
+    // permanent, et un bouton qui n'est jamais juste n'apprend rien. A zero, le jeu ne compare que des modes differents -
+    // le comportement d'avant.
+    std::int32_t sameColourQuestionShare{ 20 };
+
     std::int32_t modeColourQuestionShare{ 0 };
 
     // Share of questions, in percent, that ask the player to NAME a mode heard on a drone.
@@ -564,6 +589,12 @@ public:
     // Un booleen, et non une distance : la reponse n'est pas un ecart, c'est un SENS. Le domaine compare les deux modes
     // par leur RANG dans l'ordre de couleur, ce qui garantit qu'il ne peut pas se tromper de direction.
     bool answerModeColour( bool p_secondIsBrighter );
+
+    // La meme question, avec la troisieme reponse : « pareil ».
+    //
+    // C'est ce que le bouton de Roger appelle, et c'est la seule facon de repondre juste quand les deux passages portent
+    // la meme couleur - ce qui arrive quand la part le demande (voir SessionSettings::sameColourQuestionShare).
+    bool answerModeColour( ModeColourAnswer p_answer );
 
     // Repond a une question de NOM : quel mode a ete joue ?
     bool answerModeName( Mode p_mode );

@@ -465,7 +465,7 @@ void ExerciseSession::buildChordQuestion( Question & p_question )
     p_question.chordChoices.assign( m_chordPalette.begin(), m_chordPalette.end() );
 }
 
-bool ExerciseSession::answerModeColour( bool p_secondIsBrighter )
+bool ExerciseSession::answerModeColour( ModeColourAnswer p_answer )
 {
     if( ( m_state != SessionState::Asking )
         || ( ( m_currentQuestion.kind != QuestionKind::ModeColour )
@@ -481,10 +481,26 @@ bool ExerciseSession::answerModeColour( bool p_secondIsBrighter )
 
     // Le sens attendu est calcule par le DOMAINE, a partir des deux modes de la question : l'ecran ne peut donc pas se
     // tromper de sens en lisant la question, et il n'a rien a recalculer.
-    const bool secondIsBrighter = m_currentQuestion.previousMode.has_value()
-                                  && isBrighterThan( m_currentQuestion.mode, *m_currentQuestion.previousMode );
+    //
+    // Et il se calcule en TROIS valeurs, pas deux : quand les deux passages portent la meme couleur, la seule bonne
+    // reponse est « pareil ». L'ancien calcul rendait « plus sombre » (la comparaison d'un mode avec lui-meme est fausse),
+    // ce qui aurait donne une bonne reponse a un joueur qui n'avait rien entendu - le bug que Roger a vu de loin.
+    const bool sameness = !m_currentQuestion.previousMode.has_value()
+                          || ( m_currentQuestion.mode == *m_currentQuestion.previousMode );
 
-    return resolveAnswer( p_secondIsBrighter == secondIsBrighter, std::nullopt );
+    const ModeColourAnswer expected =
+      sameness ? ModeColourAnswer::Same
+               : ( isBrighterThan( m_currentQuestion.mode, *m_currentQuestion.previousMode ) ? ModeColourAnswer::Brighter
+                                                                                            : ModeColourAnswer::Darker );
+
+    return resolveAnswer( p_answer == expected, std::nullopt );
+}
+
+bool ExerciseSession::answerModeColour( bool p_secondIsBrighter )
+{
+    // L'ancienne forme, a deux reponses : la plupart des questions de couleur ne portent qu'une difference a entendre, et
+    // les tests qui parlent du SENS de la comparaison n'ont pas a connaitre la troisieme reponse.
+    return answerModeColour( p_secondIsBrighter ? ModeColourAnswer::Brighter : ModeColourAnswer::Darker );
 }
 
 bool ExerciseSession::answerModeName( Mode p_mode )
@@ -509,19 +525,33 @@ void ExerciseSession::buildModeQuestion( Question & p_question, bool p_compare )
 
     if( p_compare )
     {
-        // Un mode DIFFERENT du premier, et tire dans la meme palette : comparer un mode avec lui-meme n'aurait pas de
-        // reponse, donc la question serait impossible plutot que difficile.
+        // Parfois, la MEME couleur DEUX FOIS, et c'est deliberé : c'est la seule facon pour que « pareil » soit une bonne
+        // reponse de temps en temps. Roger a demande le bouton ; encore fallait-il lui donner quelque chose a entendre.
         //
-        // La boucle se termine, et c'est une garantie du DOMAINE et non un espoir : beginnerModePalette rend toujours
-        // deux modes au moins, donc il existe toujours un mode different a tirer.
-        Mode previousMode = drawMode();
+        // Entendre qu'il n'y a PAS de difference est une competence d'oreille, et c'est celle qu'on perd en cherchant
+        // toujours quelque chose a entendre. La part est reglable, et a zero le jeu ne pose que des differences.
+        std::uniform_int_distribution<std::int32_t> shareDraw{ 0, 99 };
 
-        while( previousMode == p_question.mode )
+        if( shareDraw( m_randomEngine ) < m_settings.sameColourQuestionShare )
         {
-            previousMode = drawMode();
+            p_question.previousMode = p_question.mode;
         }
+        else
+        {
+            // Sinon, un mode DIFFERENT du premier, et tire dans la meme palette : comparer un mode avec lui-meme n'aurait
+            // pas de reponse, donc la question serait impossible plutot que difficile.
+            //
+            // La boucle se termine, et c'est une garantie du DOMAINE et non un espoir : beginnerModePalette rend toujours
+            // deux modes au moins, donc il existe toujours un mode different a tirer.
+            Mode previousMode = drawMode();
 
-        p_question.previousMode = previousMode;
+            while( previousMode == p_question.mode )
+            {
+                previousMode = drawMode();
+            }
+
+            p_question.previousMode = previousMode;
+        }
     }
 
     // Ce que le joueur peut repondre : SA palette, dans l'ordre d'apprentissage, et rien d'autre. Un mode qu'il n'a

@@ -957,7 +957,30 @@ QVariantList ExerciseSessionController::modeChoices() const
 
 QVariantMap ExerciseSessionController::heardMode() const
 {
-    return m_heardMode;
+    // Le mode de la QUESTION, et non le dernier qui a sonne.
+    //
+    // C'etait un cache, mis a jour a chaque lecture, et il mentait : un joueur qui ecoute, reecoute, et repond avant que
+    // le second passage ne sonne y lisait encore le PREMIER mode - donc « Dorien -> Dorien » dans le verdict, c'est-a-dire
+    // deux modes identiques qui n'ont jamais existe. Roger l'a vu : « bug dans le plus clair plus sombre, si les 2 modes
+    // sont identiques, erreur ».
+    //
+    // La question SAIT quel mode elle a pose : le lire la est plus court que de tenir un cache a jour, et surtout cela ne
+    // peut pas se desynchroniser de ce qui a ete demande.
+    if( m_session == nullptr )
+    {
+        return {};
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    if( !isModeQuestion() )
+    {
+        // Une question d'intervalle ou d'accord ne parle pas de mode : la question en porte un par construction (l'ordre
+        // des tirages), mais personne ne l'a entendu, et le decrire serait un mensonge de plus.
+        return {};
+    }
+
+    return describeMode( question.mode );
 }
 
 QVariantMap ExerciseSessionController::previousMode() const
@@ -983,6 +1006,19 @@ QVariantMap ExerciseSessionController::modeDifference() const
     return describeModeDifference( *m_session->currentQuestion().previousMode, m_session->currentQuestion().mode );
 }
 
+QVariantList ExerciseSessionController::modeCircle() const
+{
+    // Trois raisons de ne rien montrer, et une seule de montrer : la question a ete conclue, et elle parle d'un mode.
+    if( ( m_session == nullptr ) || isAsking() || !isModeQuestion() )
+    {
+        return {};
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    return describeModeCircle( question.mode, question.modeTonic.pitchClassIndex() );
+}
+
 void ExerciseSessionController::answerModeColour( bool p_secondIsBrighter )
 {
     if( m_session == nullptr )
@@ -991,6 +1027,16 @@ void ExerciseSessionController::answerModeColour( bool p_secondIsBrighter )
     }
 
     processAnswer( m_session->answerModeColour( p_secondIsBrighter ) );
+}
+
+void ExerciseSessionController::answerSameColour()
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    processAnswer( m_session->answerModeColour( domain::ModeColourAnswer::Same ) );
 }
 
 void ExerciseSessionController::answerModeName( int p_modeIndex )
@@ -2199,16 +2245,6 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
           domain::droneDurationFor( domain::DEGREE_COUNT, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
 
         m_modeTimer.start( static_cast<int>( ( modeDuration + MODE_COMPARISON_GAP ).count() ) );
-    }
-
-    // Ce que l'ecran peut montrer : le mode qui vient de sonner, decrit exactement comme les choix qu'il offre.
-    const QVariantMap description = describeMode( mode );
-
-    if( m_heardMode != description )
-    {
-        m_heardMode = description;
-
-        emit sessionChanged();
     }
 }
 

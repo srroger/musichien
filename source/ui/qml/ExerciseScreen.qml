@@ -444,7 +444,7 @@ Item {
                                 return qsTr("Deux fois la même gamme, sur deux centres différents : le second passage est-il plus clair, ou plus sombre ?");
 
                             if (ExerciseController.isModeColourQuestion)
-                                return qsTr("Écoute les deux modes : le second est-il plus clair, ou plus sombre ?");
+                                return qsTr("Écoute les deux modes : le second est-il plus clair, plus sombre, ou pareil ?");
 
                             if (ExerciseController.isModeQuestion)
                                 return qsTr("Écoute ce mode sur son bourdon : lequel est-ce ?");
@@ -898,6 +898,8 @@ Item {
                 }
 
                 Text {
+                    id: modeVerdict
+
                     // Le VERDICT, et il est en GRAS parce que le temps de lecture est court.
 
                     Layout.fillWidth: true
@@ -907,10 +909,25 @@ Item {
                     color: "#ffd479"
                     font.pixelSize: 19
                     font.bold: true
+
                     // Deux noms poses cote a cote ne disent rien : ce qu'on a entendu, c'est UNE NOTE qui a bouge, et
                     // c'est donc cela qu'il faut ecrire - « de dorien a ionien, la tierce a monte ».
-                    visible: !ExerciseController.isAsking && ExerciseController.modeDifference.label !== undefined
-                    text: ExerciseController.modeDifference.label !== undefined ? ExerciseController.previousMode.name + " → " + ExerciseController.heardMode.name + "  ·  " + ExerciseController.modeDifference.label : ""
+                    //
+                    // Et quand RIEN n'a bouge - deux fois la meme couleur - il faut le dire aussi : c'est la seule
+                    // reponse possible, et un verdict muet laisserait croire a un bug.
+                    readonly property bool sameness: ExerciseController.previousMode.name !== undefined && ExerciseController.heardMode.name !== undefined && (ExerciseController.previousMode.name === ExerciseController.heardMode.name)
+
+                    visible: !ExerciseController.isAsking && ExerciseController.heardMode.name !== undefined
+
+                    text: {
+                        if (!visible)
+                            return "";
+
+                        if (sameness)
+                            return qsTr("Les deux passages : %1 — pareils").arg(ExerciseController.heardMode.name);
+
+                        return ExerciseController.previousMode.name + " → " + ExerciseController.heardMode.name + "  ·  " + ExerciseController.modeDifference.label;
+                    }
                 }
 
                 Text {
@@ -920,8 +937,21 @@ Item {
                     wrapMode: Text.WordWrap
                     color: "#8ef2b0"
                     font.pixelSize: 14
-                    visible: !ExerciseController.isAsking && ExerciseController.modeDifference.sentence !== undefined
-                    text: ExerciseController.modeDifference.sentence !== undefined ? ExerciseController.modeDifference.sentence : ""
+
+                    // Une phrase VIDE, c'est « il n'y a rien a dire » - le cas des deux passages pareils.
+                    visible: modeVerdict.visible && !modeVerdict.sameness
+                    text: modeVerdict.visible && !modeVerdict.sameness ? ExerciseController.modeDifference.sentence : ""
+                }
+
+                // La ROUE du mode, et elle arrive AVEC le verdict : c'est là qu'elle relie ce qu'on a entendu à ce qu'on
+                // voit. Elle est vide pendant la question - la fenêtre des sept notes plus la tonique donne le mode, donc
+                // l'afficher plus tôt serait donner la réponse.
+                ModeCircle {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 6
+                    dotSize: 34
+                    visible: ExerciseController.modeCircle.length > 0
+                    notes: ExerciseController.modeCircle
                 }
 
                 RowLayout {
@@ -943,6 +973,17 @@ Item {
                         text: qsTr("Plus sombre")
                         enabled: ExerciseController.isAsking
                         onClicked: ExerciseController.answerModeColour(false)
+                    }
+
+                    // Le troisieme bouton, demande par Roger, et ce n'est pas un bouton de secours : quand le jeu pose
+                    // deux fois la MEME couleur, c'est la seule bonne reponse. Ne pas inventer une difference est une
+                    // competence d'oreille, et c'est celle qu'on perd en cherchant toujours quelque chose a entendre.
+                    Button {
+                        Layout.fillWidth: true
+                        height: 56
+                        text: qsTr("Pareil")
+                        enabled: ExerciseController.isAsking
+                        onClicked: ExerciseController.answerSameColour()
                     }
 
                 }
