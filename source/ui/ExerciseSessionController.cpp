@@ -303,6 +303,56 @@ bool ExerciseSessionController::wasSessionWon() const noexcept
     return isFinished() && ( hasUnlimitedLives() || ( lives() > 0 ) );
 }
 
+void ExerciseSessionController::resetPreferences()
+{
+    // L'instrument : tous ceux que ce build connait. Un profil neuf doit sonner complet, pas vide.
+    for( std::size_t index = 0; index < domain::INSTRUMENT_COUNT; ++index )
+    {
+        setInstrumentEnabled( static_cast<int>( index ), true );
+    }
+
+    // Les poids : ceux du DOMAINE, et pas une liste recopiee ici. Le jour ou un defaut change, il change a un seul
+    // endroit - et c'est celui qui fait foi.
+    const domain::SessionSettings defaults;
+
+    setNamedIntervalQuestionShare( defaults.namedIntervalQuestionShare );
+    setSingQuestionShare( defaults.singQuestionShare );
+    setChordQuestionShare( defaults.chordQuestionShare );
+    setModeColourQuestionShare( defaults.modeColourQuestionShare );
+    setModeNameQuestionShare( defaults.modeNameQuestionShare );
+    setModeVampQuestionShare( defaults.modeVampQuestionShare );
+    setForeignNoteQuestionShare( defaults.foreignNoteQuestionShare );
+
+    // Le tempo des phrases, l'accordage, et le rappel.
+    setPhraseTempoBpm( 72 );
+    setPhraseTempoVariation( 20 );
+    setTemperament( 0 );
+    setReferencePitch( 440.0 );
+    setDailyReminderEnabled( false );
+
+    // Et le NIVEAU reste : c'est un choix que le joueur fait sur lui-meme, pas un reglage qu'on remet a zero. Le nom
+    // aussi : c'est le sien.
+}
+
+void ExerciseSessionController::tellAnotherAnecdote()
+{
+    // Le chien de l'accueil : il raconte quand on lui demande. C'est le meme chemin que la fin de partie - une anecdote
+    // fraiche, et la popup qui va avec - mais c'est le joueur qui le declenche, en appuyant sur le chien lui-meme.
+    //
+    // La nouvelle anecdote est tiree AVANT d'ouvrir la popup : sans ca, elle s'ouvrirait sur l'anecdote precedente, et
+    // « raconte-moi autre chose » aurait l'air de ne rien faire.
+    refreshAnecdote();
+
+    if( m_isChibaTalking )
+    {
+        return;
+    }
+
+    m_isChibaTalking = true;
+
+    emit chibaTalkingChanged();
+}
+
 void ExerciseSessionController::dismissChiba()
 {
     if( !m_isChibaTalking )
@@ -505,7 +555,18 @@ QVariantList ExerciseSessionController::instruments() const
     {
         QVariantMap instrument;
         instrument.insert( QStringLiteral( "index" ), static_cast<int>( index ) );
-        instrument.insert( QStringLiteral( "name" ), QString::fromUtf8( domain::INSTRUMENT_NAMES.at( index ) ) );
+
+        // Le NOM, avec sa majuscule : c'est un libelle d'ecran, et Roger l'a demande tel quel - « et les ecrire propre
+        // au lieu de mot sans majuscule ». La capitale est posee ICI, dans la couche d'affichage, et jamais dans le
+        // domaine : les noms du domaine servent aussi a retrouver les enregistrements, et un identifiant ne se decore pas.
+        QString name = QString::fromUtf8( domain::INSTRUMENT_NAMES.at( index ) );
+
+        if( !name.isEmpty() )
+        {
+            name[0] = name.at( 0 ).toUpper();
+        }
+
+        instrument.insert( QStringLiteral( "name" ), name );
 
         // A list shorter than the instruments this build knows about means "everything": a first run must sound
         // complete, not empty.

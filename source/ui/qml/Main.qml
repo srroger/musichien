@@ -260,6 +260,15 @@ ApplicationWindow {
                     source: "qrc:/assets/images/shiba-guitar.png"
                     fillMode: Image.PreserveAspectFit
                     smooth: true
+
+                    // Le chien de l'accueil REPOND : appuyer sur lui ouvre la popup avec une AUTRE anecdote. Roger l'a
+                    // demande, et c'est ce qui fait du chien un personnage plutot qu'une illustration - il a toujours
+                    // quelque chose a raconter, et c'est lui qu'on vient voir.
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: ExerciseController.tellAnotherAnecdote()
+                    }
+
                 }
 
                 Text {
@@ -873,16 +882,13 @@ ApplicationWindow {
         id: settingsDialog
 
         anchors.centerIn: parent
-        width: Math.min(mainWindow.width * 0.9, 420)
-        // La popup s'adapte a son contenu, et se borne seulement quand il ne tient pas : plus d'espace vide en bas,
-        // et le defilement prend le relais quand il y a trop a montrer.
-        height: Math.min(mainWindow.height * 0.9, settingsColumn.implicitHeight + 32)
+        // PLEIN ECRAN, et ce n'est pas un caprice : la page des reglages a grandi jusqu'a ne plus tenir dans une popup -
+        // instruments, rappel, poids des jeux, tempo - et Roger a demande « un ecran pour avoir un peu plus de place ».
+        // Un dialogue qui prend tout l'ecran est cet ecran, sans toucher a la navigation.
+        width: mainWindow.width
+        height: mainWindow.height
         modal: true
-        padding: 16
-        // Les reglages contiennent la page du micro : l'ouvrir ouvre l'ecoute, le fermer la referme. C'est le meme
-        // reglage que dans l'accordeur, avec la meme regle - pas de microphone ouvert pour rien.
-        onOpened: MicrophoneController.ensureListening()
-        onClosed: MicrophoneController.stopTest()
+        padding: 12
 
         // Un fond sombre, et pas la feuille blanche du systeme : cette page fait partie du jeu, et le
         // blanc de l’application systeme jurait au milieu du bleu nuit.
@@ -905,26 +911,33 @@ ApplicationWindow {
             ColumnLayout {
                 // Le TEMPO des phrases de mode, et son amplitude. Roger : « on pourrait choisir de l'augmenter, d'en choisir
                 // un central et de varier autour de 20-30 bpm. Histoire de rendre moins monotone. »
+                // Et celle-ci est en TETE parce que c'est d'elle que les autres se detachent : on commence par demander
+                // moins de « nommer », et les parts qui suivent prennent ce qu'on lui retire. C'est la question que le
+                // jeu posait a ses debuts, et la seule qui n'avait pas de part a elle - elle prenait ce qui restait, et
+                // un total qui depassait cent la faisait disparaitre en silence.
+                // LES POIDS DES JEUX, et dans CET ordre : d'abord les trois questions d'ecoute, puis les modes, puis la
+                // note etrangere. Roger l'a demande tel quel, et l'ordre de l'ecran est aussi celui du tirage - une
+                // part ne deplace donc que les questions qui la suivent.
+                // Le micro, le tempere et le diapason ne sont PAS ici : ils vivent dans la page Accordeur, ou ils servent
+                // vraiment. Roger l'a demande - « enlever le micro et la configuration du temperament, le diapason, et le
+                // laisser seulement au niveau de l'accordeur » - et il a raison : un reglage se range la ou il s'emploie.
+                // Le panneau du micro, lui, est le MEME composant que celui de l'accordeur : une seule definition.
+                // LES DEUX BOUTONS DU BAS, dans l'ordre demande : « Par defaut » puis « Fermer ».
 
                 id: settingsColumn
 
                 width: settingsScroll.availableWidth
                 spacing: 3
 
-                // Les trois parts de question : combien de questions de chaque genre sur cent. Un reglage par genre,
-                // la meme mise en page pour les trois, et une seule definition - voir QuestionShareSetting.
-                // Les parts sont des POIDS, lus les uns par rapport aux autres : leur somme est l'echelle, et le total
-                // n'a donc pas besoin de faire cent. Vingt partout vaut un sixieme pour chacun.
-                // La troisieme marche de l'harmonie : la plus fine des trois, et c'est pour cela qu'elle vient en dernier.
-                QuestionShareSetting {
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.fillWidth: true
-                    Layout.topMargin: 10
-                    title: qsTr("Note étrangère")
-                    hint: qsTr("Poids des questions où une note étrangère se cache dans une gamme. 0 = jamais. Il faut tenir toute la gamme dans sa tête pour la repérer.")
-                    share: ExerciseController.foreignNoteQuestionShare
-                    onShareEdited: (p_share) => {
-                        return ExerciseController.setForeignNoteQuestionShare(p_share);
-                    }
+                    Layout.topMargin: 8
+                    color: "#e8dcff"
+                    font.pixelSize: 16
+                    font.bold: true
+                    text: qsTr("Sons des instruments")
                 }
 
                 Text {
@@ -934,25 +947,60 @@ ApplicationWindow {
                     color: "#cbb8e8"
                     font.pixelSize: 14
                     wrapMode: Text.WordWrap
-                    text: qsTr("Le tirage se fait au hasard parmi les instruments coches.")
+                    text: qsTr("Le tirage se fait au hasard parmi les instruments cochés.")
                 }
 
-                Repeater {
-                    model: ExerciseController.instruments
+                // Les instruments sur DEUX colonnes : une seule colonne obligeait a faire defiler pour voir la liste
+                // entiere, et Roger a demande ce regroupement - « les ecrire propre au lieu de mot sans majuscule, et
+                // sur plusieurs colonnes plutot que sur une seule comme maintenant ».
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 4
 
-                    delegate: CheckBox {
-                        required property var modelData
+                    Repeater {
+                        model: ExerciseController.instruments
 
-                        Layout.fillWidth: true
-                        // Material reserve une cible tactile de 48 dp : dans une LIGNE de liste, c'est deux fois trop.
-                        // Un Layout n'obéit qu'a Layout.preferredHeight, jamais a `height`.
+                        delegate: CheckBox {
+                            required property var modelData
+
+                            width: (settingsColumn.width / 2) - 6
+                            // Material reserve une cible tactile de 48 dp : dans une LIGNE de liste, c'est deux fois trop.
+                            // Un Layout n'obéit qu'a Layout.preferredHeight, jamais a `height`.
+                            Layout.preferredHeight: 34
+                            text: modelData.name
+                            checked: modelData.enabled
+                            onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+
+                            // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre. Le leftPadding
+                            // remet le texte a droite de la case, sinon il se pose par-dessus l'indicateur.
+                            contentItem: Text {
+                                text: parent.text
+                                color: "#e8dcff"
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: parent.indicator.width + parent.spacing
+                                font.pixelSize: 13
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                // L'HEURE du rappel est sur la MEME ligne que la case qui l'active : celui qui vient de l'activer cherche
+                // aussitot QUAND il sonnera, et Roger a demande exactement ce regroupement - « et enlever le texte inutile
+                // "L'heure du rappel" ».
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    spacing: 6
+
+                    CheckBox {
                         Layout.preferredHeight: 34
-                        text: modelData.name
-                        checked: modelData.enabled
-                        onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+                        text: qsTr("Un rappel chaque jour")
+                        checked: ExerciseController.dailyReminderEnabled
+                        onClicked: ExerciseController.setDailyReminderEnabled(checked)
 
-                        // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre. Le leftPadding
-                        // remet le texte a droite de la case, sinon il se pose par-dessus l'indicateur.
                         contentItem: Text {
                             text: parent.text
                             color: "#e8dcff"
@@ -961,40 +1009,6 @@ ApplicationWindow {
                             font.pixelSize: 13
                         }
 
-                    }
-
-                }
-
-                CheckBox {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 34
-                    text: qsTr("Un rappel chaque jour")
-                    checked: ExerciseController.dailyReminderEnabled
-                    onClicked: ExerciseController.setDailyReminderEnabled(checked)
-
-                    contentItem: Text {
-                        text: parent.text
-                        color: "#e8dcff"
-                        verticalAlignment: Text.AlignVCenter
-                        leftPadding: parent.indicator.width + parent.spacing
-                        font.pixelSize: 13
-                    }
-
-                }
-
-                // L'HEURE du rappel, juste sous la case qui l'active : celui qui vient de l'activer cherche aussitot
-                // QUAND il sonnera. Deux nombres plutot qu'un selecteur d'heure : c'est plus court a regler, et cela
-                // tient sur une ligne de telephone.
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.topMargin: 2
-                    visible: ExerciseController.dailyReminderEnabled
-                    spacing: 6
-
-                    Text {
-                        color: "#8a77ad"
-                        font.pixelSize: 13
-                        text: qsTr("L'heure du rappel :")
                     }
 
                     DarkSpinBox {
@@ -1052,114 +1066,29 @@ ApplicationWindow {
                     text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
                 }
 
-                // L'accordage. Le tempere egal est la reference, et il reste le defaut : c'est ce sur quoi la musique
-                // autour de nous est construite. Les anciens ne prennent leur sens qu'autour d'une tonique, et le
-                // texte le dit plutot que de laisser croire a un simple bouton de plus.
-                ColumnLayout {
+                // Les parts sont des POIDS, lus les uns par rapport aux autres : leur somme est l'echelle, et le total
+                // n'a donc pas besoin de faire cent. Vingt partout vaut un sixieme pour chacun.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                     Layout.fillWidth: true
-                    Layout.topMargin: 10
-                    spacing: 6
-
-                    Text {
-                        Layout.fillWidth: true
-                        color: "#e8dcff"
-                        font.pixelSize: 14
-                        font.bold: true
-                        text: qsTr("Accordage (tempérament et diapason)")
-                    }
-
-                    DarkComboBox {
-                        model: ExerciseController.temperaments
-                        currentIndex: ExerciseController.temperament
-                        onActivated: ExerciseController.setTemperament(index)
-                    }
-
-                    Text {
-                        Layout.preferredWidth: 0
-                        Layout.minimumWidth: 0
-                        Layout.fillWidth: true
-                        color: "#8a77ad"
-                        font.pixelSize: 12
-                        wrapMode: Text.WordWrap
-                        text: qsTr("Le tempéré est la référence. Les autres sonnent plus juste par endroits, et faux ailleurs. La page Accordeur explique chacun d'eux.")
-                    }
-
-                    // La note de reference : sans elle, un accordage non egal ne veut rien dire. Elle n'apparait
-                    // donc que quand l'accordage en a besoin.
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 4
-                        spacing: 6
-                        visible: ExerciseController.temperament !== 0
-
-                        Text {
-                            Layout.fillWidth: true
-                            color: "#e8dcff"
-                            font.pixelSize: 13
-                            text: qsTr("Note de référence")
-                        }
-
-                        DarkComboBox {
-                            model: ExerciseController.tuningRoots
-                            currentIndex: ExerciseController.tuningRoot
-                            onActivated: ExerciseController.setTuningRoot(index)
-                        }
-
-                    }
-
-                    // Le diapason. 440 par defaut, mais beaucoup d'instruments a vent sont construits un peu plus
-                    // haut pour sonner plus brillant : le regler, c'est accorder l'accordeur sur eux.
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 4
-                        spacing: 6
-
-                        Text {
-                            Layout.fillWidth: true
-                            color: "#e8dcff"
-                            font.pixelSize: 13
-                            text: qsTr("Diapason (le la de référence)")
-                        }
-
-                        SpinBox {
-                            Layout.preferredWidth: 150
-                            Layout.preferredHeight: 32
-                            Layout.alignment: Qt.AlignLeft
-                            from: 400
-                            to: 480
-                            stepSize: 1
-                            editable: true
-                            value: ExerciseController.referencePitch
-                            onValueModified: ExerciseController.setReferencePitch(value)
-
-                            contentItem: TextInput {
-                                text: parent.textFromValue(parent.value, parent.locale)
-                                color: "#ffffff"
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pixelSize: 15
-                                validator: parent.validator
-                                inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                readOnly: !parent.editable
-                            }
-
-                            background: Rectangle {
-                                color: "#1b1035"
-                                radius: 4
-                                border.width: 1
-                                border.color: "#5c4a80"
-                            }
-
-                        }
-
-                    }
-
+                    Layout.topMargin: 16
+                    color: "#e8dcff"
+                    font.pixelSize: 16
+                    font.bold: true
+                    text: qsTr("Poids des jeux")
                 }
 
-                // Et celle-ci est en TETE parce que c'est d'elle que les autres se detachent : on commence par demander
-                // moins de « nommer », et les parts qui suivent prennent ce qu'on lui retire. C'est la question que le
-                // jeu posait a ses debuts, et la seule qui n'avait pas de part a elle - elle prenait ce qui restait, et
-                // un total qui depassait cent la faisait disparaitre en silence.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.fillWidth: true
+                    color: "#cbb8e8"
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Chaque curseur est un poids, pas un pourcentage : c'est le rapport entre les poids qui décide. Le pourcentage affiché est la chance réelle de tomber sur cette question.")
+                }
+
                 QuestionShareSetting {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
@@ -1233,6 +1162,18 @@ ApplicationWindow {
                     }
                 }
 
+                // La troisieme marche de l'harmonie : la plus fine des trois, et c'est pour cela qu'elle vient en dernier.
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Note étrangère")
+                    hint: qsTr("Poids des questions où une note étrangère se cache dans une gamme. 0 = jamais. Il faut tenir toute la gamme dans sa tête pour la repérer.")
+                    share: ExerciseController.foreignNoteQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setForeignNoteQuestionShare(p_share);
+                    }
+                }
+
                 // Le premier est le CENTRE, le second l'amplitude du tirage : chaque phrase est jouée à centre ± tirage,
                 // donc aucune ne sonne exactement comme la précédente. Le tempo écrit dans le contenu ne décide plus.
                 RowLayout {
@@ -1294,16 +1235,26 @@ ApplicationWindow {
 
                 }
 
-                // Le micro : choisir le peripherique et le tester. Le MEME panneau sert ici et sur la page
-                // Accordeur - deux copies finiraient par montrer deux accordeurs differents.
-                MicrophonePanel {
-                    Layout.topMargin: 10
-                }
+                // « Par defaut » est a gauche et discret : c'est un geste rare, et il ne touche JAMAIS au score - voir
+                // resetPreferences. Un bouton qui efface les etoiles sans le dire serait un piege.
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 16
+                    spacing: 10
 
-                Button {
-                    Layout.alignment: Qt.AlignRight
-                    text: qsTr("Fermer")
-                    onClicked: settingsDialog.close()
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Par défaut")
+                        onClicked: ExerciseController.resetPreferences()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        highlighted: true
+                        text: qsTr("Fermer")
+                        onClicked: settingsDialog.close()
+                    }
+
                 }
 
             }
@@ -2919,9 +2870,21 @@ ApplicationWindow {
         RowLayout {
             spacing: 10
 
+            // Un CURSEUR, et un champ a cote. Roger : « au lieu de + et de -, mettre un slider (avec le textfield au bout
+            // pour changer a la main) ». Le curseur pour le geste, le champ pour la valeur exacte - et le pourcentage
+            // effectif juste apres, parce que c'est lui que le joueur veut lire.
+            Slider {
+                Layout.fillWidth: true
+                from: 0
+                to: 100
+                stepSize: 5
+                value: questionShareSetting.share
+                onMoved: questionShareSetting.shareEdited(value)
+            }
+
             DarkSpinBox {
-                Layout.preferredWidth: 150
-                Layout.alignment: Qt.AlignLeft
+                Layout.preferredWidth: 92
+                Layout.alignment: Qt.AlignRight
                 from: 0
                 to: 100
                 stepSize: 5

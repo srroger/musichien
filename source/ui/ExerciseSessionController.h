@@ -587,8 +587,18 @@ public:
     // tout seul - un texte qu'on n'a pas fini de lire est un texte qu'on n'aurait pas du montrer.
     [[nodiscard]] bool isChibaTalking() const noexcept { return m_isChibaTalking; }
 
+    // Remet les REGLAGES au defaut, et seulement eux.
+    //
+    // Roger l'a demande : « je rajouterais bien un "Reset by default" pour remettre tous les parametres par defaut ».
+    // Le score n'est pas un parametre : l'experience, les sessions et les etoiles sont le journal du joueur, et les
+    // effacer au passage ferait de ce bouton un piege.
+    Q_INVOKABLE void resetPreferences();
+
     // Le joueur a lu : la popup s'efface, et ne revient pas avant la prochaine fin de partie.
     Q_INVOKABLE void dismissChiba();
+
+    // Le joueur appuie sur le chien : il raconte autre chose.
+    Q_INVOKABLE void tellAnotherAnecdote();
     [[nodiscard]] bool isFeedbackVisible() const noexcept;
     [[nodiscard]] bool wasLastAnswerCorrect() const noexcept;
     [[nodiscard]] int lastSungCentsOffset() const noexcept { return m_lastSungCentsOffset; }

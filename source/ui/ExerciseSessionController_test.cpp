@@ -1668,6 +1668,26 @@ TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_pla
     }
 }
 
+TEST( ExerciseSessionControllerTest, the_dog_of_the_home_page_tells_another_anecdote )
+{
+    // Le chien de l'accueil repond : appuyer sur lui ouvre la popup avec une AUTRE anecdote. Roger l'a demande en bonus,
+    // et c'est ce qui fait du chien un personnage plutot qu'une illustration.
+    domain::NotePlayerFake notePlayer;
+
+    ExerciseSessionController controller{ notePlayer, {} };
+
+    EXPECT_FALSE( controller.isChibaTalking() );
+
+    controller.tellAnotherAnecdote();
+
+    EXPECT_TRUE( controller.isChibaTalking() );
+
+    // Et il se tait comme les autres : sur un clic.
+    controller.dismissChiba();
+
+    EXPECT_FALSE( controller.isChibaTalking() );
+}
+
 TEST( ExerciseSessionControllerTest, a_foreign_note_question_is_a_harmony_question )
 {
     // L'ecran avait recopie « mode » la ou il fallait « harmonie » : le bloc qui porte les sept boutons de l'intrus etait
