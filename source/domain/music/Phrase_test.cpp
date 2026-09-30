@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <random>
@@ -101,6 +102,53 @@ TEST( PhraseTest, a_transposed_phrase_is_still_the_same_phrase )
     for( std::size_t index = 0; index < atC.size(); ++index )
     {
         EXPECT_EQ( atC.at( index ).midiNumber() + 2, atD.at( index ).midiNumber() );
+    }
+}
+
+TEST( PhraseTest, a_step_lasts_its_beats_at_the_tempo_of_the_phrase )
+{
+    // 60 bpm : un temps par seconde, l'exemple ou la regle se lit sans calcul.
+    Phrase phrase;
+    phrase.bpm = 60;
+    phrase.steps = { PhraseStep{ .degree = 1, .beats = 1 },
+                     PhraseStep{ .degree = 3, .beats = 2 },
+                     PhraseStep{ .degree = 1, .beats = 4 } };
+
+    const std::vector<std::chrono::milliseconds> durations = phrase.stepDurations();
+
+    ASSERT_EQ( 3U, durations.size() );
+    EXPECT_EQ( 1000, durations.at( 0 ).count() );
+    EXPECT_EQ( 2000, durations.at( 1 ).count() );
+    EXPECT_EQ( 4000, durations.at( 2 ).count() );
+
+    // Et le tempo change les durees sans changer les PROPORTIONS : c'est ce qui fait qu'une phrase plus lente reste la
+    // meme phrase, et c'est exactement ce que la jouer en notes uniformes detruirait.
+    phrase.bpm = 120;
+
+    const std::vector<std::chrono::milliseconds> faster = phrase.stepDurations();
+
+    EXPECT_EQ( 500, faster.at( 0 ).count() );
+    EXPECT_EQ( 1000, faster.at( 1 ).count() );
+    EXPECT_EQ( 2000, faster.at( 2 ).count() );
+}
+
+TEST( PhraseTest, a_broken_tempo_does_not_silence_the_phrase )
+{
+    // Un bpm nul arriverait d'un contenu edite a la main. La phrase reste audible, au tempo le plus lent du domaine,
+    // plutot que de disparaitre derriere une division par zero.
+    Phrase phrase;
+    phrase.bpm = 0;
+    phrase.steps = { PhraseStep{ .degree = 1, .beats = 1 },
+                     PhraseStep{ .degree = 3, .beats = 0 },
+                     PhraseStep{ .degree = 1, .beats = 1 } };
+
+    const std::vector<std::chrono::milliseconds> durations = phrase.stepDurations();
+
+    ASSERT_EQ( 3U, durations.size() );
+
+    for( const std::chrono::milliseconds duration : durations )
+    {
+        EXPECT_GT( duration.count(), 0 );
     }
 }
 

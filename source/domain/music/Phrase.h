@@ -39,6 +39,7 @@
 #include "domain/music/Mode.h"
 #include "domain/music/Note.h"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <random>
@@ -74,6 +75,13 @@ struct Phrase
     // Les notes de la phrase, resolues DANS son mode et sa tonique : c'est la seule fonction qui sait traduire des
     // degres en hauteurs, et c'est ce qui garantit qu'une phrase transposee reste la meme phrase.
     [[nodiscard]] std::vector<Note> notes( Note p_tonic ) const;
+
+    // La duree de CHAQUE pas, en millisecondes, au tempo de la phrase.
+    //
+    // C'est une regle de MUSIQUE, et elle vit donc ici plutot que dans un ecran : un temps vaut une noire, et c'est
+    // bpm qui dit combien de temps dure ce temps. La calculer ailleurs aurait laisse chaque appelant choisir son
+    // arrondi, et deux phrases identiques auraient pu sonner differemment selon l'endroit qui les joue.
+    [[nodiscard]] std::vector<std::chrono::milliseconds> stepDurations() const;
 };
 
 // Ce qui regle une generation. Des valeurs par defaut, parce qu'un appelant qui ne veut rien regler doit obtenir une

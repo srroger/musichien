@@ -37,6 +37,10 @@ musichienFunction_AddLibrary(domain
     music/Phrase.h
     music/Phrase.cpp
 
+    # Le livre des phrases modales : ou le domaine tient ce qu'un fichier de contenu lui a appris. Voir PhraseBook.h.
+    music/PhraseBook.h
+    music/PhraseBook.cpp
+
     # L'arbre des accords : comment chaque couleur s'obtient d'une autre, en un geste
     music/ChordTree.h
     music/ChordTree.cpp
@@ -125,6 +129,7 @@ if(MUSICHIEN_BUILD_TESTING)
         music/Mode_test.cpp
         music/KeySignature_test.cpp
         music/Phrase_test.cpp
+        music/PhraseBook_test.cpp
         music/ChordTree_test.cpp
         audio/ToneSynthesizer_test.cpp
         audio/PitchEstimator_test.cpp

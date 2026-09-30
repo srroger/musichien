@@ -1,6 +1,7 @@
 #include "domain/music/Phrase.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <random>
@@ -71,6 +72,32 @@ std::vector<Note> Phrase::notes( Note p_tonic ) const
     }
 
     return result;
+}
+
+std::vector<std::chrono::milliseconds> Phrase::stepDurations() const
+{
+    // Un temps vaut une noire, et c'est le tempo qui dit combien de millisecondes dure ce temps. Le plancher a un n'est
+    // pas une precaution de style : un bpm nul - un contenu edite a la main peut en porter un - produirait une division
+    // par zero, et un pas de zero temps une note d'une longueur nulle. La phrase reste alors audible, simplement lente,
+    // ce qui vaut mieux qu'un silence qu'aucun ecran ne saurait expliquer.
+    const std::int32_t safeBpm = std::max( std::int32_t{ 1 }, bpm );
+
+    const double millisecondsPerBeat = 60000.0 / static_cast<double>( safeBpm );
+
+    std::vector<std::chrono::milliseconds> durations;
+    durations.reserve( steps.size() );
+
+    for( const PhraseStep & step : steps )
+    {
+        const auto beats = static_cast<double>( std::max( std::int32_t{ 1 }, step.beats ) );
+
+        // L'arrondi est fait ICI, une fois pour toutes : deux appelants qui arrondiraient chacun de leur cote feraient
+        // sonner differemment la meme phrase.
+        durations.push_back(
+          std::chrono::milliseconds{ static_cast<std::int64_t>( std::llround( millisecondsPerBeat * beats ) ) } );
+    }
+
+    return durations;
 }
 
 Phrase generatePhrase( Mode p_mode, Note p_tonic, std::mt19937 & p_randomEngine, PhraseSettings p_settings )
