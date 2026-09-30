@@ -416,6 +416,7 @@ domain::SessionSettings ExerciseSessionController::sessionSettingsForLevel( doma
     // Ce que le PROFIL en dit, lui, est applique juste apres, par applyStoredQuestionShares : c'est la que ces
     // reglages sont ranges, et le profil fait foi.
     settings.namedIntervalQuestionShare = m_settings.namedIntervalQuestionShare;
+    settings.foreignNoteQuestionShare = m_settings.foreignNoteQuestionShare;
     settings.singQuestionShare = m_settings.singQuestionShare;
     settings.chordQuestionShare = m_settings.chordQuestionShare;
 
@@ -430,6 +431,7 @@ void ExerciseSessionController::applyStoredQuestionShares( domain::SessionSettin
     }
 
     p_settings.namedIntervalQuestionShare = m_levelStore->storedNamedIntervalQuestionShare();
+    p_settings.foreignNoteQuestionShare = m_levelStore->storedForeignNoteQuestionShare();
     p_settings.singQuestionShare = m_levelStore->storedSingQuestionShare();
     p_settings.chordQuestionShare = m_levelStore->storedChordQuestionShare();
 
@@ -1006,11 +1008,9 @@ QVariantMap ExerciseSessionController::modeDifference() const
 
 QVariantList ExerciseSessionController::modeCircle() const
 {
-    // Deux raisons de ne rien montrer, et une seule de montrer : la question parle d'un mode.
-    //
-    // L'etat de la question ne compte plus : la roue est donnee DES LA QUESTION. Roger l'a voulue ainsi - « l'utilisateur
-    // pourra ne pas trop la regarder » - et c'est un choix de difficulte qui lui appartient, comme celui de l'indice.
-    if( ( m_session == nullptr ) || !isModeQuestion() )
+    // Deux raisons de ne rien montrer, et une seule de montrer : la question parle d'un mode - ou d'une gamme dont
+    // l'intrus est a trouver, et la roue dit alors laquelle des douze notes n'y est pas.
+    if( ( m_session == nullptr ) || !( isModeQuestion() || isForeignNoteQuestion() ) )
     {
         return {};
     }
@@ -1022,7 +1022,7 @@ QVariantList ExerciseSessionController::modeCircle() const
 
 QString ExerciseSessionController::modeCircleLabel() const
 {
-    if( ( m_session == nullptr ) || !isModeQuestion() )
+    if( ( m_session == nullptr ) || !( isModeQuestion() || isForeignNoteQuestion() ) )
     {
         return {};
     }
@@ -1032,6 +1032,13 @@ QString ExerciseSessionController::modeCircleLabel() const
     // Le NOM du mode n'arrive qu'avec le verdict : avant la reponse, il serait la reponse - de la question de nom comme
     // de la question de couleur, ou il est une des deux choses qu'on demande de comparer.
     const QString modeName = isAsking() ? QString{} : describeMode( question.mode ).value( "name" ).toString();
+
+    // La note etrangere est la SEULE question ou la gamme n'est pas la reponse : c'est l'intrus qu'on cherche, donc on
+    // peut nommer la gamme tout de suite.
+    if( isForeignNoteQuestion() )
+    {
+        return modeName.isEmpty() ? tr( "La gamme" ) : tr( "La gamme : %1" ).arg( modeName );
+    }
 
     if( question.kind == domain::QuestionKind::ModeName )
     {
@@ -1044,7 +1051,9 @@ QString ExerciseSessionController::modeCircleLabel() const
 
 int ExerciseSessionController::modeSoundDurationMs() const
 {
-    if( ( m_session == nullptr ) || !isModeQuestion() )
+    // Les questions dont le son est une MELODIE sur un bourdon : les trois de mode, et la note etrangere - qui joue sept
+    // notes, soit exactement ce qu'un mode fait entendre.
+    if( ( m_session == nullptr ) || !( isModeQuestion() || isForeignNoteQuestion() ) )
     {
         return 0;
     }
@@ -1059,6 +1068,91 @@ int ExerciseSessionController::modeSoundDurationMs() const
     const bool twoModes = m_session->currentQuestion().previousMode.has_value();
 
     return static_cast<int>( ( twoModes ? ( ( oneMode * 2 ) + MODE_COMPARISON_GAP ) : oneMode ).count() );
+}
+
+bool ExerciseSessionController::isForeignNoteQuestion() const noexcept
+{
+    return ( m_session != nullptr ) && ( m_session->currentQuestion().kind == domain::QuestionKind::ForeignNote );
+}
+
+QVariantList ExerciseSessionController::foreignNoteChoices() const
+{
+    if( !isForeignNoteQuestion() )
+    {
+        return {};
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    return describeScale( question.mode, question.modeTonic.pitchClassIndex() );
+}
+
+QVariantMap ExerciseSessionController::foreignNoteVerdict() const
+{
+    // Rien tant que la question est posee : le verdict dit OU etait l'intrus, donc il est la reponse.
+    if( !isForeignNoteQuestion() || isAsking() )
+    {
+        return {};
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    const auto step = static_cast<std::size_t>( question.foreignStepIndex );
+
+    const QVariantList scale = describeScale( question.mode, question.modeTonic.pitchClassIndex() );
+
+    QVariantMap verdict;
+
+    // Le pas est dit de 1 a 7, comme un musicien compte - la ou l'index est de 0 a 6, comme un tableau.
+    verdict.insert( QStringLiteral( "stepNumber" ), static_cast<int>( step ) + 1 );
+
+    // Ce qui a ete ENTENDU, et ce que la gamme attendait : les deux, parce que c'est leur paire qui apprend quelque
+    // chose - « fa♯ au lieu de fa » dit la faute, « fa♯ » seul ne dit rien.
+    verdict.insert( QStringLiteral( "heardName" ),
+                    describeNoteName( question.foreignMelody.at( step ).pitchClassIndex() ) );
+    verdict.insert( QStringLiteral( "expectedName" ),
+                    scale.at( static_cast<qsizetype>( step ) ).toMap().value( QStringLiteral( "name" ) ) );
+
+    return verdict;
+}
+
+void ExerciseSessionController::answerForeignNote( int p_stepIndex )
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    processAnswer( m_session->answerForeignNote( p_stepIndex ) );
+}
+
+void ExerciseSessionController::playForeignNoteQuestion()
+{
+    if( m_session == nullptr )
+    {
+        return;
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    // La melodie du DOMAINE, posee deux octaves au-dessus du bourdon comme l'est celle d'un mode : c'est le meme geste,
+    // donc le meme son a comparer a celui du banc d'essai.
+    std::vector<domain::Note> melody;
+    melody.reserve( question.foreignMelody.size() );
+
+    for( const domain::Note & note : question.foreignMelody )
+    {
+        melody.push_back( note.transposedBy( MODE_MELODY_OCTAVE_OFFSET ) );
+    }
+
+    const std::array<domain::Note, 2> drone{ question.modeTonic,
+                                             question.modeTonic.transposedBy( FIFTH_IN_SEMITONES ) };
+
+    m_notePlayer.playMelodyOverDrone( melody,
+                                      drone,
+                                      MODE_NOTE_DURATION,
+                                      MODE_NOTE_GAP,
+                                      domain::DroneFraming{ MODE_LEAD_IN, MODE_TAIL } );
 }
 
 void ExerciseSessionController::answerModeColour( bool p_secondIsBrighter )
@@ -1576,6 +1670,33 @@ void ExerciseSessionController::setNamedIntervalQuestionShare( int p_share )
     m_settings.namedIntervalQuestionShare = p_share;
 
     emit namedIntervalQuestionShareChanged();
+}
+
+int ExerciseSessionController::foreignNoteQuestionShare() const
+{
+    // ZERO quand il n'y a pas de profil : le defaut du domaine et celui du fichier de reglages disent la meme chose,
+    // sinon l'un des trois finirait par mentir a l'ecran.
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedForeignNoteQuestionShare() : 0;
+}
+
+void ExerciseSessionController::setForeignNoteQuestionShare( int p_share )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    if( p_share < 0 || p_share > 100 )
+    {
+        return;
+    }
+
+    m_levelStore->storeForeignNoteQuestionShare( p_share );
+
+    // La session SUIVANTE prend la nouvelle part ; une session en cours garde ses regles.
+    m_settings.foreignNoteQuestionShare = p_share;
+
+    emit foreignNoteQuestionShareChanged();
 }
 
 int ExerciseSessionController::phraseTempoBpm() const
@@ -2205,6 +2326,15 @@ void ExerciseSessionController::playCurrentQuestion()
     if( question.kind == domain::QuestionKind::Chord )
     {
         playChordNotes( question.chord );
+
+        return;
+    }
+
+    // La NOTE ETRANGERE se joue comme un mode qui monte : les sept notes de la gamme, une par degre, avec l'intrus a la
+    // place de l'une d'elles. Meme fonction du port, meme bourdon - parce que c'est la meme oreille qui ecoute.
+    if( question.kind == domain::QuestionKind::ForeignNote )
+    {
+        playForeignNoteQuestion();
 
         return;
     }

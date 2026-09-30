@@ -48,6 +48,9 @@ constexpr const char * SING_QUESTION_SHARE_KEY = "player/sing-question-share";
 // profil neuf sonne exactement comme le jeu d'avant que cette part existe.
 constexpr const char * NAMED_INTERVAL_QUESTION_SHARE_KEY = "player/named-interval-question-share";
 
+// La part de la note etrangere : la troisieme marche de l'harmonie, eteinte par defaut comme les deux autres.
+constexpr const char * FOREIGN_NOTE_QUESTION_SHARE_KEY = "player/foreign-note-question-share";
+
 // Le tempo des phrases de mode, et son amplitude de variation. Soixante-douze par defaut, comme le contenu de l'atelier.
 constexpr const char * PHRASE_TEMPO_BPM_KEY = "player/phrase-tempo-bpm";
 constexpr const char * PHRASE_TEMPO_VARIATION_KEY = "player/phrase-tempo-variation";
@@ -268,6 +271,27 @@ void QSettingsPlayerPreferences::storeReferencePitch( double p_hertz )
     QSettings settings;
 
     settings.setValue( REFERENCE_PITCH_KEY, p_hertz );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedForeignNoteQuestionShare() const
+{
+    // ZERO, comme le domaine : la question de la note etrangere existe, elle se regle, et elle est eteinte tant qu'on ne
+    // l'allume pas. Une valeur hors bornes retombe sur ce meme zero, jamais sur autre chose.
+    const std::int32_t stored = QSettings{}.value( FOREIGN_NOTE_QUESTION_SHARE_KEY, 0 ).toInt();
+
+    if( stored < 0 || stored > 100 )
+    {
+        return 0;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeForeignNoteQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( FOREIGN_NOTE_QUESTION_SHARE_KEY, p_share );
 }
 
 std::int32_t QSettingsPlayerPreferences::storedPhraseTempoBpm() const

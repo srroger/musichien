@@ -125,7 +125,7 @@ Item {
 
         // Une question de rythme a la sienne, et elle est plus longue : le feedback y est la CELLULE elle-meme, qui
         // dure une mesure entiere. Couper avant la fin couperait le son qui vient d'etre donne en reponse.
-        interval: ExerciseController.isModeQuestion ? exerciseScreen.modePause : (ExerciseController.questionKind === 3 ? exerciseScreen.rhythmPause : (ExerciseController.wasLastAnswerCorrect ? exerciseScreen.successPause : exerciseScreen.mistakePause))
+        interval: (ExerciseController.isModeQuestion || ExerciseController.isForeignNoteQuestion) ? exerciseScreen.modePause : (ExerciseController.questionKind === 3 ? exerciseScreen.rhythmPause : (ExerciseController.wasLastAnswerCorrect ? exerciseScreen.successPause : exerciseScreen.mistakePause))
         onTriggered: ExerciseController.continueToNextQuestion()
     }
 
@@ -447,6 +447,9 @@ Item {
                             // memes notes, et c'est pourtant deux modes.
                             if (ExerciseController.questionKind === 7)
                                 return qsTr("Deux fois la même gamme, sur deux centres différents : le second passage est-il plus clair, ou plus sombre ?");
+
+                            if (ExerciseController.isForeignNoteQuestion)
+                                return qsTr("Sept notes montent sur le bourdon : l'une n'appartient pas à la gamme. Laquelle ?");
 
                             if (ExerciseController.isModeColourQuestion)
                                 return qsTr("Écoute les deux modes : le second est-il plus clair, plus sombre, ou pareil ?");
@@ -877,6 +880,7 @@ Item {
             // -------------------------------------------------------------------------------------------------
             ColumnLayout {
                 // La ROUE du mode : ses sept notes allumées sur le cercle des quintes, la tonique en haut.
+                // LA NOTE ETRANGERE : les sept notes de la gamme, dans l'ordre entendu, et l'intrus se designe par sa PLACE.
 
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -945,6 +949,19 @@ Item {
                     notes: ExerciseController.modeCircle
                 }
 
+                // Le verdict de l'intrus : quel pas, et quelle note il portait au lieu de celle de la gamme.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#ffd479"
+                    font.pixelSize: 18
+                    font.bold: true
+                    visible: ExerciseController.foreignNoteVerdict.stepNumber !== undefined
+                    text: ExerciseController.foreignNoteVerdict.stepNumber !== undefined ? qsTr("L'intrus : le pas %1 — %2 au lieu de %3").arg(ExerciseController.foreignNoteVerdict.stepNumber).arg(ExerciseController.foreignNoteVerdict.heardName).arg(ExerciseController.foreignNoteVerdict.expectedName) : ""
+                }
+
                 // Et DE QUOI elle parle : sur une question de couleur, deux modes ont sonne, et la roue est celle du
                 // second. Sans cette ligne, Roger l'a dit en jouant : « on ne sait pas a qui correspond le cercle ».
                 Text {
@@ -1000,6 +1017,33 @@ Item {
                         text: qsTr("Plus sombre")
                         enabled: ExerciseController.isAsking
                         onClicked: ExerciseController.answerModeColour(false)
+                    }
+
+                }
+
+                // Des boutons de note et non de degre : le joueur a entendu sept notes, il montre celle qui sonnait faux.
+                // La tonique est mise en avant, parce que c'est le repere qui rend la gamme lisible - le meme que celui du
+                // cercle des quintes.
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    visible: ExerciseController.isForeignNoteQuestion
+
+                    Repeater {
+                        model: ExerciseController.foreignNoteChoices
+
+                        delegate: Button {
+                            required property var modelData
+
+                            width: 62
+                            height: 48
+                            text: modelData.name
+                            font.pixelSize: 14
+                            enabled: ExerciseController.isAsking
+                            highlighted: modelData.isTonic
+                            onClicked: ExerciseController.answerForeignNote(modelData.stepIndex)
+                        }
+
                     }
 
                 }

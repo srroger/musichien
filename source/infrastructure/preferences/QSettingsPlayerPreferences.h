@@ -80,6 +80,9 @@ public:
 
     [[nodiscard]] std::int32_t storedNamedIntervalQuestionShare() const override;
 
+    [[nodiscard]] std::int32_t storedForeignNoteQuestionShare() const override;
+
+    void storeForeignNoteQuestionShare( std::int32_t p_share ) override;
     void storeNamedIntervalQuestionShare( std::int32_t p_share ) override;
 
     [[nodiscard]] std::int32_t storedSingQuestionShare() const override;

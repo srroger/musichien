@@ -554,6 +554,85 @@ void storeColourOnlyShares( domain::PlayerPreferencesFake & p_store )
     p_store.storeModeVampQuestionShare( 0 );
 }
 
+// Un profil qui ne veut QUE des questions de note etrangere.
+void storeForeignNoteOnlyShares( domain::PlayerPreferencesFake & p_store )
+{
+    p_store.storeNamedIntervalQuestionShare( 0 );
+    p_store.storeSingQuestionShare( 0 );
+    p_store.storeChordQuestionShare( 0 );
+    p_store.storeModeColourQuestionShare( 0 );
+    p_store.storeModeNameQuestionShare( 0 );
+    p_store.storeModeVampQuestionShare( 0 );
+    p_store.storeForeignNoteQuestionShare( 100 );
+}
+
+TEST( ExerciseSessionControllerTest, a_foreign_note_question_offers_the_seven_notes_in_the_order_heard )
+{
+    // L'ecran recoit les sept notes DANS L'ORDRE ENTENDU : c'est celui de l'ecoute, donc celui des boutons. Le joueur
+    // designe la place de l'intrus, et le domaine juge ce pas.
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    storeForeignNoteOnlyShares( levelStore );
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+    controller.startSession();
+
+    ASSERT_TRUE( controller.isForeignNoteQuestion() );
+
+    const QVariantList choices = controller.foreignNoteChoices();
+
+    ASSERT_EQ( 7, choices.size() );
+
+    int tonicCount = 0;
+
+    for( int index = 0; index < choices.size(); ++index )
+    {
+        const QVariantMap note = choices.at( index ).toMap();
+
+        EXPECT_EQ( index, note.value( "stepIndex" ).toInt() );
+        EXPECT_FALSE( note.value( "name" ).toString().isEmpty() );
+
+        if( note.value( "isTonic" ).toBool() )
+        {
+            ++tonicCount;
+        }
+    }
+
+    // Une seule tonique, et c'est la premiere : le repere de la gamme, comme sur la roue.
+    EXPECT_EQ( 1, tonicCount );
+    EXPECT_TRUE( choices.first().toMap().value( "isTonic" ).toBool() );
+
+    // Le verdict n'existe pas tant que la question est posee : il DIT ou est l'intrus, donc il est la reponse.
+    EXPECT_TRUE( controller.foreignNoteVerdict().isEmpty() );
+
+    // Et le son est bien une melodie sur un bourdon, comme pour un mode.
+    EXPECT_FALSE( notePlayer.melodiesOverDrones().empty() );
+
+    // Le pas juste n'est pas expose - ce serait donner la reponse - donc on les essaie tous : l'un d'eux conclut.
+    for( int step = 0; ( step < 7 ) && !controller.isFeedbackVisible(); ++step )
+    {
+        controller.answerForeignNote( step );
+    }
+
+    ASSERT_TRUE( controller.isFeedbackVisible() );
+
+    const QVariantMap verdict = controller.foreignNoteVerdict();
+
+    ASSERT_TRUE( verdict.contains( "stepNumber" ) );
+
+    // Un pas de 1 a 7, comme un musicien compte, et deux noms de note DIFFERENTS : ce que l'oreille a entendu, et ce que
+    // la gamme attendait. Deux fois le meme nom voudrait dire que la question n'a pas de faute - et l'exercice serait
+    // insoluble, ce que le test du domaine verifie de son cote.
+    EXPECT_GE( verdict.value( "stepNumber" ).toInt(), 1 );
+    EXPECT_LE( verdict.value( "stepNumber" ).toInt(), 7 );
+    EXPECT_FALSE( verdict.value( "heardName" ).toString().isEmpty() );
+    EXPECT_FALSE( verdict.value( "expectedName" ).toString().isEmpty() );
+    EXPECT_NE( verdict.value( "heardName" ).toString(), verdict.value( "expectedName" ).toString() );
+}
+
 TEST( ExerciseSessionControllerTest, a_two_mode_question_announces_twice_the_sound )
 {
     // L'ecran se sert de cette duree pour ne PAS couper la lecture : Roger a vu le minuteur avancer au milieu du son -

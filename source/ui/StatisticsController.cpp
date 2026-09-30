@@ -102,6 +102,12 @@ constexpr qint64 MINUTES_PER_HOUR = 60;
 
         case domain::QuestionKind::ModeName:
             return StatisticsController::tr( "Modes : nom" );
+
+        case domain::QuestionKind::ModeVamp:
+            return StatisticsController::tr( "Modes : deux centres" );
+
+        case domain::QuestionKind::ForeignNote:
+            return StatisticsController::tr( "Note étrangère" );
     }
 
     return {};
@@ -136,7 +142,9 @@ constexpr qint64 MINUTES_PER_HOUR = 60;
         }
 
         case domain::QuestionKind::ModeColour:
-        case domain::QuestionKind::ModeName: {
+        case domain::QuestionKind::ModeName:
+        case domain::QuestionKind::ModeVamp:
+        case domain::QuestionKind::ForeignNote: {
             // La cible d'une question d'harmonie est l'INDEX du mode pose. Un index hors bornes ne peut venir que d'un
             // journal edite a la main : il coute un nom, jamais la page.
             //

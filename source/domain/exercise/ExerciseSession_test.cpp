@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -42,6 +43,7 @@ void pinEveryQuestionShare( SessionSettings & p_settings )
 {
     p_settings.namedIntervalQuestionShare = 0;
     p_settings.sameColourQuestionShare = 0;
+    p_settings.foreignNoteQuestionShare = 0;
     p_settings.singQuestionShare = 0;
     p_settings.directionQuestionShare = 0;
     p_settings.chordQuestionShare = 0;
@@ -1408,6 +1410,89 @@ TEST( ExerciseSessionTest, the_mode_palette_starts_with_the_known_ones_and_grows
 
     EXPECT_EQ( 3, session.modePalette().size() );
     EXPECT_EQ( Mode::Mixolydian, session.modePalette().at( 2 ) );
+}
+
+// Une session qui ne pose QUE des questions de NOTE ETRANGERE.
+[[nodiscard]] SessionSettings foreignNoteOnlySettings()
+{
+    SessionSettings settings;
+    pinEveryQuestionShare( settings );
+
+    settings.foreignNoteQuestionShare = 100;
+
+    return settings;
+}
+
+TEST( ExerciseSessionTest, a_foreign_note_question_poses_a_scale_with_exactly_one_note_out_of_it )
+{
+    // La question que Roger a demandee des le debut - « quelle note n'est pas dans la gamme ? » - et la seule chose qui
+    // compte : la gamme doit rester RECONNAISSABLE, donc six de ses sept notes y sont, et une seule est etrangere.
+    ExerciseSession session{ TEST_SEED, foreignNoteOnlySettings() };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_EQ( QuestionKind::ForeignNote, question.kind );
+
+    // Sept notes, une par degre : c'est une gamme montee.
+    ASSERT_EQ( 7U, question.foreignMelody.size() );
+
+    const std::vector<Note> scale = notesOfMode( question.modeTonic, question.mode );
+
+    std::set<std::int32_t> scaleClasses;
+
+    for( const Note & note : scale )
+    {
+        scaleClasses.insert( note.pitchClassIndex() );
+    }
+
+    std::size_t foreignCount = 0;
+    std::size_t foreignStep = 0;
+
+    for( std::size_t index = 0; index < question.foreignMelody.size(); ++index )
+    {
+        if( scaleClasses.count( question.foreignMelody.at( index ).pitchClassIndex() ) == 0 )
+        {
+            ++foreignCount;
+            foreignStep = index;
+        }
+    }
+
+    // UNE seule note etrangere, et c'est celle que le domaine ANNONCE : la question et sa reponse ne peuvent pas
+    // diverger, sinon l'exercice serait insoluble.
+    EXPECT_EQ( 1U, foreignCount );
+    EXPECT_EQ( static_cast<std::int32_t>( foreignStep ), question.foreignStepIndex );
+
+    // A un DEMI-TON de la note de la gamme, jamais plus : la faute doit s'entendre, pas crier.
+    EXPECT_EQ( 1,
+               std::abs( question.foreignMelody.at( foreignStep ).midiNumber() - scale.at( foreignStep ).midiNumber() ) );
+
+    // Et les six autres pas sont EXACTEMENT la gamme : c'est ce qui permet d'entendre l'intrus.
+    for( std::size_t index = 0; index < question.foreignMelody.size(); ++index )
+    {
+        if( index != foreignStep )
+        {
+            EXPECT_EQ( scale.at( index ).midiNumber(), question.foreignMelody.at( index ).midiNumber() );
+        }
+    }
+}
+
+TEST( ExerciseSessionTest, answering_the_foreign_note_means_designing_its_step )
+{
+    ExerciseSession session{ TEST_SEED, foreignNoteOnlySettings() };
+
+    const std::int32_t foreignStep = session.currentQuestion().foreignStepIndex;
+
+    // Un AUTRE pas est faux : l'exercice ne se reussit pas en designant n'importe quoi.
+    EXPECT_FALSE( session.answerForeignNote( ( foreignStep + 1 ) % 7 ) );
+
+    // Et le bon pas est juste.
+    EXPECT_TRUE( session.answerForeignNote( foreignStep ) );
+
+    // Une question d'intervalle n'accepte pas une reponse de gamme : deux langues differentes ne se repondent pas l'une
+    // l'autre, et c'est le meme refus que partout ailleurs dans ce domaine.
+    ExerciseSession intervalSession{ TEST_SEED, intervalOnlySettings() };
+
+    EXPECT_FALSE( intervalSession.answerForeignNote( 0 ) );
 }
 
 TEST( ExerciseSessionTest, a_vamp_plays_the_same_notes_on_two_different_centres )

@@ -125,6 +125,15 @@ Question ExerciseSession::buildQuestion()
         return question;
     }
 
+    if( question.kind == QuestionKind::ForeignNote )
+    {
+        // La note etrangere a la sienne : c'est la seule question dont la melodie soit DECIDEE d'avance - sept notes, une
+        // par degre - et dont l'intrus soit choisi avant d'etre joue.
+        buildForeignNoteQuestion( question );
+
+        return question;
+    }
+
     if( !planned.has_value() )
     {
         // Le SENS n'est tire que si personne ne l'a decide : un plan le porte deja.
@@ -400,7 +409,7 @@ QuestionKind ExerciseSession::drawKind()
     //
     // L'ordre est celui de l'ecran : chaque genre prend la tranche qui suit la precedente, donc augmenter une part ne
     // deplace que les questions d'apres.
-    const std::array<KindShare, 7> shares{ KindShare{ .share = m_settings.namedIntervalQuestionShare,
+    const std::array<KindShare, 8> shares{ KindShare{ .share = m_settings.namedIntervalQuestionShare,
                                                       .kind = QuestionKind::NamedInterval },
                                            KindShare{ .share = m_settings.singQuestionShare,
                                                       .kind = QuestionKind::Sing },
@@ -413,7 +422,9 @@ QuestionKind ExerciseSession::drawKind()
                                            KindShare{ .share = m_settings.modeNameQuestionShare,
                                                       .kind = QuestionKind::ModeName },
                                            KindShare{ .share = m_settings.modeVampQuestionShare,
-                                                      .kind = QuestionKind::ModeVamp } };
+                                                      .kind = QuestionKind::ModeVamp },
+                                           KindShare{ .share = m_settings.foreignNoteQuestionShare,
+                                                      .kind = QuestionKind::ForeignNote } };
 
     std::int32_t total = 0;
 
@@ -515,6 +526,18 @@ bool ExerciseSession::answerModeName( Mode p_mode )
     return resolveAnswer( p_mode == m_currentQuestion.mode, std::nullopt );
 }
 
+bool ExerciseSession::answerForeignNote( std::int32_t p_stepIndex )
+{
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::ForeignNote ) )
+    {
+        // Designer un pas la ou il n'y a pas de gamme a juger ne repond a rien : c'est le meme refus que le nom
+        // d'intervalle oppose a une question chantee.
+        return false;
+    }
+
+    return resolveAnswer( p_stepIndex == m_currentQuestion.foreignStepIndex, std::nullopt );
+}
+
 void ExerciseSession::buildModeQuestion( Question & p_question, bool p_compare )
 {
     p_question.modeTonic = drawModeTonic();
@@ -587,6 +610,59 @@ Note ExerciseSession::drawModeTonic()
     std::uniform_int_distribution<std::int32_t> distribution{ LOWEST_TONIC_MIDI_NUMBER, HIGHEST_TONIC_MIDI_NUMBER };
 
     return Note{ distribution( m_randomEngine ) };
+}
+
+void ExerciseSession::buildForeignNoteQuestion( Question & p_question )
+{
+    p_question.modeTonic = drawModeTonic();
+
+    p_question.mode = drawMode();
+
+    const std::vector<Note> scale = notesOfMode( p_question.modeTonic, p_question.mode );
+
+    // L'INTRUS : un pas au hasard, et sa note remplacee par une VOISINE qui n'appartient pas a la gamme.
+    //
+    // Un demi-ton d'ecart, et jamais plus : c'est ce qui rend la faute audible SANS etre caricaturale. Une note prise
+    // trois tons plus loin s'entendrait comme une rupture, et l'exercice deviendrait une question de bon sens plutot
+    // qu'une question d'oreille.
+    std::uniform_int_distribution<std::size_t> stepDraw{ 0, scale.size() - 1 };
+
+    const std::size_t stepIndex = stepDraw( m_randomEngine );
+
+    p_question.foreignStepIndex = static_cast<std::int32_t>( stepIndex );
+
+    p_question.foreignMelody = scale;
+
+    // La gamme, ramenee a ses CLASSES de hauteur : c'est ce qui dit si une note en fait partie, et non sa place dans la
+    // melodie - la meme note peut y revenir une octave plus haut.
+    std::array<bool, SEMITONES_PER_OCTAVE> belongsToScale{};
+
+    for( const Note & note : scale )
+    {
+        belongsToScale.at( static_cast<std::size_t>( note.pitchClassIndex() ) ) = true;
+    }
+
+    // Le demi-ton AU-DESSUS d'abord, puis celui du dessous s'il retombe dans la gamme. L'un des deux en sort toujours :
+    // une gamme occupe sept des douze classes de hauteur, donc une note de la gamme ne peut pas avoir ses DEUX voisines
+    // dedans.
+    const Note original = scale.at( stepIndex );
+
+    for( const std::int32_t shift : { 1, -1 } )
+    {
+        const Note candidate{ original.midiNumber() + shift };
+
+        if( !candidate.isValid() )
+        {
+            continue;
+        }
+
+        if( !belongsToScale.at( static_cast<std::size_t>( candidate.pitchClassIndex() ) ) )
+        {
+            p_question.foreignMelody.at( stepIndex ) = candidate;
+
+            return;
+        }
+    }
 }
 
 void ExerciseSession::buildVampQuestion( Question & p_question )

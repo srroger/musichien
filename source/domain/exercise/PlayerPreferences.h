@@ -126,6 +126,14 @@ public:
 
     virtual void storeReferencePitch( double p_hertz ) = 0;
 
+    // Part des questions qui font chercher la NOTE ETRANGERE d'une gamme.
+    //
+    // Zero par defaut, comme les autres parts de l'harmonie : le pilier se decouvre en l'allumant. Roger l'a demandee des
+    // le debut, et c'est le troisieme exercice du pilier.
+    [[nodiscard]] virtual std::int32_t storedForeignNoteQuestionShare() const = 0;
+
+    virtual void storeForeignNoteQuestionShare( std::int32_t p_share ) = 0;
+
     // Le TEMPO des phrases de mode, et de combien il varie d'une phrase a l'autre.
     //
     // Roger l'a demande en jouant : « on pourrait faire varier les bpm des phrases des modes ? Genre dans les reglages,
@@ -245,6 +253,9 @@ public:
 
     [[nodiscard]] std::int32_t storedPhraseTempoBpm() const override { return m_phraseTempoBpm; }
 
+    [[nodiscard]] std::int32_t storedForeignNoteQuestionShare() const override { return m_foreignNoteQuestionShare; }
+
+    void storeForeignNoteQuestionShare( std::int32_t p_share ) override { m_foreignNoteQuestionShare = p_share; }
     void storePhraseTempoBpm( std::int32_t p_bpm ) override { m_phraseTempoBpm = p_bpm; }
 
     [[nodiscard]] std::int32_t storedPhraseTempoVariation() const override { return m_phraseTempoVariation; }
@@ -310,6 +321,9 @@ private:
     // entend exactement ce que Roger a valide a l'oreille.
     std::int32_t m_phraseTempoBpm{ 72 };
     std::int32_t m_phraseTempoVariation{ 20 };
+
+    // La part de la note etrangere : zero par defaut, comme celle des modes.
+    std::int32_t m_foreignNoteQuestionShare{ 0 };
     std::int32_t m_singQuestionShare{ 20 };
 
     // Vingt pour cent chacune, comme le chant : un premier lancement entend un peu de tout, et c'est au joueur de

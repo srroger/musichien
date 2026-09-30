@@ -57,6 +57,17 @@ namespace musichien::ui
 // la tonique dans cet arc. Voir domain::modeCircleNotes.
 [[nodiscard]] QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchClass );
 
+// Les SEPT notes d'une gamme, dans l'ordre des degres - la ou le cercle les donne dans l'ordre des quintes.
+//
+// C'est ce qu'il faut pour repondre a une question de NOTE ETRANGERE : le joueur a entendu sept notes monter, et il
+// designe la place de l'intrus. L'ordre des DEGRES est donc le seul qui convienne - c'est celui de l'ecoute.
+//
+// Chaque entree porte 'name' (en francais), 'stepIndex' (0 a 6, l'ordre entendu) et 'isTonic'.
+[[nodiscard]] QVariantList describeScale( domain::Mode p_mode, std::int32_t p_tonicPitchClass );
+
+// Le nom francais d'une classe de hauteur. Une seule table pour tous les ecrans, et jamais deux facons d'ecrire « fa♯ ».
+[[nodiscard]] QString describeNoteName( std::int32_t p_pitchClassIndex );
+
 // Les sept modes, dans l'ordre de clarte, du plus clair au plus sombre.
 //
 // Une seule fonction, parce que deux ecrans lisent la meme forme de donnees : le banc d'essai aujourd'hui, et le

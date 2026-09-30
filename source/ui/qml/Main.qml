@@ -898,10 +898,6 @@ ApplicationWindow {
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
-                // Les trois parts de question : combien de questions de chaque genre sur cent. Un reglage par genre,
-                // la meme mise en page pour les trois, et une seule definition - voir QuestionShareSetting.
-                // Les parts sont des POIDS, lus les uns par rapport aux autres : leur somme est l'echelle, et le total
-                // n'a donc pas besoin de faire cent. Vingt partout vaut un sixieme pour chacun.
                 // Le TEMPO des phrases de mode, et son amplitude. Roger : « on pourrait choisir de l'augmenter, d'en choisir
                 // un central et de varier autour de 20-30 bpm. Histoire de rendre moins monotone. »
 
@@ -909,6 +905,22 @@ ApplicationWindow {
 
                 width: settingsScroll.availableWidth
                 spacing: 3
+
+                // Les trois parts de question : combien de questions de chaque genre sur cent. Un reglage par genre,
+                // la meme mise en page pour les trois, et une seule definition - voir QuestionShareSetting.
+                // Les parts sont des POIDS, lus les uns par rapport aux autres : leur somme est l'echelle, et le total
+                // n'a donc pas besoin de faire cent. Vingt partout vaut un sixieme pour chacun.
+                // La troisieme marche de l'harmonie : la plus fine des trois, et c'est pour cela qu'elle vient en dernier.
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Note étrangère")
+                    hint: qsTr("Poids des questions où une note étrangère se cache dans une gamme. 0 = jamais. Il faut tenir toute la gamme dans sa tête pour la repérer.")
+                    share: ExerciseController.foreignNoteQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setForeignNoteQuestionShare(p_share);
+                    }
+                }
 
                 Text {
                     Layout.preferredWidth: 0

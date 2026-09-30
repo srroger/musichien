@@ -177,12 +177,21 @@ class ExerciseSessionController final : public QObject
     // La tonique reste EN HAUT du cercle : c'est ce qui rend l'arc lisible d'un coup d'oeil, et c'est ce qui ne doit
     // jamais bouger d'un mode a l'autre.
     Q_PROPERTY( QVariantList modeCircle READ modeCircle NOTIFY questionChanged )
-
     // Ce que la roue montre, et DUQUEL il s'agit : Roger, en jouant - « on ne sait pas a qui correspond le cercle ».
     //
     // Sur une question de couleur, DEUX modes ont sonne, et le cercle est celui du SECOND - c'est le seul des deux que la
     // question nomme. Le nom lui-meme n'arrive qu'avec le verdict : avant, ce serait la reponse de la question de nom.
     Q_PROPERTY( QString modeCircleLabel READ modeCircleLabel NOTIFY questionChanged )
+
+    // LA NOTE ETRANGERE : sept notes montees, une seule etrangere a la gamme, et le joueur dit laquelle.
+    Q_PROPERTY( bool isForeignNoteQuestion READ isForeignNoteQuestion NOTIFY questionChanged )
+
+    // Les sept notes de la gamme, DANS L'ORDRE ENTENDU : c'est celui de l'ecoute, donc celui des boutons de reponse.
+    Q_PROPERTY( QVariantList foreignNoteChoices READ foreignNoteChoices NOTIFY questionChanged )
+
+    // Le verdict de la note etrangere : quel pas etait l'intrus, quelle note il portait, et quelle note la gamme
+    // attendait. Vide tant que la question est posee.
+    Q_PROPERTY( QVariantMap foreignNoteVerdict READ foreignNoteVerdict NOTIFY questionChanged )
 
     // Combien de temps DURE le son d'une question de mode, en millisecondes.
     //
@@ -308,6 +317,10 @@ class ExerciseSessionController final : public QObject
     // les parts se lisent les unes par rapport aux autres, une part qui se tait n'est plus une part.
     Q_PROPERTY( int namedIntervalQuestionShare READ namedIntervalQuestionShare NOTIFY namedIntervalQuestionShareChanged )
 
+    // Part des questions qui font chercher la NOTE ETRANGERE d'une gamme. Zero par defaut, comme les deux autres marches
+    // de l'harmonie : le pilier se decouvre en l'allumant.
+    Q_PROPERTY( int foreignNoteQuestionShare READ foreignNoteQuestionShare NOTIFY foreignNoteQuestionShareChanged )
+
     // Le TEMPO des phrases de mode, et son amplitude de variation. Roger : « on pourrait choisir de l'augmenter, d'en
     // choisir un central et de varier autour de 20-30 bpm. Histoire de rendre moins monotone. »
     //
@@ -377,6 +390,12 @@ public:
     [[nodiscard]] QString modeCircleLabel() const;
 
     [[nodiscard]] int modeSoundDurationMs() const;
+
+    [[nodiscard]] bool isForeignNoteQuestion() const noexcept;
+
+    [[nodiscard]] QVariantList foreignNoteChoices() const;
+
+    [[nodiscard]] QVariantMap foreignNoteVerdict() const;
 
     [[nodiscard]] int modeColourQuestionShare() const;
 
@@ -464,6 +483,12 @@ public:
     [[nodiscard]] int namedIntervalQuestionShare() const;
 
     Q_INVOKABLE void setNamedIntervalQuestionShare( int p_share );
+
+    // La part de la note etrangere. Meme contrat que les autres : bornee a 0-100, memorisee, et prise en compte par la
+    // session SUIVANTE.
+    [[nodiscard]] int foreignNoteQuestionShare() const;
+
+    Q_INVOKABLE void setForeignNoteQuestionShare( int p_share );
 
     // Le tempo des phrases de mode, et son amplitude. Memes contrats que les autres reglages : bornes verifiees, valeur
     // memorisee, et prise en compte a la prochaine phrase jouee.
@@ -599,6 +624,9 @@ public:
     //
     // Demande par Roger, et c'est une vraie question d'oreille : ne pas inventer une difference quand il n'y en a pas.
     Q_INVOKABLE void answerSameColour();
+
+    // La reponse a une question de NOTE ETRANGERE : le pas ou l'intrus a ete entendu, de 0 a 6.
+    Q_INVOKABLE void answerForeignNote( int p_stepIndex );
 
     // Repond a une question de NOM : l'index du mode joue, dans la liste de modeChoices().
     Q_INVOKABLE void answerModeName( int p_modeIndex );
@@ -745,6 +773,8 @@ signals:
 
     void namedIntervalQuestionShareChanged();
 
+    void foreignNoteQuestionShareChanged();
+
     void phraseTempoChanged();
 
     // Le joueur vient de changer la part des accords.
@@ -885,6 +915,8 @@ private:
     // et le second par le minuteur, quand le premier a fini de sonner. Sur une question de nom, un seul appel suffit.
     void playModeQuestion( bool p_secondOnly );
 
+    // La note etrangere : la gamme montee sur son bourdon, avec l'intrus a sa place.
+    void playForeignNoteQuestion();
     // Whether the player still gets the answer played for him: a beginner hears the interval first, everyone else
     // has to ask for it (and pays for the asking).
     [[nodiscard]] bool isBeginner() const noexcept;

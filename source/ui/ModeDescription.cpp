@@ -63,6 +63,28 @@ QVariantMap describeMode( domain::Mode p_mode )
     return description;
 }
 
+namespace
+{
+
+// Les noms FRANCAIS des douze classes de hauteur, dans l'ordre des touches : do, puis les cinq alterees, puis les
+// naturelles. Un nom est une AFFAIRE D'ECRAN - le domaine ne connait que des numeros - et c'est pour cela que la table
+// vit ici, avec les noms de modes, et non dans Mode.h.
+//
+// Une seule table, lue par le cercle, par la gamme ET par le verdict de la note etrangere : trois ecritures du meme nom
+// finiraient par en montrer trois differentes au meme joueur.
+constexpr std::array<const char *, domain::SEMITONES_PER_OCTAVE> PITCH_CLASS_NAMES{
+  "do", "do♯", "ré", "ré♯", "mi", "fa", "fa♯", "sol", "sol♯", "la", "la♯", "si" };
+
+}    // namespace
+
+QString describeNoteName( std::int32_t p_pitchClassIndex )
+{
+    const std::int32_t wrapped =
+      ( ( p_pitchClassIndex % domain::SEMITONES_PER_OCTAVE ) + domain::SEMITONES_PER_OCTAVE ) % domain::SEMITONES_PER_OCTAVE;
+
+    return QString::fromUtf8( PITCH_CLASS_NAMES.at( static_cast<std::size_t>( wrapped ) ) );
+}
+
 QVariantMap describeModeDifference( domain::Mode p_from, domain::Mode p_to )
 {
     const domain::ModeDifference difference = domain::modeDifference( p_from, p_to );
@@ -137,12 +159,6 @@ QVariantMap describePhrase( const domain::Phrase & p_phrase )
 
 QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchClass )
 {
-    // Les noms francais des douze classes de hauteur, dans l'ordre des touches : do, puis les cinq alterees, puis les
-    // naturelles. Un nom est une AFFAIRE D'ECRAN - le domaine ne connait que des numeros - et c'est pour cela que la
-    // table vit ici, avec les noms de modes, et non dans Mode.h.
-    static const std::array<const char *, domain::SEMITONES_PER_OCTAVE> PITCH_CLASS_NAMES{
-      "do", "do♯", "ré", "ré♯", "mi", "fa", "fa♯", "sol", "sol♯", "la", "la♯", "si" };
-
     QVariantList circle;
 
     for( const domain::CircleNote & entry : domain::modeCircleNotes( p_mode, p_tonicPitchClass ) )
@@ -159,6 +175,33 @@ QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchC
     }
 
     return circle;
+}
+
+QVariantList describeScale( domain::Mode p_mode, std::int32_t p_tonicPitchClass )
+{
+    // Les sept offsets du mode, dans l'ordre des DEGRES : c'est le domaine qui les donne, et l'ecran ne les invente pas.
+    // C'est aussi ce qui garantit que l'ordre affiche est celui qui a ete joue.
+    const std::array<std::int32_t, domain::DEGREE_COUNT> offsets = domain::modeDegreeOffsets( p_mode );
+
+    QVariantList scale;
+
+    for( std::size_t index = 0; index < offsets.size(); ++index )
+    {
+        const std::int32_t pitchClass =
+          ( ( ( p_tonicPitchClass + offsets.at( index ) ) % domain::SEMITONES_PER_OCTAVE ) + domain::SEMITONES_PER_OCTAVE )
+          % domain::SEMITONES_PER_OCTAVE;
+
+        QVariantMap note;
+
+        note.insert( QStringLiteral( "name" ),
+                     QString::fromUtf8( PITCH_CLASS_NAMES.at( static_cast<std::size_t>( pitchClass ) ) ) );
+        note.insert( QStringLiteral( "stepIndex" ), static_cast<int>( index ) );
+        note.insert( QStringLiteral( "isTonic" ), index == 0 );
+
+        scale.append( note );
+    }
+
+    return scale;
 }
 
 QVariantList describeAllModes()

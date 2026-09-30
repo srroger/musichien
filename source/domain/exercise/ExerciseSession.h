@@ -118,7 +118,18 @@ enum class QuestionKind
     //
     // C'est aussi la seule question ou la reponse est dans le CONTEXTE et non dans les notes : le meme materiau,
     // deux modes. Un joueur qui a compris cela a compris ce qu'un mode est.
-    ModeVamp = 7
+    ModeVamp = 7,
+
+    // LA NOTE ETRANGERE : une gamme monte, une note par degre, et l'une d'elles n'appartient pas a la gamme. Le joueur
+    // dit LAQUELLE.
+    //
+    // C'est le troisieme exercice d'harmonie, et il est different des deux premiers : ceux-la demandent de comparer deux
+    // couleurs ou d'en nommer une, celui-ci demande de tenir une gamme ENTIERE dans sa tete et d'y reperer l'intrus.
+    // C'est le plus fin des trois, et c'est pour cela qu'il vient en dernier.
+    //
+    // Roger l'a demande des le debut - « quelle note n'est pas dans la gamme ? » - et il a attendu que la roue des
+    // quintes existe : sans un appui visuel, l'exercice est une devinette a sept choix.
+    ForeignNote = 8
 };
 
 // La question porte-t-elle sur un INTERVALLE qui a ETE JOUE ?
@@ -146,6 +157,7 @@ enum class QuestionKind
         case QuestionKind::ModeColour:
         case QuestionKind::ModeName:
         case QuestionKind::ModeVamp:
+        case QuestionKind::ForeignNote:
             return false;
     }
 
@@ -330,6 +342,12 @@ struct SessionSettings
     // le comportement d'avant.
     std::int32_t sameColourQuestionShare{ 20 };
 
+    // Part des questions qui font chercher la NOTE ETRANGERE d'une gamme.
+    //
+    // ZERO par defaut, comme les autres parts de l'harmonie : le pilier se decouvre en l'allumant, et une question dont on
+    // ne sait pas encore quoi faire n'a rien a faire dans une session ordinaire.
+    std::int32_t foreignNoteQuestionShare{ 0 };
+
     std::int32_t modeColourQuestionShare{ 0 };
 
     // Share of questions, in percent, that ask the player to NAME a mode heard on a drone.
@@ -457,6 +475,17 @@ struct Question
     // champ qui contiendrait une valeur sans signification finirait par etre lu par quelqu'un.
     Mode mode{ Mode::Ionian };
     std::optional<Mode> previousMode;
+
+    // LA NOTE ETRANGERE : la gamme jouee, et le pas ou l'intrus se trouve.
+    //
+    // La melodie est gardee ENTIERE, et pas seulement la note fautive : c'est elle qu'on rejoue quand le joueur demande a
+    // reecouter, et la reconstruire a chaque lecture serait deux facons de dire la meme chose. Sept notes, une par degre,
+    // dans l'ordre de la gamme.
+    std::vector<Note> foreignMelody;
+
+    // L'index de l'intrus dans cette melodie : c'est LA reponse. Le joueur a entendu sept notes, il dit laquelle
+    // n'appartenait pas a la gamme.
+    std::int32_t foreignStepIndex{ 0 };
 
     // Ce que le joueur a le droit de repondre : les modes de sa palette, dans l'ordre d'apprentissage.
     //
@@ -604,6 +633,13 @@ public:
     // Repond a une question de NOM : quel mode a ete joue ?
     bool answerModeName( Mode p_mode );
 
+    // La reponse a une question de NOTE ETRANGERE : l'index du pas qui n'appartenait pas a la gamme.
+    //
+    // L'index, et non une classe de hauteur : les sept notes sont entendues DANS L'ORDRE, et le joueur designe la place
+    // ou il a entendu l'intrus. Un nom de note marcherait aussi, mais il demanderait au joueur de nommer ce qu'il vient
+    // d'entendre - un autre exercice, et pas celui-ci.
+    bool answerForeignNote( std::int32_t p_stepIndex );
+
     // Les modes que le joueur a rencontres, dans l'ordre d'apprentissage.
     [[nodiscard]] std::span<const Mode> modePalette() const noexcept { return m_modePalette; }
 
@@ -655,6 +691,9 @@ private:
 
     // Construit un VAMP : la MEME gamme, posee sur deux centres differents.
     void buildVampQuestion( Question & p_question );
+
+    // La question de la NOTE ETRANGERE : une gamme montee, une note par degre, et l'une d'elles est etrangere a la gamme.
+    void buildForeignNoteQuestion( Question & p_question );
 
     void widenModePalette();
 
