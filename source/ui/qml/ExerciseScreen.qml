@@ -886,10 +886,16 @@ Item {
                     wrapMode: Text.WordWrap
                     color: "#8ef2b0"
                     font.pixelSize: 14
-                    // Sur une question de COMPARAISON, savoir lequel des deux on vient d'entendre n'aide pas a dire
-                    // s'il est plus clair : la reponse est un SENS, pas un nom. Mais sur une question de NOM, l'ecrire
-                    // pendant la question serait donner la reponse - et c'est ce que faisait la premiere version.
-                    visible: ExerciseController.heardMode.name !== undefined && (ExerciseController.isModeColourQuestion || !ExerciseController.isAsking)
+                    // RIEN PENDANT LA QUESTION, ni le nom ni la note qui colore.
+                    //
+                    // J'avais cru qu'un nom etait inoffensif sur une question de comparaison, parce que la reponse y est
+                    // un SENS et non un nom. Mais un joueur qui lit « dorien » et « mixolydien » peut les situer sur
+                    // l'axe des clartes et repondre sans ecouter : le nom EST la reponse, d'une autre facon. Roger l'a
+                    // vu tout de suite - « je crois toujours voir le texte du mode pendant la question ».
+                    //
+                    // Le mode se dit donc APRES, comme tout ce qui aide : c'est a ce moment-la que cela fixe ce qu'on
+                    // vient d'entendre.
+                    visible: !ExerciseController.isAsking && ExerciseController.heardMode.name !== undefined
                     text: ExerciseController.heardMode.name !== undefined ? ExerciseController.heardMode.name + " — " + ExerciseController.heardMode.characteristic : ""
                 }
 

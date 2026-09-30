@@ -120,8 +120,13 @@ Item {
                     id: slot
 
                     required property var modelData
-                    // Trente degres par case, en partant du haut : la disposition d'un vrai cercle des quintes.
-                    readonly property real slotAngleRadians: (-90 + (30 * modelData.index)) * Math.PI / 180
+                    // Trente degres par case, et **DO EN HAUT**.
+                    //
+                    // C'est la convention de toutes les roues qu'on trouve imprimees, et ce n'est pas une coquetterie :
+                    // do au sommet met les dieses d'un cote et les bemols de l'autre, donc « une alteration de plus »
+                    // se lit dans un sens ou dans l'autre sans reflechir. Placer les cases par leur RANG dans la liste
+                    // mettrait re bemol en haut, ce qui ne veut rien dire pour personne.
+                    readonly property real slotAngleRadians: (-90 + (30 * modelData.accidentals)) * Math.PI / 180
                     readonly property bool isSelected: modelData.index === KeyCircleController.selectedKey.index
 
                     width: wheel.slotSize
