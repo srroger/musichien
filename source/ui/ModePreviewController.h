@@ -53,12 +53,19 @@ class ModePreviewController final : public QObject
     // peut pas relire d'un chiffre n'apprend rien de plus qu'une devinette.
     Q_PROPERTY( QVariantMap lastPlayedPhrase READ lastPlayedPhrase NOTIFY lastPlayedPhraseChanged )
 
+    // Le cercle des quintes DU MODE ENTENDU : ses sept notes allumees, les autres eteintes, la tonique marquee.
+    //
+    // C'est l'aide visuelle que Roger a demandee. Ici elle ne cache rien : le banc d'essai fait ecouter a loisir, et voir
+    // la fenetre de notes pendant qu'on l'entend est exactement ce qui apprend a la reconnaitre.
+    Q_PROPERTY( QVariantList playedModeCircle READ playedModeCircle NOTIFY playedModeCircleChanged )
+
 public:
     explicit ModePreviewController( domain::NotePlayer & p_notePlayer, QObject * p_parent = nullptr );
 
     [[nodiscard]] QVariantList modes() const;
     [[nodiscard]] QVariantMap lastPlayedMode() const;
     [[nodiscard]] QVariantMap lastPlayedPhrase() const;
+    [[nodiscard]] QVariantList playedModeCircle() const;
 
     // Le temperament et le diapason, donnes par la couche de cablage - comme pour les intervalles.
     void setTuning( domain::TuningContext p_tuning );
@@ -90,12 +97,18 @@ public:
 signals:
     void lastPlayedModeChanged();
     void lastPlayedPhraseChanged();
+    void playedModeCircleChanged();
 
 private:
     domain::NotePlayer & m_notePlayer;
     QVariantList m_modes;
     QVariantMap m_lastPlayedMode;
     QVariantMap m_lastPlayedPhrase;
+    QVariantList m_playedModeCircle;
+
+    // Allume le cercle d'un mode sur une tonique donnee, et ne notifie que s'il a change : rejouer le meme mode ne doit
+    // pas faire redessiner l'ecran pour rien.
+    void showCircleFor( domain::Mode p_mode, std::int32_t p_tonicPitchClass );
 
     // Un POINTEUR, et non une copie : le livre vit aussi longtemps que l'application, et le copier ici en dupliquerait
     // les trois cents phrases pour rien.

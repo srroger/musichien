@@ -16,6 +16,12 @@
         <file>qml/ChordTreeView.qml</file>
         <file>qml/StaffBall.qml</file>
         <!--
+          La roue des notes d'un mode : les sept notes du mode allumees sur le cercle des quintes, la tonique marquee.
+          Elle sert au banc d'essai des modes ET a l'exercice, apres la reponse seulement - elle donne le mode, donc
+          l'afficher pendant la question serait donner la reponse.
+        -->
+        <file>qml/ModeCircle.qml</file>
+        <!--
           The content files live at the root of the project, as docs/ARCHITECTURE.md requires, and the
           alias gives each one the runtime path it has on disk: ':/assets/content/...'. An alias rather
           than a relative path is what keeps the resource path identical to the real one, which is what

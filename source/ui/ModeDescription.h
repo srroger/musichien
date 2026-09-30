@@ -44,6 +44,19 @@ namespace musichien::ui
 // en triant doit etre ce qu'elle retrouve en ecoutant, sans quoi les deux ne peuvent pas se relier.
 [[nodiscard]] QVariantMap describePhrase( const domain::Phrase & p_phrase );
 
+// Le cercle des quintes vu depuis une tonique : les douze notes, celles du mode allumees et les autres eteintes.
+//
+// Chaque entree porte ce qu'un dessin doit savoir, et rien de plus :
+//
+//   * 'name'       le nom de la note, EN FRANCAIS - « ré », « fa♯ » - parce que c'est ainsi qu'un musicien les lit
+//   * 'inMode'     vrai pour les sept notes du mode : elles s'allument
+//   * 'isTonic'    vrai pour la tonique, qui ouvre le cercle et se marque
+//
+// L'ORDRE de la liste est l'ordre des quintes en partant de la tonique, et c'est tout le dessin : les sept notes d'un
+// mode y sont voisines, donc l'arc allume est toujours d'un seul tenant, et ce qui distingue les modes est la place de
+// la tonique dans cet arc. Voir domain::modeCircleNotes.
+[[nodiscard]] QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchClass );
+
 // Les sept modes, dans l'ordre de clarte, du plus clair au plus sombre.
 //
 // Une seule fonction, parce que deux ecrans lisent la meme forme de donnees : le banc d'essai aujourd'hui, et le

@@ -115,11 +115,31 @@ void ModePreviewController::playMode( int p_index )
 
         emit lastPlayedModeChanged();
     }
+
+    // Et la roue qui va avec : ses sept notes allumees, la tonique marquee.
+    showCircleFor( mode, TONIC_MIDI_NUMBER % domain::SEMITONES_PER_OCTAVE );
 }
 
 QVariantMap ModePreviewController::lastPlayedPhrase() const
 {
     return m_lastPlayedPhrase;
+}
+
+QVariantList ModePreviewController::playedModeCircle() const
+{
+    return m_playedModeCircle;
+}
+
+void ModePreviewController::showCircleFor( domain::Mode p_mode, std::int32_t p_tonicPitchClass )
+{
+    const QVariantList circle = describeModeCircle( p_mode, p_tonicPitchClass );
+
+    if( m_playedModeCircle != circle )
+    {
+        m_playedModeCircle = circle;
+
+        emit playedModeCircleChanged();
+    }
 }
 
 int ModePreviewController::phraseCountForMode( int p_index ) const
@@ -200,6 +220,9 @@ void ModePreviewController::playPhraseOfMode( int p_index )
 
         emit lastPlayedModeChanged();
     }
+
+    // Et la roue, sur la tonique de la PHRASE : c'est celle que l'oreille vient d'entendre sous elle.
+    showCircleFor( mode, phrase->tonic.pitchClassIndex() );
 }
 
 void ModePreviewController::stopPlayback()

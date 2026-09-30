@@ -234,6 +234,7 @@ ApplicationWindow {
                 // Elle vient APRES avoir entendu le mode, et sur le mode allume : c'est le meme geste que la gamme, un
                 // cran plus loin. Un bouton par mode en ferait quatorze a l'ecran d'un telephone, pour un choix qui n'a
                 // aucune raison d'etre simultane.
+                // La ROUE du mode entendu : ses sept notes allumées sur le cercle des quintes, la tonique marquée.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -796,6 +797,15 @@ ApplicationWindow {
                     wrapMode: Text.WordWrap
                     visible: ModeController.lastPlayedPhrase.degrees !== undefined
                     text: ModeController.lastPlayedPhrase.degrees !== undefined ? qsTr("la phrase : %1 (%2 bpm)").arg(ModeController.lastPlayedPhrase.degrees).arg(ModeController.lastPlayedPhrase.bpm) : ""
+                }
+
+                // Ici elle ne cache rien - le banc d'essai fait écouter à loisir - et c'est justement à quoi elle sert :
+                // voir la fenêtre de notes pendant qu'on l'entend, jusqu'à ce que l'oreille la reconnaisse seule.
+                ModeCircle {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 12
+                    visible: ModeController.playedModeCircle.length > 0
+                    notes: ModeController.playedModeCircle
                 }
 
                 Item {

@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 
 namespace musichien::ui
@@ -132,6 +133,32 @@ QVariantMap describePhrase( const domain::Phrase & p_phrase )
     description.insert( QStringLiteral( "stepCount" ), static_cast<int>( p_phrase.steps.size() ) );
 
     return description;
+}
+
+QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchClass )
+{
+    // Les noms francais des douze classes de hauteur, dans l'ordre des touches : do, puis les cinq alterees, puis les
+    // naturelles. Un nom est une AFFAIRE D'ECRAN - le domaine ne connait que des numeros - et c'est pour cela que la
+    // table vit ici, avec les noms de modes, et non dans Mode.h.
+    static const std::array<const char *, domain::SEMITONES_PER_OCTAVE> PITCH_CLASS_NAMES{
+      "do", "do♯", "ré", "ré♯", "mi", "fa", "fa♯", "sol", "sol♯", "la", "la♯", "si" };
+
+    QVariantList circle;
+
+    for( const domain::CircleNote & entry : domain::modeCircleNotes( p_mode, p_tonicPitchClass ) )
+    {
+        const auto index = static_cast<std::size_t>( entry.pitchClassIndex );
+
+        QVariantMap description;
+
+        description.insert( QStringLiteral( "name" ), QString::fromUtf8( PITCH_CLASS_NAMES.at( index ) ) );
+        description.insert( QStringLiteral( "inMode" ), entry.belongsToMode );
+        description.insert( QStringLiteral( "isTonic" ), entry.isTonic );
+
+        circle.append( description );
+    }
+
+    return circle;
 }
 
 QVariantList describeAllModes()

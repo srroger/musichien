@@ -898,9 +898,15 @@ Item {
                 }
 
                 Text {
+                    // Le VERDICT, et il est en GRAS parce que le temps de lecture est court.
+                    // Deux noms poses cote a cote ne disent rien : ce qu'on a entendu, c'est UNE NOTE qui a bouge, et
+                    // c'est donc cela qu'il faut ecrire - « de dorien a ionien, la tierce a monte ».
+
                     id: modeVerdict
 
-                    // Le VERDICT, et il est en GRAS parce que le temps de lecture est court.
+                    // Et quand RIEN n'a bouge - deux fois la meme couleur - il faut le dire aussi : c'est la seule
+                    // reponse possible, et un verdict muet laisserait croire a un bug.
+                    readonly property bool sameness: ExerciseController.previousMode.name !== undefined && ExerciseController.heardMode.name !== undefined && (ExerciseController.previousMode.name === ExerciseController.heardMode.name)
 
                     Layout.fillWidth: true
                     Layout.preferredWidth: 0
@@ -909,16 +915,7 @@ Item {
                     color: "#ffd479"
                     font.pixelSize: 19
                     font.bold: true
-
-                    // Deux noms poses cote a cote ne disent rien : ce qu'on a entendu, c'est UNE NOTE qui a bouge, et
-                    // c'est donc cela qu'il faut ecrire - « de dorien a ionien, la tierce a monte ».
-                    //
-                    // Et quand RIEN n'a bouge - deux fois la meme couleur - il faut le dire aussi : c'est la seule
-                    // reponse possible, et un verdict muet laisserait croire a un bug.
-                    readonly property bool sameness: ExerciseController.previousMode.name !== undefined && ExerciseController.heardMode.name !== undefined && (ExerciseController.previousMode.name === ExerciseController.heardMode.name)
-
                     visible: !ExerciseController.isAsking && ExerciseController.heardMode.name !== undefined
-
                     text: {
                         if (!visible)
                             return "";
@@ -937,7 +934,6 @@ Item {
                     wrapMode: Text.WordWrap
                     color: "#8ef2b0"
                     font.pixelSize: 14
-
                     // Une phrase VIDE, c'est « il n'y a rien a dire » - le cas des deux passages pareils.
                     visible: modeVerdict.visible && !modeVerdict.sameness
                     text: modeVerdict.visible && !modeVerdict.sameness ? ExerciseController.modeDifference.sentence : ""
