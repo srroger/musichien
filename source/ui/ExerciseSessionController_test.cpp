@@ -1668,6 +1668,78 @@ TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_pla
     }
 }
 
+TEST( ExerciseSessionControllerTest, a_foreign_note_question_is_a_harmony_question )
+{
+    // L'ecran avait recopie « mode » la ou il fallait « harmonie » : le bloc qui porte les sept boutons de l'intrus etait
+    // donc cache, et Roger se retrouvait devant un ecran vide apres avoir entendu la gamme - « j'entends bien une phrase,
+    // mais rien ensuite, aucun bouton, on est bloque ».
+    //
+    // Le predicat vit ici, nomme, et il est teste : c'est ce qui empeche l'ecran de le recopier de travers.
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings foreignOnly;
+    foreignOnly.namedIntervalQuestionShare = 0;
+    foreignOnly.singQuestionShare = 0;
+    foreignOnly.chordQuestionShare = 0;
+    foreignOnly.modeColourQuestionShare = 0;
+    foreignOnly.modeNameQuestionShare = 0;
+    foreignOnly.modeVampQuestionShare = 0;
+    foreignOnly.foreignNoteQuestionShare = 100;
+
+    ExerciseSessionController harmonyController{ notePlayer, foreignOnly };
+    harmonyController.startSession();
+
+    EXPECT_TRUE( harmonyController.isForeignNoteQuestion() );
+    EXPECT_TRUE( harmonyController.isHarmonyQuestion() );
+
+    // Et une question d'intervalle n'est PAS une question d'harmonie : sinon la zone des modes se montrerait devant elle.
+    domain::SessionSettings intervalsOnly = intervalOnlySettings();
+    intervalsOnly.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController intervalController{ notePlayer, intervalsOnly };
+    intervalController.startSession();
+
+    EXPECT_FALSE( intervalController.isHarmonyQuestion() );
+}
+
+TEST( ExerciseSessionControllerTest, a_foreign_note_question_offers_seven_notes_and_is_answerable )
+{
+    // Roger : « quand je lance, j'entends bien une phrase, mais rien ensuite, aucun bouton, on est bloqué ».
+    //
+    // Ce test suit le chemin exact de l'ecran, et il echoue sur le premier maillon casse : la question doit etre POSEE
+    // (isAsking), offrir SEPT notes a montrer, et accepter une reponse. Un seul de ces trois manque, et le joueur reste
+    // devant un ecran vide.
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings;
+    settings.namedIntervalQuestionShare = 0;
+    settings.singQuestionShare = 0;
+    settings.chordQuestionShare = 0;
+    settings.modeColourQuestionShare = 0;
+    settings.modeNameQuestionShare = 0;
+    settings.modeVampQuestionShare = 0;
+    settings.foreignNoteQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+
+    ASSERT_TRUE( controller.isForeignNoteQuestion() );
+
+    // 1. la question est posee, et pas bloquee en lecture.
+    EXPECT_TRUE( controller.isAsking() ) << "la question de note etrangere n'est pas posee";
+
+    // 2. sept notes, celles de la gamme jouee.
+    EXPECT_EQ( 7, controller.foreignNoteChoices().size() );
+
+    // 3. et une reponse est acceptee : le verdict d'un intrus se donne apres. Une mauvaise reponse laisse REESSAYER -
+    // c'est la regle du jeu, pas un blocage - donc on se sert du geste que l'ecran offre au joueur.
+    controller.revealAnswer();
+
+    EXPECT_FALSE( controller.isAsking() );
+    EXPECT_TRUE( controller.foreignNoteVerdict().contains( QStringLiteral( "stepNumber" ) ) );
+}
+
 TEST( ExerciseSessionControllerTest, only_the_vamp_comes_out_when_only_the_vamp_is_open )
 {
     // Le diagnostic de Roger, et il etait exact : « je pense que les modes "deux centre" et "plus clair, plus sombre" se

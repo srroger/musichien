@@ -125,7 +125,7 @@ Item {
 
         // Une question de rythme a la sienne, et elle est plus longue : le feedback y est la CELLULE elle-meme, qui
         // dure une mesure entiere. Couper avant la fin couperait le son qui vient d'etre donne en reponse.
-        interval: (ExerciseController.isModeQuestion || ExerciseController.isForeignNoteQuestion) ? exerciseScreen.modePause : (ExerciseController.questionKind === 3 ? exerciseScreen.rhythmPause : (ExerciseController.wasLastAnswerCorrect ? exerciseScreen.successPause : exerciseScreen.mistakePause))
+        interval: ExerciseController.isHarmonyQuestion ? exerciseScreen.modePause : (ExerciseController.questionKind === 3 ? exerciseScreen.rhythmPause : (ExerciseController.wasLastAnswerCorrect ? exerciseScreen.successPause : exerciseScreen.mistakePause))
         onTriggered: ExerciseController.continueToNextQuestion()
     }
 
@@ -885,7 +885,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.alignment: Qt.AlignVCenter
-                visible: ExerciseController.isModeQuestion
+                visible: ExerciseController.isHarmonyQuestion
                 spacing: 10
 
                 Text {

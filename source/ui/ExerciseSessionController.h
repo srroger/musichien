@@ -147,6 +147,14 @@ class ExerciseSessionController final : public QObject
     // Le mode a comparer ou a nommer, et celui qui vient d'etre entendu avant lui.
     Q_PROPERTY( bool isModeQuestion READ isModeQuestion NOTIFY questionChanged )
 
+    // Une question d'HARMONIE : celles de mode, et la note etrangere - qui pose la meme oreille devant le meme bourdon.
+    //
+    // Elle existe parce que l'ecran avait recopie « mode » la ou il fallait « harmonie » : le bloc qui porte les sept
+    // boutons de l'intrus etait cache sur une question de note etrangere, et Roger s'est retrouve devant un ecran vide -
+    // « j'entends bien une phrase, mais rien ensuite, aucun bouton, on est bloque ». Un predicat nomme, teste, ne se
+    // recopie pas.
+    Q_PROPERTY( bool isHarmonyQuestion READ isHarmonyQuestion NOTIFY questionChanged )
+
     // Vrai sur la question de COULEUR : deux modes, et une reponse « plus clair / plus sombre ».
     Q_PROPERTY( bool isModeColourQuestion READ isModeColourQuestion NOTIFY questionChanged )
     Q_PROPERTY( bool isModeVampQuestion READ isModeVampQuestion NOTIFY questionChanged )
@@ -384,6 +392,10 @@ public:
     [[nodiscard]] QVariantList chordChoices() const;
 
     [[nodiscard]] bool isModeQuestion() const noexcept;
+
+    // Vrai pour les questions d'harmonie : un mode a comparer ou a nommer, un vamp, OU une note etrangere a trouver.
+    // L'ecran s'en sert pour montrer la zone qui va avec - la roue, le verdict, et les boutons.
+    [[nodiscard]] bool isHarmonyQuestion() const noexcept;
 
     [[nodiscard]] bool isModeColourQuestion() const noexcept;
 

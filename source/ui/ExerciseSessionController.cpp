@@ -665,7 +665,10 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
                       << " chant=" << p_settings.singQuestionShare << " accords=" << p_settings.chordQuestionShare
                       << " modes(clair/nom/deux)=" << p_settings.modeColourQuestionShare << "/"
                       << p_settings.modeNameQuestionShare << "/" << p_settings.modeVampQuestionShare
-                      << " etrangere=" << p_settings.foreignNoteQuestionShare;
+                      << " etrangere=" << p_settings.foreignNoteQuestionShare
+                      // Le genre de la PREMIERE question, avec les parts qui l'ont produite : sans lui, un joueur bloque
+                      // sur la question 1 ne laisse aucune trace, et il faut deviner. C'est exactement ce qui est arrive.
+                      << " genre1=" << static_cast<int>( m_session->currentQuestion().kind );
 
     // The end of the previous session has been announced; this one gets its own turn.
     m_sessionEndAnnounced = false;
@@ -993,6 +996,11 @@ bool ExerciseSessionController::isModeColourQuestion() const noexcept
 bool ExerciseSessionController::isModeVampQuestion() const noexcept
 {
     return ( m_session != nullptr ) && ( m_session->currentQuestion().kind == domain::QuestionKind::ModeVamp );
+}
+
+bool ExerciseSessionController::isHarmonyQuestion() const noexcept
+{
+    return isModeQuestion() || isForeignNoteQuestion();
 }
 
 QVariantList ExerciseSessionController::modeChoices() const
@@ -1390,8 +1398,8 @@ void ExerciseSessionController::continueToNextQuestion()
     // la ligne reste lisible seule.
     qInfo().nospace() << "Musichien question " << m_session->questionNumber() << ": genre="
                       << static_cast<int>( m_session->currentQuestion().kind )
-                      << " (0=nommer 1=direction 2=chanter 3=accords 4=mode-clair 5=mode-nom 6=mode-deux-centres"
-                         " 7=etrangere 8=rythme)";
+                      << " (0=nommer 1=direction 2=chanter 3=rythme 4=accords 5=mode-clair 6=mode-nom"
+                         " 7=mode-deux-centres 8=etrangere)";
 
     // Une nouvelle question, donc une nouvelle anecdote : le texte suit chaque question, et jamais la meme. Peu de
     // choses sont gratuites et agreables dans une application : celle-ci est les deux.
