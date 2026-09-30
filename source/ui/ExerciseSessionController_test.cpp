@@ -1668,6 +1668,44 @@ TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_pla
     }
 }
 
+TEST( ExerciseSessionControllerTest, a_plain_game_after_a_review_is_not_a_review )
+{
+    // Le drapeau du bilan doit RETOMBER quand on repart pour une partie ordinaire.
+    //
+    // Roger a decrit le symptome : « j'ai les encouragements que je ne devrais avoir que dans le mode bilan ». Le drapeau
+    // n'etait remis a faux qu'a trois endroits - la remise a zero du score, un bilan vide, le debut d'un bilan - donc UN
+    // SEUL bilan joue, une fois, suffisait a faire parler TOUTES les parties suivantes comme un bilan.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    fillJournalWithWorkedTargets( log );
+
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    ASSERT_TRUE( controller.isReviewRunning() );
+
+    // Le joueur quitte le bilan, puis joue : ce n'est plus un bilan.
+    controller.stopSession();
+    controller.startSession();
+
+    EXPECT_FALSE( controller.isReviewRunning() );
+
+    // Et sur la partie entiere, aucun mot du bilan ne sort : le silence est la regle hors bilan.
+    while( controller.running() && controller.isAsking() )
+    {
+        EXPECT_TRUE( controller.encouragementText().isEmpty() ) << "le bilan a parle pendant une partie ordinaire";
+
+        controller.revealAnswer();
+        controller.continueToNextQuestion();
+    }
+}
+
 TEST( ExerciseSessionControllerTest, a_review_session_without_a_journal_is_an_ordinary_game )
 {
     domain::NotePlayerFake notePlayer;

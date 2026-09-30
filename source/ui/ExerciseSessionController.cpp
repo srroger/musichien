@@ -11,6 +11,7 @@
 
 #include <QColor>
 #include <QDate>
+#include <QDebug>
 #include <QString>
 
 #include <array>
@@ -580,8 +581,24 @@ bool ExerciseSessionController::starEarned() const noexcept
     return ( m_session != nullptr ) && m_session->hasEarnedStar();
 }
 
+void ExerciseSessionController::leaveReviewMode() noexcept
+{
+    // L'etat de bilan ne doit pas SURVIVRE a un bilan. Il vit dans deux membres, et les oublier est exactement ce qui a
+    // fait parler toutes les parties de Roger comme des bilans : une seule fonction, donc plus rien a oublier.
+    m_isReviewRunning = false;
+    m_reviewEasyQuestionCount = 0;
+}
+
 void ExerciseSessionController::startSession()
 {
+    // Une partie ordinaire n'est PAS un bilan, et le drapeau retombe ici.
+    //
+    // C'est une correction, et elle explique le symptome que Roger a decrit : « j'ai les encouragements que je ne devrais
+    // avoir que dans le mode bilan ». Le drapeau n'etait remis a faux qu'a trois endroits - la remise a zero du score, un
+    // bilan vide, le debut d'un bilan - donc UN SEUL bilan joue, une fois, suffisait a faire parler TOUTES les parties
+    // suivantes comme un bilan, jusqu'a la prochaine remise a zero.
+    leaveReviewMode();
+
     beginSession( m_settings );
 }
 
@@ -591,6 +608,8 @@ void ExerciseSessionController::startInfiniteSession()
 
     // Le mode infini, c'est le mode qui ne s'arrete jamais : pas de vies, pas de fin, juste enchaner. Une erreur
     // coute du rythme - la serie retombe - mais jamais la partie.
+    leaveReviewMode();
+
     settings.lives = std::nullopt;
     settings.questionCount = std::numeric_limits<std::size_t>::max();
 
@@ -603,6 +622,8 @@ void ExerciseSessionController::startSurvivalSession()
 
     // Le survival, c'est l'arcade avec des vies : un nombre de questions sans fin, et la partie s'arrete quand les
     // vies tombent a zero. Les vies restent donc celles du niveau, pas un retour en arriere vers "illimite".
+    leaveReviewMode();
+
     settings.questionCount = std::numeric_limits<std::size_t>::max();
 
     beginSession( settings );
@@ -621,6 +642,16 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
     std::random_device entropySource;
 
     m_session = std::make_unique<domain::ExerciseSession>( entropySource(), p_settings );
+
+    // LE DIAGNOSTIC, en une ligne, et il reste : « pourquoi cette question-la ? » se repond avec des chiffres, jamais avec
+    // une memoire. Les parts affichees par les reglages et celles qui tirent vraiment la question sont deux choses, et
+    // elles peuvent diverger sans que rien ne le dise - c'est precisement ce qu'il fallait pouvoir voir.
+    qInfo().nospace() << "Musichien session: bilan=" << ( m_isReviewRunning ? "oui" : "non" )
+                      << " nommer=" << p_settings.namedIntervalQuestionShare
+                      << " chant=" << p_settings.singQuestionShare << " accords=" << p_settings.chordQuestionShare
+                      << " modes(clair/nom/deux)=" << p_settings.modeColourQuestionShare << "/"
+                      << p_settings.modeNameQuestionShare << "/" << p_settings.modeVampQuestionShare
+                      << " etrangere=" << p_settings.foreignNoteQuestionShare;
 
     // The end of the previous session has been announced; this one gets its own turn.
     m_sessionEndAnnounced = false;
@@ -1324,6 +1355,14 @@ void ExerciseSessionController::continueToNextQuestion()
     }
 
     m_session->advance();
+
+    // Chaque question, et son genre, sur une ligne : c'est ce qui repond a « pourquoi celle-la ? » pendant une vraie
+    // partie, sur le telephone, sans instrumenter quoi que ce soit apres coup. Le numero du genre est explicite pour que
+    // la ligne reste lisible seule.
+    qInfo().nospace() << "Musichien question " << m_session->questionNumber() << ": genre="
+                      << static_cast<int>( m_session->currentQuestion().kind )
+                      << " (0=nommer 1=direction 2=chanter 3=accords 4=mode-clair 5=mode-nom 6=mode-deux-centres"
+                         " 7=etrangere 8=rythme)";
 
     // Une nouvelle question, donc une nouvelle anecdote : le texte suit chaque question, et jamais la meme. Peu de
     // choses sont gratuites et agreables dans une application : celle-ci est les deux.

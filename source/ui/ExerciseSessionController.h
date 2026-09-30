@@ -832,6 +832,9 @@ private:
     // en place, et rien n'est ecrase.
     void applyStoredQuestionShares( domain::SessionSettings & p_settings ) const;
 
+    // L'etat de bilan ne doit jamais survivre a un bilan : cette fonction le referme, et c'est le seul endroit qui le fait.
+    void leaveReviewMode() noexcept;
+
     // Adds the session's outcome - its experience, its count, its star - to the profile, once, when it ends.
     void persistSessionOutcome();
 
