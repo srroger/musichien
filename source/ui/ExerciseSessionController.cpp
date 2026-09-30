@@ -1008,8 +1008,11 @@ QVariantMap ExerciseSessionController::modeDifference() const
 
 QVariantList ExerciseSessionController::modeCircle() const
 {
-    // Trois raisons de ne rien montrer, et une seule de montrer : la question a ete conclue, et elle parle d'un mode.
-    if( ( m_session == nullptr ) || isAsking() || !isModeQuestion() )
+    // Deux raisons de ne rien montrer, et une seule de montrer : la question parle d'un mode.
+    //
+    // L'etat de la question ne compte plus : la roue est donnee DES LA QUESTION. Roger l'a voulue ainsi - « l'utilisateur
+    // pourra ne pas trop la regarder » - et c'est un choix de difficulte qui lui appartient, comme celui de l'indice.
+    if( ( m_session == nullptr ) || !isModeQuestion() )
     {
         return {};
     }
@@ -1534,6 +1537,55 @@ void ExerciseSessionController::setNamedIntervalQuestionShare( int p_share )
     m_settings.namedIntervalQuestionShare = p_share;
 
     emit namedIntervalQuestionShareChanged();
+}
+
+int ExerciseSessionController::phraseTempoBpm() const
+{
+    // Soixante-douze quand il n'y a pas de profil : le defaut du domaine, celui du fichier de reglages et celui du
+    // contenu de l'atelier disent tous les trois la meme chose, sinon l'un des trois finirait par mentir a l'ecran.
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedPhraseTempoBpm() : 72;
+}
+
+int ExerciseSessionController::phraseTempoVariation() const
+{
+    return ( m_levelStore != nullptr ) ? m_levelStore->storedPhraseTempoVariation() : 20;
+}
+
+void ExerciseSessionController::setPhraseTempoBpm( int p_bpm )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    // Les bornes du domaine : sous quarante la phrase traine, au-dessus de cent soixante elle n'en est plus une.
+    if( p_bpm < 40 || p_bpm > 160 )
+    {
+        return;
+    }
+
+    m_levelStore->storePhraseTempoBpm( p_bpm );
+
+    emit phraseTempoChanged();
+}
+
+void ExerciseSessionController::setPhraseTempoVariation( int p_variation )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    // Une amplitude negative n'est pas un tirage plus petit, c'est une erreur ; et au-dela de quarante, la phrase
+    // change de tempo en cours d'ecoute plutot que de varier d'une fois a l'autre.
+    if( p_variation < 0 || p_variation > 40 )
+    {
+        return;
+    }
+
+    m_levelStore->storePhraseTempoVariation( p_variation );
+
+    emit phraseTempoChanged();
 }
 
 void ExerciseSessionController::setSingQuestionShare( int p_share )

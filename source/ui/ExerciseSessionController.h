@@ -169,12 +169,13 @@ class ExerciseSessionController final : public QObject
 
     // Le cercle des quintes du mode de la question : ses sept notes allumees, le reste eteint, la tonique marquee.
     //
-    // VIDE tant que la question est posee, et ce n'est pas une precaution d'affichage : la fenetre de sept notes PLUS la
-    // tonique DONNE le mode, donc l'afficher pendant la question serait donner la reponse. C'est ce qui distingue cette
-    // aide de l'indice des intervalles, qui aide sans repondre.
+    // DONNE DES LA QUESTION, et c'est un choix de Roger, assume : « je mettrais quand meme la roue dans la question,
+    // l'utilisateur pourra ne pas trop la regarder ». La fenetre de sept notes plus la tonique donne le mode, donc c'est
+    // une aide forte - mais elle est visible et ignorable, comme l'indice des intervalles, et un joueur qui apprend a
+    // situer les modes a besoin de la voir PENDANT qu'il ecoute, pas apres.
     //
-    // Roger l'a voulue apres la reponse, dans l'exercice comme dans le banc d'essai : « la roue apparait avec le verdict,
-    // pour relier ce qu'on a entendu a ce qu'on a vu - jamais pendant la question ».
+    // La tonique reste EN HAUT du cercle : c'est ce qui rend l'arc lisible d'un coup d'oeil, et c'est ce qui ne doit
+    // jamais bouger d'un mode a l'autre.
     Q_PROPERTY( QVariantList modeCircle READ modeCircle NOTIFY questionChanged )
 
     // Les deux parts de l'harmonie, en pour cent : comparer deux modes, et nommer un mode. Deux reglages, parce que ce
@@ -290,6 +291,14 @@ class ExerciseSessionController final : public QObject
     // - la question que le jeu posait a ses debuts - n'en avait aucune. Elle prenait « ce qui restait », et depuis que
     // les parts se lisent les unes par rapport aux autres, une part qui se tait n'est plus une part.
     Q_PROPERTY( int namedIntervalQuestionShare READ namedIntervalQuestionShare NOTIFY namedIntervalQuestionShareChanged )
+
+    // Le TEMPO des phrases de mode, et son amplitude de variation. Roger : « on pourrait choisir de l'augmenter, d'en
+    // choisir un central et de varier autour de 20-30 bpm. Histoire de rendre moins monotone. »
+    //
+    // Le premier est le CENTRE, le second l'amplitude : une phrase est jouee a centre ± tirage. Retenus entre deux
+    // seances, comme tous les reglages.
+    Q_PROPERTY( int phraseTempoBpm READ phraseTempoBpm NOTIFY phraseTempoChanged )
+    Q_PROPERTY( int phraseTempoVariation READ phraseTempoVariation NOTIFY phraseTempoChanged )
 
     // Combien de questions sur cent portent sur le RYTHME, et combien sur les ACCORDS. Memes reglages, memes bornes,
     // memes raisons : au-dela d'une part, on ne choisit plus ce qu'on travaille, on le subit.
@@ -436,6 +445,14 @@ public:
     [[nodiscard]] int namedIntervalQuestionShare() const;
 
     Q_INVOKABLE void setNamedIntervalQuestionShare( int p_share );
+
+    // Le tempo des phrases de mode, et son amplitude. Memes contrats que les autres reglages : bornes verifiees, valeur
+    // memorisee, et prise en compte a la prochaine phrase jouee.
+    [[nodiscard]] int phraseTempoBpm() const;
+
+    Q_INVOKABLE void setPhraseTempoBpm( int p_bpm );
+    Q_INVOKABLE void setPhraseTempoVariation( int p_variation );
+    [[nodiscard]] int phraseTempoVariation() const;
 
     // Combien de questions sur cent portent sur le rythme, et combien sur les accords. Meme contrat que le chant :
     // borne a 0-100, memorise, et pris en compte par la session SUIVANTE.
@@ -712,6 +729,8 @@ signals:
     void singQuestionShareChanged();
 
     void namedIntervalQuestionShareChanged();
+
+    void phraseTempoChanged();
 
     // Le joueur vient de changer la part du rythme, ou celle des accords.
     void rhythmQuestionShareChanged();

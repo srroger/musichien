@@ -596,15 +596,8 @@ TEST( ExerciseSessionControllerTest, a_harmony_question_offers_no_interval_hint 
     // L'indice existe - le livre en a un pour tous les intervalles - et il doit pourtant rester absent.
     EXPECT_TRUE( controller.hintText().isEmpty() );
 
-    // La roue non plus n'est pas donnee : la fenetre des sept notes PLUS la tonique donne le mode, donc l'afficher tant
-    // que la question est posee serait donner la reponse. C'est la seule aide du jeu qui doive attendre le verdict.
-    EXPECT_TRUE( controller.modeCircle().isEmpty() );
-
-    controller.answerModeName( heardIndex );
-
-    ASSERT_TRUE( controller.wasLastAnswerCorrect() );
-
-    // Reponse donnee : la roue arrive avec le verdict.
+    // La roue, elle, est donnee DES LA QUESTION : Roger l'a voulu ainsi - « l'utilisateur pourra ne pas trop la
+    // regarder ». Elle aide fortement, et c'est assume : c'est un choix de difficulte, comme celui de l'indice.
     const QVariantList circle = controller.modeCircle();
 
     ASSERT_EQ( 12, circle.size() );
@@ -630,6 +623,12 @@ TEST( ExerciseSessionControllerTest, a_harmony_question_offers_no_interval_hint 
     // Sept notes allumees dont UNE tonique : c'est une armure, et c'est tout le dessin.
     EXPECT_EQ( 7, litCount );
     EXPECT_EQ( 1, tonicCount );
+
+    // Et elle reste une fois la reponse donnee : le verdict la garde sous les yeux.
+    controller.answerModeName( heardIndex );
+
+    ASSERT_TRUE( controller.wasLastAnswerCorrect() );
+    EXPECT_EQ( 12, controller.modeCircle().size() );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

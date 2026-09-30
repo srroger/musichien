@@ -25,11 +25,14 @@ Item {
     // Le diametre des pastilles. L'exercice les fait un peu plus petites : il a une consigne et un verdict a afficher
     // au-dessus.
     property int dotSize: 40
+    // La taille du dessin, parametrable : l'ecran de l'exercice est deja charge - consigne, boutons de reponse, verdict -
+    // et une roue de 260 pixels n'y tiendrait pas. La tonique reste EN HAUT quelle que soit la taille.
+    property int span: 260
     // Le rayon laisse la place a la pastille : sans cela, la case du haut et celle du bas sortiraient du cadre.
     readonly property real radius: (Math.min(width, height) / 2) - (dotSize / 2) - 4
 
-    implicitWidth: 260
-    implicitHeight: 260
+    implicitWidth: span
+    implicitHeight: span
 
     Repeater {
         model: root.notes

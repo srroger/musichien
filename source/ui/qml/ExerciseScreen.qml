@@ -871,6 +871,8 @@ Item {
             // ce que la theorie en dit, au moment ou elle l'entend.
             // -------------------------------------------------------------------------------------------------
             ColumnLayout {
+                // La ROUE du mode : ses sept notes allumées sur le cercle des quintes, la tonique en haut.
+
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.alignment: Qt.AlignVCenter
@@ -939,13 +941,15 @@ Item {
                     text: modeVerdict.visible && !modeVerdict.sameness ? ExerciseController.modeDifference.sentence : ""
                 }
 
-                // La ROUE du mode, et elle arrive AVEC le verdict : c'est là qu'elle relie ce qu'on a entendu à ce qu'on
-                // voit. Elle est vide pendant la question - la fenêtre des sept notes plus la tonique donne le mode, donc
-                // l'afficher plus tôt serait donner la réponse.
+                // Elle est là PENDANT la question, et c'est un choix de Roger : « je mettrais quand même la roue dans la
+                // question, l'utilisateur pourra ne pas trop la regarder ». Elle donne le mode à qui sait la lire - et
+                // c'est justement ce qu'on veut apprendre. La tonique reste en haut, toujours : c'est ce qui rend l'arc
+                // lisible d'un coup d'œil.
                 ModeCircle {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 6
-                    dotSize: 34
+                    span: 200
+                    dotSize: 30
                     visible: ExerciseController.modeCircle.length > 0
                     notes: ExerciseController.modeCircle
                 }
