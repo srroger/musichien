@@ -33,6 +33,10 @@ musichienFunction_AddLibrary(domain
     music/KeySignature.h
     music/KeySignature.cpp
 
+    # Une phrase modale, et le generateur qui la propose : des degres, jamais des notes
+    music/Phrase.h
+    music/Phrase.cpp
+
     # L'arbre des accords : comment chaque couleur s'obtient d'une autre, en un geste
     music/ChordTree.h
     music/ChordTree.cpp
@@ -120,6 +124,7 @@ if(MUSICHIEN_BUILD_TESTING)
         music/Chord_test.cpp
         music/Mode_test.cpp
         music/KeySignature_test.cpp
+        music/Phrase_test.cpp
         music/ChordTree_test.cpp
         audio/ToneSynthesizer_test.cpp
         audio/PitchEstimator_test.cpp

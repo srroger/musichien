@@ -15,3 +15,17 @@ musichienFunction_ConfigureTarget(musichien_render_preview)
 target_link_libraries(musichien_render_preview PRIVATE musichien_domain)
 
 set_target_properties(musichien_render_preview PROPERTIES FOLDER "tools")
+
+# =====================================================================================================================
+# L'ATELIER
+#
+# Il genere des phrases modales, ecrit leurs WAV, et pose a cote une page pour les ecouter et les trier. C'est l'outil
+# qui donne a Roger de quoi faire le tri dont il a parle : « genere plein de phrases, je fais le tri derriere ».
+# =====================================================================================================================
+add_executable(musichien_render_phrases render_phrases.cpp)
+
+musichienFunction_ConfigureTarget(musichien_render_phrases)
+
+target_link_libraries(musichien_render_phrases PRIVATE musichien_domain)
+
+set_target_properties(musichien_render_phrases PROPERTIES FOLDER "tools")
