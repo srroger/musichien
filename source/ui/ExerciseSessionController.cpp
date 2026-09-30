@@ -2412,10 +2412,10 @@ QString ExerciseSessionController::chordColourName( int p_quality ) const
     // Une saturation moderee et une clarte elevee : le texte pose dessus est sombre, et c'est ce contraste qui rend le
     // bouton lisible d'un coup d'oeil.
     //
-    // Les suffixes F ne sont pas cosmetiques : fromHslF prend des qreal, qui sont des FLOAT dans Qt 6, et deux
-    // litteraux double y seraient une conversion retrecissante - ce que clang-tidy signale a juste titre
-    // (bugprone-narrowing-conversions).
-    return QColor::fromHslF( hue, 0.45F, 0.70F ).name();
+    // Les suffixes F et le transtypage ne sont pas cosmetiques : fromHslF prend des qreal, qui sont des FLOAT dans
+    // Qt 6, et un double y serait une conversion retrecissante - ce que clang-tidy signale a juste titre
+    // (bugprone-narrowing-conversions). Le calcul reste en double, ou il est plus precis, et seul le passage se fait.
+    return QColor::fromHslF( static_cast<float>( hue ), 0.45F, 0.70F ).name();
 }
 
 bool ExerciseSessionController::isChordHintAvailable() const noexcept
