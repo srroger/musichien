@@ -199,37 +199,123 @@ void writePhraseJson( const std::filesystem::path & p_path,
 
 // La page qui permet d'ECOUTER et de TRIER : ecrite par l'outil, pour qu'il n'y ait pas de page a copier.
 //
-// Elle ne fait que deux choses, et c'est assez : jouer un fichier, et montrer les degres de la phrase. Le tri lui-meme
-// reste ce qu'il doit etre - un geste de l'oreille, une fois le casque sur la tete.
+// Elle fait trois choses, et pas une de plus : jouer un fichier, montrer les degres de la phrase, et RETENIR le tri. Le
+// tri lui-meme reste ce qu'il doit etre - un geste de l'oreille, une fois le casque sur la tete - mais ce qu'il produit
+// doit pouvoir sortir de la page : une liste de noms de fichiers, a coller dans un message.
+//
+// Le tri est garde dans le navigateur, parce qu'il se fait en PLUSIEURS FOIS : trois cents phrases ne s'ecoutent pas
+// d'un coup, et reprendre a zero parce qu'un onglet s'est ferme serait une raison de ne pas finir.
+//
+// Et la page dit ce qu'elle ne fait pas : aucun WAV n'entre dans le jeu. Ce qui voyage, c'est le fichier JSON ecrit a
+// cote - les degres, la tonique, le tempo - et c'est le moteur du jeu qui les rejouera.
 void writeIndexHtml( const std::filesystem::path & p_path, const std::vector<RenderedPhrase> & p_rendered )
 {
-    std::ofstream html{ p_path };
-
-    html << "<!DOCTYPE html>\n<html lang='fr'>\n<head>\n<meta charset='utf-8'>\n";
-    html << "<title>Atelier des phrases</title>\n<style>\n";
-    html << "body{background:#1d1033;color:#e8dcff;font-family:sans-serif;padding:16px}\n";
-    html << "li{margin:8px 0;padding:8px;border:1px solid #4a3170;border-radius:8px;list-style:none}\n";
-    html << ".mode{color:#8ef2b0}.degres{color:#cbb8e8;font-size:13px}\n";
-    html << "audio{vertical-align:middle;height:32px}\n</style>\n</head>\n<body>\n";
-    html << "<h1>Atelier des phrases</h1>\n";
-    html << "<p>Ecoute, puis garde ce qui te parle. Le tri se fait en deplacant les WAV retenus vers "
-            "assets/content.</p>\n";
-
-    // Un bouton plutot qu'un lecteur audio : trier trois cents phrases se fait a la chaine, et le lecteur integre du
-    // navigateur ajoute deux gestes par phrase. Le fichier joue est le WAV, tel quel - aucun format compresse n'entre
-    // dans cet atelier, puisque ce qu'on y entend doit etre exactement ce que le jeu jouera.
-    html << "<script>\n";
-    html << "function play(target){ new Audio(target).play(); }\n";
-    html << "</script>\n<ul>\n";
+    // Un bouton de filtre par mode, dans l'ordre ou les phrases les font apparaitre.
+    std::vector<std::string> modeIdentifiers;
 
     for( const RenderedPhrase & rendered : p_rendered )
     {
-        html << "<li><button onclick=\"play('" << rendered.fileName << "')\">▶</button> ";
-        html << "<span class='mode'>" << rendered.modeIdentifier << "</span> ";
-        html << "<span class='degres'>" << rendered.degrees << "</span></li>\n";
+        if( std::find( modeIdentifiers.begin(), modeIdentifiers.end(), rendered.modeIdentifier )
+            == modeIdentifiers.end() )
+        {
+            modeIdentifiers.push_back( rendered.modeIdentifier );
+        }
     }
 
-    html << "</ul>\n</body>\n</html>\n";
+    std::ofstream html{ p_path };
+
+    html << R"HTML(<!DOCTYPE html>
+<html lang='fr'>
+<head>
+<meta charset='utf-8'>
+<title>Atelier des phrases</title>
+<style>
+body{background:#1d1033;color:#e8dcff;font-family:sans-serif;padding:16px 16px 180px}
+h1{font-size:20px;margin:0 0 6px}
+.aide{color:#cbb8e8;font-size:14px;margin:0 0 12px;max-width:760px}
+.filtres button{background:#33224d}
+ul{padding:0;margin:0}
+li{margin:6px 0;padding:8px;border:1px solid #4a3170;border-radius:8px;list-style:none;display:flex;align-items:center;gap:10px}
+li.garde{border-color:#8ef2b0;background:#241640}
+button{background:#4a3170;color:#e8dcff;border:0;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px}
+button:hover{background:#5d3f8c}
+.mode{color:#8ef2b0;min-width:120px}
+.degres{color:#cbb8e8;font-size:13px}
+#bilan{position:fixed;left:0;right:0;bottom:0;background:#150b26;border-top:1px solid #4a3170;padding:10px 16px}
+#compte{color:#8ef2b0;font-weight:bold}
+#liste{width:100%;height:52px;margin-top:8px;background:#1d1033;color:#8ef2b0;border:1px solid #4a3170;border-radius:6px;font-family:monospace;font-size:12px}
+</style>
+</head>
+<body>
+<h1>Atelier des phrases</h1>
+<p class='aide'>Ecoute, puis coche ce qui te parle. Le tri est garde dans ce navigateur : il se reprend ou il s'est arrete. La liste du bas est ce qui compte - et aucun WAV n'entre dans le jeu, seuls les degres voyagent.</p>
+<div class='filtres'>
+<button onclick='filtre("")'>Tous</button>
+)HTML";
+
+    for( const std::string & modeIdentifier : modeIdentifiers )
+    {
+        html << "<button onclick='filtre(\"" << modeIdentifier << "\")'>" << modeIdentifier << "</button>\n";
+    }
+
+    html << "</div>\n<ul>\n";
+
+    for( const RenderedPhrase & rendered : p_rendered )
+    {
+        // &#9654; plutot que le caractere lui-meme : la page est ecrite octet par octet, et un symbole ecrit en clair
+        // finirait par dependre de l'encodage du jour.
+        html << "<li class='item' data-mode='" << rendered.modeIdentifier << "'>";
+        html << "<input type='checkbox' class='garde' value='" << rendered.fileName << "' onchange='mettreAJour()'>";
+        html << "<button onclick=\"play('" << rendered.fileName << "')\">&#9654;</button>";
+        html << "<span class='mode'>" << rendered.modeIdentifier << "</span>";
+        html << "<span class='degres'>" << rendered.degrees << "</span>";
+        html << "</li>\n";
+    }
+
+    html << R"HTML(</ul>
+<div id='bilan'>
+<div><span id='compte'>0</span> phrase(s) retenue(s)
+<button onclick='copier()'>Copier la liste</button>
+<button onclick='vider()'>Tout decocher</button></div>
+<textarea id='liste' readonly></textarea>
+</div>
+<script>
+const CLE='musichien-atelier-phrases';
+function play(fichier){ new Audio(fichier).play(); }
+function mettreAJour(){
+  const gardees=[...document.querySelectorAll('.garde:checked')].map(function(c){return c.value;});
+  document.querySelectorAll('.item').forEach(function(item){
+    item.classList.toggle('garde', item.querySelector('.garde').checked);
+  });
+  document.getElementById('compte').textContent=gardees.length;
+  document.getElementById('liste').value=gardees.join('\n');
+  localStorage.setItem(CLE, JSON.stringify(gardees));
+}
+function restaurer(){
+  let gardees=[];
+  try { gardees=JSON.parse(localStorage.getItem(CLE)||'[]'); } catch(e) { gardees=[]; }
+  document.querySelectorAll('.garde').forEach(function(c){ c.checked=gardees.indexOf(c.value)>=0; });
+  mettreAJour();
+}
+function filtre(mode){
+  document.querySelectorAll('.item').forEach(function(item){
+    item.style.display=(!mode||item.dataset.mode===mode)?'flex':'none';
+  });
+}
+function copier(){
+  const zone=document.getElementById('liste');
+  zone.select();
+  document.execCommand('copy');
+}
+function vider(){
+  document.querySelectorAll('.garde').forEach(function(c){ c.checked=false; });
+  mettreAJour();
+}
+restaurer();
+</script>
+</body>
+</html>
+)HTML";
 }
 
 }    // namespace
