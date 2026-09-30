@@ -922,6 +922,11 @@ Item {
                         if (!visible)
                             return "";
 
+                        // Un SEUL mode a sonne - une question de nom : il n'y a rien a comparer, et « undefined -> Dorien »
+                        // n'aurait aucun sens. C'est ce que Roger voyait a la victoire, sur une question de nom.
+                        if (ExerciseController.previousMode.name === undefined)
+                            return ExerciseController.heardMode.name + " — " + ExerciseController.heardMode.characteristic;
+
                         if (sameness)
                             return qsTr("Les deux passages : %1 — pareils").arg(ExerciseController.heardMode.name);
 
@@ -936,9 +941,10 @@ Item {
                     wrapMode: Text.WordWrap
                     color: "#8ef2b0"
                     font.pixelSize: 14
-                    // Une phrase VIDE, c'est « il n'y a rien a dire » - le cas des deux passages pareils.
-                    visible: modeVerdict.visible && !modeVerdict.sameness
-                    text: modeVerdict.visible && !modeVerdict.sameness ? ExerciseController.modeDifference.sentence : ""
+                    // Trois cas ou il n'y a rien a dire ici : la question est encore posee, les deux passages etaient
+                    // pareils, ou un seul mode a sonne - et sa caracteristique est deja ecrite dans le verdict.
+                    visible: modeVerdict.visible && !modeVerdict.sameness && ExerciseController.previousMode.name !== undefined
+                    text: modeVerdict.visible && !modeVerdict.sameness && ExerciseController.previousMode.name !== undefined ? ExerciseController.modeDifference.sentence : ""
                 }
 
                 // Elle est là PENDANT la question, et c'est un choix de Roger : « je mettrais quand même la roue dans la
@@ -954,11 +960,26 @@ Item {
                     notes: ExerciseController.modeCircle
                 }
 
+                // Et DE QUOI elle parle : sur une question de couleur, deux modes ont sonne, et la roue est celle du
+                // second. Sans cette ligne, Roger l'a dit en jouant : « on ne sait pas a qui correspond le cercle ».
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    visible: ExerciseController.modeCircleLabel !== ""
+                    text: ExerciseController.modeCircleLabel
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 10
                     visible: ExerciseController.isModeColourQuestion
 
+                    // Le « neutre » au MILIEU, comme Roger le demandait : plus clair d'un cote, plus sombre de l'autre, et
+                    // « pareil » entre les deux. Une reponse qui ne prend pas parti se lit mieux la ou elle est.
                     Button {
                         Layout.fillWidth: true
                         height: 56
@@ -970,20 +991,17 @@ Item {
                     Button {
                         Layout.fillWidth: true
                         height: 56
-                        text: qsTr("Plus sombre")
-                        enabled: ExerciseController.isAsking
-                        onClicked: ExerciseController.answerModeColour(false)
-                    }
-
-                    // Le troisieme bouton, demande par Roger, et ce n'est pas un bouton de secours : quand le jeu pose
-                    // deux fois la MEME couleur, c'est la seule bonne reponse. Ne pas inventer une difference est une
-                    // competence d'oreille, et c'est celle qu'on perd en cherchant toujours quelque chose a entendre.
-                    Button {
-                        Layout.fillWidth: true
-                        height: 56
                         text: qsTr("Pareil")
                         enabled: ExerciseController.isAsking
                         onClicked: ExerciseController.answerSameColour()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        height: 56
+                        text: qsTr("Plus sombre")
+                        enabled: ExerciseController.isAsking
+                        onClicked: ExerciseController.answerModeColour(false)
                     }
 
                 }

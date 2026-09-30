@@ -178,6 +178,12 @@ class ExerciseSessionController final : public QObject
     // jamais bouger d'un mode a l'autre.
     Q_PROPERTY( QVariantList modeCircle READ modeCircle NOTIFY questionChanged )
 
+    // Ce que la roue montre, et DUQUEL il s'agit : Roger, en jouant - « on ne sait pas a qui correspond le cercle ».
+    //
+    // Sur une question de couleur, DEUX modes ont sonne, et le cercle est celui du SECOND - c'est le seul des deux que la
+    // question nomme. Le nom lui-meme n'arrive qu'avec le verdict : avant, ce serait la reponse de la question de nom.
+    Q_PROPERTY( QString modeCircleLabel READ modeCircleLabel NOTIFY questionChanged )
+
     // Les deux parts de l'harmonie, en pour cent : comparer deux modes, et nommer un mode. Deux reglages, parce que ce
     // sont deux competences - un joueur peut vouloir la comparaison sans le vocabulaire, et l'inverse.
     Q_PROPERTY( int modeColourQuestionShare READ modeColourQuestionShare WRITE setModeColourQuestionShare NOTIFY
@@ -357,6 +363,8 @@ public:
     [[nodiscard]] QVariantMap modeDifference() const;
 
     [[nodiscard]] QVariantList modeCircle() const;
+
+    [[nodiscard]] QString modeCircleLabel() const;
 
     [[nodiscard]] int modeColourQuestionShare() const;
 

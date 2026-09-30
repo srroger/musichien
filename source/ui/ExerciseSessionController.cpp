@@ -1020,6 +1020,28 @@ QVariantList ExerciseSessionController::modeCircle() const
     return describeModeCircle( question.mode, question.modeTonic.pitchClassIndex() );
 }
 
+QString ExerciseSessionController::modeCircleLabel() const
+{
+    if( ( m_session == nullptr ) || !isModeQuestion() )
+    {
+        return {};
+    }
+
+    const domain::Question & question = m_session->currentQuestion();
+
+    // Le NOM du mode n'arrive qu'avec le verdict : avant la reponse, il serait la reponse - de la question de nom comme
+    // de la question de couleur, ou il est une des deux choses qu'on demande de comparer.
+    const QString modeName = isAsking() ? QString{} : describeMode( question.mode ).value( "name" ).toString();
+
+    if( question.kind == domain::QuestionKind::ModeName )
+    {
+        return modeName.isEmpty() ? tr( "Le mode entendu" ) : modeName;
+    }
+
+    // Une question de couleur ou un vamp : DEUX modes ont sonne, et la roue est celle du SECOND.
+    return modeName.isEmpty() ? tr( "Le second passage" ) : tr( "Le second passage : %1" ).arg( modeName );
+}
+
 void ExerciseSessionController::answerModeColour( bool p_secondIsBrighter )
 {
     if( m_session == nullptr )

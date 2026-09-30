@@ -34,6 +34,10 @@ Item {
 
         anchors.fill: parent
         anchors.margins: 16
+        // Et de la place EN BAS, parce que le bas de l'ecran n'appartient pas a l'application : sur un telephone, la
+        // barre de navigation du systeme y vit. Roger l'a vu en jouant - « les degres en bas sont trop en bas, ils sont
+        // caches par le layout des boutons du telephone ».
+        anchors.bottomMargin: 72
         spacing: 8
 
         Text {
