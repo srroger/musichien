@@ -878,7 +878,12 @@ Item {
                     wrapMode: Text.WordWrap
                     color: "#8ef2b0"
                     font.pixelSize: 14
-                    visible: ExerciseController.heardMode.name !== undefined
+                    // Le mode qui vient de sonner n'est NOMME que la ou le nom ne donne pas la reponse.
+                    //
+                    // Sur une question de COMPARAISON, savoir lequel des deux on vient d'entendre n'aide pas a dire
+                    // s'il est plus clair : la reponse est un SENS, pas un nom. Mais sur une question de NOM, l'ecrire
+                    // pendant la question serait donner la reponse - et c'est ce que faisait la premiere version.
+                    visible: ExerciseController.heardMode.name !== undefined && (ExerciseController.isModeColourQuestion || !ExerciseController.isAsking)
                     text: ExerciseController.heardMode.name !== undefined ? ExerciseController.heardMode.name + " — " + ExerciseController.heardMode.characteristic : ""
                 }
 
@@ -889,7 +894,9 @@ Item {
                     wrapMode: Text.WordWrap
                     color: "#cbb8e8"
                     font.pixelSize: 14
-                    visible: ExerciseController.isModeColourQuestion && ExerciseController.previousMode.name !== undefined
+                    // Le premier mode est une AIDE a la comparaison, jamais une information de question : on le dit donc
+                    // une fois la reponse donnee, pas pendant.
+                    visible: !ExerciseController.isAsking && ExerciseController.previousMode.name !== undefined
                     text: ExerciseController.previousMode.name !== undefined ? qsTr("Le premier était : %1").arg(ExerciseController.previousMode.name) : ""
                 }
 
