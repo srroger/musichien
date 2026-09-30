@@ -45,9 +45,6 @@ ApplicationWindow {
     // L'accordeur vivait dans les reglages, ce qui est la meilleure facon de ne jamais le trouver : c'est un OUTIL, et un
     // outil se prend quand on en a besoin. La page porte les trois choses qui vont ensemble - le micro, les reglages
     // d'accordage, et de quoi comprendre ce qu'on regle.
-
-    id: mainWindow
-
     // Hides the explanatory text after a few seconds: enough time to read a name and a number, short
     // enough that the screen does not stay cluttered.
     // -------------------------------------------------------------------------------------------------
@@ -62,7 +59,9 @@ ApplicationWindow {
     // Un champ numerique aux couleurs du jeu.
     // Les couleurs des parts du camembert : un vert pour l'oreille, un bleu pour le sens, un dore pour le chant, un rose
     // pour le rythme, un violet pour les accords, un turquoise pour la couleur des modes et un orange pour leur nom.
-    //
+
+    id: mainWindow
+
     // Le NOMBRE compte : une part prend sa couleur par son RANG, donc une palette plus courte que la liste des genres
     // ferait reapparaitre les premieres couleurs sur les derniers genres - et deux parts de la meme teinte dans un
     // camembert ne disent plus rien.

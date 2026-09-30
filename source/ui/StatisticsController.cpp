@@ -139,7 +139,17 @@ constexpr qint64 MINUTES_PER_HOUR = 60;
         case domain::QuestionKind::ModeName: {
             // La cible d'une question d'harmonie est l'INDEX du mode pose. Un index hors bornes ne peut venir que d'un
             // journal edite a la main : il coute un nom, jamais la page.
-            if( ( p_target.target < 0 ) || ( p_target.target >= static_cast<std::int32_t>( domain::MODE_COUNT ) ) )
+            //
+            // Le SIGNE d'abord, la borne ensuite : convertir un index negatif en size_t en ferait un tres grand nombre,
+            // et la borne passerait alors pour la mauvaise raison.
+            constexpr auto MODE_COUNT = static_cast<std::int32_t>( domain::MODE_COUNT );
+
+            if( p_target.target < 0 )
+            {
+                return StatisticsController::tr( "Mode" );
+            }
+
+            if( p_target.target >= MODE_COUNT )
             {
                 return StatisticsController::tr( "Mode" );
             }
@@ -248,11 +258,11 @@ void StatisticsController::refresh()
 
         const auto index = static_cast<std::size_t>( HISTOGRAM_DAY_COUNT - 1 - daysAgo );
 
-        ++questionsPerDay[index];
+        questionsPerDay.at( index ) += 1;
 
         if( record.isCorrect() )
         {
-            ++correctPerDay[index];
+            correctPerDay.at( index ) += 1;
         }
     }
 
