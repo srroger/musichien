@@ -90,6 +90,27 @@ public:
         playMelody( p_melody, p_gap );
     }
 
+    // Une PHRASE sur un bourdon : les memes notes que ci-dessus, mais CHACUNE avec sa duree.
+    //
+    // C'est la difference entre une gamme et une phrase, et elle n'est pas cosmetique : les degres disent la couleur, et
+    // les DUREES disent la musique. Jouer une phrase en notes uniformes ferait entendre autre chose que la phrase que
+    // l'oreille avait choisie - et ce serait pourtant celle-la qu'on lui aurait fait ecouter.
+    //
+    // Un corps par defaut, comme playChordFor : un adaptateur qui ignore les phrases joue la melodie avec la premiere
+    // duree pour toutes. La phrase perd son rythme, mais elle reste audible, et rien ne casse.
+    virtual void playPhraseOverDrone( std::span<const Note> p_melody,
+                                      std::span<const std::chrono::milliseconds> p_durations,
+                                      std::span<const Note> p_drone,
+                                      std::chrono::milliseconds p_gap,
+                                      DroneFraming p_framing = {} )
+    {
+        // Le nom de la variable ne peut pas etre celui de la methode qu'elle appelle : le masquage ferait du repli un
+        // appel a la variable elle-meme.
+        const std::chrono::milliseconds fallbackDuration = p_durations.empty() ? noteDuration() : p_durations.front();
+
+        playMelodyOverDrone( p_melody, p_drone, fallbackDuration, p_gap, p_framing );
+    }
+
     // Plays the short cue that marks a mistake.
     //
     // A cue is NOT an interval, and the domain says so here rather than leaving the distinction to the

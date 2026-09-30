@@ -347,24 +347,56 @@ std::vector<float> ToneSynthesizer::renderMelody( std::span<const Note> p_notes,
                                                   std::chrono::milliseconds p_gap,
                                                   TuningContext p_tuning ) const
 {
+    // Une note, une duree, repetee : la version uniforme n'est qu'un CAS PARTICULIER de celle qui suit. Il n'y a donc
+    // qu'une seule facon de rendre une melodie - deux boucles paralleles finiraient par diverger sur un detail, et c'est
+    // la divergence qui coute, jamais la ligne economisee.
+    const std::vector<std::chrono::milliseconds> durations( p_notes.size(), p_noteDuration );
+
+    return renderMelody( p_notes, durations, p_gap, p_tuning );
+}
+
+std::vector<float> ToneSynthesizer::renderMelody( std::span<const Note> p_notes,
+                                                  std::span<const std::chrono::milliseconds> p_durations,
+                                                  std::chrono::milliseconds p_gap,
+                                                  TuningContext p_tuning ) const
+{
     std::vector<float> melodySamples;
 
-    if( p_notes.empty() )
+    // Sans note, il n'y a rien a jouer ; sans DUREE, il n'y a rien a tenir. Les deux sont des reponses, et la seconde
+    // ne se devine pas : une duree par defaut inventee ici ferait sonner une phrase que personne n'a ecrite.
+    if( p_notes.empty() || p_durations.empty() )
     {
         return melodySamples;
     }
 
     const std::size_t gapSampleCount = sampleCountFor( p_gap );
 
-    melodySamples.reserve( p_notes.size() * ( sampleCountFor( p_noteDuration ) + gapSampleCount ) );
+    // Une duree par note, et la derniere connue pour celles qui n'en ont pas : c'est la somme qui dimensionne le
+    // tampon, et la calculer evite de le faire grandir au fil des insertions.
+    std::size_t sampleCount = 0;
+
+    for( const std::size_t index : std::views::iota( std::size_t{ 0 }, p_notes.size() ) )
+    {
+        const std::chrono::milliseconds duration =
+          ( index < p_durations.size() ) ? p_durations[index] : p_durations.back();
+
+        sampleCount += sampleCountFor( duration ) + gapSampleCount;
+    }
+
+    melodySamples.reserve( sampleCount );
 
     // A melody is heard FROM its first note, exactly like a chord: the interval is built on the root it starts on.
     const Note root = p_notes.front();
 
-    for( const Note & note : p_notes )
+    for( const std::size_t index : std::views::iota( std::size_t{ 0 }, p_notes.size() ) )
     {
+        const std::chrono::milliseconds duration =
+          ( index < p_durations.size() ) ? p_durations[index] : p_durations.back();
+
+        const Note & note = p_notes[index];
+
         const std::vector<float> noteSamples =
-          renderNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_noteDuration );
+          renderNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), duration );
 
         melodySamples.insert( melodySamples.end(), noteSamples.begin(), noteSamples.end() );
 
@@ -384,6 +416,23 @@ std::chrono::milliseconds droneDurationFor( std::size_t p_noteCount,
     return p_framing.leadIn + ( ( p_noteDuration + p_gap ) * static_cast<std::int64_t>( p_noteCount ) ) + p_framing.tail;
 }
 
+std::chrono::milliseconds droneDurationFor( std::span<const std::chrono::milliseconds> p_durations,
+                                            std::chrono::milliseconds p_gap,
+                                            DroneFraming p_framing ) noexcept
+{
+    // Le silence est compte UNE fois par note, comme dans la version uniforme : c'est la meme phrase musicale, lue pas a
+    // pas au lieu d'etre multipliee. Aucune allocation, pour la meme raison que l'autre : cette fonction est appelee a
+    // chaque lecture, et elle est `noexcept`.
+    std::chrono::milliseconds total = p_framing.leadIn + p_framing.tail;
+
+    for( const std::chrono::milliseconds duration : p_durations )
+    {
+        total += duration + p_gap;
+    }
+
+    return total;
+}
+
 std::vector<float> ToneSynthesizer::renderMelodyOverDrone( std::span<const Note> p_melody,
                                                            std::span<const Note> p_drone,
                                                            std::chrono::milliseconds p_noteDuration,
@@ -391,15 +440,28 @@ std::vector<float> ToneSynthesizer::renderMelodyOverDrone( std::span<const Note>
                                                            TuningContext p_tuning,
                                                            DroneFraming p_framing ) const
 {
+    // Meme raison que pour renderMelody : une note, une duree, repetee, puis la vraie fonction.
+    const std::vector<std::chrono::milliseconds> durations( p_melody.size(), p_noteDuration );
+
+    return renderMelodyOverDrone( p_melody, p_drone, durations, p_gap, p_tuning, p_framing );
+}
+
+std::vector<float> ToneSynthesizer::renderMelodyOverDrone( std::span<const Note> p_melody,
+                                                           std::span<const Note> p_drone,
+                                                           std::span<const std::chrono::milliseconds> p_durations,
+                                                           std::chrono::milliseconds p_gap,
+                                                           TuningContext p_tuning,
+                                                           DroneFraming p_framing ) const
+{
     if( p_melody.empty() || p_drone.empty() )
     {
-        return renderMelody( p_melody, p_noteDuration, p_gap, p_tuning );
+        return renderMelody( p_melody, p_durations, p_gap, p_tuning );
     }
 
     // Le bourdon tient PLUS LONGTEMPS que la melodie, des deux cotes : c'est ce qui installe le centre avant que la
     // couleur n'arrive, et ce qui le laisse sonner apres la derniere note. Le verdict d'ecoute du 30/09/2026 l'a
     // demande exactement ainsi : « le bourdon est au bon volume, mais on ne l'entend pas assez longtemps ».
-    const std::chrono::milliseconds droneDuration = droneDurationFor( p_melody.size(), p_noteDuration, p_gap, p_framing );
+    const std::chrono::milliseconds droneDuration = droneDurationFor( p_durations, p_gap, p_framing );
 
     // LE BOURDON EST UNE ONDE ENTRETENUE, et non une corde frappee : un test l'a montre apres que l'oreille l'avait
     // dit. Une corde frappee DECROIT - mesure faite, 1,85 s apres son depart, elle etait trente decibels sous son
@@ -411,7 +473,7 @@ std::vector<float> ToneSynthesizer::renderMelodyOverDrone( std::span<const Note>
     // gresille pas - ce que la dents de scie de la version precedente ne savait pas faire.
     const std::vector<float> droneSamples = renderWaveChord( p_drone, Waveform::Organ, droneDuration, p_tuning );
 
-    return mixMelodyOverDrone( p_melody, droneSamples, p_noteDuration, p_gap, p_tuning, p_framing );
+    return mixMelodyOverDrone( p_melody, droneSamples, p_durations, p_gap, p_tuning, p_framing );
 }
 
 std::vector<float> ToneSynthesizer::mixMelodyOverDrone( std::span<const Note> p_melody,
@@ -421,9 +483,22 @@ std::vector<float> ToneSynthesizer::mixMelodyOverDrone( std::span<const Note> p_
                                                         TuningContext p_tuning,
                                                         DroneFraming p_framing ) const
 {
+    // Meme raison que pour renderMelody : la version uniforme est le cas particulier d'une note, une duree, repetee.
+    const std::vector<std::chrono::milliseconds> durations( p_melody.size(), p_noteDuration );
+
+    return mixMelodyOverDrone( p_melody, p_droneSamples, durations, p_gap, p_tuning, p_framing );
+}
+
+std::vector<float> ToneSynthesizer::mixMelodyOverDrone( std::span<const Note> p_melody,
+                                                        std::span<const float> p_droneSamples,
+                                                        std::span<const std::chrono::milliseconds> p_durations,
+                                                        std::chrono::milliseconds p_gap,
+                                                        TuningContext p_tuning,
+                                                        DroneFraming p_framing ) const
+{
     // PAS de const ici : un tampon const ne peut plus etre DEPLACE au retour, donc il serait copie - une copie de
     // 200 000 echantillons pour rien, dans la fonction la plus appelee de l'exercice.
-    std::vector<float> melodySamples = renderMelody( p_melody, p_noteDuration, p_gap, p_tuning );
+    std::vector<float> melodySamples = renderMelody( p_melody, p_durations, p_gap, p_tuning );
 
     if( melodySamples.empty() )
     {

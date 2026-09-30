@@ -498,6 +498,56 @@ void QAudioNotePlayer::playMelodyOverDrone( std::span<const domain::Note> p_melo
     playSamples( m_synthesizer->renderMelodyOverDrone( p_melody, p_drone, p_noteDuration, p_gap, m_tuning, p_framing ) );
 }
 
+void QAudioNotePlayer::playPhraseOverDrone( std::span<const domain::Note> p_melody,
+                                            std::span<const std::chrono::milliseconds> p_durations,
+                                            std::span<const domain::Note> p_drone,
+                                            std::chrono::milliseconds p_gap,
+                                            domain::DroneFraming p_framing )
+{
+    // Exactement le meme chemin que playMelodyOverDrone, a une chose pres : les durees. Recopier la mecanique plutot que
+    // d'en inventer une seconde est delibere - une phrase et une gamme doivent sonner du meme bourdon, au meme niveau,
+    // decalees de la meme facon, sinon comparer l'une a l'autre serait comparer deux choses differentes.
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    if( !m_drones.empty() )
+    {
+        const bool sameDrone = ( p_drone.size() == m_lastDroneNotes.size() )
+                               && std::is_permutation( p_drone.begin(), p_drone.end(), m_lastDroneNotes.begin() );
+
+        if( !sameDrone )
+        {
+            m_lastDroneNotes.assign( p_drone.begin(), p_drone.end() );
+
+            std::uniform_int_distribution<std::size_t> distribution{ 0, m_drones.size() - 1 };
+
+            m_droneIndex = distribution( m_instrumentRandomEngine );
+        }
+
+        const domain::SampledInstrument & drone = m_drones.at( m_droneIndex );
+
+        // La duree du bourdon est la SOMME des pas, silences compris : c'est la meme regle que pour une melodie
+        // reguliere, et elle vit dans le domaine pour que les deux bourdons - celui de la synthese et celui des
+        // echantillons - ne puissent pas diverger.
+        const std::vector<float> droneSamples =
+          drone.renderChord( p_drone,
+                             domain::droneDurationFor( p_durations, p_gap, p_framing ),
+                             m_audioFormat.sampleRate(),
+                             m_tuning );
+
+        playSamples(
+          m_synthesizer->mixMelodyOverDrone( p_melody, droneSamples, p_durations, p_gap, m_tuning, p_framing ) );
+
+        return;
+    }
+
+    playSamples( m_synthesizer->renderMelodyOverDrone( p_melody, p_drone, p_durations, p_gap, m_tuning, p_framing ) );
+}
+
 void QAudioNotePlayer::playMistakeCue()
 {
     ensureAudioOutputIsOpen();

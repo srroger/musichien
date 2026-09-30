@@ -50,6 +50,19 @@ public:
         DroneFraming framing{};
     };
 
+    // Un appel a playPhraseOverDrone : la melodie, la duree de CHAQUE pas, et le bourdon.
+    //
+    // Les durees sont gardees telles quelles, sans etre reduites a une moyenne : c'est ce qui permet a un test de dire
+    // « la note longue est bien restee longue », qui est exactement ce qu'une phrase a de plus qu'une gamme.
+    struct PlayedPhraseOverDrone
+    {
+        std::vector<Note> melody;
+        std::vector<std::chrono::milliseconds> durations;
+        std::vector<Note> drone;
+        std::chrono::milliseconds gap{ 0 };
+        DroneFraming framing{};
+    };
+
     explicit NotePlayerFake( std::chrono::milliseconds p_noteDuration = std::chrono::milliseconds{ 600 } )
       : m_noteDuration{ p_noteDuration }
     {
@@ -83,6 +96,20 @@ public:
                                                          std::vector<Note>{ p_drone.begin(), p_drone.end() },
                                                          p_gap,
                                                          p_framing } );
+    }
+
+    void playPhraseOverDrone( std::span<const Note> p_melody,
+                              std::span<const std::chrono::milliseconds> p_durations,
+                              std::span<const Note> p_drone,
+                              std::chrono::milliseconds p_gap,
+                              DroneFraming p_framing = {} ) override
+    {
+        m_phrasesOverDrones.push_back( PlayedPhraseOverDrone{
+          std::vector<Note>{ p_melody.begin(), p_melody.end() },
+          std::vector<std::chrono::milliseconds>{ p_durations.begin(), p_durations.end() },
+          std::vector<Note>{ p_drone.begin(), p_drone.end() },
+          p_gap,
+          p_framing } );
     }
 
     void playMistakeCue() override
@@ -165,6 +192,13 @@ public:
     {
         return m_melodiesOverDrones;
     }
+
+    // Les appels « phrase sur bourdon », avec la duree de chaque pas : c'est ce qu'un test lit pour verifier qu'une
+    // phrase n'a pas ete jouee comme une gamme reguliere.
+    [[nodiscard]] const std::vector<PlayedPhraseOverDrone> & phrasesOverDrones() const noexcept
+    {
+        return m_phrasesOverDrones;
+    }
     [[nodiscard]] int mistakeCueCount() const noexcept { return m_mistakeCueCount; }
     [[nodiscard]] int stopCount() const noexcept { return m_stopCount; }
 
@@ -212,6 +246,7 @@ public:
         m_playedMelodies.clear();
         m_playedChords.clear();
         m_melodiesOverDrones.clear();
+        m_phrasesOverDrones.clear();
         m_mistakeCueCount = 0;
         m_stopCount = 0;
         m_metronomeClickCount = 0;
@@ -231,6 +266,7 @@ private:
     std::vector<PlayedGroup> m_playedMelodies;
     std::vector<PlayedGroup> m_playedChords;
     std::vector<PlayedOverDrone> m_melodiesOverDrones;
+    std::vector<PlayedPhraseOverDrone> m_phrasesOverDrones;
     int m_mistakeCueCount{ 0 };
     int m_stopCount{ 0 };
     int m_metronomeClickCount{ 0 };

@@ -98,6 +98,12 @@ struct DroneFraming
                                                           std::chrono::milliseconds p_gap,
                                                           DroneFraming p_framing = {} ) noexcept;
 
+// La meme duree, pour une phrase dont chaque note a la sienne. Le silence est compte UNE fois par note, exactement
+// comme ci-dessus : la formule ne change pas, seule la facon de la parcourir change.
+[[nodiscard]] std::chrono::milliseconds droneDurationFor( std::span<const std::chrono::milliseconds> p_durations,
+                                                          std::chrono::milliseconds p_gap,
+                                                          DroneFraming p_framing = {} ) noexcept;
+
 class ToneSynthesizer
 {
 public:
@@ -193,6 +199,19 @@ public:
                                                    std::chrono::milliseconds p_gap,
                                                    TuningContext p_tuning = {} ) const;
 
+    // Les memes notes, dont CHACUNE a sa duree : c'est ce qu'une PHRASE demande.
+    //
+    // Une phrase n'est pas une gamme : les degres disent la couleur, et les durees disent la musique. La jouer en notes
+    // uniformes en ferait une AUTRE phrase - et ce serait pourtant celle-la qu'on ferait entendre a l'oreille qui a
+    // choisi la vraie.
+    //
+    // Une note pour laquelle aucune duree n'est donnee garde la derniere duree CONNUE : un appelant qui compte mal
+    // obtient quelque chose d'audible, plutot qu'un silence qu'il ne comprendrait pas.
+    [[nodiscard]] std::vector<float> renderMelody( std::span<const Note> p_notes,
+                                                   std::span<const std::chrono::milliseconds> p_durations,
+                                                   std::chrono::milliseconds p_gap,
+                                                   TuningContext p_tuning = {} ) const;
+
     // A melody heard OVER a drone that is held from its first note to its last: the two are heard TOGETHER.
     //
     // -------------------------------------------------------------------------------------------------------------
@@ -230,6 +249,15 @@ public:
                                                             TuningContext p_tuning = {},
                                                             DroneFraming p_framing = {} ) const;
 
+    // La meme chose pour une PHRASE, dont chaque note a sa duree. Le bourdon, lui, tient la somme des pas : il n'a pas
+    // a savoir que la phrase n'est pas reguliere.
+    [[nodiscard]] std::vector<float> renderMelodyOverDrone( std::span<const Note> p_melody,
+                                                            std::span<const Note> p_drone,
+                                                            std::span<const std::chrono::milliseconds> p_durations,
+                                                            std::chrono::milliseconds p_gap,
+                                                            TuningContext p_tuning = {},
+                                                            DroneFraming p_framing = {} ) const;
+
     // Mixe une melodie et un bourdon DEJA RENDUS : c'est la moitie « assemblage » de renderMelodyOverDrone.
     //
     // Pourquoi cette moitie existe separement : le TIMBRE du bourdon n'est pas une regle de musique, c'est une donnee de
@@ -244,6 +272,15 @@ public:
     [[nodiscard]] std::vector<float> mixMelodyOverDrone( std::span<const Note> p_melody,
                                                          std::span<const float> p_droneSamples,
                                                          std::chrono::milliseconds p_noteDuration,
+                                                         std::chrono::milliseconds p_gap,
+                                                         TuningContext p_tuning = {},
+                                                         DroneFraming p_framing = {} ) const;
+
+    // La meme regle d'assemblage, pour une phrase dont chaque note a sa duree. L'adaptateur audio en a besoin : c'est
+    // par elle qu'un bourdon ENREGISTRE et une phrase se rencontrent.
+    [[nodiscard]] std::vector<float> mixMelodyOverDrone( std::span<const Note> p_melody,
+                                                         std::span<const float> p_droneSamples,
+                                                         std::span<const std::chrono::milliseconds> p_durations,
                                                          std::chrono::milliseconds p_gap,
                                                          TuningContext p_tuning = {},
                                                          DroneFraming p_framing = {} ) const;

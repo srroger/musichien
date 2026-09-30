@@ -76,6 +76,15 @@ public:
                               std::chrono::milliseconds p_gap,
                               domain::DroneFraming p_framing = {} ) override;
 
+    // Une PHRASE : chaque pas garde SA duree, et le bourdon tient la somme des pas. Meme regle d'assemblage que
+    // ci-dessus, et c'est ce qui garantit qu'une phrase et une gamme s'entendent avec le meme bourdon, au meme niveau,
+    // decalees de la meme facon.
+    void playPhraseOverDrone( std::span<const domain::Note> p_melody,
+                              std::span<const std::chrono::milliseconds> p_durations,
+                              std::span<const domain::Note> p_drone,
+                              std::chrono::milliseconds p_gap,
+                              domain::DroneFraming p_framing = {} ) override;
+
     void playMistakeCue() override;
 
     // Le clic de menu : un accuse de reception, pas une reponse.
