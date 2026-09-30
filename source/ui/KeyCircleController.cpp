@@ -85,7 +85,10 @@ KeyCircleController::KeyCircleController( QObject * p_parent )
 
     for( std::size_t index = 0; index < keys.size(); ++index )
     {
-        m_keys.append( describeKey( keys.at( index ), static_cast<int>( index ) ) );
+        // L'index est borne par la boucle, et l'acces se fait donc par l'operateur : std::span::at() n'existe que dans
+        // un C++26 tres recent, et le compilateur du NDK Android ne l'a pas encore. C'est la meme lecon que pour
+        // mixMelodyOverDrone, et il a fallu qu'un build Android la repete.
+        m_keys.append( describeKey( keys[index], static_cast<int>( index ) ) );
     }
 }
 

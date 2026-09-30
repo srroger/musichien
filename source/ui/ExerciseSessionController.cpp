@@ -2210,7 +2210,8 @@ void ExerciseSessionController::recordCurrentQuestion( bool p_wasCorrect, bool p
 
         case domain::QuestionKind::ModeColour:
         case domain::QuestionKind::ModeName:
-            // Pour les deux questions d'harmonie, la cible est l'INDEX du mode pose.
+        case domain::QuestionKind::ModeVamp:
+            // Pour les trois questions d'harmonie, la cible est l'INDEX du mode pose.
             //
             // Le genre dit laquelle des deux, et c'est ce qui permettra aux statistiques de separer « entendre une
             // couleur » de « savoir la nommer » - deux competences distinctes, et deux facons distinctes d'echouer.
