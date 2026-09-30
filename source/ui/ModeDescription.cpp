@@ -161,15 +161,36 @@ QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchC
 {
     QVariantList circle;
 
+    // LE PAS de chaque note, et il est calcule ICI parce que la roue et la gamme ne sont pas rangees pareil : la roue
+    // suit les QUINTES, la gamme suit les DEGRES. C'est ce pas que l'exercice de la note etrangere attend quand on
+    // appuie sur une pastille, et l'ecran n'a donc rien a reconcilier - il envoie ce que le domaine lui donne.
+    const std::array<std::int32_t, domain::DEGREE_COUNT> offsets = domain::modeDegreeOffsets( p_mode );
+
     for( const domain::CircleNote & entry : domain::modeCircleNotes( p_mode, p_tonicPitchClass ) )
     {
         const auto index = static_cast<std::size_t>( entry.pitchClassIndex );
+
+        const std::int32_t fromTonic = ( ( ( entry.pitchClassIndex - p_tonicPitchClass ) % domain::SEMITONES_PER_OCTAVE )
+                                         + domain::SEMITONES_PER_OCTAVE )
+                                       % domain::SEMITONES_PER_OCTAVE;
+
+        // Le rang du degre, ou -1 : une note hors de la gamme n'est pas un pas, et l'ecran ne doit pas la proposer.
+        std::int32_t stepIndex = -1;
+
+        for( std::size_t degree = 0; degree < offsets.size(); ++degree )
+        {
+            if( offsets.at( degree ) == fromTonic )
+            {
+                stepIndex = static_cast<std::int32_t>( degree );
+            }
+        }
 
         QVariantMap description;
 
         description.insert( QStringLiteral( "name" ), QString::fromUtf8( PITCH_CLASS_NAMES.at( index ) ) );
         description.insert( QStringLiteral( "inMode" ), entry.belongsToMode );
         description.insert( QStringLiteral( "isTonic" ), entry.isTonic );
+        description.insert( QStringLiteral( "stepIndex" ), stepIndex );
 
         circle.append( description );
     }

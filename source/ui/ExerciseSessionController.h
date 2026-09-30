@@ -286,6 +286,9 @@ class ExerciseSessionController final : public QObject
     // texte qu'on n'aurait pas du montrer. Le drapeau est arme par la fin d'une partie, jamais par une page.
     Q_PROPERTY( bool isChibaTalking READ isChibaTalking NOTIFY chibaTalkingChanged )
 
+    // L'humeur du chien qui parle : tiree au hasard parmi les siennes a chaque fois qu'il ouvre la bouche.
+    Q_PROPERTY( QString chibaImageSource READ chibaImageSource NOTIFY chibaTalkingChanged )
+
     // Vrai quand la partie est finie et gagnee : c'est ce qui decide quel chien vient a la fin.
     Q_PROPERTY( bool wasSessionWon READ wasSessionWon NOTIFY sessionChanged )
 
@@ -587,6 +590,9 @@ public:
     // tout seul - un texte qu'on n'a pas fini de lire est un texte qu'on n'aurait pas du montrer.
     [[nodiscard]] bool isChibaTalking() const noexcept { return m_isChibaTalking; }
 
+    // L'humeur du chien : un chemin de ressource, tire au hasard a chaque fois qu'il ouvre la bouche.
+    [[nodiscard]] QString chibaImageSource() const { return m_chibaImageSource; }
+
     // Remet les REGLAGES au defaut, et seulement eux.
     //
     // Roger l'a demande : « je rajouterais bien un "Reset by default" pour remettre tous les parametres par defaut ».
@@ -599,6 +605,11 @@ public:
 
     // Le joueur appuie sur le chien : il raconte autre chose.
     Q_INVOKABLE void tellAnotherAnecdote();
+
+    // Tire une des quatre humeurs du chien. Privee : c'est le deroulement - la fin d'une partie, ou le clic du joueur -
+    // qui la declenche, jamais l'ecran.
+    void pickChibaImage();
+
     [[nodiscard]] bool isFeedbackVisible() const noexcept;
     [[nodiscard]] bool wasLastAnswerCorrect() const noexcept;
     [[nodiscard]] int lastSungCentsOffset() const noexcept { return m_lastSungCentsOffset; }
@@ -1014,6 +1025,9 @@ private:
 
     // Le chien qui s'invite : arme par la fin d'une partie, desarme par le clic du joueur.
     bool m_isChibaTalking{ false };
+
+    // Son humeur du moment : une des quatre planches, tiree a chaque fois qu'il parle.
+    QString m_chibaImageSource{ QStringLiteral( "qrc:/assets/images/chibaSpeak.png" ) };
 
     // L'ecart mesure du dernier chant juge, mis de cote au moment de la reponse : le micro est resynchronise juste
     // apres, et la mesure serait perdue avec lui.

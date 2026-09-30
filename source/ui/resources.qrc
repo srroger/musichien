@@ -61,6 +61,10 @@
           chibaLose  : il a perdu, nuage et coeur brise.
         -->
         <file alias="assets/images/chibaSpeak.png">../../assets/images/chibaSpeak.png</file>
+        <!-- Les trois autres humeurs du chien qui parle : elles tournent au hasard avec la premiere. -->
+        <file alias="assets/images/chibaSpeak2.png">../../assets/images/chibaSpeak2.png</file>
+        <file alias="assets/images/chibaSpeak3.png">../../assets/images/chibaSpeak3.png</file>
+        <file alias="assets/images/chibaSpeak4.png">../../assets/images/chibaSpeak4.png</file>
         <file alias="assets/images/chibaWin.png">../../assets/images/chibaWin.png</file>
         <file alias="assets/images/chibaLose.png">../../assets/images/chibaLose.png</file>
     <!--

@@ -305,10 +305,16 @@ bool ExerciseSessionController::wasSessionWon() const noexcept
 
 void ExerciseSessionController::resetPreferences()
 {
-    // L'instrument : tous ceux que ce build connait. Un profil neuf doit sonner complet, pas vide.
+    // L'instrument : ceux d'un PREMIER lancement, et pas tous ceux que ce build connait. Roger l'a vu tout de suite -
+    // « les valeurs par defaut sont mauvaises, ce ne sont pas les valeurs qu'on a quand on installe l'application ». Un
+    // profil neuf sonne du piano et de la guitare ; le saxo et les formes d'onde sont OFFERTS, jamais imposes.
+    const std::vector<bool> defaultInstruments = domain::defaultEnabledInstruments();
+
     for( std::size_t index = 0; index < domain::INSTRUMENT_COUNT; ++index )
     {
-        setInstrumentEnabled( static_cast<int>( index ), true );
+        const bool isEnabled = std::cmp_less( index, defaultInstruments.size() ) ? defaultInstruments.at( index ) : true;
+
+        setInstrumentEnabled( static_cast<int>( index ), isEnabled );
     }
 
     // Les poids : ceux du DOMAINE, et pas une liste recopiee ici. Le jour ou un defaut change, il change a un seul
@@ -334,6 +340,23 @@ void ExerciseSessionController::resetPreferences()
     // aussi : c'est le sien.
 }
 
+void ExerciseSessionController::pickChibaImage()
+{
+    // QUATRE humeurs, et le tirage se fait ICI : Roger a livre trois planches de plus, et il veut les voir tourner -
+    // « en gros il faudrait que les 4 tournent aleatoirement, histoire de varier ». L'ecran ne choisit rien : il affiche
+    // la ressource que le controleur lui donne, comme pour tout le reste.
+    static const std::array<const char *, 4> CHIBA_IMAGES{ "qrc:/assets/images/chibaSpeak.png",
+                                                           "qrc:/assets/images/chibaSpeak2.png",
+                                                           "qrc:/assets/images/chibaSpeak3.png",
+                                                           "qrc:/assets/images/chibaSpeak4.png" };
+
+    std::random_device entropySource;
+
+    std::uniform_int_distribution<std::size_t> draw{ 0, CHIBA_IMAGES.size() - 1 };
+
+    m_chibaImageSource = QString::fromLatin1( CHIBA_IMAGES.at( draw( entropySource ) ) );
+}
+
 void ExerciseSessionController::tellAnotherAnecdote()
 {
     // Le chien de l'accueil : il raconte quand on lui demande. C'est le meme chemin que la fin de partie - une anecdote
@@ -342,6 +365,10 @@ void ExerciseSessionController::tellAnotherAnecdote()
     // La nouvelle anecdote est tiree AVANT d'ouvrir la popup : sans ca, elle s'ouvrirait sur l'anecdote precedente, et
     // « raconte-moi autre chose » aurait l'air de ne rien faire.
     refreshAnecdote();
+
+    // ET UNE HUMEUR AU HASARD : quatre planches, et le chien change de tete a chaque fois qu'il ouvre la bouche - Roger
+    // les a dessinees pour ca, « histoire de varier ».
+    pickChibaImage();
 
     if( m_isChibaTalking )
     {
@@ -756,6 +783,8 @@ void ExerciseSessionController::stopSession()
     if( isFinished() && !m_isChibaTalking )
     {
         m_isChibaTalking = true;
+
+        pickChibaImage();
 
         emit chibaTalkingChanged();
     }

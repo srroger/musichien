@@ -881,6 +881,9 @@ Item {
             ColumnLayout {
                 // La ROUE du mode : ses sept notes allumées sur le cercle des quintes, la tonique en haut.
                 // LA NOTE ETRANGERE : les sept notes de la gamme, dans l'ordre entendu, et l'intrus se designe par sa PLACE.
+                // Les boutons de la note etrangere ont DISPARU : c'est la roue du dessus qui repond, depuis qu'elle est
+                // cliquable. Une rangee de sept boutons plats disait la meme chose en plus petit, et son texte etait elide
+                // jusqu'au « ... » - Roger l'a vu jouer : « on voit ... au lieu de la note a l'interieur ».
 
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -940,13 +943,21 @@ Item {
                 // question, l'utilisateur pourra ne pas trop la regarder ». Elle donne le mode à qui sait la lire - et
                 // c'est justement ce qu'on veut apprendre. La tonique reste en haut, toujours : c'est ce qui rend l'arc
                 // lisible d'un coup d'œil.
+                // La ROUE, et c'est elle qui REPOND sur une question de note etrangere : ses sept notes allumees sont
+                // exactement les sept pas de la gamme, donc appuyer sur l'une d'elles designe l'intrus. Roger l'a demande -
+                // « il suffit d'appuyer sur un de ces boutons non ? » - et il a raison : les pastilles sont plus grandes que
+                // les petits boutons de note qu'elles remplacent, et elles sont deja la pour montrer la gamme.
                 ModeCircle {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 6
-                    span: 200
-                    dotSize: 30
-                    visible: ExerciseController.modeCircle.length > 0
+                    span: 288
+                    dotSize: 50
+                    visible: ExerciseController.isHarmonyQuestion
+                    selectable: ExerciseController.isForeignNoteQuestion
                     notes: ExerciseController.modeCircle
+                    onNoteChosen: (p_stepIndex) => {
+                        ExerciseController.answerForeignNote(p_stepIndex);
+                    }
                 }
 
                 // Le verdict de l'intrus : quel pas, et quelle note il portait au lieu de celle de la gamme.
@@ -1023,33 +1034,6 @@ Item {
                         text: qsTr("Plus obscur")
                         enabled: ExerciseController.isAsking
                         onClicked: ExerciseController.answerModeColour(false)
-                    }
-
-                }
-
-                // Des boutons de note et non de degre : le joueur a entendu sept notes, il montre celle qui sonnait faux.
-                // La tonique est mise en avant, parce que c'est le repere qui rend la gamme lisible - le meme que celui du
-                // cercle des quintes.
-                Flow {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    visible: ExerciseController.isForeignNoteQuestion
-
-                    Repeater {
-                        model: ExerciseController.foreignNoteChoices
-
-                        delegate: Button {
-                            required property var modelData
-
-                            width: 62
-                            height: 48
-                            text: modelData.name
-                            font.pixelSize: 14
-                            enabled: ExerciseController.isAsking
-                            highlighted: modelData.isTonic
-                            onClicked: ExerciseController.answerForeignNote(modelData.stepIndex)
-                        }
-
                     }
 
                 }

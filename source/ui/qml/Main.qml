@@ -907,6 +907,11 @@ ApplicationWindow {
             // La colonne ne doit jamais defiler de cote : rien ne depasse en largeur, et un leger mouvement horizontal
             // quand on fait defiler vers le bas est un defaut, pas une liberte.
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            // Et le contenu est BORNE a la largeur disponible, ce qui est la seule facon d'empecher vraiment le
+            // deplacement lateral : la barre cachee n'empechait pas le glissement, et Roger l'a senti - « on peut toujours
+            // bouger la page de gauche a droite, ce qui est derangeant avec les sliders ». Un curseur qu'on tire ne doit
+            // jamais deplacer la page.
+            contentWidth: availableWidth
 
             ColumnLayout {
                 // Le TEMPO des phrases de mode, et son amplitude. Roger : « on pourrait choisir de l'augmenter, d'en choisir
@@ -1255,6 +1260,13 @@ ApplicationWindow {
                         onClicked: settingsDialog.close()
                     }
 
+                }
+
+                // Et un peu de VIDE en bas : les derniers boutons tombaient sous la barre de navigation du telephone, et
+                // Roger ne pouvait plus les atteindre - « la page de settings ne descend pas assez, les derniers boutons
+                // sont caches par les boutons du telephone ».
+                Item {
+                    Layout.preferredHeight: 128
                 }
 
             }
@@ -2615,6 +2627,8 @@ ApplicationWindow {
     // ne part que sur un clic : un texte qu'on n'a pas fini de lire est un texte qu'on n'aurait pas du montrer.
     // =================================================================================================================
     Item {
+        // Le chien parle : sa bulle est au-dessus de lui, et elle porte l'anecdote.
+
         id: chibaPopup
 
         anchors.fill: parent
@@ -2634,11 +2648,13 @@ ApplicationWindow {
 
         }
 
-        // Le chien parle : sa bulle est au-dessus de lui, et elle porte l'anecdote. La hauteur du chien est bornee a la
-        // fenetre, sinon il deborderait sur un telephone en paysage.
+        // La bulle et le chien ont la MEME largeur, et c'est une correction : Roger a vu le contraire - « le chien est
+        // legerement mal centre, legerement trop a droite, du coup la bulle de texte depasse un peu a droite ». Le chien
+        // n'etait pas decentre (mesure : son contour occupe toute la largeur de l'image) ; c'etait la bulle qui etait plus
+        // large que lui.
         ColumnLayout {
             anchors.centerIn: parent
-            width: Math.min(chibaPopup.width - 48, 420)
+            width: Math.min(chibaPopup.width - 96, 300)
             spacing: 0
 
             Rectangle {
@@ -2669,10 +2685,13 @@ ApplicationWindow {
             }
 
             Image {
-                Layout.alignment: Qt.AlignHCenter
+                Layout.fillWidth: true
+                // La hauteur est bornee par l'ecran, pour que le chien ne mange pas la page en paysage ; la largeur, elle,
+                // est celle de la bulle. Les deux blocs se superposent donc exactement, et plus rien ne depasse.
                 Layout.preferredHeight: Math.min(chibaPopup.height * 0.34, 190)
                 fillMode: Image.PreserveAspectFit
-                source: "qrc:/assets/images/chibaSpeak.png"
+                // Une des QUATRE humeurs, tiree au hasard a chaque fois qu'il ouvre la bouche.
+                source: ExerciseController.chibaImageSource
 
                 MouseArea {
                     anchors.fill: parent

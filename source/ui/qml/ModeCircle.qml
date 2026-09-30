@@ -28,8 +28,14 @@ Item {
     // La taille du dessin, parametrable : l'ecran de l'exercice est deja charge - consigne, boutons de reponse, verdict -
     // et une roue de 260 pixels n'y tiendrait pas. La tonique reste EN HAUT quelle que soit la taille.
     property int span: 260
-    // Le rayon laisse la place a la pastille : sans cela, la case du haut et celle du bas sortiraient du cadre.
+    // Le clic : vrai quand l'ecran ATTEND une note. La roue est alors un clavier, et plus seulement un dessin - c'est la
+    // demande de Roger pour la note etrangere : « on a deja le cercle en haut avec toutes les notes de la gamme allumees.
+    // Il suffit d'appuyer sur un de ces boutons non ? »
+    property bool selectable: false
     readonly property real radius: (Math.min(width, height) / 2) - (dotSize / 2) - 4
+
+    // Le pas de la gamme de la note choisie : c'est ce que le domaine a mis dans chaque case (voir describeModeCircle).
+    signal noteChosen(int p_stepIndex)
 
     implicitWidth: span
     implicitHeight: span
@@ -58,8 +64,18 @@ Item {
                 anchors.centerIn: parent
                 text: modelData.name
                 color: modelData.inMode ? "#1d1033" : "#6f5b93"
-                font.pixelSize: 13
+                // La taille du texte SUIT celle de la pastille : agrandir la roue sans agrandir ses noms ne servirait a rien,
+                // et c'est la pastille entiere qui doit etre lisible - elle est un bouton quand l'ecran attend une note.
+                font.pixelSize: Math.round(root.dotSize * 0.36)
                 font.bold: modelData.isTonic
+            }
+
+            // Le clic n'existe que si l'ecran ATTEND une note, et seulement sur une note de la gamme : une pastille eteinte
+            // n'est pas un choix, et la rendre cliquable ferait croire le contraire.
+            MouseArea {
+                anchors.fill: parent
+                enabled: root.selectable && (modelData.stepIndex >= 0)
+                onClicked: root.noteChosen(modelData.stepIndex)
             }
 
         }

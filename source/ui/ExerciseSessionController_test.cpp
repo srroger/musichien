@@ -1668,6 +1668,59 @@ TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_pla
     }
 }
 
+TEST( ExerciseSessionControllerTest, the_circle_carries_the_step_of_each_note )
+{
+    // La roue est rangée par QUINTES, la gamme par DEGRÉS : « appuyer sur une pastille pour répondre » n'a donc de sens
+    // que si le domaine a réconcilié les deux. Roger l'a demandé - « il suffit d'appuyer sur un de ces boutons non ? » -
+    // et c'est exactement ce que ce test verrouille : chaque note allumée porte le pas que answerForeignNote attend.
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings;
+    settings.namedIntervalQuestionShare = 0;
+    settings.singQuestionShare = 0;
+    settings.chordQuestionShare = 0;
+    settings.modeColourQuestionShare = 0;
+    settings.modeNameQuestionShare = 0;
+    settings.modeVampQuestionShare = 0;
+    settings.foreignNoteQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startSession();
+
+    ASSERT_TRUE( controller.isForeignNoteQuestion() );
+
+    const QVariantList choices = controller.foreignNoteChoices();
+    const QVariantList circle = controller.modeCircle();
+
+    int litCount = 0;
+
+    for( const QVariant & entry : circle )
+    {
+        const QVariantMap note = entry.toMap();
+
+        if( !note.value( QStringLiteral( "inMode" ) ).toBool() )
+        {
+            // Une pastille éteinte n'est pas un choix : son pas vaut -1, et le clic est désactivé côté écran.
+            EXPECT_EQ( -1, note.value( QStringLiteral( "stepIndex" ) ).toInt() );
+            continue;
+        }
+
+        ++litCount;
+
+        const int step = note.value( QStringLiteral( "stepIndex" ) ).toInt();
+
+        ASSERT_GE( step, 0 );
+        ASSERT_LT( step, choices.size() );
+
+        // Le nom porté par la pastille doit être celui du pas correspondant : c'est la même gamme, vue dans deux ordres.
+        EXPECT_EQ( choices.at( step ).toMap().value( QStringLiteral( "name" ) ).toString(),
+                   note.value( QStringLiteral( "name" ) ).toString() );
+    }
+
+    EXPECT_EQ( 7, litCount );
+}
+
 TEST( ExerciseSessionControllerTest, the_dog_of_the_home_page_tells_another_anecdote )
 {
     // Le chien de l'accueil repond : appuyer sur lui ouvre la popup avec une AUTRE anecdote. Roger l'a demande en bonus,
