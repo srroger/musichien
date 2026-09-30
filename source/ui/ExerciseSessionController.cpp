@@ -2273,6 +2273,14 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
     // n'y a qu'un mode, et c'est celui de la question.
     const bool hasPrevious = question.previousMode.has_value();
 
+    // Le SECOND passage d'une comparaison demande le MEME TIMBRE que le premier : deux modes ont des notes differentes -
+    // et un vamp deplace meme le bourdon - donc l'adaptateur les aurait joues avec deux instruments, et la difference de
+    // son se mele a la difference de couleur. Roger : « ca evite le bruit de la difference d'instrument ».
+    if( p_secondOnly && hasPrevious )
+    {
+        m_notePlayer.holdTimbre();
+    }
+
     const domain::Mode mode = ( p_secondOnly || !hasPrevious ) ? question.mode : *question.previousMode;
 
     // Et la TONIQUE qui va avec, qui n'est pas la meme sur un vamp : les deux passages y ont les memes notes, donc deux

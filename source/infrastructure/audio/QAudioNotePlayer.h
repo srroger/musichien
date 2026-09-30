@@ -87,6 +87,8 @@ public:
 
     void playMistakeCue() override;
 
+    // Garde le meme timbre pour la lecture suivante : la demande du domaine, mise en oeuvre ici.
+    void holdTimbre() override;
     // Le clic de menu : un accuse de reception, pas une reponse.
     void playTapCue() override;
 
@@ -229,6 +231,10 @@ private:
 
     // Les timbres du bourdon, vides quand aucun echantillon n'a pu etre lu - auquel cas la synthese prend le relais.
     std::vector<domain::SampledInstrument> m_drones;
+
+    // Le domaine a demande de garder le timbre pour la lecture suivante. Consomme par la lecture qui suit, comme un
+    // jeton : une demande, une lecture.
+    bool m_holdTimbre{ false };
 
     // Le timbre de bourdon tire pour la question en cours, et le bourdon qu'elle accompagnait : c'est ce qui garde le
     // meme son tant que la question ne change pas.

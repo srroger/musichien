@@ -196,6 +196,16 @@ public:
     // must not be forced to write one.
     virtual void setTuning( TuningContext p_tuning ) { (void)p_tuning; }
 
+    // Garde le MEME TIMBRE pour la lecture suivante, meme si les notes changent.
+    //
+    // C'est ce qu'une comparaison demande, et l'adaptateur ne peut pas le deviner : deux modes n'ont pas les memes notes,
+    // donc la regle « memes notes, meme timbre » ne s'applique pas, et le bourdon d'un vamp change de centre par nature.
+    // Sans cela, la guitare devenait un saxophone ENTRE LES DEUX PASSAGES - et Roger l'a entendu : « il faudrait que ca
+    // utilise les memes instruments, ca evite le bruit de la difference d'instrument, l'exercice est deja difficile ».
+    //
+    // Un corps par defaut, comme playTapCue : un adaptateur qui n'a qu'un timbre n'a rien a garder.
+    virtual void holdTimbre() {}
+
     // Stops everything immediately. Called when the screen is left or the application goes to the
     // background: an audio stream left open on a phone is a battery drain and a bug.
     virtual void stopAll() = 0;

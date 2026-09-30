@@ -885,26 +885,6 @@ Item {
                 spacing: 10
 
                 Text {
-                    // Le mode qui vient de sonner n'est NOMME que la ou le nom ne donne pas la reponse.
-                    // RIEN PENDANT LA QUESTION, ni le nom ni la note qui colore.
-                    // J'avais cru qu'un nom etait inoffensif sur une question de comparaison, parce que la reponse y est
-                    // un SENS et non un nom. Mais un joueur qui lit « dorien » et « mixolydien » peut les situer sur
-                    // l'axe des clartes et repondre sans ecouter : le nom EST la reponse, d'une autre facon. Roger l'a
-                    // vu tout de suite - « je crois toujours voir le texte du mode pendant la question ».
-
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 0
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    color: "#8ef2b0"
-                    font.pixelSize: 14
-                    // Le mode se dit donc APRES, comme tout ce qui aide : c'est a ce moment-la que cela fixe ce qu'on
-                    // vient d'entendre.
-                    visible: !ExerciseController.isAsking && ExerciseController.heardMode.name !== undefined
-                    text: ExerciseController.heardMode.name !== undefined ? ExerciseController.heardMode.name + " — " + ExerciseController.heardMode.characteristic : ""
-                }
-
-                Text {
                     // Le VERDICT, et il est en GRAS parce que le temps de lecture est court.
                     // Deux noms poses cote a cote ne disent rien : ce qu'on a entendu, c'est UNE NOTE qui a bouge, et
                     // c'est donc cela qu'il faut ecrire - « de dorien a ionien, la tierce a monte ».
@@ -1077,12 +1057,16 @@ Item {
                 Layout.minimumWidth: 0
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
+                // L'anecdote : de la DECORATION, et elle doit se lire comme telle. L'italique entre guillemets, comme le
+                // bout de lore en italique des cartes Magic que Roger a en tete - on sait d'un coup d'oeil que ce n'est
+                // pas une consigne, et qu'on peut la sauter sans rien perdre.
                 maximumLineCount: 3
                 elide: Text.ElideRight
                 visible: ExerciseController.questionAnecdoteText !== ""
-                text: ExerciseController.questionAnecdoteText
+                text: ExerciseController.questionAnecdoteText !== "" ? qsTr("« %1 »").arg(ExerciseController.questionAnecdoteText) : ""
                 color: "#8a77ad"
                 font.pixelSize: 12
+                font.italic: true
             }
 
             RowLayout {
@@ -1202,7 +1186,7 @@ Item {
                 font.pixelSize: 13
                 font.italic: true
                 visible: ExerciseController.anecdoteText !== ""
-                text: ExerciseController.anecdoteText
+                text: ExerciseController.anecdoteText !== "" ? qsTr("« %1 »").arg(ExerciseController.anecdoteText) : ""
             }
 
             Item {

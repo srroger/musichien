@@ -465,8 +465,16 @@ void QAudioNotePlayer::playMelodyOverDrone( std::span<const domain::Note> p_melo
     {
         // Le timbre est TIRE, et il reste le meme tant que le bourdon ne change pas : entendre le meme mode sur un
         // autre bourdon serait une autre question. C'est exactement la regle des instruments de melodie.
-        const bool sameDrone = ( p_drone.size() == m_lastDroneNotes.size() )
-                               && std::is_permutation( p_drone.begin(), p_drone.end(), m_lastDroneNotes.begin() );
+        //
+        // Et le domaine peut DEMANDER de le garder malgre un changement de bourdon : c'est ce que fait une comparaison
+        // de deux modes, ou le bourdon d'un vamp se deplace par nature. Roger l'a entendu : « il faudrait que ca utilise
+        // les meme instruments, ca evite le bruit de la difference d'instrument ».
+        const bool sameDrone = m_holdTimbre
+                               || ( ( p_drone.size() == m_lastDroneNotes.size() )
+                                    && std::is_permutation( p_drone.begin(), p_drone.end(), m_lastDroneNotes.begin() ) );
+
+        // Consomme : la demande vaut pour UNE lecture, et la suivante retrouve sa liberte.
+        m_holdTimbre = false;
 
         if( !sameDrone )
         {
@@ -546,6 +554,11 @@ void QAudioNotePlayer::playPhraseOverDrone( std::span<const domain::Note> p_melo
     }
 
     playSamples( m_synthesizer->renderMelodyOverDrone( p_melody, p_drone, p_durations, p_gap, m_tuning, p_framing ) );
+}
+
+void QAudioNotePlayer::holdTimbre()
+{
+    m_holdTimbre = true;
 }
 
 void QAudioNotePlayer::playMistakeCue()
