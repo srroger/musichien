@@ -230,6 +230,10 @@ ApplicationWindow {
                 // setting: the answer is remembered, and it is the first piece of the profile.
                 // -------------------------------------------------------------------------------------------------
                 // Les sept modes, du plus clair au plus sombre
+                // La PHRASE du mode : une vraie phrase du contenu, avec les durees que l'oreille de Roger a retenues.
+                // Elle vient APRES avoir entendu le mode, et sur le mode allume : c'est le meme geste que la gamme, un
+                // cran plus loin. Un bouton par mode en ferait quatorze a l'ecran d'un telephone, pour un choix qui n'a
+                // aucune raison d'etre simultane.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -762,6 +766,36 @@ ApplicationWindow {
                     wrapMode: Text.WordWrap
                     visible: ModeController.lastPlayedMode.index !== undefined
                     text: ModeController.lastPlayedMode.index !== undefined ? qsTr("%1 — %2").arg(ModeController.lastPlayedMode.name).arg(ModeController.lastPlayedMode.characteristic) : ""
+                }
+
+                // Le bouton disparait quand le contenu n'a pas de phrase pour ce mode, et c'est voulu : offrir un bouton
+                // qui ne sonne pas apprendrait au joueur a ne plus appuyer.
+                Button {
+                    readonly property int playedModeIndex: ModeController.lastPlayedMode.index !== undefined ? ModeController.lastPlayedMode.index : -1
+
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 10
+                    visible: playedModeIndex >= 0 && ModeController.phraseCountForMode(playedModeIndex) > 0
+                    text: qsTr("♪ Phrase")
+                    onClicked: ModeController.playPhraseOfMode(playedModeIndex)
+                }
+
+                // Ce qui vient de sonner, en degres : « 1 4(2) 5 1 ». C'est la meme ecriture que celle de l'atelier, ou
+                // ces phrases ont ete gardees - donc ce que l'oreille a juge peut se relire ici.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.topMargin: 6
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#cbb8e8"
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                    visible: ModeController.lastPlayedPhrase.degrees !== undefined
+                    text: ModeController.lastPlayedPhrase.degrees !== undefined ? qsTr("la phrase : %1 (%2 bpm)").arg(ModeController.lastPlayedPhrase.degrees).arg(ModeController.lastPlayedPhrase.bpm) : ""
                 }
 
                 Item {

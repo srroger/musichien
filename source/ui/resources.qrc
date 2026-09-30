@@ -30,6 +30,13 @@
         -->
         <file alias="assets/content/tuner.json">../../assets/content/tuner.json</file>
         <!--
+          Les phrases modales : des DEGRES, une tonique, un tempo. Jamais d'audio - les 300 phrases de l'atelier pesent
+          323 Mo, et ce fichier en porte tout le contenu musical en quelques dizaines de kilo-octets. C'est le moteur du
+          jeu qui les rejoue, avec le meme bourdon que l'exercice : ce que l'atelier a fait ecouter est donc exactement
+          ce que le jeu fera entendre.
+        -->
+        <file alias="assets/content/modal-phrases.json">../../assets/content/modal-phrases.json</file>
+        <!--
           La police musicale, pour la clef de Sol. Le glyphe U+1D11E n'existe pas dans les polices Android par
           defaut (d'ou le rectangle), alors qu'il est dans Noto Music. Embarquee, elle rend la clef identique sur
           le PC et le telephone.

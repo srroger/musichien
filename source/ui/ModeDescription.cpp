@@ -104,6 +104,36 @@ QVariantMap describeModeDifference( domain::Mode p_from, domain::Mode p_to )
     return description;
 }
 
+QVariantMap describePhrase( const domain::Phrase & p_phrase )
+{
+    // L'ecriture de l'atelier, a la lettre : un chiffre par pas, et la duree seulement quand elle depasse un temps.
+    // Ecrire « 1(1) 4(2) » noierait la phrase sous des chiffres qui ne disent rien a personne.
+    QString degrees;
+
+    for( const domain::PhraseStep & step : p_phrase.steps )
+    {
+        if( !degrees.isEmpty() )
+        {
+            degrees += QLatin1Char( ' ' );
+        }
+
+        degrees += QString::number( step.degree );
+
+        if( step.beats > 1 )
+        {
+            degrees += QStringLiteral( "(%1)" ).arg( step.beats );
+        }
+    }
+
+    QVariantMap description;
+
+    description.insert( QStringLiteral( "degrees" ), degrees );
+    description.insert( QStringLiteral( "bpm" ), p_phrase.bpm );
+    description.insert( QStringLiteral( "stepCount" ), static_cast<int>( p_phrase.steps.size() ) );
+
+    return description;
+}
+
 QVariantList describeAllModes()
 {
     QVariantList modes;

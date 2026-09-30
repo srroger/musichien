@@ -9,6 +9,7 @@
 #include "infrastructure/audio/QAudioPitchDetector.h"
 #include "infrastructure/content/JsonAnecdoteBook.h"
 #include "infrastructure/content/JsonHintBook.h"
+#include "infrastructure/content/JsonPhraseBook.h"
 #include "infrastructure/content/JsonTunerGuide.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
 #ifdef Q_OS_ANDROID
@@ -71,6 +72,10 @@ constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
 
 constexpr const char * TUNER_GUIDE_RESOURCE = ":/assets/content/tuner.json";
 
+// Les phrases modales : ce que l'oreille de Roger a garde a l'atelier, et rien de plus. Le fichier porte des DEGRES,
+// une tonique et un tempo - jamais d'audio - et c'est le moteur du jeu qui les rejoue.
+constexpr const char * MODAL_PHRASES_RESOURCE = ":/assets/content/modal-phrases.json";
+
 // Reads the memory hints from the resources.
 //
 // The file is opened HERE and not inside the reader: understanding JSON is the infrastructure's job,
@@ -120,6 +125,31 @@ constexpr const char * TUNER_GUIDE_RESOURCE = ":/assets/content/tuner.json";
     std::cerr << "Musichien: " << book.count() << " anecdotes read\n";
 
     return book;
+}
+
+// Les phrases modales, du meme contrat que tout le reste : un fichier manquant ou casse coute les phrases, jamais
+// l'application. Le banc d'essai s'en passe alors, simplement.
+[[nodiscard]] musichien::domain::PhraseBook loadPhraseBook()
+{
+    QFile contentFile{ QString::fromUtf8( MODAL_PHRASES_RESOURCE ) };
+
+    if( !contentFile.open( QIODevice::ReadOnly ) )
+    {
+        std::cerr << "Musichien: the modal phrases are missing from the resources.\n";
+
+        return {};
+    }
+
+    const QByteArray content = contentFile.readAll();
+
+    musichien::domain::PhraseBook phraseBook = musichien::infrastructure::readPhraseBook(
+      std::string_view{ content.constData(), static_cast<std::size_t>( content.size() ) } );
+
+    // La ligne qui prouve le plus court chemin entre le fichier et le binaire : elle distingue « le fichier est la »
+    // de « le fichier a ete compris », et c'est la seule verification de l'embarquement qui ne se discute pas.
+    std::cerr << "Musichien: " << phraseBook.phraseCount() << " modal phrases read\n";
+
+    return phraseBook;
 }
 
 // Les textes de la page Accordeur : ce qu'un temperament est, d'ou il vient, ce que sont le diapason et la note de
@@ -421,10 +451,16 @@ int main( int p_argumentCount, char * p_arguments[] )
                                   "IntervalController",
                                   &intervalController );
 
+    // Les phrases modales, lues AVANT le banc d'essai qui va les jouer : le livre doit vivre plus longtemps que le
+    // controleur, comme le journal des questions. Un objet detruit se voit tres mal, et se voit toujours trop tard.
+    const musichien::domain::PhraseBook modalPhraseBook = loadPhraseBook();
+
     // Le banc d'essai des modes : le MEME port, et rien de plus. Sept boutons qui font entendre une couleur sur un
     // bourdon tenu - c'est exactement ce que l'exercice du degrade demandera, jusqu'au timbre du bourdon, qui est tire
     // par l'adaptateur. Un banc d'essai qui sonnerait autrement que le jeu serait pire qu'inutile.
     musichien::ui::ModePreviewController modePreviewController{ notePlayer };
+
+    modePreviewController.setPhraseBook( modalPhraseBook );
 
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,

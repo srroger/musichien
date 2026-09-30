@@ -88,4 +88,100 @@ TEST( ModePreviewControllerTest, an_index_outside_the_known_modes_plays_nothing 
     EXPECT_TRUE( notePlayer.melodiesOverDrones().empty() );
 }
 
+TEST( ModePreviewControllerTest, playing_a_phrase_keeps_the_mode_and_the_durations_of_the_content )
+{
+    domain::NotePlayerFake notePlayer;
+    ModePreviewController controller{ notePlayer };
+
+    domain::PhraseBook phraseBook;
+
+    // Deux phrases, dont une seule nous interesse : le livre doit rendre celle du mode DEMANDE, et jamais celle d'a cote.
+    domain::Phrase slowDorian;
+    slowDorian.mode = domain::Mode::Dorian;
+    slowDorian.tonic = domain::Note{ 50 };
+    slowDorian.bpm = 60;    // un temps par seconde : les durees se lisent alors sans calcul
+    slowDorian.steps = { domain::PhraseStep{ .degree = 1, .beats = 1 },
+                         domain::PhraseStep{ .degree = 3, .beats = 2 },
+                         domain::PhraseStep{ .degree = 1, .beats = 1 } };
+
+    domain::Phrase lydian;
+    lydian.mode = domain::Mode::Lydian;
+    lydian.tonic = domain::Note{ 50 };
+    lydian.steps = { domain::PhraseStep{ .degree = 1, .beats = 4 },
+                     domain::PhraseStep{ .degree = 4, .beats = 1 },
+                     domain::PhraseStep{ .degree = 1, .beats = 1 } };
+
+    phraseBook.add( slowDorian );
+    phraseBook.add( lydian );
+
+    controller.setPhraseBook( phraseBook );
+
+    EXPECT_EQ( 1, controller.phraseCountForMode( static_cast<int>( domain::Mode::Dorian ) ) );
+    EXPECT_EQ( 1, controller.phraseCountForMode( static_cast<int>( domain::Mode::Lydian ) ) );
+    EXPECT_EQ( 0, controller.phraseCountForMode( static_cast<int>( domain::Mode::Locrian ) ) );
+
+    controller.playPhraseOfMode( static_cast<int>( domain::Mode::Dorian ) );
+
+    const std::vector<domain::NotePlayerFake::PlayedPhraseOverDrone> & played = notePlayer.phrasesOverDrones();
+
+    ASSERT_EQ( 1U, played.size() );
+
+    // La phrase a ete jouee SUR un bourdon, comme une gamme : c'est ce qui en fait un mode, et non une suite de notes.
+    ASSERT_EQ( 2U, played.front().drone.size() );
+
+    // Et chaque pas a garde SA duree, dans l'ordre. C'est tout ce qu'une phrase a de plus qu'une gamme : la perdre
+    // reviendrait a faire ecouter autre chose que ce que l'oreille avait choisi a l'atelier.
+    ASSERT_EQ( 3U, played.front().durations.size() );
+    EXPECT_EQ( 1000, played.front().durations.at( 0 ).count() );
+    EXPECT_EQ( 2000, played.front().durations.at( 1 ).count() );
+    EXPECT_EQ( 1000, played.front().durations.at( 2 ).count() );
+
+    // La mauvaise phrase n'est pas celle qui a sonne : 4 temps d'entree, c'etait la lydienne.
+    EXPECT_NE( 4000, played.front().durations.at( 0 ).count() );
+
+    // Et ce que l'ecran affichera, dans l'ecriture de l'atelier : ce que l'oreille a juge peut se relire ici.
+    EXPECT_EQ( "1 3(2) 1", controller.lastPlayedPhrase().value( "degrees" ).toString() );
+    EXPECT_EQ( 60, controller.lastPlayedPhrase().value( "bpm" ).toInt() );
+    EXPECT_EQ( "dorian", controller.lastPlayedMode().value( "identifier" ).toString() );
+}
+
+TEST( ModePreviewControllerTest, a_mode_without_a_phrase_plays_nothing_at_all )
+{
+    // Un contenu qui n'a pas encore servi un mode n'est pas une panne : rien ne sonne, et l'ecran n'offre pas le bouton.
+    domain::NotePlayerFake notePlayer;
+    ModePreviewController controller{ notePlayer };
+
+    domain::PhraseBook phraseBook;
+
+    domain::Phrase dorian;
+    dorian.mode = domain::Mode::Dorian;
+    dorian.steps = { domain::PhraseStep{ .degree = 1, .beats = 1 },
+                     domain::PhraseStep{ .degree = 3, .beats = 1 },
+                     domain::PhraseStep{ .degree = 1, .beats = 1 } };
+
+    phraseBook.add( dorian );
+
+    controller.setPhraseBook( phraseBook );
+    controller.playPhraseOfMode( static_cast<int>( domain::Mode::Locrian ) );
+
+    EXPECT_TRUE( notePlayer.phrasesOverDrones().empty() );
+    EXPECT_FALSE( controller.lastPlayedPhrase().contains( "degrees" ) );
+}
+
+TEST( ModePreviewControllerTest, an_index_that_designs_no_mode_is_ignored )
+{
+    domain::NotePlayerFake notePlayer;
+    ModePreviewController controller{ notePlayer };
+
+    const domain::PhraseBook emptyBook;
+    controller.setPhraseBook( emptyBook );
+
+    controller.playPhraseOfMode( -1 );
+    controller.playPhraseOfMode( 99 );
+
+    EXPECT_TRUE( notePlayer.phrasesOverDrones().empty() );
+    EXPECT_EQ( 0, controller.phraseCountForMode( -1 ) );
+    EXPECT_EQ( 0, controller.phraseCountForMode( 99 ) );
+}
+
 }    // namespace musichien::ui

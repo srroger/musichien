@@ -23,11 +23,14 @@
 
 #include "domain/audio/NotePlayer.h"
 #include "domain/music/Mode.h"
+#include "domain/music/PhraseBook.h"
 #include "domain/music/Temperament.h"
 
 #include <QObject>
 #include <QVariantList>
 #include <QVariantMap>
+
+#include <random>
 
 namespace musichien::ui
 {
@@ -43,11 +46,19 @@ class ModePreviewController final : public QObject
     // le bouton qui a vraiment ete JOUE, et non celui qui a ete touche.
     Q_PROPERTY( QVariantMap lastPlayedMode READ lastPlayedMode NOTIFY lastPlayedModeChanged )
 
+    // La PHRASE qui vient de sonner : ses degres - « 1 4(2) 5 1 » - et son tempo, ou une carte vide quand rien n'a
+    // sonne ou que le mode n'a pas de phrase.
+    //
+    // C'est ce qui relie ce que l'oreille entend a ce qu'un musicien ecrirait : un exercice sur une couleur qu'on ne
+    // peut pas relire d'un chiffre n'apprend rien de plus qu'une devinette.
+    Q_PROPERTY( QVariantMap lastPlayedPhrase READ lastPlayedPhrase NOTIFY lastPlayedPhraseChanged )
+
 public:
     explicit ModePreviewController( domain::NotePlayer & p_notePlayer, QObject * p_parent = nullptr );
 
     [[nodiscard]] QVariantList modes() const;
     [[nodiscard]] QVariantMap lastPlayedMode() const;
+    [[nodiscard]] QVariantMap lastPlayedPhrase() const;
 
     // Le temperament et le diapason, donnes par la couche de cablage - comme pour les intervalles.
     void setTuning( domain::TuningContext p_tuning );
@@ -58,15 +69,41 @@ public:
     // demander un mode qui n'existe pas.
     Q_INVOKABLE void playMode( int p_index );
 
+    // Le livre des phrases modales, donne par la couche de cablage comme le temperament et le diapason.
+    //
+    // Nul tant qu'il n'a pas ete donne, et ce n'est pas un cas d'erreur : un contenu de phrases absent ou casse doit
+    // laisser un banc d'essai qui fonctionne, simplement sans phrases.
+    void setPhraseBook( const domain::PhraseBook & p_phraseBook );
+
     Q_INVOKABLE void stopPlayback();
+
+    // Joue une PHRASE de ce mode, tiree dans le contenu.
+    //
+    // Rien ne sonne quand le contenu n'a pas de phrase pour ce mode, et ce n'est pas une erreur : c'est un mode que
+    // l'atelier n'a pas encore servi. L'ecran, lui, n'offre pas le bouton (voir phraseCountForMode).
+    Q_INVOKABLE void playPhraseOfMode( int p_index );
+
+    // Combien de phrases le contenu porte pour ce mode. Un mode sans phrase n'est pas un cas particulier : il repond
+    // zero, et l'ecran en tire ce qu'il veut.
+    [[nodiscard]] Q_INVOKABLE int phraseCountForMode( int p_index ) const;
 
 signals:
     void lastPlayedModeChanged();
+    void lastPlayedPhraseChanged();
 
 private:
     domain::NotePlayer & m_notePlayer;
     QVariantList m_modes;
     QVariantMap m_lastPlayedMode;
+    QVariantMap m_lastPlayedPhrase;
+
+    // Un POINTEUR, et non une copie : le livre vit aussi longtemps que l'application, et le copier ici en dupliquerait
+    // les trois cents phrases pour rien.
+    const domain::PhraseBook * m_phraseBook{ nullptr };
+
+    // Le tirage d'une phrase. Le controleur n'est pas le domaine : il a le droit a une graine tiree au demarrage, et
+    // c'est meme ce qui fait qu'une seance ne donne pas toujours la premiere phrase du meme mode.
+    std::mt19937 m_randomEngine{ std::random_device{}() };
 
     // Equal temperament at 440 Hz until the wiring layer says otherwise.
     domain::TuningContext m_tuning;

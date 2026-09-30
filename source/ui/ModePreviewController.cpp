@@ -2,8 +2,10 @@
 
 #include "ui/ModeDescription.h"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <optional>
 #include <vector>
 
 namespace musichien::ui
@@ -27,6 +29,9 @@ constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
 // sont des decisions MUSICALES, donc elles se reglent a l'oreille - comme celles du banc d'essai des intervalles.
 constexpr std::chrono::milliseconds NOTE_DURATION{ 420 };
 constexpr std::chrono::milliseconds GAP{ 70 };
+
+// Les demi-tons d'une octave, pour poser le bourdon d'une phrase SOUS elle.
+constexpr std::int32_t SEMITONES_PER_OCTAVE = 12;
 
 }    // namespace
 
@@ -52,6 +57,11 @@ QVariantMap ModePreviewController::lastPlayedMode() const
 void ModePreviewController::setTuning( domain::TuningContext p_tuning )
 {
     m_tuning = p_tuning;
+}
+
+void ModePreviewController::setPhraseBook( const domain::PhraseBook & p_phraseBook )
+{
+    m_phraseBook = &p_phraseBook;
 }
 
 void ModePreviewController::playMode( int p_index )
@@ -102,6 +112,91 @@ void ModePreviewController::playMode( int p_index )
     if( m_lastPlayedMode != description )
     {
         m_lastPlayedMode = description;
+
+        emit lastPlayedModeChanged();
+    }
+}
+
+QVariantMap ModePreviewController::lastPlayedPhrase() const
+{
+    return m_lastPlayedPhrase;
+}
+
+int ModePreviewController::phraseCountForMode( int p_index ) const
+{
+    // Le test du SIGNE avant la borne, comme partout : convertir un index negatif en size_t en ferait un tres grand
+    // nombre, et la comparaison suivante passerait pour la mauvaise raison.
+    if( ( m_phraseBook == nullptr ) || ( p_index < 0 ) || ( static_cast<std::size_t>( p_index ) >= domain::MODE_COUNT ) )
+    {
+        return 0;
+    }
+
+    return static_cast<int>( m_phraseBook->phraseCountFor( static_cast<domain::Mode>( p_index ) ) );
+}
+
+void ModePreviewController::playPhraseOfMode( int p_index )
+{
+    if( ( m_phraseBook == nullptr ) || ( p_index < 0 )
+        || ( static_cast<std::size_t>( p_index ) >= domain::MODE_COUNT ) )
+    {
+        return;
+    }
+
+    const auto mode = static_cast<domain::Mode>( p_index );
+
+    const std::optional<domain::Phrase> phrase = m_phraseBook->drawPhraseFor( mode, m_randomEngine );
+
+    if( !phrase.has_value() )
+    {
+        // Aucune phrase pour ce mode : rien ne sonne, et l'ecran n'affiche rien de plus. Ce n'est pas une panne, c'est
+        // un contenu qui n'a pas encore servi ce mode - et l'ecran ne devrait meme pas offrir le bouton.
+        if( !m_lastPlayedPhrase.isEmpty() )
+        {
+            m_lastPlayedPhrase = {};
+
+            emit lastPlayedPhraseChanged();
+        }
+
+        return;
+    }
+
+    m_notePlayer.setTuning( m_tuning );
+
+    // La phrase est jouee TELLE QUE le contenu l'a ecrite : sa tonique, son tempo, ses DUREES. C'est tout le point -
+    // ce que l'oreille a choisi a l'atelier doit etre ce qu'elle retrouve ici, sans transposition ni arrangement.
+    const std::vector<domain::Note> melody = phrase->notes( phrase->tonic );
+
+    const std::vector<std::chrono::milliseconds> durations = phrase->stepDurations();
+
+    // Le bourdon : la tonique de la phrase une OCTAVE sous elle, et sa quinte juste. Jamais au-dessus, et jamais au
+    // niveau de la melodie : un bourdon est un centre, pas une seconde voix.
+    //
+    // Le plancher est la premiere note jouable : une phrase dont la tonique est deja tout en bas se poserait sinon sur
+    // un bourdon qui n'existe pas, et c'est la phrase entiere qui deviendrait inaudible.
+    const std::int32_t droneRootMidi = std::max( phrase->tonic.midiNumber() - SEMITONES_PER_OCTAVE,
+                                                 domain::Note::MINIMUM_MIDI_NUMBER );
+
+    const std::array<domain::Note, 2> drone{ domain::Note{ droneRootMidi },
+                                             domain::Note{ droneRootMidi + FIFTH_IN_SEMITONES } };
+
+    m_notePlayer.playPhraseOverDrone( melody, durations, drone, GAP );
+
+    const QVariantMap description = describePhrase( *phrase );
+
+    if( m_lastPlayedPhrase != description )
+    {
+        m_lastPlayedPhrase = description;
+
+        emit lastPlayedPhraseChanged();
+    }
+
+    // La phrase fait aussi connaitre son MODE : l'ecran n'a pas a deviner lequel a sonne, puisque c'est justement la
+    // question que l'exercice posera un jour.
+    const QVariantMap modeDescription = describeMode( mode );
+
+    if( m_lastPlayedMode != modeDescription )
+    {
+        m_lastPlayedMode = modeDescription;
 
         emit lastPlayedModeChanged();
     }

@@ -21,6 +21,7 @@
 // =====================================================================================================================
 
 #include "domain/music/Mode.h"
+#include "domain/music/Phrase.h"
 
 #include <QVariantList>
 #include <QVariantMap>
@@ -35,6 +36,13 @@ namespace musichien::ui
 // « De dorien a ionien : la tierce a monte d'un demi-ton » vaut mieux que deux noms poses cote a cote : c'est la seule
 // chose qu'on ait vraiment entendue, et c'est donc la seule qui s'apprenne.
 [[nodiscard]] QVariantMap describeModeDifference( domain::Mode p_from, domain::Mode p_to );
+
+// Une phrase, telle qu'un ecran la montre : ses degres - « 1 4(2) 5 1 » - et son tempo.
+//
+// Les degres sont ecrits COMME UN MUSICIEN LES LIT : un chiffre par pas, et la duree entre parentheses quand elle
+// depasse un temps. C'est exactement l'ecriture de l'atelier, et ce n'est pas une coincidence : ce que l'oreille a vu
+// en triant doit etre ce qu'elle retrouve en ecoutant, sans quoi les deux ne peuvent pas se relier.
+[[nodiscard]] QVariantMap describePhrase( const domain::Phrase & p_phrase );
 
 // Les sept modes, dans l'ordre de clarte, du plus clair au plus sombre.
 //
