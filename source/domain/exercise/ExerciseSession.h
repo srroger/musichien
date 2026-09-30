@@ -103,6 +103,39 @@ enum class QuestionKind
     ModeVamp = 7
 };
 
+// La question porte-t-elle sur un INTERVALLE qui a ETE JOUE ?
+//
+// La reponse est OUI pour les trois premiers genres, et NON pour tous les autres - et cette fonction existe parce que
+// la question se pose a trois endroits : l'ecran, pour savoir s'il a un indice a montrer ; la session, pour savoir si
+// une aide doit reculer la palette ; et le contenu, qui n'a de souvenirs que d'intervalles.
+//
+// Toute question porte un intervalle - c'est l'ordre des tirages qui veut ca - mais sur une cellule rythmique, une
+// couleur d'accord ou un mode, PERSONNE ne l'a jamais entendu. Trois listes recopiees sont trois listes qu'on oublie
+// d'etendre : c'est exactement ce qui est arrive, et Roger l'a vu avant nous - « pour les bourdons quand je fail, je
+// vois l'indice des intervalles apparaitre » : l'intervalle tire au hasard pour une question de mode tombait sur un
+// souvenir de film.
+[[nodiscard]] constexpr bool isIntervalQuestion( QuestionKind p_kind ) noexcept
+{
+    switch( p_kind )
+    {
+        case QuestionKind::NamedInterval:
+        case QuestionKind::Direction:
+        case QuestionKind::Sing:
+            return true;
+
+        case QuestionKind::Rhythm:
+        case QuestionKind::Chord:
+        case QuestionKind::ModeColour:
+        case QuestionKind::ModeName:
+        case QuestionKind::ModeVamp:
+            return false;
+    }
+
+    // Inatteignable tant que le commutateur ci-dessus couvre tous les genres, et c'est voulu : un genre AJOUTE sans
+    // etre classe ici doit faire echouer le test qui parcourt l'enumeration, pas tomber dans un « oui » silencieux.
+    return false;
+}
+
 // Une question DECIDEE a l'avance : quel genre, quelle cible, dans quel sens.
 //
 // C'est ce qui permet a une session de suivre un PLAN plutot qu'un tirage, et c'est la seule chose dont le Bilan du

@@ -1302,6 +1302,22 @@ namespace
 }
 
 // La reponse juste a une question de couleur, telle que le DOMAINE la calcule.
+TEST( ExerciseSessionTest, only_the_three_first_kinds_are_about_an_interval )
+{
+    // La question que se posent l'ecran (« ai-je un indice a montrer ? ») et la session (« une aide doit-elle reculer la
+    // palette ? »), posee une seule fois pour les deux. Elle etait ecrite trois fois, et la troisieme - les modes -
+    // manquait : Roger a vu un souvenir de film apparaitre sous une question de bourdon.
+    EXPECT_TRUE( isIntervalQuestion( QuestionKind::NamedInterval ) );
+    EXPECT_TRUE( isIntervalQuestion( QuestionKind::Direction ) );
+    EXPECT_TRUE( isIntervalQuestion( QuestionKind::Sing ) );
+
+    EXPECT_FALSE( isIntervalQuestion( QuestionKind::Rhythm ) );
+    EXPECT_FALSE( isIntervalQuestion( QuestionKind::Chord ) );
+    EXPECT_FALSE( isIntervalQuestion( QuestionKind::ModeColour ) );
+    EXPECT_FALSE( isIntervalQuestion( QuestionKind::ModeName ) );
+    EXPECT_FALSE( isIntervalQuestion( QuestionKind::ModeVamp ) );
+}
+
 [[nodiscard]] bool expectedColourAnswer( const Question & p_question )
 {
     return p_question.previousMode.has_value() && isBrighterThan( p_question.mode, *p_question.previousMode );

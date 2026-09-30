@@ -765,11 +765,12 @@ void ExerciseSession::revealAnswer()
     // does say something, and this is the only place where saying it does not feel like a punishment.
     //
     // Seulement sur une question qui PARLE d'intervalles, et c'est une precision qui compte : passer une cellule
-    // rythmique ou un accord n'apprend rien sur la palette d'intervalles, et la faire reculer serait une consequence
-    // que le joueur ne pourrait relier a rien de ce qu'il vient de faire.
-    if( ( m_currentQuestion.kind == QuestionKind::NamedInterval )
-        || ( m_currentQuestion.kind == QuestionKind::Direction )
-        || ( m_currentQuestion.kind == QuestionKind::Sing ) )
+    // rythmique, un accord ou un mode n'apprend rien sur la palette d'intervalles, et la faire reculer serait une
+    // consequence que le joueur ne pourrait relier a rien de ce qu'il vient de faire.
+    //
+    // Le test est demande au domaine via isIntervalQuestion, et non reecrit ici : une liste recopiee est une liste
+    // qu'on oublie d'etendre quand un genre apparait.
+    if( isIntervalQuestion( m_currentQuestion.kind ) )
     {
         narrowPalette();
     }

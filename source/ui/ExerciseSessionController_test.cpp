@@ -158,6 +158,21 @@ void storeIntervalOnlyShares( domain::PlayerPreferencesFake & p_store )
     return hintBook;
 }
 
+// Un profil qui ne veut QUE des questions de mode, et NOMMEES : la seule forme ou l'ecran connait la reponse sans
+// attendre un minuteur.
+//
+// Toutes les parts de question sont epinglees ENSEMBLE, et les trois parts d'harmonie le sont aussi : une seule laissee
+// a sa valeur par defaut, et le test tombe sur un autre genre une fois sur cinq.
+void storeNamedModeOnlyShares( domain::PlayerPreferencesFake & p_store )
+{
+    p_store.storeSingQuestionShare( 0 );
+    p_store.storeRhythmQuestionShare( 0 );
+    p_store.storeChordQuestionShare( 0 );
+    p_store.storeModeColourQuestionShare( 0 );
+    p_store.storeModeNameQuestionShare( 100 );
+    p_store.storeModeVampQuestionShare( 0 );
+}
+
 void answerCorrectly( ExerciseSessionController & p_controller )
 {
     p_controller.answer( heardDistance( p_controller ) );
@@ -518,6 +533,55 @@ TEST( ExerciseSessionControllerTest, an_interval_without_a_hint_shows_nothing )
     controller.startSession();
     controller.answer( heardDistance( controller ) + 1 );
 
+    EXPECT_TRUE( controller.hintText().isEmpty() );
+}
+
+TEST( ExerciseSessionControllerTest, a_harmony_question_offers_no_interval_hint )
+{
+    // Roger : « pour les bourdons quand je fail, je vois l'indice des intervalles apparaitre ».
+    //
+    // Toute question porte un intervalle - c'est l'ordre des tirages qui veut ca - mais sur un bourdon, personne ne l'a
+    // jamais entendu : l'indice tombait donc sur le souvenir de film d'un intervalle jamais joue.
+    //
+    // La question est NOMMEE plutot que comparee, et ce n'est pas un detail : sur une question de couleur, le second
+    // passage est joue par un minuteur, que le test ne fait pas tourner. Ici le mode qui vient de sonner est connu tout
+    // de suite, donc on sait se tromper POUR DE BON.
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    storeNamedModeOnlyShares( levelStore );
+
+    ExerciseSessionController controller{ notePlayer, {}, hintBookForEveryAscendingInterval(), {}, {}, &levelStore };
+
+    controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+    controller.startSession();
+
+    ASSERT_EQ( static_cast<int>( domain::QuestionKind::ModeName ), controller.questionKind() );
+
+    const int heardIndex = controller.heardMode().value( "index" ).toInt();
+
+    // Un AUTRE mode de la palette du joueur : l'erreur est certaine, il n'y a aucun hasard a esperer ni a craindre.
+    int wrongIndex = heardIndex;
+
+    for( const QVariant & choice : controller.modeChoices() )
+    {
+        const int index = choice.toMap().value( "index" ).toInt();
+
+        if( index != heardIndex )
+        {
+            wrongIndex = index;
+
+            break;
+        }
+    }
+
+    ASSERT_NE( heardIndex, wrongIndex );
+
+    controller.answerModeName( wrongIndex );
+
+    ASSERT_FALSE( controller.wasLastAnswerCorrect() );
+
+    // L'indice existe - le livre en a un pour tous les intervalles - et il doit pourtant rester absent.
     EXPECT_TRUE( controller.hintText().isEmpty() );
 }
 

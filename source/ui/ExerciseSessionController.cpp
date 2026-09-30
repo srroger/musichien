@@ -317,10 +317,9 @@ bool ExerciseSessionController::isHelpAvailable() const noexcept
 
 QVariantMap ExerciseSessionController::heardInterval() const
 {
-    // Sur une question de rythme ou d'accord, il n'y a pas d'intervalle a decrire : la question porte bien un intervalle
-    // tire au hasard - c'est l'ordre des tirages qui veut ca - mais il n'a jamais ete joue, et le montrer serait un
-    // mensonge.
-    if( ( m_session == nullptr ) || isRhythmQuestion() || isChordQuestion() )
+    // Sur une question qui ne PARLE pas d'intervalle, il n'y a pas d'intervalle a decrire : la question en porte bien un
+    // - c'est l'ordre des tirages qui veut ca - mais il n'a jamais ete joue, et le montrer serait un mensonge.
+    if( ( m_session == nullptr ) || !domain::isIntervalQuestion( m_session->currentQuestion().kind ) )
     {
         return QVariantMap{};
     }
@@ -344,9 +343,13 @@ QVariantMap ExerciseSessionController::answeredInterval() const
 
 QString ExerciseSessionController::hintText() const
 {
-    // Pas d'indice sur une question de rythme ni sur une question d'accord : les indices sont des souvenirs
-    // d'INTERVALLES ("pense a Star Wars"), et le contenu n'en a ni pour une cellule ni pour une couleur d'accord.
-    if( ( m_session == nullptr ) || !m_session->isHintAvailable() || isRhythmQuestion() || isChordQuestion() )
+    // Pas d'indice sur une question qui ne parle pas d'INTERVALLES : les indices sont des souvenirs d'intervalles
+    // (« pense a Star Wars »), et le contenu n'en a ni pour une cellule, ni pour une couleur d'accord, ni pour un mode.
+    //
+    // C'est ICI que Roger a vu le defaut : « pour les bourdons quand je fail, je vois l'indice des intervalles
+    // apparaitre ». Le test est demande au domaine, et non reecrit : c'est une liste recopiee qui l'avait oublie.
+    if( ( m_session == nullptr ) || !m_session->isHintAvailable()
+        || !domain::isIntervalQuestion( m_session->currentQuestion().kind ) )
     {
         return QString{};
     }
