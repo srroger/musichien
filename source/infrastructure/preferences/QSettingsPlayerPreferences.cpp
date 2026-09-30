@@ -44,7 +44,6 @@ constexpr const char * REFERENCE_PITCH_KEY = "player/reference-pitch";
 
 // How many questions in a hundred ask the player to SING, the rest asking him to name the interval.
 constexpr const char * SING_QUESTION_SHARE_KEY = "player/sing-question-share";
-
 // La part de la question historique du jeu : nommer l'intervalle. Soixante par defaut, comme le domaine, donc un
 // profil neuf sonne exactement comme le jeu d'avant que cette part existe.
 constexpr const char * NAMED_INTERVAL_QUESTION_SHARE_KEY = "player/named-interval-question-share";
@@ -55,7 +54,6 @@ constexpr const char * PHRASE_TEMPO_VARIATION_KEY = "player/phrase-tempo-variati
 
 // Les deux autres parts de question, gardees avec les memes bornes et la meme valeur de repli que celle du chant :
 // trois reglages du meme genre se lisent de la meme facon, sinon l'un des trois finira par mentir.
-constexpr const char * RHYTHM_QUESTION_SHARE_KEY = "player/rhythm-question-share";
 constexpr const char * CHORD_QUESTION_SHARE_KEY = "player/chord-question-share";
 
 // L'harmonie : deux parts, et deux cles distinctes. « Entendre une couleur » et « savoir la nommer » sont deux
@@ -353,28 +351,6 @@ void QSettingsPlayerPreferences::storeSingQuestionShare( std::int32_t p_share )
     QSettings settings;
 
     settings.setValue( SING_QUESTION_SHARE_KEY, p_share );
-}
-
-std::int32_t QSettingsPlayerPreferences::storedRhythmQuestionShare() const
-{
-    // ZERO, et c'est le defaut du DOMAINE aussi (SessionSettings) : la question de rythme existe, elle se regle, et
-    // elle est eteinte tant qu'on ne l'allume pas. Une valeur hors bornes retombe sur ce meme zero, pas sur autre
-    // chose : un fichier abime doit rendre le silence, jamais imposer du rythme.
-    const std::int32_t stored = QSettings{}.value( RHYTHM_QUESTION_SHARE_KEY, 0 ).toInt();
-
-    if( stored < 0 || stored > 100 )
-    {
-        return 0;
-    }
-
-    return stored;
-}
-
-void QSettingsPlayerPreferences::storeRhythmQuestionShare( std::int32_t p_share )
-{
-    QSettings settings;
-
-    settings.setValue( RHYTHM_QUESTION_SHARE_KEY, p_share );
 }
 
 std::int32_t QSettingsPlayerPreferences::storedChordQuestionShare() const

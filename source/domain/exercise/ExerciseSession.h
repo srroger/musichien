@@ -278,11 +278,16 @@ struct SessionSettings
     // separate screen.
     std::int32_t singQuestionShare{ 20 };
 
-    // Share of questions, in percent, that ask the player to REPRODUCE a rhythmic cell.
+    // Le rythme n'est PLUS un exercice de ce jeu, et c'est une decision de Roger, prise en jouant : « je pense qu'on peut
+    // enlever les exercices de Rythme de l'app (mais garder le metronome). Ils seront jamais implementes ni utilises. »
     //
-    // ZERO par defaut : la question de rythme fonctionne, mais une question dont on ne peut pas croire le temps n'a
-    // rien a faire dans une session ordinaire. Qui veut du rythme le demande - le reglage est la, entre 0 et 100.
-    std::int32_t rhythmQuestionShare{ 0 };
+    // La part a disparu - c'etait le seul moyen de demander une cellule - et le genre a disparu du TIRAGE avec elle. Ce
+    // qui reste est ce que Roger garde : le pilotage, la frappe, le metronome et les echantillons de batterie. C'est
+    // aussi pourquoi QuestionKind::Rhythm est encore declaree : la demonter vraiment demanderait de demonter la frappe,
+    // et un bouton de moins ne vaut pas un metronome casse.
+    //
+    // Aucune ligne de code ne pose donc plus de cellule : voir drawKind, dont la table des parts ne contient plus le
+    // rythme.
 
     // Le tempo, en battements par minute, auquel la cellule rythmique est posee.
     //

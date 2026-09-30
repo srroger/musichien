@@ -115,7 +115,7 @@ namespace
     settings.namedIntervalQuestionShare = 0;
     settings.singQuestionShare = 0;
     settings.directionQuestionShare = 0;
-    settings.rhythmQuestionShare = 0;
+
     settings.chordQuestionShare = 0;
     settings.modeColourQuestionShare = 0;
     settings.modeNameQuestionShare = 0;
@@ -635,74 +635,4 @@ TEST( ExerciseScreenTest, the_circle_draws_each_octave_on_its_own_ring )
 // hasard apprend a etre ignoree, et c'est exactement ce que le projet refuse.
 //
 // A REPRENDRE : comprendre ce qui, dans un binaire de test Qt, empeche la seconde phase de la boucle de rythme.
-TEST( ExerciseScreenTest, DISABLED_the_cell_is_listened_to_before_it_is_reproduced )
-{
-    // Le seul test de TEMPS du projet, et il est a sa place ici : c'est le seul binaire de test qui a une application
-    // Qt - donc des QTimer qui battent et une boucle d'evenements qui les fait avancer. Le meme test, ecrit dans les
-    // tests du view model, attendait un evenement qui ne venait jamais : une suite de tests sans application ne fait
-    // pas tourner une horloge, elle reste bloquee.
-    //
-    // Ce qu'il verifie n'est couvert nulle part ailleurs : les DEUX phases de la boucle de rythme - l'ecoute, puis la
-    // reproduction - et l'ardoise remise a zero au moment ou le doigt devient juge. Le jugement lui-meme appartient au
-    // domaine, ou il est teste sans horloge du tout.
-    //
-    // Le tempo est pousse tres haut pour que la mesure dure deux dixiemes de seconde.
-    domain::NotePlayerFake notePlayer;
-
-    domain::SessionSettings settings;
-    settings.namedIntervalQuestionShare = 0;
-    settings.singQuestionShare = 0;
-    settings.directionQuestionShare = 0;
-    settings.rhythmQuestionShare = 100;
-
-    // Et TOUTES les autres parts a zero, accords compris : les parts se lisent entre elles, donc un accord laisse a son
-    // defaut de vingt prendrait une question sur six - et ce test, qui attend une cellule, attendrait pour toujours.
-    settings.chordQuestionShare = 0;
-    settings.sameColourQuestionShare = 0;
-    settings.modeColourQuestionShare = 0;
-    settings.modeNameQuestionShare = 0;
-    settings.modeVampQuestionShare = 0;
-
-    settings.rhythmBpm = 1200;
-
-    ExerciseSessionController controller{ notePlayer, settings };
-
-    QEventLoop settling;
-
-    // On sort des que la reproduction commence...
-    QObject::connect( &controller, &ExerciseSessionController::rhythmStateChanged, [&controller, &settling]() {
-        if( controller.isRhythmPlaying() )
-        {
-            settling.quit();
-        }
-    } );
-
-    QTimer::singleShot( 2000, &settling, &QEventLoop::quit );
-
-    controller.startSession();
-
-    // Une question de rythme commence toujours par l'ECOUTE : le doigt n'est pas juge tant que la cellule n'a pas ete
-    // entendue en entier.
-    EXPECT_FALSE( controller.isRhythmPlaying() );
-
-    // ... et on avance le temps NOUS-MEMES, en pompant les evenements jusqu'a ce que la reproduction commence - jamais
-    // plus longtemps qu'une echeance, pour qu'un echec DISE quelque chose au lieu d'attendre toujours.
-    //
-    // C'etait une attente sur un SIGNAL, et elle avait deux defauts a la fois : le signal peut tomber avant que l'attente
-    // ne commence, ce qui rendait le test instable, et quand il ne tombait pas, l'attente ne finissait pas. L'ETAT, lui,
-    // ne ment pas.
-    const QDeadlineTimer deadline{ 4000 };
-
-    while( !controller.isRhythmPlaying() && !deadline.hasExpired() )
-    {
-        QCoreApplication::processEvents( QEventLoop::AllEvents, 20 );
-    }
-
-    EXPECT_TRUE( controller.isRhythmPlaying() ) << "la cellule n'a jamais laisse la place a la reproduction";
-
-    // La tentative commence : l'ardoise repart de zero, et la derniere frappe avec elle.
-    EXPECT_EQ( 0, controller.rhythmCoveredOnsets() );
-    EXPECT_EQ( -1, controller.rhythmLastQuality() );
-}
-
 }    // namespace musichien::ui

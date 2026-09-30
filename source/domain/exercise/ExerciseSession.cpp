@@ -400,14 +400,12 @@ QuestionKind ExerciseSession::drawKind()
     //
     // L'ordre est celui de l'ecran : chaque genre prend la tranche qui suit la precedente, donc augmenter une part ne
     // deplace que les questions d'apres.
-    const std::array<KindShare, 8> shares{ KindShare{ .share = m_settings.namedIntervalQuestionShare,
+    const std::array<KindShare, 7> shares{ KindShare{ .share = m_settings.namedIntervalQuestionShare,
                                                       .kind = QuestionKind::NamedInterval },
                                            KindShare{ .share = m_settings.singQuestionShare,
                                                       .kind = QuestionKind::Sing },
                                            KindShare{ .share = m_settings.directionQuestionShare,
                                                       .kind = QuestionKind::Direction },
-                                           KindShare{ .share = m_settings.rhythmQuestionShare,
-                                                      .kind = QuestionKind::Rhythm },
                                            KindShare{ .share = m_settings.chordQuestionShare,
                                                       .kind = QuestionKind::Chord },
                                            KindShare{ .share = m_settings.modeColourQuestionShare,

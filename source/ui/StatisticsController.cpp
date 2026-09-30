@@ -289,12 +289,14 @@ void StatisticsController::refresh()
     }
 
     // LA REPARTITION par genre : ce que le joueur travaille vraiment, et ce qu'il delaisse sans le savoir.
+    //
+    // Le RYTHME n'y figure plus : il n'est plus un exercice, donc une ligne a zero y serait un mensonge poli. Le genre
+    // reste declare dans l'enumeration - la frappe et le metronome s'y accrochent - mais aucune question ne le pose.
     m_kinds.clear();
 
-    const std::array<domain::QuestionKind, 7> kinds{ domain::QuestionKind::NamedInterval,
+    const std::array<domain::QuestionKind, 6> kinds{ domain::QuestionKind::NamedInterval,
                                                      domain::QuestionKind::Direction,
                                                      domain::QuestionKind::Sing,
-                                                     domain::QuestionKind::Rhythm,
                                                      domain::QuestionKind::Chord,
                                                      domain::QuestionKind::ModeColour,
                                                      domain::QuestionKind::ModeName };

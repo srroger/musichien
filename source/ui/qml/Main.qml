@@ -1170,17 +1170,6 @@ ApplicationWindow {
                 QuestionShareSetting {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
-                    title: qsTr("Rythme")
-                    hint: qsTr("Poids des questions de rythme. Un poids, lu par rapport aux autres parts.")
-                    share: ExerciseController.rhythmQuestionShare
-                    onShareEdited: (p_share) => {
-                        return ExerciseController.setRhythmQuestionShare(p_share);
-                    }
-                }
-
-                QuestionShareSetting {
-                    Layout.fillWidth: true
-                    Layout.topMargin: 10
                     title: qsTr("Accords")
                     hint: qsTr("Poids des questions d'accords. Un poids, lu par rapport aux autres parts.")
                     share: ExerciseController.chordQuestionShare

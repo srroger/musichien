@@ -156,14 +156,6 @@ public:
 
     virtual void storeSingQuestionShare( std::int32_t p_share ) = 0;
 
-    // Combien de questions sur cent portent sur le RYTHME.
-    //
-    // Meme regle, meme raison d'etre reglable : une part a zero, et le rythme disparait de la session sans qu'aucune
-    // ligne de code ne change.
-    [[nodiscard]] virtual std::int32_t storedRhythmQuestionShare() const = 0;
-
-    virtual void storeRhythmQuestionShare( std::int32_t p_share ) = 0;
-
     // Combien de questions sur cent portent sur les ACCORDS.
     //
     // Troisieme part reglable, et la coincidence n'en est pas une : des qu'un genre de question existe, quelqu'un
@@ -270,10 +262,6 @@ public:
 
     void storeSingQuestionShare( std::int32_t p_share ) override { m_singQuestionShare = p_share; }
 
-    [[nodiscard]] std::int32_t storedRhythmQuestionShare() const override { return m_rhythmQuestionShare; }
-
-    void storeRhythmQuestionShare( std::int32_t p_share ) override { m_rhythmQuestionShare = p_share; }
-
     [[nodiscard]] std::int32_t storedChordQuestionShare() const override { return m_chordQuestionShare; }
 
     void storeChordQuestionShare( std::int32_t p_share ) override { m_chordQuestionShare = p_share; }
@@ -326,10 +314,6 @@ private:
 
     // Vingt pour cent chacune, comme le chant : un premier lancement entend un peu de tout, et c'est au joueur de
     // decider ensuite ce qu'il veut travailler. Les memes valeurs que les reglages par defaut du domaine.
-    //
-    // SAUF le rythme, a zero, et c'est une valeur VOULUE : un reglage qui vaut zero ne veut pas dire « pas encore
-    // fait », il veut dire « disponible, et pas impose ».
-    std::int32_t m_rhythmQuestionShare{ 0 };
 
     std::int32_t m_chordQuestionShare{ 20 };
 

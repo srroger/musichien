@@ -417,7 +417,6 @@ domain::SessionSettings ExerciseSessionController::sessionSettingsForLevel( doma
     // reglages sont ranges, et le profil fait foi.
     settings.namedIntervalQuestionShare = m_settings.namedIntervalQuestionShare;
     settings.singQuestionShare = m_settings.singQuestionShare;
-    settings.rhythmQuestionShare = m_settings.rhythmQuestionShare;
     settings.chordQuestionShare = m_settings.chordQuestionShare;
 
     return settings;
@@ -432,7 +431,6 @@ void ExerciseSessionController::applyStoredQuestionShares( domain::SessionSettin
 
     p_settings.namedIntervalQuestionShare = m_levelStore->storedNamedIntervalQuestionShare();
     p_settings.singQuestionShare = m_levelStore->storedSingQuestionShare();
-    p_settings.rhythmQuestionShare = m_levelStore->storedRhythmQuestionShare();
     p_settings.chordQuestionShare = m_levelStore->storedChordQuestionShare();
 
     // L'harmonie se pose avec les autres, et vaut zero tant que le joueur ne l'a pas demandee : une session ordinaire
@@ -1607,34 +1605,6 @@ void ExerciseSessionController::setSingQuestionShare( int p_share )
     m_settings.singQuestionShare = p_share;
 
     emit singQuestionShareChanged();
-}
-
-int ExerciseSessionController::rhythmQuestionShare() const
-{
-    // ZERO quand il n'y a pas de profil : le defaut de l'application, celui du domaine et celui du fichier de
-    // reglages disent tous les trois la meme chose, sinon l'un des trois finirait par mentir a l'ecran.
-    return ( m_levelStore != nullptr ) ? m_levelStore->storedRhythmQuestionShare() : 0;
-}
-
-void ExerciseSessionController::setRhythmQuestionShare( int p_share )
-{
-    if( m_levelStore == nullptr )
-    {
-        return;
-    }
-
-    if( p_share < 0 || p_share > 100 )
-    {
-        return;
-    }
-
-    m_levelStore->storeRhythmQuestionShare( p_share );
-
-    // La session SUIVANTE prend la nouvelle part ; une session en cours garde ses regles. Meme contrat que le chant,
-    // et c'est ce qui rend le reglage sur : rien ne change sous les pieds du joueur au milieu d'une partie.
-    m_settings.rhythmQuestionShare = p_share;
-
-    emit rhythmQuestionShareChanged();
 }
 
 int ExerciseSessionController::chordQuestionShare() const

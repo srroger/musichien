@@ -44,7 +44,6 @@ void pinEveryQuestionShare( SessionSettings & p_settings )
     p_settings.sameColourQuestionShare = 0;
     p_settings.singQuestionShare = 0;
     p_settings.directionQuestionShare = 0;
-    p_settings.rhythmQuestionShare = 0;
     p_settings.chordQuestionShare = 0;
     p_settings.modeColourQuestionShare = 0;
     p_settings.modeNameQuestionShare = 0;
@@ -123,7 +122,6 @@ void playCorrectly( ExerciseSession & p_session, std::size_t p_questionCount )
 {
     SessionSettings settings;
     pinEveryQuestionShare( settings );
-    settings.rhythmQuestionShare = 100;
     return settings;
 }
 
@@ -794,153 +792,6 @@ TEST( ExerciseSessionTest, a_sung_question_can_be_passed_at_once )
 // que le domaine ne mesure pas le temps : il RECOIT la position des frappes, et il les juge.
 // ---------------------------------------------------------------------------------------------------------------------
 
-TEST( ExerciseSessionTest, a_rhythm_question_asks_for_a_cell_and_a_tempo )
-{
-    const ExerciseSession session{ TEST_SEED, rhythmOnlySettings() };
-
-    const Question & question = session.currentQuestion();
-
-    EXPECT_EQ( QuestionKind::Rhythm, question.kind );
-
-    // La cellule vient du domaine, et l'ardoise de la tentative a une case par frappe a couvrir.
-    ASSERT_LT( question.patternIndex, allRhythmPatterns().size() );
-    EXPECT_EQ( allRhythmPatterns().at( question.patternIndex ).hits().size(), question.coveredOnsets.size() );
-    EXPECT_EQ( 90, question.bpm );
-
-    // Rien a choisir : la reponse n'est pas un bouton, c'est le geste.
-    EXPECT_TRUE( question.choices.empty() );
-}
-
-TEST( ExerciseSessionTest, reproducing_every_hit_of_the_cell_wins_the_question )
-{
-    ExerciseSession session{ TEST_SEED, rhythmOnlySettings() };
-
-    playTheCellCorrectly( session );
-
-    EXPECT_TRUE( session.endRhythmLoop() );
-    EXPECT_EQ( SessionState::Feedback, session.state() );
-
-    // Une question juste est une question juste, quel que soit son genre : elle compte dans le score et allonge la
-    // serie. C'est ce que "le rythme est une question comme une autre" veut dire, et c'est tout l'interet du travail.
-    EXPECT_EQ( 1, session.score().streak() );
-    EXPECT_EQ( 1U, session.score().completedQuestionCount() );
-}
-
-TEST( ExerciseSessionTest, forgetting_a_hit_loses_the_attempt_and_keeps_the_question )
-{
-    SessionSettings settings = rhythmOnlySettings();
-    settings.lives = std::nullopt;
-
-    ExerciseSession session{ TEST_SEED, settings };
-
-    const RhythmPattern & pattern = patternOf( session );
-
-    // Toutes les frappes SAUF la derniere : l'oubli typique, celui du joueur qui suit la cellule et s'arrete une
-    // frappe trop tot.
-    ASSERT_GT( pattern.hits().size(), 1U );
-
-    for( std::size_t index = 0; index + 1 < pattern.hits().size(); ++index )
-    {
-        session.registerRhythmTap( pattern.hits().at( index ).beat );
-    }
-
-    EXPECT_FALSE( session.endRhythmLoop() );
-    EXPECT_EQ( SessionState::Asking, session.state() );
-
-    // Et l'ardoise est VIERGE pour la boucle suivante : la frappe oubliee une fois ne le reste pas pour toujours.
-    playTheCellCorrectly( session );
-
-    EXPECT_TRUE( session.endRhythmLoop() );
-}
-
-TEST( ExerciseSessionTest, a_tap_between_the_hits_costs_the_whole_attempt )
-{
-    SessionSettings settings = rhythmOnlySettings();
-    settings.lives = std::nullopt;
-
-    ExerciseSession session{ TEST_SEED, settings };
-
-    const RhythmPattern & pattern = patternOf( session );
-
-    const double offBeat = furthestPositionFromAnyHitInBeats( pattern );
-
-    // Le prealable du test, verifie plutot que suppose : cette position est bien un rate, au tempo de la question.
-    ASSERT_GT( distanceToNearestOnsetInBeats( pattern, offBeat ) * beatDurationMs( 90.0 ), GOOD_WINDOW_MS );
-
-    playTheCellCorrectly( session );
-
-    // La frappe de trop : toutes les frappes sont la, mais une est tombee entre deux. Sans cette regle, "reproduire
-    // une cellule" deviendrait "taper en continu jusqu'a avoir touche les bons endroits".
-    session.registerRhythmTap( offBeat );
-
-    EXPECT_FALSE( session.endRhythmLoop() );
-}
-
-TEST( ExerciseSessionTest, tapping_twice_on_the_same_hit_is_not_a_mistake )
-{
-    ExerciseSession session{ TEST_SEED, rhythmOnlySettings() };
-
-    playTheCellCorrectly( session );
-
-    // Le doigt qui rebondit sur l'ecran, ou le doute d'un joueur qui reaffirme : ce qui est juge, c'est la PLACE des
-    // frappes, et une frappe de la cellule est touchee ou elle ne l'est pas.
-    session.registerRhythmTap( patternOf( session ).hits().front().beat );
-
-    EXPECT_TRUE( session.endRhythmLoop() );
-}
-
-TEST( ExerciseSessionTest, a_rhythm_question_is_never_turned_into_a_guided_one )
-{
-    SessionSettings settings = rhythmOnlySettings();
-    settings.lives = std::nullopt;
-
-    // Un intervalle qui monte, pour que le basculement guide soit possible s'il devait arriver.
-    settings.ascendingShare = 100;
-    settings.descendingShare = 0;
-    settings.harmonicShare = 0;
-
-    ExerciseSession session{ TEST_SEED, settings };
-
-    for( int attempt = 0; attempt < 3; ++attempt )
-    {
-        // Rien tape : la boucle se termine sans une seule frappe.
-        EXPECT_FALSE( session.endRhythmLoop() );
-    }
-
-    // Une cellule n'a ni montee ni descente : la question reste une question de rythme, et le joueur qui vient d'en
-    // rater une attend de la REPOSER.
-    EXPECT_EQ( QuestionKind::Rhythm, session.currentQuestion().kind );
-}
-
-TEST( ExerciseSessionTest, a_rhythm_question_can_be_passed_after_one_lost_attempt )
-{
-    SessionSettings settings = rhythmOnlySettings();
-    settings.lives = std::nullopt;
-
-    ExerciseSession session{ TEST_SEED, settings };
-
-    EXPECT_FALSE( session.isHelpAvailable() );
-
-    session.endRhythmLoop();    // rien tape : une tentative perdue
-
-    // Un intervalle se reecoute autant de fois qu'on veut ; une cellule ne s'entend que pendant sa boucle d'ecoute.
-    // Un seul essai perdu, et le joueur peut passer - sinon une question incomprehensible couterait toutes ses vies.
-    EXPECT_TRUE( session.isHelpAvailable() );
-}
-
-TEST( ExerciseSessionTest, tapping_on_a_question_that_is_not_rhythmic_judges_nothing )
-{
-    ExerciseSession session{ TEST_SEED, unlimitedLivesSettings() };
-
-    EXPECT_EQ( QuestionKind::NamedInterval, session.currentQuestion().kind );
-
-    // Deux langues ne se repondent pas l'une l'autre : une frappe sur une question d'intervalle ne juge rien, et ne
-    // ferme pas la question.
-    EXPECT_EQ( HitQuality::Miss, session.registerRhythmTap( 0.0 ) );
-    EXPECT_FALSE( session.endRhythmLoop() );
-    EXPECT_EQ( SessionState::Asking, session.state() );
-}
-
 TEST( ExerciseSessionTest, every_genre_comes_out_when_every_part_is_equal )
 {
     // Le defaut que Roger a trouve, et il etait invisible : six parts a vingt font une somme de CENT VINGT, et l'ancien
@@ -950,12 +801,16 @@ TEST( ExerciseSessionTest, every_genre_comes_out_when_every_part_is_equal )
     // Six parts egales doivent donc donner SEPT genres. Le test prend une centaine de graines differentes et ne lit que
     // la PREMIERE question de chacune : avancer demanderait de savoir repondre a tous les genres, ce qui n'est pas le
     // sujet ici - le tirage l'est.
+    // Six parts egales doivent donc donner SIX genres : le rythme en a ete retire, et c'est le VAMP qui reste en dernier
+    // dans l'ordre du tirage - c'est lui qui manquait avant la correction.
+    //
+    // Le test prend deux cents graines differentes et ne lit que la PREMIERE question de chacune : avancer demanderait de
+    // savoir repondre a tous les genres, ce qui n'est pas le sujet ici - le tirage l'est.
     SessionSettings settings;
     pinEveryQuestionShare( settings );
 
     settings.namedIntervalQuestionShare = 20;
     settings.singQuestionShare = 20;
-    settings.rhythmQuestionShare = 20;
     settings.chordQuestionShare = 20;
     settings.modeColourQuestionShare = 20;
     settings.modeNameQuestionShare = 20;
@@ -972,46 +827,8 @@ TEST( ExerciseSessionTest, every_genre_comes_out_when_every_part_is_equal )
         seenKinds.insert( session.currentQuestion().kind );
     }
 
-    // Les sept, et pas six : c'est le VAMP qui manquait, et c'est lui qui tombe en dernier dans l'ordre du tirage.
-    EXPECT_EQ( 7U, seenKinds.size() );
-}
-
-TEST( ExerciseSessionTest, the_rhythm_share_decides_whether_a_cell_is_asked )
-{
-    // Zero : jamais de rythme, meme sur trente questions.
-    SessionSettings withoutRhythm = unlimitedLivesSettings();
-    withoutRhythm.questionCount = 30;
-
-    ExerciseSession intervalSession{ TEST_SEED, withoutRhythm };
-
-    for( std::size_t index = 0; index < 30; ++index )
-    {
-        EXPECT_NE( QuestionKind::Rhythm, intervalSession.currentQuestion().kind );
-
-        answerCorrectly( intervalSession );
-        intervalSession.advance();
-    }
-
-    // Cent : toutes les questions en sont, et c'est ce qui rend le reste de ces tests possible.
-    SessionSettings onlyRhythm = rhythmOnlySettings();
-    onlyRhythm.questionCount = 30;
-
-    ExerciseSession rhythmSession{ TEST_SEED, onlyRhythm };
-
-    for( std::size_t index = 0; index < 30; ++index )
-    {
-        EXPECT_EQ( QuestionKind::Rhythm, rhythmSession.currentQuestion().kind );
-
-        playTheCellCorrectly( rhythmSession );
-
-        EXPECT_TRUE( rhythmSession.endRhythmLoop() );
-
-        rhythmSession.advance();
-    }
-
-    // La session va jusqu'au bout sans rater une question : la fin est la meme que pour des intervalles.
-    EXPECT_TRUE( rhythmSession.isFinished() );
-    EXPECT_TRUE( rhythmSession.hasEarnedStar() );
+    // Les six, et pas cinq : c'est le VAMP qui manquait, et c'est lui qui tombe en dernier dans l'ordre du tirage.
+    EXPECT_EQ( 6U, seenKinds.size() );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

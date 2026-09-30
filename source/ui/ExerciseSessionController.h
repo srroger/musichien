@@ -300,9 +300,8 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( int phraseTempoBpm READ phraseTempoBpm NOTIFY phraseTempoChanged )
     Q_PROPERTY( int phraseTempoVariation READ phraseTempoVariation NOTIFY phraseTempoChanged )
 
-    // Combien de questions sur cent portent sur le RYTHME, et combien sur les ACCORDS. Memes reglages, memes bornes,
-    // memes raisons : au-dela d'une part, on ne choisit plus ce qu'on travaille, on le subit.
-    Q_PROPERTY( int rhythmQuestionShare READ rhythmQuestionShare NOTIFY rhythmQuestionShareChanged )
+    // Combien de questions sur cent portent sur les ACCORDS. Meme reglage, memes bornes, meme raison : au-dela d'une
+    // part, on ne choisit plus ce qu'on travaille, on le subit.
     Q_PROPERTY( int chordQuestionShare READ chordQuestionShare NOTIFY chordQuestionShareChanged )
 
     // Only meaningful once the session is over.
@@ -454,12 +453,8 @@ public:
     Q_INVOKABLE void setPhraseTempoVariation( int p_variation );
     [[nodiscard]] int phraseTempoVariation() const;
 
-    // Combien de questions sur cent portent sur le rythme, et combien sur les accords. Meme contrat que le chant :
-    // borne a 0-100, memorise, et pris en compte par la session SUIVANTE.
-    [[nodiscard]] int rhythmQuestionShare() const;
-
-    Q_INVOKABLE void setRhythmQuestionShare( int p_share );
-
+    // Combien de questions sur cent portent sur les accords. Meme contrat que le chant : borne a 0-100, memorise, et pris
+    // en compte par la session SUIVANTE.
     [[nodiscard]] int chordQuestionShare() const;
 
     Q_INVOKABLE void setChordQuestionShare( int p_share );
@@ -732,8 +727,7 @@ signals:
 
     void phraseTempoChanged();
 
-    // Le joueur vient de changer la part du rythme, ou celle des accords.
-    void rhythmQuestionShareChanged();
+    // Le joueur vient de changer la part des accords.
     void chordQuestionShareChanged();
 
     // Un seul signal pour les deux parts de l'harmonie : elles se reglent ensemble, dans le meme ecran, et un signal

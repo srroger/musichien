@@ -45,7 +45,6 @@ void pinEveryQuestionShare( domain::SessionSettings & p_settings )
     p_settings.sameColourQuestionShare = 0;
     p_settings.singQuestionShare = 0;
     p_settings.directionQuestionShare = 0;
-    p_settings.rhythmQuestionShare = 0;
     p_settings.chordQuestionShare = 0;
     p_settings.modeColourQuestionShare = 0;
     p_settings.modeNameQuestionShare = 0;
@@ -94,8 +93,6 @@ void pinEveryQuestionShare( domain::SessionSettings & p_settings )
     domain::SessionSettings settings;
     pinEveryQuestionShare( settings );
 
-    settings.rhythmQuestionShare = 100;
-
     return settings;
 }
 
@@ -120,7 +117,6 @@ void storeIntervalOnlyShares( domain::PlayerPreferencesFake & p_store )
 {
     p_store.storeNamedIntervalQuestionShare( 100 );
     p_store.storeSingQuestionShare( 0 );
-    p_store.storeRhythmQuestionShare( 0 );
     p_store.storeChordQuestionShare( 0 );
     p_store.storeModeColourQuestionShare( 0 );
     p_store.storeModeNameQuestionShare( 0 );
@@ -178,7 +174,6 @@ void storeNamedModeOnlyShares( domain::PlayerPreferencesFake & p_store )
 {
     p_store.storeNamedIntervalQuestionShare( 0 );
     p_store.storeSingQuestionShare( 0 );
-    p_store.storeRhythmQuestionShare( 0 );
     p_store.storeChordQuestionShare( 0 );
     p_store.storeModeColourQuestionShare( 0 );
     p_store.storeModeNameQuestionShare( 100 );
@@ -1067,78 +1062,6 @@ TEST( ExerciseSessionControllerTest, the_sing_share_is_remembered_and_the_profil
 // proprietes ne ment sur une question d'intervalle.
 // ---------------------------------------------------------------------------------------------------------------------
 
-TEST( ExerciseSessionControllerTest, a_rhythm_question_is_heard_as_a_cell_and_not_as_an_interval )
-{
-    domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
-
-    controller.startSession();
-
-    EXPECT_TRUE( controller.isRhythmQuestion() );
-    EXPECT_EQ( 3, controller.questionKind() );
-
-    // L'ecoute commence tout de suite : le premier temps de la cellule est frappe des l'ouverture de la question.
-    EXPECT_GT( notePlayer.drumCount(), 0 );
-
-    // Et AUCUN intervalle n'est joue : une question de rythme ne fait pas entendre de notes.
-    EXPECT_TRUE( notePlayer.playedMelodies().empty() );
-    EXPECT_TRUE( notePlayer.playedChords().empty() );
-}
-
-TEST( ExerciseSessionControllerTest, the_rhythm_properties_describe_the_cell_for_the_screen )
-{
-    domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
-
-    controller.startSession();
-
-    // Le nom vient du domaine, et c'est celui d'une cellule du domaine.
-    EXPECT_FALSE( controller.rhythmPatternName().isEmpty() );
-
-    EXPECT_EQ( 90, controller.rhythmBpm() );
-    EXPECT_GT( controller.rhythmBeatsPerBar(), 0 );
-
-    // Une frappe a dessiner par frappe de la cellule, et rien de plus : l'ecran place ce qu'on lui donne.
-    EXPECT_GT( controller.rhythmOnsetCount(), 0 );
-    EXPECT_EQ( controller.rhythmOnsetCount(), controller.rhythmHits().size() );
-
-    const QVariantMap firstHit = controller.rhythmHits().first().toMap();
-
-    EXPECT_TRUE( firstHit.contains( "beat" ) );
-    EXPECT_TRUE( firstHit.contains( "accented" ) );
-    EXPECT_TRUE( firstHit.contains( "drum" ) );
-
-    // Une mesure dure ce que dit le domaine : l'ecran s'en sert pour laisser le feedback s'entendre en entier.
-    EXPECT_GT( controller.rhythmCellDurationMs(), 0 );
-
-    // Et l'ecran commence par l'ECOUTE : le doigt n'est pas juge tant que la cellule n'a pas ete entendue.
-    EXPECT_FALSE( controller.isRhythmPlaying() );
-
-    // Rien n'a encore ete frappe : -1, et non 0, qui est deja un Miss.
-    EXPECT_EQ( -1, controller.rhythmLastQuality() );
-}
-
-TEST( ExerciseSessionControllerTest, a_tap_during_the_listening_phase_is_heard_but_not_judged )
-{
-    domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
-
-    controller.startSession();
-
-    const int drumsBefore = notePlayer.drumCount();
-
-    controller.tapRhythm();
-
-    // Le doigt s'entend toujours : sans ce son, taper donnerait l'impression que l'ecran n'a pas recu le geste.
-    EXPECT_GT( notePlayer.drumCount(), drumsBefore );
-
-    // Et il ne vaut RIEN tant que la cellule n'a pas ete entendue en entier : celui qui accompagne le modele pendant
-    // qu'il s'ecoute ne perd pas une vie pour l'avoir suivi.
-    EXPECT_FALSE( controller.isRhythmPlaying() );
-    EXPECT_EQ( -1, controller.rhythmLastQuality() );
-    EXPECT_EQ( 0, controller.rhythmCoveredOnsets() );
-}
-
 TEST( ExerciseSessionControllerTest, tapping_on_an_interval_question_changes_nothing )
 {
     domain::NotePlayerFake notePlayer;
@@ -1159,50 +1082,6 @@ TEST( ExerciseSessionControllerTest, tapping_on_an_interval_question_changes_not
     EXPECT_TRUE( controller.rhythmHits().isEmpty() );
     EXPECT_EQ( 0, controller.rhythmBeatsPerBar() );
     EXPECT_EQ( 0, controller.rhythmCellDurationMs() );
-}
-
-TEST( ExerciseSessionControllerTest, a_rhythm_question_shows_no_interval )
-{
-    domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
-
-    controller.startSession();
-
-    // La question porte un intervalle tire au hasard - c'est l'ordre des tirages - mais il n'a jamais ete joue : le
-    // montrer ferait croire a un intervalle entendu, et l'ecran afficherait un verdict faux.
-    EXPECT_TRUE( controller.heardInterval().isEmpty() );
-    EXPECT_TRUE( controller.hintText().isEmpty() );
-}
-
-TEST( ExerciseSessionControllerTest, passing_a_rhythm_question_plays_the_cell_once )
-{
-    domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
-
-    controller.startSession();
-
-    const int drumsAfterListening = notePlayer.drumCount();
-
-    controller.revealAnswer();
-
-    // Passer la question laisse entendre ce qu'il fallait reproduire : la cellule est rejouee, et la question est close.
-    EXPECT_GT( notePlayer.drumCount(), drumsAfterListening );
-    EXPECT_TRUE( controller.isFeedbackVisible() );
-}
-
-TEST( ExerciseSessionControllerTest, leaving_a_rhythm_question_silences_the_loop )
-{
-    domain::NotePlayerFake notePlayer;
-    ExerciseSessionController controller{ notePlayer, rhythmOnlySettings() };
-
-    controller.startSession();
-
-    controller.stopSession();
-
-    // La boucle est un son comme un autre : quitter l'ecran la fait taire, et la session est bel et bien terminee.
-    EXPECT_FALSE( controller.running() );
-    EXPECT_GT( notePlayer.stopCount(), 0 );
-    EXPECT_FALSE( controller.isRhythmQuestion() );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1335,14 +1214,9 @@ TEST( ExerciseSessionControllerTest, the_four_question_shares_are_remembered_and
     // Vingt pour cent par defaut pour le chant et les accords... et ZERO pour le rythme : la question de rythme est
     // eteinte tant qu'on ne l'allume pas (sa mesure du temps n'est pas encore fiable).
     EXPECT_EQ( 20, controller.singQuestionShare() );
-    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
     EXPECT_EQ( 20, controller.chordQuestionShare() );
 
     // On l'allume : le reglage existe, et c'est ce qui compte - le rythme se dose, y compris depuis zero.
-    controller.setRhythmQuestionShare( 25 );
-
-    EXPECT_EQ( 25, controller.rhythmQuestionShare() );
-    EXPECT_EQ( 25, levelStore.storedRhythmQuestionShare() );
 
     controller.setChordQuestionShare( 45 );
 
@@ -1350,17 +1224,11 @@ TEST( ExerciseSessionControllerTest, the_four_question_shares_are_remembered_and
     EXPECT_EQ( 45, levelStore.storedChordQuestionShare() );
 
     // Et une valeur qui n'a pas de sens est refusee, pas convertie.
-    controller.setRhythmQuestionShare( 150 );
     controller.setChordQuestionShare( -3 );
 
-    EXPECT_EQ( 25, controller.rhythmQuestionShare() );
     EXPECT_EQ( 45, controller.chordQuestionShare() );
 
     // ZERO est une valeur legitime, et c'est meme celle par defaut : elle fait disparaitre le rythme d'une session.
-    controller.setRhythmQuestionShare( 0 );
-
-    EXPECT_EQ( 0, controller.rhythmQuestionShare() );
-    EXPECT_EQ( 0, levelStore.storedRhythmQuestionShare() );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
