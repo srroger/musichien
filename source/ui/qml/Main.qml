@@ -1588,7 +1588,9 @@ ApplicationWindow {
                             Button {
                                 id: instrumentPreviewButton
 
-                                width: 30
+                                // Roger l'a trouve « un peu petit » : 36, c'est juste ce qu'il faut pour un pouce, sans
+                                // voler la place du nom de l'instrument a cote.
+                                width: 36
                                 height: parent.height
                                 text: "\u25B6"
                                 onClicked: ExerciseController.previewInstrument(modelData.index)

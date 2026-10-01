@@ -2595,4 +2595,19 @@ TEST( ExerciseSessionControllerTest, an_instrument_that_does_not_exist_is_not_pl
     EXPECT_TRUE( notePlayer.playedChords().empty() );
 }
 
+TEST( ExerciseSessionControllerTest, an_instrument_can_be_heard_before_it_is_chosen )
+{
+    // C'est tout l'interet du bouton : un instrument DECOCHE doit pouvoir s'ecouter, puisque c'est justement celui qu'on
+    // hesite a cocher. L'apercu ne regarde donc jamais la liste des timbres acceptes - il joue ce qu'on lui demande.
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, nullptr };
+
+    controller.setInstrumentEnabled( 4, false );
+
+    controller.previewInstrument( 4 );
+
+    EXPECT_EQ( 1U, notePlayer.playedMelodies().size() );
+    EXPECT_EQ( 1U, notePlayer.playedChords().size() );
+}
+
 }    // namespace musichien::ui

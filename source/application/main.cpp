@@ -407,15 +407,20 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     for( const char * instrumentName : SAMPLED_INSTRUMENT_NAMES )
     {
-        musichien::domain::SampledInstrument instrument = loadInstrument( QString::fromLatin1( instrumentName ) );
-
-        if( !instrument.isEmpty() )
-        {
-            instruments.push_back( std::move( instrument ) );
-        }
+        // AUCUN INSTRUMENT N'EST RETIRE DE LA LISTE, meme quand sa ressource n'a pas pu etre lue.
+        //
+        // Le RANG d'un instrument est son identite : le domaine dit « joue le 4e », et le cable ne traduit rien. Un
+        // instrument saute ferait glisser tous les suivants d'un cran, et l'apercu comme les cases a cocher joueraient
+        // alors d'autres timbres que les leurs. Une ressource manquante laisse donc un TROU a sa place, et l'adaptateur
+        // retombe sur la synthese pour ce rang.
+        instruments.push_back( loadInstrument( QString::fromLatin1( instrumentName ) ) );
     }
 
-    std::cerr << "Musichien: " << instruments.size() << " sampled instrument(s)\n";
+    const auto loadedInstrumentCount = static_cast<std::size_t>( std::ranges::count_if(
+      instruments, []( const musichien::domain::SampledInstrument & p_instrument ) { return !p_instrument.isEmpty(); } ) );
+
+    std::cerr << "Musichien: " << loadedInstrumentCount << " sampled instrument(s) read, " << instruments.size()
+              << " timbre(s) offered\n";
 
     // La batterie, rendue depuis la meme banque libre que les instruments : une vraie peau vaut mieux qu'une chute de
     // sinus.
@@ -468,7 +473,13 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     notePlayer.useDroneInstruments( std::move( drones ) );
 
-    notePlayer.useInstruments( instruments, {} );
+    // Les trois formes d'onde pures FERMENT la liste des timbres, et leur rang suit celui des echantillons - exactement
+    // comme domain::INSTRUMENT_NAMES les nomme. Elles ne coutent rien (un drapeau dans les reglages), donc elles gardent
+    // TOUJOURS leur place, meme decochees : c'est ce qui permet plus bas de parler de « l'instrument 10 ».
+    const std::vector<musichien::domain::Waveform> waveforms{ musichien::domain::WAVEFORM_INSTRUMENTS.begin(),
+                                                              musichien::domain::WAVEFORM_INSTRUMENTS.end() };
+
+    notePlayer.useInstruments( std::move( instruments ), waveforms );
 
     // Opening the output now, rather than at the first note, means a machine without a sound card is
     // reported at start up instead of silently refusing to play in the middle of an exercise.
@@ -625,37 +636,16 @@ int main( int p_argumentCount, char * p_arguments[] )
     // La session peut poser des questions CHANTEES : elle a besoin du micro pour les juger.
     exerciseController.setMicrophoneController( &microphoneController );
 
-    // What the player WANTS to hear. The filtering happens HERE, in the wiring layer, which is what keeps the
-    // audio adapter from having to know anything about preferences - and it happens again on every change, so
-    // that unticking the saxophone is heard on the very next question rather than at the next launch.
-    const auto playWantedInstruments = [&exerciseController, &notePlayer, &instruments]() {
-        const std::vector<bool> enabled = exerciseController.enabledInstruments();
-
-        std::vector<musichien::domain::SampledInstrument> wantedInstruments;
-
-        for( std::size_t index = 0; index < instruments.size(); ++index )
-        {
-            if( ( index >= enabled.size() ) || enabled.at( index ) )
-            {
-                wantedInstruments.push_back( instruments.at( index ) );
-            }
-        }
-
-        // The waveforms are the instruments that are NOT samples: the flags after the sampled ones ask the adapter
-        // to render a pure spectrum (sine, sawtooth, square) instead of a recording.
-        std::vector<musichien::domain::Waveform> wantedWaveforms;
-
-        for( std::size_t waveformIndex = 0; waveformIndex < musichien::domain::WAVEFORM_INSTRUMENTS.size(); ++waveformIndex )
-        {
-            const std::size_t flagIndex = instruments.size() + waveformIndex;
-
-            if( ( flagIndex >= enabled.size() ) || enabled.at( flagIndex ) )
-            {
-                wantedWaveforms.push_back( musichien::domain::WAVEFORM_INSTRUMENTS.at( waveformIndex ) );
-            }
-        }
-
-        notePlayer.useInstruments( std::move( wantedInstruments ), std::move( wantedWaveforms ) );
+    // Ce que le joueur VEUT entendre. Le filtrage se fait ICI, dans la couche de cablage, ce qui evite a l'adaptateur
+    // audio de connaitre les preferences - et il se refait a chaque changement, donc decocher le saxo s'entend des la
+    // question suivante.
+    //
+    // IL N'ENVOIE PLUS UNE LISTE D'INSTRUMENTS, mais un drapeau par timbre. C'est le fond du bug que Roger a entendu -
+    // « il ne joue pas forcement l'instrument en face » : en compactant la liste, chaque case decochee faisait GLISSER
+    // les rangs, et l'index d'un instrument cessait de designer le meme son. Le filtre porte desormais sur le TIRAGE,
+    // et les instruments gardent leur place - y compris ceux qu'on vient de decocher, qu'il faut encore pouvoir ecouter.
+    const auto playWantedInstruments = [&exerciseController, &notePlayer]() {
+        notePlayer.useEnabledInstruments( exerciseController.enabledInstruments() );
     };
 
     QObject::connect( &exerciseController,

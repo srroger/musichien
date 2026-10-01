@@ -388,6 +388,38 @@ void QAudioNotePlayer::useDroneInstruments( std::vector<domain::SampledInstrumen
     m_lastDroneNotes.clear();
 }
 
+void QAudioNotePlayer::useEnabledInstruments( std::vector<bool> p_enabled )
+{
+    m_enabledTimbre = std::move( p_enabled );
+
+    // Le timbre retenu pour la session peut tres bien avoir ete decoche entre-temps : le tirage suivant en choisira un
+    // autre, et c'est tout ce qu'il y a a faire. Rien n'est reinitialise ici - c'est le TIRAGE qui verifie.
+}
+
+bool QAudioNotePlayer::isTimbreEnabled( std::size_t p_timbreIndex ) const
+{
+    if( p_timbreIndex >= m_enabledTimbre.size() )
+    {
+        return true;
+    }
+
+    return m_enabledTimbre.at( p_timbreIndex );
+}
+
+const domain::SampledInstrument * QAudioNotePlayer::instrumentAt( std::size_t p_timbreIndex ) const
+{
+    if( p_timbreIndex >= m_instruments.size() )
+    {
+        return nullptr;
+    }
+
+    const domain::SampledInstrument & instrument = m_instruments.at( p_timbreIndex );
+
+    // Vide : la ressource n'a pas pu etre lue. Le rang reste le sien - c'est ce qui garde les index du domaine justes -
+    // mais il n'y a rien a jouer, et la synthese s'en charge.
+    return instrument.isEmpty() ? nullptr : &instrument;
+}
+
 std::size_t QAudioNotePlayer::timbreIndexFor( std::span<const domain::Note> p_notes )
 {
     // The same question is the same NOTES, whatever order the melody played them in: a falling fifth and its
@@ -403,7 +435,10 @@ std::size_t QAudioNotePlayer::timbreIndexFor( std::span<const domain::Note> p_no
 
     // ET LE TIMBRE DE LA SESSION NE BOUGE PLUS : voir beginTimbreForSession. Une nouvelle question ne retire donc plus de
     // timbre, et l'oreille ne compare plus que ce qu'on lui demande - l'intervalle, jamais l'instrument.
-    if( sameQuestion || m_timbreIsHeldForSession )
+    //
+    // Sauf s'il vient d'etre DECOCHE : garder un son que le joueur vient de refuser serait la seule facon d'entendre
+    // encore ce qu'il ne veut plus. Le tirage, plus bas, en choisira un autre - et c'est la seule chose a faire ici.
+    if( ( sameQuestion || m_timbreIsHeldForSession ) && isTimbreEnabled( m_instrumentIndex ) )
     {
         return m_instrumentIndex;
     }
@@ -415,9 +450,45 @@ std::size_t QAudioNotePlayer::timbreIndexFor( std::span<const domain::Note> p_no
         return m_instrumentIndex;
     }
 
-    std::uniform_int_distribution<std::size_t> distribution{ 0, timbreCount - 1 };
+    // Le tirage porte sur les timbres ACCEPTES, et il tire un RANG parmi eux plutot que de batir une liste : une
+    // allocation a chaque question serait payee a chaque question, pour un resultat identique.
+    std::size_t allowedCount = 0;
 
-    m_instrumentIndex = distribution( m_instrumentRandomEngine );
+    for( std::size_t index = 0; index < timbreCount; ++index )
+    {
+        if( isTimbreEnabled( index ) )
+        {
+            ++allowedCount;
+        }
+    }
+
+    // Aucun timbre accepte : l'interface l'interdit - la derniere case ne peut pas s'eteindre - mais un fichier de
+    // reglages peut encore le dire. Plutot que de tirer parmi ce que le joueur a refuse, on continue ce qu'on jouait.
+    if( allowedCount == 0 )
+    {
+        return m_instrumentIndex;
+    }
+
+    std::uniform_int_distribution<std::size_t> distribution{ 0, allowedCount - 1 };
+
+    std::size_t wantedRank = distribution( m_instrumentRandomEngine );
+
+    for( std::size_t index = 0; index < timbreCount; ++index )
+    {
+        if( !isTimbreEnabled( index ) )
+        {
+            continue;
+        }
+
+        if( wantedRank == 0 )
+        {
+            m_instrumentIndex = index;
+
+            break;
+        }
+
+        --wantedRank;
+    }
 
     return m_instrumentIndex;
 }
@@ -435,9 +506,14 @@ std::vector<float> QAudioNotePlayer::renderNoteFor( std::span<const domain::Note
 
     const std::size_t index = timbreIndexFor( p_sequence );
 
-    if( index < m_instruments.size() )
+    if( const domain::SampledInstrument * instrument = instrumentAt( index ) )
     {
-        return m_instruments.at( index ).renderNote( p_note, p_duration, m_audioFormat.sampleRate(), m_tuning );
+        return instrument->renderNote( p_note, p_duration, m_audioFormat.sampleRate(), m_tuning );
+    }
+
+    if( index >= m_instruments.size() + m_waveforms.size() )
+    {
+        return m_synthesizer->renderNote( p_note, p_duration, m_tuning );
     }
 
     return m_synthesizer->renderWaveNote( p_note, m_waveforms.at( index - m_instruments.size() ), p_duration, m_tuning );
@@ -458,9 +534,9 @@ std::vector<float> QAudioNotePlayer::renderChordWithIndex( std::span<const domai
                                                            std::chrono::milliseconds p_duration,
                                                            std::size_t p_timbreIndex )
 {
-    if( p_timbreIndex < m_instruments.size() )
+    if( const domain::SampledInstrument * instrument = instrumentAt( p_timbreIndex ) )
     {
-        return m_instruments.at( p_timbreIndex ).renderChord( p_notes, p_duration, m_audioFormat.sampleRate(), m_tuning );
+        return instrument->renderChord( p_notes, p_duration, m_audioFormat.sampleRate(), m_tuning );
     }
 
     // Un index au-dela des deux listes retombe sur la synthese, comme un appareil sans echantillons : mieux vaut un
@@ -493,9 +569,9 @@ std::vector<float> QAudioNotePlayer::renderMelodyWithIndex( std::span<const doma
                                                             std::chrono::milliseconds p_gap,
                                                             std::size_t p_timbreIndex )
 {
-    if( p_timbreIndex < m_instruments.size() )
+    if( const domain::SampledInstrument * instrument = instrumentAt( p_timbreIndex ) )
     {
-        return m_instruments.at( p_timbreIndex ).renderMelody( p_notes, p_noteDuration, p_gap, m_audioFormat.sampleRate(), m_tuning );
+        return instrument->renderMelody( p_notes, p_noteDuration, p_gap, m_audioFormat.sampleRate(), m_tuning );
     }
 
     // Un index au-dela des deux listes retombe sur la synthese : mieux vaut une gamme synthetisee qu'un apercu muet.
@@ -573,9 +649,10 @@ void QAudioNotePlayer::playMelodyOverDrone( std::span<const domain::Note> p_melo
         // meme entendre la question.
         const std::size_t timbreIndex = timbreIndexFor( p_melody );
 
-        if( timbreIndex < m_instruments.size() )
+        if( const domain::SampledInstrument * instrument = instrumentAt( timbreIndex ) )
         {
-            const std::vector<float> melodySamples = m_instruments.at( timbreIndex ).renderMelody( p_melody, p_noteDuration, p_gap, m_audioFormat.sampleRate(), m_tuning );
+            const std::vector<float> melodySamples =
+              instrument->renderMelody( p_melody, p_noteDuration, p_gap, m_audioFormat.sampleRate(), m_tuning );
 
             playSamples( m_synthesizer->mixRenderedMelodyOverDrone( melodySamples, droneSamples, p_framing ) );
 
@@ -638,9 +715,10 @@ void QAudioNotePlayer::playPhraseOverDrone( std::span<const domain::Note> p_melo
         // d'une seule matiere, que la question joue une phrase ou une gamme.
         const std::size_t timbreIndex = timbreIndexFor( p_melody );
 
-        if( timbreIndex < m_instruments.size() )
+        if( const domain::SampledInstrument * instrument = instrumentAt( timbreIndex ) )
         {
-            const std::vector<float> melodySamples = m_instruments.at( timbreIndex ).renderMelody( p_melody, p_durations, p_gap, m_audioFormat.sampleRate(), m_tuning );
+            const std::vector<float> melodySamples =
+              instrument->renderMelody( p_melody, p_durations, p_gap, m_audioFormat.sampleRate(), m_tuning );
 
             playSamples( m_synthesizer->mixRenderedMelodyOverDrone( melodySamples, droneSamples, p_framing ) );
 

@@ -169,14 +169,38 @@ public:
     //
     // The instrument is drawn at RANDOM from the list, and that is a decision rather than a shortcut: an interval
     // heard only on a piano has not been heard, and each instrument has its own harmonics and therefore its own
-    // colour. The day the player chooses his instrument explicitly, this becomes a preference - the drawing here
-    // is what makes the variety exist in the meantime.
+    // colour. Le tirage ne porte que sur les timbres que le joueur accepte - voir useEnabledInstruments - et le
+    // filtre appartient au CABLE, pas a cet adaptateur : lui ne connait que des drapeaux.
+    //
+    // The ORDER of the list is the one the domain names in INSTRUMENT_NAMES, and it is what makes an index mean
+    // something: see useEnabledInstruments for what happens when it stops being true.
     //
     // Passing an empty list is legal and means "no samples". p_waveforms lists the PURE WAVEFORMS (sine, sawtooth,
     // square) that join the drawing as additional timbres, so an exercise can be heard with a controlled spectrum.
     // With no samples and no waveform, the synthesiser (the struck string) plays everything.
     void useInstruments( std::vector<domain::SampledInstrument> p_instruments,
                          std::vector<domain::Waveform> p_waveforms );
+
+    // Les timbres que le JOUEUR accepte d'entendre, un drapeau par entree de domain::INSTRUMENT_NAMES.
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // Pourquoi c'est une liste de drapeaux, et non une liste d'instruments
+    //
+    // La version precedente recevait la liste des instruments COCHES, et elle etait compactee : decocher le piano
+    // faisait glisser tous les rangs d'un cran. Deux consequences, dont une que Roger a vue tout de suite - « il ne
+    // joue pas forcement l'instrument en face » :
+    //
+    //   * le RANG d'un instrument ne veut plus rien dire : l'index demande par le domaine (« joue le 4e ») designait
+    //     alors un autre instrument des qu'une case changeait. C'est le bug.
+    //   * un instrument DECOCHE disparaissait, donc ne pouvait plus etre ECOUTE - alors que c'est precisement celui
+    //     qu'on veut entendre avant de le cocher.
+    //
+    // Les instruments gardent donc leur place, et la selection ne porte plus que sur le TIRAGE. Une entree peut etre
+    // vide (une ressource manquante) et garde quand meme la sienne : c'est ce qui garde les rangs alignes sur ceux du
+    // domaine, qui est seul a nommer les instruments.
+    //
+    // Un drapeau manquant compte comme actif : un adaptateur qui n'a jamais recu de selection joue tout, comme avant.
+    void useEnabledInstruments( std::vector<bool> p_enabled );
 
     [[nodiscard]] std::chrono::milliseconds noteDuration() const override;
 
@@ -236,6 +260,19 @@ private:
     // m_instruments.size() for the sine.
     [[nodiscard]] std::size_t timbreIndexFor( std::span<const domain::Note> p_notes );
 
+    // Le joueur accepte-t-il ce timbre ? Lu par le TIRAGE et par lui seul : un apercu joue ce qu'on lui demande, coche
+    // ou pas. Un drapeau manquant compte comme actif, parce qu'un adaptateur qui ne connait pas encore les preferences
+    // du joueur doit continuer de jouer tout ce qu'il a.
+    [[nodiscard]] bool isTimbreEnabled( std::size_t p_timbreIndex ) const;
+
+    // L'instrument de ce rang, ou nul quand il n'y en a pas.
+    //
+    // SEUL endroit qui sait qu'une entree peut etre VIDE tout en gardant sa place : une ressource qui n'a pas pu etre
+    // lue laisse un trou, et le trou doit rester a son rang pour que les index du domaine continuent de designer les
+    // memes instruments. Ce que les appelants en font : ils retombent sur la synthese, parce qu'une note silencieuse
+    // serait un trou dans l'exercice.
+    [[nodiscard]] const domain::SampledInstrument * instrumentAt( std::size_t p_timbreIndex ) const;
+
     // One note, rendered with the timbre drawn for the given sequence. Falls back on the struck-string synthesiser
     // when there is neither a sample nor the sine.
     [[nodiscard]] std::vector<float> renderNoteFor( std::span<const domain::Note> p_sequence,
@@ -264,6 +301,10 @@ private:
     // The sampled instruments, empty when there are none.
     std::vector<domain::SampledInstrument> m_instruments;
 
+    // Un drapeau par entree de domain::INSTRUMENT_NAMES : les timbres que le joueur accepte d'entendre. Le TIRAGE ne
+    // porte que sur ceux-la (voir timbreIndexFor) ; un apercu, lui, ignore ce filtre, parce qu'ecouter ce qu'on n'a pas
+    // encore coche est justement a quoi sert le bouton.
+    std::vector<bool> m_enabledTimbre;
     // Les timbres du bourdon, vides quand aucun echantillon n'a pu etre lu - auquel cas la synthese prend le relais.
     std::vector<domain::SampledInstrument> m_drones;
 
