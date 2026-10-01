@@ -1004,7 +1004,10 @@ TEST( ExerciseSessionTest, the_chord_palette_widens_with_successes )
 
     // Et la couleur arrivee est la SUIVANTE de l'ordre d'apprentissage, jamais une tiree au hasard : c'est ce qui rend
     // la progression previsible pour le joueur.
-    EXPECT_EQ( ChordQuality::Sus4, session.chordPalette().at( 2 ) );
+    //
+    // La troisieme couleur est le 7 DE DOMINANTE depuis le 01/10/2026, et non plus le sus4 : c'est l'accord qu'on rencontre
+    // partout - la tension qui demande a resoudre - la ou un sus est une couleur flottante qu'on croise bien plus tard.
+    EXPECT_EQ( ChordQuality::DominantSeventh, session.chordPalette().at( 2 ) );
 
     // Elle est desormais proposee, et elle peut tomber : le tirage peut la demander.
     EXPECT_EQ( 3U, session.currentQuestion().chordChoices.size() );

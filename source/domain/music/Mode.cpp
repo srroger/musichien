@@ -50,7 +50,21 @@ std::span<const Mode> modeLearningOrder()
 {
     // L'ordre est ecrit UNE fois, et il est STATIQUE : un span sur une variable locale serait un pointeur vers un
     // cadavre. L'ordre de la liste est explique en detail dans l'en-tete, parce qu'il se discute.
-    static const std::array<Mode, MODE_COUNT> ORDER{ Mode::Ionian, Mode::Aeolian, Mode::Mixolydian, Mode::Dorian, Mode::Lydian, Mode::Phrygian, Mode::Locrian };
+    // IONIEN ET EOLIEN, PUIS LES DEUX PLUS CONTRASTES, PUIS LES DEUX PLUS SUBTILS, PUIS LE LOCRIEN.
+    //
+    // Les niveaux prennent les N premiers de cette liste : elle EST la progression des modes.
+    //
+    // Le PHRYGIEN monte de la sixieme a la quatrieme place le 01/10/2026, a la demande de Roger et pour la raison qui
+    // gouverne deja l'ordre des intervalles - « les plus contrastes d'abord ». Sa seconde mineure sur la tonique donne la
+    // couleur hispanique ou orientale qu'une oreille reconnait en une seconde, la ou le dorien et le lydien ne bougent
+    // qu'une seule note, et doucement.
+    static const std::array<Mode, MODE_COUNT> ORDER{ Mode::Ionian,
+                                                     Mode::Aeolian,
+                                                     Mode::Mixolydian,
+                                                     Mode::Phrygian,
+                                                     Mode::Dorian,
+                                                     Mode::Lydian,
+                                                     Mode::Locrian };
 
     return ORDER;
 }

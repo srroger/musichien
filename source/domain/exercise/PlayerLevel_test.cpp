@@ -113,8 +113,12 @@ TEST( PlayerLevelTest, a_higher_level_opens_the_chords_wider )
     // niveau, parce que deux couleurs, c'est un terrain de debutant.
     //
     // Le niveau decide donc la main d'accords comme il decide la palette d'intervalles : un joueur qui se declare
-    // "a l'aise" n'a pas a gagner les suspendues une par une.
-    constexpr std::array<std::size_t, PLAYER_LEVEL_COUNT> EXPECTED_HAND_SIZE{ 2, 4, 6, 9, CHORD_QUALITY_COUNT };
+    // "a l'aise" n'a pas a gagner les septiemes une par une.
+    //
+    // LES VALEURS ONT CHANGE le 01/10/2026 : 4, 7 et 11 au lieu de 4, 6 et 9. Les quatre premiers accords sont desormais le
+    // majeur, le mineur, le 7 de dominante et le maj7 ; le sus est parti aux composes. La progression complete est lue en
+    // clair par every_level_says_exactly_what_it_gives, juste en dessous.
+    constexpr std::array<std::size_t, PLAYER_LEVEL_COUNT> EXPECTED_HAND_SIZE{ 2, 4, 7, 11, CHORD_QUALITY_COUNT };
 
     std::size_t previous = 0;
 
@@ -157,6 +161,61 @@ TEST( PlayerLevelTest, the_guided_mode_is_not_on_by_default )
     {
         EXPECT_EQ( 0, sessionSettingsFor( level ).directionQuestionShare );
     }
+}
+
+TEST( PlayerLevelTest, every_level_says_exactly_what_it_gives )
+{
+    // LA PROGRESSION, ECRITE ICI POUR ETRE LUE.
+    //
+    // Elle vit dans deux listes ordonnees (Chord.cpp, Mode.cpp) et dans les nombres de PlayerLevel.cpp : personne ne peut la
+    // relire sans jouer dix parties. Elle est donc figee ici, en clair, et c'est ce test qui dit si un palier a bouge.
+    //
+    // Roger l'a mise au point le 01/10/2026, apres avoir vu dans le GodMode que les paliers etaient inegaux - « la
+    // progression est assez inegale ». Deux principes, et il faut les deux : la FREQUENCE dans le repertoire et la
+    // DIFFICULTE a l'entendre, qui n'est pas la difficulte a l'ecrire.
+    const SessionSettings beginner = sessionSettingsFor( PlayerLevel::Beginner );
+
+    EXPECT_EQ( 2U, beginner.startingPaletteSize );
+    EXPECT_EQ( 2U, beginner.startingChordQualityCount );
+    EXPECT_EQ( 2U, beginner.startingModeCount );
+
+    // A l'aise : les QUATRE accords qu'on rencontre en premier, et les deux modes les plus contrastes des cinq restants.
+    const SessionSettings fluent = sessionSettingsFor( PlayerLevel::Fluent );
+
+    EXPECT_EQ( 5U, fluent.startingPaletteSize );
+    EXPECT_EQ( 4U, fluent.startingChordQualityCount );
+    EXPECT_EQ( 4U, fluent.startingModeCount );
+
+    EXPECT_EQ( ( std::vector<ChordQuality>{ ChordQuality::Major,
+                                            ChordQuality::Minor,
+                                            ChordQuality::DominantSeventh,
+                                            ChordQuality::MajorSeventh } ),
+               beginnerChordPalette( fluent.startingChordQualityCount ) );
+
+    EXPECT_EQ( ( std::vector<Mode>{ Mode::Ionian, Mode::Aeolian, Mode::Mixolydian, Mode::Phrygian } ),
+               beginnerModePalette( fluent.startingModeCount ) );
+
+    // Jusqu'a l'octave : la famille FONCTIONNELLE des accords, et six modes sur sept.
+    const SessionSettings advanced = sessionSettingsFor( PlayerLevel::Advanced );
+
+    EXPECT_EQ( 12U, advanced.startingPaletteSize );
+    EXPECT_EQ( 7U, advanced.startingChordQualityCount );
+    EXPECT_EQ( 6U, advanced.startingModeCount );
+
+    // Les composes : les COULEURS plutot que les fonctions, et les sept modes - « et la, on a tous les modes ».
+    const SessionSettings beyond = sessionSettingsFor( PlayerLevel::BeyondTheOctave );
+
+    EXPECT_EQ( 18U, beyond.startingPaletteSize );
+    EXPECT_EQ( 11U, beyond.startingChordQualityCount );
+    EXPECT_EQ( MODE_COUNT, beyond.startingModeCount );
+
+    // Et la carte entiere, sans aucune aide : le niveau ou le joueur se mesure.
+    const SessionSettings master = sessionSettingsFor( PlayerLevel::Master );
+
+    EXPECT_EQ( SUPPORTED_INTERVAL_COUNT, master.startingPaletteSize );
+    EXPECT_EQ( CHORD_QUALITY_COUNT, master.startingChordQualityCount );
+    EXPECT_EQ( MODE_COUNT, master.startingModeCount );
+    EXPECT_FALSE( master.aidsAllowed );
 }
 
 }    // namespace musichien::domain

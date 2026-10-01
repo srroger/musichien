@@ -34,6 +34,14 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             // Two chords as well: major and minor, the reference colour and its shadow. This is the level where
             // telling one from the other IS the exercise.
             settings.startingChordQualityCount = 2;
+
+            // Et DEUX MODES : le majeur et son ombre, l'ionien et l'eolien. Meme raison que pour les accords - deux, et
+            // les deux seuls qui ne demandent aucun vocabulaire.
+            //
+            // Ecrit EXPLICITEMENT alors que c'est deja le defaut des reglages : c'est ce qui rend la progression LISIBLE
+            // dans un seul fichier. Chaque niveau dit ce qu'il donne, au lieu de le laisser deviner par un defaut pose
+            // ailleurs.
+            settings.startingModeCount = 2;
             break;
 
         case PlayerLevel::Fluent:
@@ -41,9 +49,20 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             settings.startingPaletteSize = 5;
             settings.successesBeforeWidening = 2;
 
-            // The four triads a musician meets first: major, minor, and the two suspended ones, where the third is
-            // REPLACED rather than moved. Someone who already hears intervals does not need a two-colour diet.
+            // LES QUATRE ACCORDS QU'ON RENCONTRE EN PREMIER, et ce ne sont plus les memes depuis le 01/10/2026 : le majeur,
+            // le mineur, la SEPTIEME DE DOMINANTE et la SEPTIEME MAJEURE.
+            //
+            // C'est la correction que Roger a demandee : « c'est la ou je mets un bemol, Csus2 et Csus4 sont des accords plus
+            // simples sur le papier, mais dans la pratique on les voit bien plus tard. Je mettrais plutot C7, beaucoup plus
+            // utilise, et le Cmaj7 ». Il a raison, et la raison est ecrite dans Chord.cpp.
             settings.startingChordQualityCount = 4;
+
+            // Et QUATRE MODES : l'ionien et l'eolien, plus le mixolydien et le PHRYGIEN.
+            //
+            // Le mixolydien est partout - blues, rock, jazz. Le phrygien est la demande de Roger, « car il est
+            // caracteristique et beaucoup utilise, avec sa note orientale et espagnole », et il vient ICI pour la raison
+            // qui gouverne deja l'ordre des intervalles : c'est le plus CONTRASTE de ceux qui restent.
+            settings.startingModeCount = 4;
             break;
 
         case PlayerLevel::Advanced:
@@ -57,9 +76,16 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             // six. Clamped by the palette, which holds twelve.
             settings.choiceCount = 8;
 
-            // Les six triades, tendues comprises : diminue et augmente entrent ici, ou l'oreille sait deja entendre
-            // une quinte serree ou elargie.
-            settings.startingChordQualityCount = 6;
+            // SEPT ACCORDS : les quatre du niveau precedent, plus le MINEUR SEPT, le DEMI-DIMINUE et le DIMINUE - la
+            // famille FONCTIONNELLE, celle qui fait tourner les cadences (le ii-V-i, le vii° qui monte a la tonique).
+            //
+            // Roger : « ce sont aussi des accords tres utilises, le demi-diminue et le diminue : on les croise beaucoup plus
+            // souvent que le Csus2 et le Csus4 ». Le sus, lui, part aux composes.
+            settings.startingChordQualityCount = 7;
+
+            // Et SIX MODES : il manque le locrien, le plus instable et le plus rare des sept. Ce que Roger resume ainsi -
+            // « et la, on a tous les modes » - est vrai au niveau suivant.
+            settings.startingModeCount = 6;
             break;
 
         case PlayerLevel::BeyondTheOctave:
@@ -72,10 +98,16 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             settings.successesBeforeWidening = 2;
             settings.choiceCount = 8;
 
-            // Et les TROIS septiemes, la famille la plus entendue de toutes : la septieme de dominante, dont l'oreille
-            // attrape la tension sans savoir la nommer, puis la majeure et la mineure, qui n'en different que d'une
-            // note. Six triades plus trois septiemes : neuf couleurs, et les accords a QUATRE notes sont arrives.
-            settings.startingChordQualityCount = 9;
+            // ONZE ACCORDS ICI, et ce sont des COULEURS plutot que des fonctions : l'augmente, la sixte, et les deux sus.
+            //
+            // La SIXTE est la plus interessante du lot, et il faut dire pourquoi : C6 a EXACTEMENT les notes de Am7 - do, mi,
+            // sol, la. Ce qui les separe, c'est l'ORDRE, et le projet joue toujours la tonique EN PREMIER (voir
+            // CHORD_ROOT_SEMITONES), donc la basse. L'ambiguite est donc levee par la convention du jeu, et l'exercice porte
+            // sur ce que la basse affirme. Roger : « la tonique reste la basse, on ne devrait pas avoir trop d'ambiguite ».
+            settings.startingChordQualityCount = 11;
+
+            // Et LES SEPT MODES : le locrien entre ici, et la palette des modes est complete.
+            settings.startingModeCount = MODE_COUNT;
             break;
 
         case PlayerLevel::Master:

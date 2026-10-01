@@ -135,12 +135,20 @@ TEST( ChordTest, the_learning_order_holds_every_quality_exactly_once )
 
     EXPECT_EQ( CHORD_QUALITY_COUNT, seen.size() );
 
-    // L'ordre suit l'enumeration, qui est elle-meme l'ordre de difficulte : c'est ce qui permet a une palette d'etre
-    // un simple PREFIXE, et a un rang de vouloir dire "plus difficile".
-    for( std::size_t index = 0; index < order.size(); ++index )
-    {
-        EXPECT_EQ( index, static_cast<std::size_t>( order[index] ) );
-    }
+    // L'ORDRE D'APPRENTISSAGE N'EST PLUS CELUI DE L'ENUMERATION, et c'est une decision du 01/10/2026 : l'enumeration range
+    // les accords par familles TECHNIQUES, l'apprentissage les range par ce qu'on RENCONTRE. Cette contrainte - « l'ordre
+    // suit l'enumeration » - a donc disparu, remplacee par la regle qui compte vraiment pour un joueur.
+    //
+    // LE 7 DE DOMINANTE AVANT LES SUSPENDUS, et c'est la demande de Roger : « Csus2 et Csus4 sont plus simples sur le
+    // papier, mais dans la pratique on les voit bien plus tard. Je mettrais plutot C7, beaucoup plus utilise ». Un sus n'a
+    // pas de tierce - donc ni majeur, ni mineur : ce n'est pas une FONCTION, c'est une couleur flottante, et on la
+    // rencontre tard.
+    const auto positionOf = [&order]( ChordQuality p_quality ) {
+        return std::distance( order.begin(), std::ranges::find( order, p_quality ) );
+    };
+
+    EXPECT_LT( positionOf( ChordQuality::DominantSeventh ), positionOf( ChordQuality::Sus4 ) );
+    EXPECT_LT( positionOf( ChordQuality::DominantSeventh ), positionOf( ChordQuality::Sus2 ) );
 
     // Et les deux premieres sont les deux couleurs de base : c'est ce qu'un debutant entend en premier.
     EXPECT_EQ( ChordQuality::Major, order.front() );

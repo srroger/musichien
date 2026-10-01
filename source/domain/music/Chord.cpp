@@ -32,20 +32,33 @@ constexpr std::array<std::int32_t, 4> MINOR_MAJOR_SEVENTH_INTERVALS{ 0, 3, 7, 11
 constexpr std::array<std::int32_t, 4> ADD9_INTERVALS{ 0, 4, 7, 14 };
 constexpr std::array<std::int32_t, 5> NINTH_INTERVALS{ 0, 4, 7, 10, 14 };
 
-// L'ordre d'apprentissage, et il repete l'ordre de l'enumeration : la liste est ecrite pour etre LUE (et pour qu'un
-// test puisse verifier que les deux ne divergent pas).
+// L'ORDRE D'APPRENTISSAGE DES ACCORDS, et c'est une decision PEDAGOGIQUE : les niveaux prennent les N premiers de cette
+// liste, donc cet ordre EST la progression du joueur.
+//
+// Il a ete repris le 01/10/2026, apres que Roger ait joue le GodMode et vu que la progression etait inegale. Deux
+// principes le gouvernent, et il faut les DEUX :
+//
+//   * la FREQUENCE dans le repertoire. Le 7 de dominante est le moteur de toute l'harmonie tonale - c'est lui qui porte
+//     la tension et la resolution, le V7 de toute cadence, le coeur du ii-V-I - et il arrivait APRES le sus4 et le sus2.
+//     C'est ce que Roger a vu tout de suite : « les Csus2 et Csus4 sont des accords plus simples sur le papier, mais dans
+//     la pratique on les voit bien plus tard » ;
+//   * la DIFFICULTE a l'entendre, qui n'est PAS la difficulte a l'ecrire. Un sus n'a pas de tierce : il ne dit donc ni
+//     majeur ni mineur, ce n'est pas une FONCTION mais une couleur flottante et souvent passagere. On la rencontre tard.
+//
+// L'ordre n'est donc PLUS celui de l'enumeration, et c'est volontaire : l'enumeration range les accords par familles
+// techniques, l'apprentissage les range par ce qu'on rencontre. Les deux repondent a deux questions differentes.
 constexpr std::array<ChordQuality, CHORD_QUALITY_COUNT> LEARNING_ORDER{
   ChordQuality::Major,
   ChordQuality::Minor,
-  ChordQuality::Sus4,
-  ChordQuality::Sus2,
-  ChordQuality::Diminished,
-  ChordQuality::Augmented,
   ChordQuality::DominantSeventh,
   ChordQuality::MajorSeventh,
   ChordQuality::MinorSeventh,
-  ChordQuality::Sixth,
   ChordQuality::HalfDiminished,
+  ChordQuality::Diminished,
+  ChordQuality::Augmented,
+  ChordQuality::Sixth,
+  ChordQuality::Sus4,
+  ChordQuality::Sus2,
   ChordQuality::DiminishedSeventh,
   ChordQuality::MinorMajorSeventh,
   ChordQuality::Add9,
