@@ -50,6 +50,14 @@ void pinEveryQuestionShare( domain::SessionSettings & p_settings )
     p_settings.modeColourQuestionShare = 0;
     p_settings.modeNameQuestionShare = 0;
     p_settings.modeVampQuestionShare = 0;
+
+    // ET LA NOTE ETRANGERE, qui manquait ici comme elle manquait a isIntervalQuestion.
+    //
+    // Elle est passee inapercue tant que sa part valait ZERO par defaut : le helper n'avait rien a eteindre. Depuis que
+    // l'harmonie s'ouvre par defaut (voir SessionSettings, 01/10/2026), une session censee ne poser que des intervalles
+    // tombait une fois sur plusieurs sur une question de note etrangere - et les tests d'intervalle se mettaient a echouer
+    // pour une raison qui n'avait rien a voir avec ce qu'ils verifiaient.
+    p_settings.foreignNoteQuestionShare = 0;
 }
 
 [[nodiscard]] domain::SessionSettings intervalOnlySettings()
@@ -2068,7 +2076,7 @@ TEST( ExerciseSessionControllerTest, the_dog_of_the_home_page_tells_another_anec
     // et c'est ce qui fait du chien un personnage plutot qu'une illustration.
     domain::NotePlayerFake notePlayer;
 
-    ExerciseSessionController controller{ notePlayer, {} };
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
 
     EXPECT_FALSE( controller.isChibaTalking() );
 

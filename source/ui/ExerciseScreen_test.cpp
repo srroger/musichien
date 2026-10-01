@@ -121,6 +121,13 @@ namespace
     settings.modeNameQuestionShare = 0;
     settings.modeVampQuestionShare = 0;
 
+    // ET LA NOTE ETRANGERE, la derniere arrivee de l'harmonie - et la seule qui manquait ici.
+    //
+    // Le commentaire juste au-dessus l'avait annonce : « une part oubliee ici suffirait a voler des questions ». Elle l'a
+    // fait le jour ou l'harmonie s'est ouverte par defaut, et le symptome a ete exactement celui qui est decrit : plus de
+    // bouton de cercle a chercher, parce que la question etait une note etrangere.
+    settings.foreignNoteQuestionShare = 0;
+
     return settings;
 }
 

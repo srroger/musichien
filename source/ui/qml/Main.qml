@@ -698,6 +698,9 @@ ApplicationWindow {
                 // palier, un bouton d'icone de fleche doree vers le haut ». C'est la que se change un palier, donc c'est la
                 // qu'un rappel a un sens - et nulle part ailleurs.
                 RowLayout {
+                    // LA FLECHE DOREE, et elle dure tant que le palier n'a pas ete pris : c'est un RAPPEL, pas une
+                    // obligation. Un joueur qui a dit « plus tard » la retrouve la, et reste libre de son rythme.
+
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
@@ -723,12 +726,15 @@ ApplicationWindow {
 
                     }
 
-                    // LA FLECHE DOREE, et elle dure tant que le palier n'a pas ete pris : c'est un RAPPEL, pas une
-                    // obligation. Un joueur qui a dit « plus tard » la retrouve la, et reste libre de son rythme.
+                    // SUR UN FOND SOMBRE, et c'est une correction de Roger : « la fleche doree dans un bouton gris ne se voit
+                    // pas bien. Mais elle est nickel ». Le gris du style est la couleur des portes grises, pas celle d'un
+                    // signal : le violet profond la fait ressortir, et c'est le seul bouton de la page a crier quelque chose.
                     MenuButton {
                         Layout.preferredWidth: 52
                         Layout.preferredHeight: levelCombo.implicitHeight
                         visible: ExerciseController.levelInvitationIsAvailable
+                        Material.background: "#2a1a46"
+                        Material.foreground: "#ffd479"
                         onClicked: {
                             ExerciseController.playTapCue();
                             levelUpDialog.open();
@@ -3268,9 +3274,13 @@ ApplicationWindow {
         // « apres une partie, on pourra lui dire : bravo ». On la marque en l'ouvrant, sinon elle reviendrait apres chaque
         // partie ; la fleche de la liste des difficultes, elle, reste tant que le palier n'est pas pris.
         onVisibleChanged: {
-            if (visible && ExerciseController.levelInvitationIsAvailable && !ExerciseController.levelInvitationAnnounced) {
-                ExerciseController.markLevelInvitationAnnounced();
-                levelUpDialog.open();
+            if (visible) {
+                // Le chien ARRIVE, et la felicitation de palier l'accompagne.
+                chibaContent.beginArrival();
+                if (ExerciseController.levelInvitationIsAvailable && !ExerciseController.levelInvitationAnnounced) {
+                    ExerciseController.markLevelInvitationAnnounced();
+                    levelUpDialog.open();
+                }
             }
         }
 
@@ -3292,11 +3302,105 @@ ApplicationWindow {
         // n'etait pas decentre (mesure : son contour occupe toute la largeur de l'image) ; c'etait la bulle qui etait plus
         // large que lui.
         ColumnLayout {
-            anchors.centerIn: parent
+            // L'ARRIVEE DU CHIEN, jouee chaque fois qu'il ouvre la bouche.
+            // Roger : « le chien qui apparait en anecdote en fin de partie a une apparition un peu brutale. On pourrait pas le
+            // faire arriver en animation de gauche ou de droite jusqu'au centre (animation tres en mode dodelinage), puis le
+            // texte apparait ». Le texte attend donc la fin du balancement - c'est la transition qui manquait.
+
+            id: chibaContent
+
+            // Le cote est TIRE AU HASARD : il n'entre pas toujours par le meme bord, ce qui donne a chaque fin de partie un
+            // petit air de « tiens, le revoila » plutot qu'un mecanisme qu'on connait par coeur.
+            property real arrivalShift: 0
+
+            function beginArrival() {
+                const fromLeft = Math.random() < 0.5;
+                const distance = chibaPopup.width * 0.75;
+                chibaContent.arrivalShift = fromLeft ? -distance : distance;
+                chibaBubble.opacity = 0;
+                chibaHint.opacity = 0;
+                arrival.restart();
+            }
+
             width: Math.min(chibaPopup.width - 96, 300)
             spacing: 0
+            x: (chibaPopup.width - width) / 2 + chibaContent.arrivalShift
+            y: (chibaPopup.height - height) / 2
+
+            // Le DEPLACEMENT, et le DODELINAGE par-dessus : le chien tangue en arrivant, de moins en moins fort, puis se pose.
+            // C'est le balancement de l'IMAGE seule - la bulle, elle, ne tourne pas, sinon le texte tremblerait.
+            SequentialAnimation {
+                id: arrival
+
+                ParallelAnimation {
+                    NumberAnimation {
+                        target: chibaContent
+                        property: "arrivalShift"
+                        to: 0
+                        duration: 700
+                        easing.type: Easing.OutCubic
+                    }
+
+                    SequentialAnimation {
+                        NumberAnimation {
+                            target: chibaDog
+                            property: "wobble"
+                            from: -9
+                            to: 9
+                            duration: 120
+                        }
+
+                        NumberAnimation {
+                            target: chibaDog
+                            property: "wobble"
+                            from: 9
+                            to: -7
+                            duration: 120
+                        }
+
+                        NumberAnimation {
+                            target: chibaDog
+                            property: "wobble"
+                            from: -7
+                            to: 5
+                            duration: 120
+                        }
+
+                        NumberAnimation {
+                            target: chibaDog
+                            property: "wobble"
+                            from: 5
+                            to: 0
+                            duration: 160
+                        }
+
+                    }
+
+                }
+
+                // Et SEULEMENT LA, le texte : « puis le texte apparait ».
+                ParallelAnimation {
+                    NumberAnimation {
+                        target: chibaBubble
+                        property: "opacity"
+                        to: 1
+                        duration: 260
+                    }
+
+                    NumberAnimation {
+                        target: chibaHint
+                        property: "opacity"
+                        to: 1
+                        duration: 260
+                    }
+
+                }
+
+            }
 
             Rectangle {
+                id: chibaBubble
+
                 Layout.fillWidth: true
                 Layout.preferredHeight: musichienLabel.implicitHeight + 36
                 color: "#fdf8ff"
@@ -3324,6 +3428,12 @@ ApplicationWindow {
             }
 
             Image {
+                id: chibaDog
+
+                // Le DODELINAGE, anime par l'arrivee : c'est le chien qui tangue, pas la bulle de texte - un texte qui
+                // tremble se lit mal.
+                property real wobble: 0
+
                 Layout.fillWidth: true
                 // La hauteur est bornee par l'ecran, pour que le chien ne mange pas la page en paysage ; la largeur, elle,
                 // est celle de la bulle. Les deux blocs se superposent donc exactement, et plus rien ne depasse.
@@ -3331,6 +3441,7 @@ ApplicationWindow {
                 fillMode: Image.PreserveAspectFit
                 // Une des QUATRE humeurs, tiree au hasard a chaque fois qu'il ouvre la bouche.
                 source: ExerciseController.chibaImageSource
+                rotation: chibaDog.wobble
 
                 MouseArea {
                     anchors.fill: parent
@@ -3340,6 +3451,8 @@ ApplicationWindow {
             }
 
             Text {
+                id: chibaHint
+
                 Layout.alignment: Qt.AlignHCenter
                 Layout.topMargin: 8
                 color: "#cbb8e8"

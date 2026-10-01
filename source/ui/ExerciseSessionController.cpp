@@ -1284,7 +1284,13 @@ QVariantMap ExerciseSessionController::heardMode() const
 
     const domain::Question & question = m_session->currentQuestion();
 
-    if( !isModeQuestion() )
+    // LA NOTE ETRANGERE ANNONCE SON MODE, et c'est une correction demandee par Roger : « il faut afficher le mode qui est en
+    // train d'etre joue des le debut. Car sans rien c'est beaucoup trop difficile, il doit a la fois trouver le mode ainsi
+    // que la note qui ne va pas ».
+    //
+    // Il a raison, et la question le dit elle-meme : la gamme jouee EST le mode. Le cacher n'ajoutait pas de difficulte, il
+    // ajoutait une devinette - on ne peut pas chercher une note etrangere A UN MODE dont on ne sait rien.
+    if( !isModeQuestion() && !isForeignNoteQuestion() )
     {
         // Une question d'intervalle ou d'accord ne parle pas de mode : la question en porte un par construction (l'ordre
         // des tirages), mais personne ne l'a entendu, et le decrire serait un mensonge de plus.

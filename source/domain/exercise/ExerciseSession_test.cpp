@@ -1652,4 +1652,25 @@ TEST( ExerciseSessionTest, a_vamp_plays_the_same_notes_on_two_different_centres 
     }
 }
 
+TEST( ExerciseSessionTest, the_harmony_is_open_out_of_the_box )
+{
+    // Roger, le 01/10/2026 : « pour les reglages par defaut (et a l'installation), il n'y a pas les modes, mets un poids de
+    // 10 a tous les jeux de modes ». Un pilier entier qu'on n'ouvre JAMAIS est un pilier invisible : personne ne peut
+    // decouvrir un reglage dont il ignore l'existence.
+    const SessionSettings defaults;
+
+    EXPECT_EQ( 10, defaults.foreignNoteQuestionShare );
+    EXPECT_EQ( 10, defaults.modeColourQuestionShare );
+    EXPECT_EQ( 10, defaults.modeNameQuestionShare );
+    EXPECT_EQ( 10, defaults.modeVampQuestionShare );
+
+    // Et l'harmonie s'OUVRE sans prendre la place du jeu : elle reste loin derriere l'intervalle a nommer, qui est la
+    // question de fond de l'application.
+    EXPECT_GT( defaults.namedIntervalQuestionShare, defaults.modeNameQuestionShare );
+
+    // Et « Par defaut » dit la MEME chose que l'installation : c'est la lecon du rappel, qui etait le seul reglage ou les
+    // deux se contredisaient. Ce test tient les DEFAUTS ; resetPreferences les recopie, donc la coherence est ici aussi.
+    EXPECT_EQ( 20, defaults.singQuestionShare );
+}
+
 }    // namespace musichien::domain

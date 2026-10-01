@@ -382,13 +382,15 @@ void QSettingsPlayerPreferences::storeReferencePitch( double p_hertz )
 
 std::int32_t QSettingsPlayerPreferences::storedForeignNoteQuestionShare() const
 {
-    // ZERO, comme le domaine : la question de la note etrangere existe, elle se regle, et elle est eteinte tant qu'on ne
-    // l'allume pas. Une valeur hors bornes retombe sur ce meme zero, jamais sur autre chose.
-    const std::int32_t stored = QSettings{}.value( FOREIGN_NOTE_QUESTION_SHARE_KEY, 0 ).toInt();
+    // DIX par defaut, comme le domaine : « Par defaut » et « a l'installation » doivent dire la MEME chose, sinon le bouton
+    // ment - et Roger l'a vu sur le rappel avant de le voir ici.
+    //
+    // Une valeur hors bornes retombe sur ce meme defaut, jamais sur autre chose.
+    const std::int32_t stored = QSettings{}.value( FOREIGN_NOTE_QUESTION_SHARE_KEY, 10 ).toInt();
 
     if( stored < 0 || stored > 100 )
     {
-        return 0;
+        return 10;
     }
 
     return stored;
@@ -506,7 +508,7 @@ void QSettingsPlayerPreferences::storeChordQuestionShare( std::int32_t p_share )
 std::int32_t QSettingsPlayerPreferences::storedModeColourQuestionShare() const
 {
     // ZERO par defaut, comme le rythme : un reglage qui n'a jamais ete touche ne doit pas changer la nature du jeu.
-    const std::int32_t stored = QSettings{}.value( MODE_COLOUR_QUESTION_SHARE_KEY, 0 ).toInt();
+    const std::int32_t stored = QSettings{}.value( MODE_COLOUR_QUESTION_SHARE_KEY, 10 ).toInt();
 
     if( stored < 0 || stored > 100 )
     {
@@ -527,11 +529,11 @@ void QSettingsPlayerPreferences::storeModeColourQuestionShare( std::int32_t p_sh
 
 std::int32_t QSettingsPlayerPreferences::storedModeNameQuestionShare() const
 {
-    const std::int32_t stored = QSettings{}.value( MODE_NAME_QUESTION_SHARE_KEY, 0 ).toInt();
+    const std::int32_t stored = QSettings{}.value( MODE_NAME_QUESTION_SHARE_KEY, 10 ).toInt();
 
     if( stored < 0 || stored > 100 )
     {
-        return 0;
+        return 10;
     }
 
     return stored;
@@ -546,11 +548,11 @@ void QSettingsPlayerPreferences::storeModeNameQuestionShare( std::int32_t p_shar
 
 std::int32_t QSettingsPlayerPreferences::storedModeVampQuestionShare() const
 {
-    const std::int32_t stored = QSettings{}.value( MODE_VAMP_QUESTION_SHARE_KEY, 0 ).toInt();
+    const std::int32_t stored = QSettings{}.value( MODE_VAMP_QUESTION_SHARE_KEY, 10 ).toInt();
 
     if( stored < 0 || stored > 100 )
     {
-        return 0;
+        return 10;
     }
 
     return stored;

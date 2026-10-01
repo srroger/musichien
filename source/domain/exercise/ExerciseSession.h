@@ -345,25 +345,28 @@ struct SessionSettings
 
     // Part des questions qui font chercher la NOTE ETRANGERE d'une gamme.
     //
-    // ZERO par defaut, comme les autres parts de l'harmonie : le pilier se decouvre en l'allumant, et une question dont on
-    // ne sait pas encore quoi faire n'a rien a faire dans une session ordinaire.
-    std::int32_t foreignNoteQuestionShare{ 0 };
-
-    std::int32_t modeColourQuestionShare{ 0 };
+    // DIX par defaut, et c'est une decision de Roger du 01/10/2026 : « pour les reglages par defaut (et a l'installation),
+    // il n'y a pas les modes, mets un poids de 10 a tous les jeux de modes ». Une application qui n'ouvre JAMAIS ses modes
+    // laisse un pilier entier invisible - et personne ne peut decouvrir un reglage dont il ignore l'existence.
+    std::int32_t foreignNoteQuestionShare{ 10 };
+    std::int32_t modeColourQuestionShare{ 10 };
 
     // Share of questions, in percent, that ask the player to NAME a mode heard on a drone.
     //
     // SEPAREE de la part de couleur, et c'est tout l'interet : entendre qu'une couleur a change est une chose, savoir
     // la nommer en est une autre. Un joueur qui reussit la premiere en ratant la seconde apprend quelque chose de son
     // oreille - et il faut, pour le voir, que les deux questions soient comptees separement.
-    std::int32_t modeNameQuestionShare{ 0 };
+    std::int32_t modeNameQuestionShare{ 10 };
 
     // Share of questions, in percent, that play the SAME scale on TWO different centres.
     //
     // La plus avancee des trois questions d'harmonie, et la seule dont la reponse soit dans le CONTEXTE : les notes ne
     // bougent pas d'un passage a l'autre, et le mode, si. C'est ce qu'un mode veut dire, et il faut l'entendre une fois
     // pour le croire.
-    std::int32_t modeVampQuestionShare{ 0 };
+    //
+    // DIX par defaut, comme les trois autres - voir foreignNoteQuestionShare. C'est la plus difficile des quatre, et elle
+    // se defend d'etre la : le tirage se fait entre quatre parts egales, donc elle tombe une fois sur quatre, pas plus.
+    std::int32_t modeVampQuestionShare{ 10 };
 
     // Combien de modes le joueur a rencontres au depart.
     //
