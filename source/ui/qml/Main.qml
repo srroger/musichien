@@ -3263,6 +3263,11 @@ ApplicationWindow {
 
                     text: modelData.name
                     checked: modelData.checked
+                    // LE TEXTE EST BLANC, et il faut le dire : le style Material peint ses cases sur fond CLAIR, avec un
+                    // texte noir - invisible sur notre nuit violette. Roger l'a vu tout de suite : « les textes sont en
+                    // noir, sur fond sombre ca ne se voit pas bien ». Meme correction que partout ailleurs, appliquee ici
+                    // une fois pour les trois familles.
+                    Material.foreground: "#ffffff"
                     onClicked: godModeSection.toggled(modelData[godModeSection.indexKey])
                 }
 
@@ -3519,8 +3524,15 @@ ApplicationWindow {
     // style pour les trois listes de la page.
     component DarkComboBox: ComboBox {
         // Un ComboBox ne doit JAMAIS prendre la largeur de son texte, et ces trois lignes sont la pour ca.
+        // LA DIFFICULTE CHOISIE, quand le modele est une liste de FICHES : c'est ce qui permet de traiter le GodMode a part
+        // - une autre couleur, une autre graisse, une icone - sans que ce composant ait a connaitre le GodMode lui-meme.
 
         id: combo
+
+        // Une liste de MOTS (les appareils audio) donne une chaine, et une chaine n'a pas de drapeau : le test retombe donc
+        // simplement a faux, et rien ne change pour elle.
+        readonly property var currentEntry: (combo.model !== null) && (combo.currentIndex >= 0) ? combo.model[combo.currentIndex] : null
+        readonly property bool currentEntryIsSpecial: currentEntry !== null && currentEntry.isGodMode === true
 
         // LE TEXTE D'UNE LIGNE, et c'est la fonction qui compte : selon que le modele est une liste de mots (les
         // appareils audio, les temperaments) ou une liste de FICHES (les niveaux de jeu, qui portent un nom, un
@@ -3551,12 +3563,53 @@ ApplicationWindow {
         // Item qui prend sa hauteur d'elle, donc la regle doit tenir en dehors d'un Layout aussi bien que dedans.
         implicitHeight: 52
 
+        // L'ENGRENAGE, dessine comme le metronome et le diapason des outils : un mode qui se REGLE merite de le dire d'un
+        // signe, et pas seulement d'un mot. Il n'apparait que pour le GodMode.
+        Canvas {
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            width: 18
+            height: 18
+            antialiasing: true
+            visible: combo.currentEntryIsSpecial
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.reset();
+                ctx.strokeStyle = "#ffd479";
+                ctx.fillStyle = "#ffd479";
+                ctx.lineWidth = 2;
+                // Huit dents, courtes et epaisses : la silhouette d'un engrenage se lit a cette taille, pas ses details.
+                const centre = 9;
+                for (let tooth = 0; tooth < 8; ++tooth) {
+                    const angle = (tooth * Math.PI) / 4;
+                    const inner = 4.6;
+                    const outer = 8.2;
+                    ctx.beginPath();
+                    ctx.moveTo(centre + (inner * Math.cos(angle)), centre + (inner * Math.sin(angle)));
+                    ctx.lineTo(centre + (outer * Math.cos(angle)), centre + (outer * Math.sin(angle)));
+                    ctx.stroke();
+                }
+                ctx.beginPath();
+                ctx.arc(centre, centre, 4.6, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(centre, centre, 1.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
         contentItem: Text {
             text: combo.displayText
-            color: "#ffffff"
+            // Le GodMode se reconnait d'un coup d'oeil : une autre couleur, une autre graisse, un engrenage. Roger :
+            // « pour bien signifier que c'est un mode a part ».
+            color: combo.currentEntryIsSpecial ? "#ffd479" : "#ffffff"
             verticalAlignment: Text.AlignVCenter
             leftPadding: 12
-            font.pixelSize: 16
+            // La place de l'engrenage, quand il est la : sans elle, un mot long passerait dessous.
+            rightPadding: combo.currentEntryIsSpecial ? 34 : 0
+            font.pixelSize: combo.currentEntryIsSpecial ? 17 : 16
+            font.bold: combo.currentEntryIsSpecial
             elide: Text.ElideRight
         }
 
@@ -3566,9 +3619,12 @@ ApplicationWindow {
 
             contentItem: Text {
                 text: combo.itemLabel(modelData)
-                color: "#e8dcff"
+                // Et dans la liste OUVERTE, le GodMode garde sa couleur : c'est la qu'on le choisit, et un mode a part qui
+                // ressemblerait aux autres au moment ou on le choisit ne serait a part nulle part.
+                color: (modelData !== null) && (typeof modelData === "object") && modelData.isGodMode === true ? "#ffd479" : "#e8dcff"
                 verticalAlignment: Text.AlignVCenter
                 font.pixelSize: 16
+                font.bold: (modelData !== null) && (typeof modelData === "object") && modelData.isGodMode === true
             }
 
             // La ligne survolee : sans ca, on ne sait pas ce qu'on est en train de choisir.

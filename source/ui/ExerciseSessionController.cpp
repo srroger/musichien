@@ -375,7 +375,15 @@ void ExerciseSessionController::resetPreferences()
     setPhraseTempoVariation( 20 );
     setTemperament( 0 );
     setReferencePitch( 440.0 );
-    setDailyReminderEnabled( false );
+
+    // LE RAPPEL REVIENT ACTIF, et c'est une CORRECTION : c'est son etat au premier lancement - voir
+    // QSettingsPlayerPreferences::dailyReminderEnabled, qui lit « vrai » quand la cle n'existe pas encore. Roger l'a vu le
+    // jour ou il a appuye sur « Par defaut » : « c'est une option qui est choisie par defaut a l'installation, il faudrait
+    // qu'elle soit aussi activee si on appuie sur par defaut ».
+    //
+    // Un bouton qui rend un etat DIFFERENT de celui d'une installation neuve n'est pas un bouton « par defaut », c'est un
+    // bouton « autre chose ».
+    setDailyReminderEnabled( true );
 
     // Et le NIVEAU reste : c'est un choix que le joueur fait sur lui-meme, pas un reglage qu'on remet a zero. Le nom
     // aussi : c'est le sien.

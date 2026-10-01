@@ -856,6 +856,27 @@ TEST( ExerciseSessionControllerTest, a_name_question_is_heard_as_a_melody )
     EXPECT_GT( controller.modeSoundDurationMs(), scaleController.modeSoundDurationMs() );
 }
 
+TEST( ExerciseSessionControllerTest, putting_the_settings_back_to_default_brings_the_reminder_back )
+{
+    // Roger l'a vu en jouant : « par defaut dans les settings tu as enleve les notifications. Pourtant c'est une option qui
+    // est choisie par defaut a l'installation, il faudrait qu'elle soit aussi activee si on appuie sur par defaut ».
+    //
+    // Un bouton qui rend un etat DIFFERENT de celui d'une installation neuve n'est pas un bouton « par defaut » : c'est un
+    // bouton « autre chose », et c'est le genre de detail qui fait qu'on ne fait plus confiance a un ecran de reglages.
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    controller.setDailyReminderEnabled( false );
+
+    EXPECT_FALSE( controller.dailyReminderEnabled() );
+
+    controller.resetPreferences();
+
+    EXPECT_TRUE( controller.dailyReminderEnabled() );
+}
+
 TEST( ExerciseSessionControllerTest, the_god_mode_plays_the_perimeter_the_player_saved )
 {
     // Ce que Roger a demande : le joueur choisit lui-meme, et le jeu joue ce qu'il a SAUVEGARDE. Le temoin est la grille de
