@@ -97,6 +97,11 @@ ApplicationWindow {
     readonly property color questColour: "#8c3a48"
     // le rouge du jeu, eteint : ce sont des variantes, elles s'annoncent sans crier
     readonly property color questLabelColour: "#ffe3e6"
+    // L'ENTRAINEMENT a sa propre couleur, et c'est un choix de Roger : « une couleur néon toujours mais qui évoquerait
+    // l'entrainement ou le chill, genre un bleu clair ». Le rouge dit « le jeu » ; le bleu clair dit « je travaille » -
+    // et les deux se lisent d'un coup d'oeil sur la page de garde, sans une phrase de plus.
+    readonly property color trainingColour: "#1c4a66"
+    readonly property color trainingLabelColour: "#a6e7ff"
     // Et le duo des outils. Le metronome est FROID et le diapason CHAUD, et c'est ce qui les distingue : l'un donne le
     // temps, l'autre la justesse. Ce qui les relie, ce n'est pas la teinte mais le TRAITEMENT - le meme fond profond,
     // la meme icone en neon, la meme intensite. Un cyan et un magenta qui se repondent, sur la nuit violette : c'est
@@ -853,26 +858,20 @@ ApplicationWindow {
                 }
 
                 // Roger les a voulues JUSTE SOUS l'Arcade - « les 3 familles, ce seront les 3 modes qu'on mettrait en ligne
-                // juste en dessous du bouton ARCADE ». Elles separent ce qu'on travaille : on ne melange pas, on choisit.
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 6
-                    horizontalAlignment: Text.AlignHCenter
-                    color: "#cbb8e8"
-                    font.pixelSize: 13
-                    text: qsTr("Entraînement · pour travailler une chose")
-                }
-
+                // juste en dessous du bouton ARCADE » - et dans un BLEU CLAIR : le rouge dit « le jeu », le bleu dit « je
+                // travaille ». Pas de phrase d'introduction : le bouton se comprend seul, et une legende qui explique
+                // l'evidence prend la place de ce qu'elle commente.
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
+                    Layout.topMargin: 8
                     spacing: 8
 
                     TintedMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
-                        tintColour: mainWindow.questColour
-                        labelColour: mainWindow.questLabelColour
+                        tintColour: mainWindow.trainingColour
+                        labelColour: mainWindow.trainingLabelColour
                         text: qsTr("Intervalles")
                         onClicked: ExerciseController.startTrainingSession(0)
                     }
@@ -880,8 +879,8 @@ ApplicationWindow {
                     TintedMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
-                        tintColour: mainWindow.questColour
-                        labelColour: mainWindow.questLabelColour
+                        tintColour: mainWindow.trainingColour
+                        labelColour: mainWindow.trainingLabelColour
                         text: qsTr("Accords")
                         onClicked: ExerciseController.startTrainingSession(1)
                     }
@@ -889,8 +888,8 @@ ApplicationWindow {
                     TintedMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
-                        tintColour: mainWindow.questColour
-                        labelColour: mainWindow.questLabelColour
+                        tintColour: mainWindow.trainingColour
+                        labelColour: mainWindow.trainingLabelColour
                         text: qsTr("Modes")
                         onClicked: ExerciseController.startTrainingSession(2)
                     }

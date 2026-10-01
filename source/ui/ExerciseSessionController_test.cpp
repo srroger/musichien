@@ -2610,4 +2610,66 @@ TEST( ExerciseSessionControllerTest, an_instrument_can_be_heard_before_it_is_cho
     EXPECT_EQ( 1U, notePlayer.playedChords().size() );
 }
 
+// LES PALIERS SE FERMENT tant que l'experience ne les ouvre pas. C'est ce qui donne au GodMode son sens de passe-droit, et
+// c'est la regle que Roger a demandee - « on bloque le choix des difficultes superieures tant qu'on n'a pas un certain
+// niveau d'experience ».
+TEST( ExerciseSessionControllerTest, a_level_stays_locked_until_experience_opens_it )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    // A ZERO experience, seul le premier palier est ouvert : il n'y a rien a meriter pour commencer.
+    EXPECT_TRUE( controller.isLevelUnlocked( 0 ) );
+    EXPECT_FALSE( controller.isLevelUnlocked( 1 ) );
+    EXPECT_FALSE( controller.isLevelUnlocked( 4 ) );
+
+    // Et la liste le DIT, parce que l'ecran la lit telle quelle pour barrer les entrees.
+    const QVariantList levels = controller.playerLevels();
+    ASSERT_FALSE( levels.isEmpty() );
+
+    const QVariantMap firstLevel = levels.at( 0 ).toMap();
+    const QVariantMap lastLevel = levels.at( static_cast<int>( domain::PLAYER_LEVEL_COUNT ) - 1 ).toMap();
+
+    EXPECT_FALSE( firstLevel.value( QStringLiteral( "isLocked" ) ).toBool() );
+    EXPECT_TRUE( lastLevel.value( QStringLiteral( "isLocked" ) ).toBool() );
+}
+
+// LE CODE DE DEVELOPPEUR : sept choix de GodMode d'affilee ouvrent toutes les difficultes, et choisir une VRAIE difficulte
+// les referme. C'est ce que Roger a demande - « il faudrait que ce deverrouillage soit temporaire ».
+TEST( ExerciseSessionControllerTest, the_developer_code_opens_everything_and_is_temporary )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    constexpr int GOD_MODE_INDEX = static_cast<int>( domain::PLAYER_LEVEL_COUNT );
+
+    EXPECT_FALSE( controller.areAllLevelsUnlocked() );
+
+    // SIX ne suffisent pas : le code demande SEPT.
+    for( int selection = 0; selection < 6; ++selection )
+    {
+        controller.choosePlayerLevel( GOD_MODE_INDEX );
+    }
+
+    EXPECT_FALSE( controller.areAllLevelsUnlocked() );
+
+    // La SEPTIEME l'ouvre, et toutes les difficultes sont alors permises.
+    controller.choosePlayerLevel( GOD_MODE_INDEX );
+
+    EXPECT_TRUE( controller.areAllLevelsUnlocked() );
+    EXPECT_TRUE( controller.isLevelUnlocked( 1 ) );
+    EXPECT_TRUE( controller.isLevelUnlocked( 4 ) );
+
+    // ET C'EST TEMPORAIRE : choisir une vraie difficulte referme le code. L'experience, elle, n'a pas bouge - donc ce qui
+    // se referme est bien le raccourci, pas un merite qui aurait disparu.
+    controller.choosePlayerLevel( 0 );
+
+    EXPECT_FALSE( controller.areAllLevelsUnlocked() );
+    EXPECT_FALSE( controller.isLevelUnlocked( 4 ) );
+}
+
 }    // namespace musichien::ui

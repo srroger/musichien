@@ -266,7 +266,10 @@ class ExerciseSessionController final : public QObject
     //
     // ET LE GODMODE EST LA DERNIERE ENTREE, sans etre un niveau du domaine : il ne dit pas ce que le joueur sait, il dit
     // qu'il a decide de choisir. Il porte donc un drapeau de plus, et c'est ce drapeau que l'ecran lit.
-    Q_PROPERTY( QVariantList playerLevels READ playerLevels CONSTANT )
+    // Pas CONSTANT : l'etat « ouvert / ferme » d'un palier change avec l'experience et le code de developpeur, et une liste
+    // figee ne le montrerait jamais. C'est ce defaut qui a fait dire a Roger « j'ai essaye, rien ne s'est passe » : le
+    // deverrouillage AVait bien eu lieu, mais le cadenas ne disparaissait pas.
+    Q_PROPERTY( QVariantList playerLevels READ playerLevels NOTIFY playerLevelChanged )
 
     // ---------------------------------------------------------------------------------------------------------------
     // LE GODMODE

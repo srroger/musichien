@@ -628,6 +628,16 @@ void ExerciseSessionController::choosePlayerLevel( int p_level )
     // deux. C'est ce que « d'affilee » veut dire, et sans cette remise a zero un joueur pourrait alterner sans le savoir.
     m_godModeSelectionCount = 0;
 
+    // Et le deverrouillage du code de developpeur est TEMPORAIRE : choisir une vraie difficulte le referme. C'est ce que
+    // Roger a demande - « il faudrait que ce déverrouillage soit temporaire ». Rouvrir l'application le referme aussi, pour
+    // la meme raison : rien de tout ceci ne s'ecrit sur le disque.
+    if( m_allLevelsUnlocked )
+    {
+        m_allLevelsUnlocked = false;
+
+        emit playerLevelChanged();
+    }
+
     const domain::PlayerLevel level = domain::playerLevelFromIndex( static_cast<std::size_t>( p_level ) );
 
     m_playerLevel = level;
@@ -1972,6 +1982,10 @@ void ExerciseSessionController::persistSessionOutcome()
     emit levelInvitationChanged();
 
     emit totalExperienceChanged();
+
+    // L'experience a monte : un palier a pu s'OUVRIR, donc la liste des difficultees doit se rafraichir - sinon le cadenas
+    // reste affiche sur une entree desormais permise.
+    emit playerLevelChanged();
 }
 
 int ExerciseSessionController::sessionCount() const
