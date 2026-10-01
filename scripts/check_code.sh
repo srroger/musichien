@@ -109,12 +109,35 @@ else
     # bury them under thousands of lines that say the same thing.
     TIDY_FINDINGS="$(grep -E 'warning:|error:' "${TIDY_LOG}" || true)"
 
-    printf '%s\n' "${TIDY_FINDINGS}" | tail -30
-
     set -e
 
     if [ -n "${TIDY_FINDINGS}" ]; then
-        echo "  FAILED - see the findings above"
+        # LE JOURNAL COMPLET EST CONSERVE, et c'est deliberé : n'afficher que les trente derniers findings rendait tout
+        # diagnostic impossible - on voyait les trouvailles dans l'ordre des fichiers, jamais celles qui comptent, et il
+        # fallait relancer vingt minutes d'analyse pour voir la suite. Le fichier est ecrit dans le dossier de build, a
+        # cote de compile_commands.json, donc au meme endroit que ce que l'analyse a lu.
+        TIDY_REPORT="${PROJECT_DIR}/../Musichien-build/Clang-Debug/clang-tidy-report.txt"
+
+        printf '%s\n' "${TIDY_FINDINGS}" > "${TIDY_REPORT}"
+
+        # UN RESUME PAR REGLE, du plus frequent au moins frequent : c'est ce qui dit en une seconde si l'echec est un
+        # vrai risque ou une regle a regler. Compter les trouvailles ligne par ligne ne le disait pas.
+        #
+        # Les codes COULEUR de clang-tidy (UseColor) sont retires AVANT tout comptage : sans cela, chaque ligne finit par
+        # une sequence d'echappement et non par « [regle] », donc aucun regroupement ne se fait et le resume affiche
+        # 214 lignes comptees une par une - ce qui ne resume rien du tout.
+        TIDY_PLAIN="$(printf '%s\n' "${TIDY_FINDINGS}" | sed -E $'s/\033\\[[0-9;]*m//g')"
+
+        printf '  %s finding(s) - summary by rule (most frequent first):\n' "$(printf '%s\n' "${TIDY_PLAIN}" | wc -l)"
+
+        printf '%s\n' "${TIDY_PLAIN}" |
+            sed -E 's/^.*\[([^]]*)\][^]]*$/\1/' |
+            tr ',' '\n' |
+            sort | uniq -c | sort -rn | head -12 |
+            sed 's/^/    /'
+
+        printf '  every finding: %s\n' "${TIDY_REPORT}"
+        echo "  FAILED - see the summary above, and the report for the details"
         FAILURE_COUNT=$((FAILURE_COUNT + 1))
     else
         echo "  OK - no finding"
