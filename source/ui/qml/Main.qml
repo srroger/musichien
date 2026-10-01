@@ -726,9 +726,11 @@ ApplicationWindow {
                             model: ExerciseController.playerLevels
                             textRole: "name"
                             valueRole: "index"
-                            // La liste deroulée montre TOUT ce qu'elle propose : voir DarkComboBox.listWidth. C'est ici
-                            // que Roger l'a demande - « le mode "je débute" ne s'affiche pas si on n'est pas débutant ».
-                            popup.width: listWidth
+                            // La liste deroulée s'ouvre assez large pour montrer TOUT ce qu'elle propose : voir
+                            // widestEntryWidth. C'est ici que Roger l'a demande - « le mode "je débute" ne s'affiche pas si
+                            // on n'est pas débutant ». L'affectation est IMPERATIVE, jamais une liaison : une liaison ici
+                            // rejouerait la mesure a chaque frame.
+                            popup.onOpened: popup.width = widestEntryWidth()
                             // Le niveau choisi reste marque dans la liste : l'ecran ne laisse jamais de doute sur la
                             // difficulte de la prochaine partie.
                             currentIndex: ExerciseController.playerLevel
@@ -2800,7 +2802,7 @@ ApplicationWindow {
                             model: ExerciseController.temperaments
                             currentIndex: ExerciseController.temperament
                             onActivated: ExerciseController.setTemperament(index)
-                            popup.width: listWidth
+                            popup.onOpened: popup.width = widestEntryWidth()
                         }
 
                         // L'EXPLICATION du temperament choisi : d'ou il vient, et comment il fonctionne. Elle vient du
@@ -2863,7 +2865,7 @@ ApplicationWindow {
                             model: ExerciseController.tuningRoots
                             currentIndex: ExerciseController.tuningRoot
                             onActivated: ExerciseController.setTuningRoot(index)
-                            popup.width: listWidth
+                            popup.onOpened: popup.width = widestEntryWidth()
                         }
 
                         Text {
@@ -3213,7 +3215,7 @@ ApplicationWindow {
                         model: RhythmController.patterns
                         currentIndex: RhythmController.currentPattern
                         onActivated: RhythmController.setCurrentPattern(index)
-                        popup.width: listWidth
+                        popup.onOpened: popup.width = widestEntryWidth()
                     }
 
                     Text {
@@ -3623,7 +3625,7 @@ ApplicationWindow {
                 currentIndex: MicrophoneController.currentDeviceIndex
                 onActivated: MicrophoneController.selectDevice(index)
                 // Les noms de peripheriques sont longs par nature : c'est ici que la liste doit s'elargir le plus.
-                popup.width: listWidth
+                popup.onOpened: popup.width = widestEntryWidth()
             }
 
             // La portee miniature : la boule suit la hauteur chantee. Le composant StaffBall porte le style.
@@ -3845,6 +3847,13 @@ ApplicationWindow {
         // s'affiche pas si on n'est pas débutant - bête de devoir scroller pour une option ». Le CONTROLE, lui, peut etre
         // etroit : il vit dans une colonne, et c'est sa place. La liste, non : elle doit montrer tout ce qu'elle propose,
         // et un choix qu'on ne voit pas est un choix qu'on ne sait pas avoir.
+        // LA MESURE D'UN LIBELLE, pour elargir la liste deroulante a ce qu'elle contient.
+        // La largeur se MESURE, et ne s'invente pas : le plus long libelle du modele, plus la place de l'indicateur de
+        // choix. Un nombre ecrit a la main aurait ete faux au premier libelle qui s'allonge.
+        // C'est une FONCTION, et surtout PAS une propriete liee : la mesure ECRIT dans comboTextMetrics.text avant de
+        // lire son advanceWidth, et une propriete liee qui ecrit dans ce dont elle depend BOUCLE A L'INFINI. C'est
+        // arrive le 01/10/2026 : 1 086 141 lignes de « Binding loop detected » en onze secondes, le thread principal a
+        // 100 %, et l'application gelee au demarrage - dix secondes d'ecran noir, sur le telephone comme sur le bureau.
 
         id: combo
 
@@ -3852,9 +3861,9 @@ ApplicationWindow {
         // simplement a faux, et rien ne change pour elle.
         readonly property var currentEntry: (combo.model !== null) && (combo.currentIndex >= 0) ? combo.model[combo.currentIndex] : null
         readonly property bool currentEntryIsSpecial: currentEntry !== null && currentEntry.isGodMode === true
-        // La largeur se MESURE, et ne s'invente pas : le plus long libelle du modele, plus la place de l'indicateur de
-        // choix. Un nombre ecrit a la main aurait ete faux au premier libelle qui s'allonge.
-        readonly property real listWidth: {
+
+        // Une fonction appelee a l'ouverture du popup ne boucle pas : elle s'execute une fois, hors de tout binding.
+        function widestEntryWidth() {
             let widest = combo.width;
             const entries = combo.model;
             if ((entries === null) || (entries === undefined) || (entries.length === undefined))
