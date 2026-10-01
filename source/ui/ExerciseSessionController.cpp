@@ -14,6 +14,7 @@
 #include <QDebug>
 #include <QString>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -600,6 +601,10 @@ void ExerciseSessionController::choosePlayerLevel( int p_level )
             emit godModeChanged();
         }
 
+        // LE CODE DE DEVELOPPEUR : sept choix de GodMode d'affilee, et toutes les difficultes s'ouvrent. Voir
+        // noteGodModeSelection.
+        noteGodModeSelection();
+
         emit playerLevelChanged();
 
         return;
@@ -618,6 +623,10 @@ void ExerciseSessionController::choosePlayerLevel( int p_level )
 
         emit godModeChanged();
     }
+
+    // Choisir un AUTRE niveau casse la suite : le code de developpeur demande SEPT GodMode d'affilee, et rien entre les
+    // deux. C'est ce que « d'affilee » veut dire, et sans cette remise a zero un joueur pourrait alterner sans le savoir.
+    m_godModeSelectionCount = 0;
 
     const domain::PlayerLevel level = domain::playerLevelFromIndex( static_cast<std::size_t>( p_level ) );
 
@@ -651,6 +660,45 @@ void ExerciseSessionController::choosePlayerLevel( int p_level )
 
     // Le palier a change : la fleche doree peut devoir disparaitre, ou apparaitre.
     emit levelInvitationChanged();
+}
+
+bool ExerciseSessionController::isLevelUnlocked( int p_index ) const
+{
+    // LE PREMIER NIVEAU EST TOUJOURS OUVERT : il n'y a rien a meriter pour commencer, et un jeu qui ferme sa porte d'entree
+    // n'est plus un jeu.
+    if( p_index <= 0 )
+    {
+        return true;
+    }
+
+    // Le code de developpeur, quand il a ete entre.
+    if( m_allLevelsUnlocked )
+    {
+        return true;
+    }
+
+    // Sinon : un palier s'ouvre quand l'EXPERIENCE du joueur le merite - la meme regle qui propose la montee, appliquee au
+    // choix. Un palier se ferme donc tant qu'on ne l'a pas gagne, et c'est ce qui donne au GodMode son sens de passe-droit.
+    const auto level = domain::levelEarnedBy( totalExperience() );
+
+    return p_index <= static_cast<int>( level );
+}
+
+void ExerciseSessionController::noteGodModeSelection()
+{
+    ++m_godModeSelectionCount;
+
+    // SEPT d'affilee : le raccourci de developpeur. Au-dela, le compteur reste haut sans rien changer - ce qui compte est
+    // qu'il n'ait jamais ete interrompu par un autre niveau (voir choosePlayerLevel, qui le remet a zero).
+    constexpr std::size_t GOD_MODE_SELECTIONS_TO_UNLOCK = 7;
+
+    if( !m_allLevelsUnlocked && ( m_godModeSelectionCount >= GOD_MODE_SELECTIONS_TO_UNLOCK ) )
+    {
+        m_allLevelsUnlocked = true;
+
+        // La liste des difficultes vient de changer : l'ecran doit redessiner ses entrees.
+        emit playerLevelChanged();
+    }
 }
 
 domain::SessionSettings ExerciseSessionController::sessionSettingsForLevel( domain::PlayerLevel p_level ) const
@@ -701,6 +749,10 @@ QVariantList ExerciseSessionController::playerLevels()
         level.insert( QStringLiteral( "index" ), static_cast<int>( index ) );
         level.insert( QStringLiteral( "name" ), levelName( domain::playerLevelFromIndex( index ) ) );
         level.insert( QStringLiteral( "isGodMode" ), false );
+
+        // FERME tant que l'experience ne l'ouvre pas : voir isLevelUnlocked. L'ecran s'en sert pour barrer l'entree au lieu
+        // de la laisser cliquer dans le vide.
+        level.insert( QStringLiteral( "isLocked" ), !isLevelUnlocked( static_cast<int>( index ) ) );
 
         levels.append( level );
     }
@@ -872,15 +924,42 @@ void ExerciseSessionController::leaveReviewMode() noexcept
 
 void ExerciseSessionController::startSession()
 {
-    // Une partie ordinaire n'est PAS un bilan, et le drapeau retombe ici.
-    //
-    // C'est une correction, et elle explique le symptome que Roger a decrit : « j'ai les encouragements que je ne devrais
-    // avoir que dans le mode bilan ». Le drapeau n'etait remis a faux qu'a trois endroits - la remise a zero du score, un
-    // bilan vide, le debut d'un bilan - donc UN SEUL bilan joue, une fois, suffisait a faire parler TOUTES les parties
-    // suivantes comme un bilan, jusqu'a la prochaine remise a zero.
+    // L'ARCADE : la porte principale. Une partie ordinaire n'est PAS un bilan, et le drapeau retombe ici.
     leaveReviewMode();
 
+    m_gameMode = domain::GameMode::Arcade;
+
+    // Le plan de l'Arcade a besoin d'une graine, et elle est tiree ICI : le domaine n'a aucune source d'entropie, ce qui
+    // rend le plan reproductible dans un test. La graine de la SESSION, elle, reste tiree par beginSession.
+    std::random_device entropySource;
+
+    beginSession( domain::arcadeSettingsFor( m_playerLevel.value_or( domain::PlayerLevel::Beginner ),
+                                             entropySource() ) );
+}
+
+void ExerciseSessionController::startOrdinarySession()
+{
+    // Le MOTEUR, sans porte : `beginSession(m_settings)` et rien de plus. Voir l'en-tete pour WHY ce n'est pas l'Arcade.
+    leaveReviewMode();
+
+    // Elle paie l'experience comme l'Arcade : c'est ce que faisait l'ancien « Jouer », et les tests de regle qui lisent
+    // l'experience apres une partie continuent de la lire.
+    m_gameMode = domain::GameMode::Arcade;
+
     beginSession( m_settings );
+}
+
+void ExerciseSessionController::startTrainingSession( int p_family )
+{
+    leaveReviewMode();
+
+    m_gameMode = domain::GameMode::Training;
+
+    // Un entrainement ne paie rien, mais il applique le PERIMETRE DU GODMODE quand celui-ci est choisi : c'est meme l'une
+    // des raisons d'etre du GodMode - « pour ceux qui veulent juste tester le jeu et ne pas y etre regulier ».
+    const auto family = static_cast<domain::QuestionFamily>( std::clamp( p_family, 0, 2 ) );
+
+    beginSession( domain::trainingSettingsFor( m_playerLevel.value_or( domain::PlayerLevel::Beginner ), family ) );
 }
 
 void ExerciseSessionController::startInfiniteSession()
@@ -890,6 +969,10 @@ void ExerciseSessionController::startInfiniteSession()
     // Le mode infini, c'est le mode qui ne s'arrete jamais : pas de vies, pas de fin, juste enchaner. Une erreur
     // coute du rythme - la serie retombe - mais jamais la partie.
     leaveReviewMode();
+
+    // Le jeu LIBRE ne paie pas : les poids des reglages le gouvernent, et il ne fait pas monter de niveau. Roger :
+    // « si il veut progresser en experience, il doit imperativement faire le B ».
+    m_gameMode = domain::GameMode::Infinite;
 
     settings.lives = std::nullopt;
     settings.questionCount = std::numeric_limits<std::size_t>::max();
@@ -904,6 +987,8 @@ void ExerciseSessionController::startSurvivalSession()
     // Le survival, c'est l'arcade avec des vies : un nombre de questions sans fin, et la partie s'arrete quand les
     // vies tombent a zero. Les vies restent donc celles du niveau, pas un retour en arriere vers "illimite".
     leaveReviewMode();
+
+    m_gameMode = domain::GameMode::Survival;
 
     settings.questionCount = std::numeric_limits<std::size_t>::max();
 
@@ -1848,9 +1933,31 @@ void ExerciseSessionController::persistSessionOutcome()
         return;
     }
 
+    // L'EXPERIENCE, ET SEULEMENT LA OU ELLE SE GAGNE.
+    //
+    // C'est ici, et nulle part ailleurs, que le mode de la partie decide. Un Entrainement, une partie libre ou un Bilan
+    // rapportent ZERO : leurs reglages gouvernent le jeu, mais ils ne font pas monter de niveau. Seule l'Arcade paie, et
+    // elle paie le score multiplie par le merite des coeurs.
+    std::int32_t earnedExperience = 0;
+
+    if( domain::grantsExperience( m_gameMode ) )
+    {
+        // Les coeurs PERDUS de la partie qui vient de finir. Le score porte les coeurs RESTANTS, et le budget de depart est
+        // la constante de l'Arcade - dix.
+        const std::optional<std::int32_t> remainingLives = m_session->score().remainingLives();
+        const std::int32_t livesLost =
+          remainingLives.has_value() ? std::max( 0, domain::ARCADE_STARTING_LIVES - *remainingLives ) : 0;
+
+        earnedExperience = domain::arcadeExperience( m_session->score().experience(), livesLost );
+
+        // FIGE au moment ou la partie se conclut : un ecran de fin qui le relirait plus tard lirait un score qui a change.
+        m_lastArcadeMultiplierPercent =
+          static_cast<int>( std::lround( domain::arcadeMultiplier( livesLost ) * 100.0 ) );
+    }
+
     // The session is over: its experience, its count and its star become part of the profile, once. Calling this
     // twice would count the same session twice, so it happens only from the transition into "finished".
-    m_levelStore->storeTotalExperience( m_levelStore->totalExperience() + m_session->score().experience() );
+    m_levelStore->storeTotalExperience( m_levelStore->totalExperience() + earnedExperience );
     m_levelStore->storeSessionCount( m_levelStore->sessionCount() + 1 );
 
     if( m_session->hasEarnedStar() )
@@ -2960,6 +3067,11 @@ void ExerciseSessionController::recordCurrentQuestion( bool p_wasCorrect, bool p
 void ExerciseSessionController::startReviewSession()
 {
     domain::SessionSettings settings = m_settings;
+
+    // LE BILAN NE PAIE PAS non plus. Roger : « l'expérience ne sera accessible qu'en salle d'arcade ». Sa recompense est
+    // ailleurs - des titres, des trophees - et le mettre ici, une fois, couvre les DEUX chemins de cette fonction (le plan
+    // normal, et le repli sur une partie ordinaire quand il n'y a rien a reviser).
+    m_gameMode = domain::GameMode::Review;
 
     std::vector<domain::QuestionTarget> plan = reviewPlan();
 

@@ -615,6 +615,7 @@ ApplicationWindow {
                 // propres Layout.* visent un parent qui est un Layout, et ici le parent n'en est pas un - la largeur
                 // vient donc du bouton qui la porte, ce qui est exactement ce qu'on veut.
                 // LA DIFFICULTE, ET LA FLECHE QUI DIT QU'ON PEUT MONTER.
+                // L'ENTRAINEMENT : trois familles, dix questions chacune, et aucune experience.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -820,17 +821,80 @@ ApplicationWindow {
 
                 // The way into the loop. It sits above the bench on purpose: the bench is a tool for
                 // building the project, and playing is what the application is FOR.
-                // La porte d'entree du jeu. Elle garde le rouge du style, que Roger a trouve bon du premier coup, et
-                // c'est le seul bouton dont le mot est plus grand que les autres : c'est celui que l'oeil doit
-                // trouver en premier, et une taille plus grande le dit mieux qu'une phrase.
+                // LA PORTE PRINCIPALE, et c'est l'ARCADE depuis que le jeu a quatre modes. Elle garde le rouge du style, et
+                // c'est le seul bouton dont le mot est plus grand que les autres : c'est celui que l'oeil doit trouver en
+                // premier, et une taille plus grande le dit mieux qu'une phrase.
                 MenuButton {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 58
                     font.pixelSize: 23
                     highlighted: true
-                    text: qsTr("▶ Jouer")
+                    text: qsTr("▶ ARCADE")
                     onClicked: ExerciseController.startSession()
+                }
+
+                // Ce que l'Arcade est, en une phrase : le seul mode qui fait progresser, et il impose son dosage. Roger a
+                // voulu que l'experience ne se gagne QU'ICI - « si il veut progresser en experience, il doit imperativement
+                // faire le B » - et l'ecran doit le dire, sinon le joueur s'entraine sans jamais comprendre pourquoi son
+                // niveau ne monte pas.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    text: qsTr("25 questions · le seul mode qui fait gagner de l'expérience.")
+                }
+
+                // Roger les a voulues JUSTE SOUS l'Arcade - « les 3 familles, ce seront les 3 modes qu'on mettrait en ligne
+                // juste en dessous du bouton ARCADE ». Elles separent ce qu'on travaille : on ne melange pas, on choisit.
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 6
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#cbb8e8"
+                    font.pixelSize: 13
+                    text: qsTr("Entraînement · pour travailler une chose")
+                }
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    spacing: 8
+
+                    TintedMenuButton {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        tintColour: mainWindow.questColour
+                        labelColour: mainWindow.questLabelColour
+                        text: qsTr("Intervalles")
+                        onClicked: ExerciseController.startTrainingSession(0)
+                    }
+
+                    TintedMenuButton {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        tintColour: mainWindow.questColour
+                        labelColour: mainWindow.questLabelColour
+                        text: qsTr("Accords")
+                        onClicked: ExerciseController.startTrainingSession(1)
+                    }
+
+                    TintedMenuButton {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        tintColour: mainWindow.questColour
+                        labelColour: mainWindow.questLabelColour
+                        text: qsTr("Modes")
+                        onClicked: ExerciseController.startTrainingSession(2)
+                    }
+
                 }
 
                 // Le BILAN : une session dont les questions sont DECIDEES, du plus facile au plus difficile. Il reste
@@ -3956,17 +4020,53 @@ ApplicationWindow {
         }
 
         delegate: ItemDelegate {
+            id: comboEntry
+
+            // La ligne appartient-elle au GodMode, ou a un palier encore FERME ? Les deux se lisent dans la fiche, et une
+            // chaine (les appareils audio) n'a ni l'un ni l'autre - les deux retombent donc a faux pour elle.
+            readonly property bool isGod: (modelData !== null) && (typeof modelData === "object") && modelData.isGodMode === true
+            readonly property bool isLocked: (modelData !== null) && (typeof modelData === "object") && modelData.isLocked === true
+
             width: combo.width
             height: 46
+            // Un palier ferme ne se CHOISIT pas : la liste montre ou l'on va, elle ne laisse pas cliquer dans le vide.
+            enabled: !isLocked
 
-            contentItem: Text {
-                text: combo.itemLabel(modelData)
-                // Et dans la liste OUVERTE, le GodMode garde sa couleur : c'est la qu'on le choisit, et un mode a part qui
-                // ressemblerait aux autres au moment ou on le choisit ne serait a part nulle part.
-                color: (modelData !== null) && (typeof modelData === "object") && modelData.isGodMode === true ? "#ffd479" : "#e8dcff"
-                verticalAlignment: Text.AlignVCenter
-                font.pixelSize: 16
-                font.bold: (modelData !== null) && (typeof modelData === "object") && modelData.isGodMode === true
+            contentItem: RowLayout {
+                spacing: 8
+
+                Text {
+                    Layout.fillWidth: true
+                    text: combo.itemLabel(modelData)
+                    // Et dans la liste OUVERTE, le GodMode garde sa couleur : c'est la qu'on le choisit, et un mode a part qui
+                    // ressemblerait aux autres au moment ou on le choisit ne serait a part nulle part.
+                    color: comboEntry.isGod ? "#ffd479" : (comboEntry.isLocked ? "#6f5b93" : "#e8dcff")
+                    verticalAlignment: Text.AlignVCenter
+                    font.pixelSize: 16
+                    font.bold: comboEntry.isGod
+                }
+
+                // LE CADENAS, dessine comme l'engrenage du GodMode et la fleche doree : une anse et un corps. Un palier ferme
+                // doit le DIRE, sinon « pourquoi je ne peux pas ? » n'a pas de reponse a l'ecran.
+                Canvas {
+                    Layout.preferredWidth: 13
+                    Layout.preferredHeight: 16
+                    visible: comboEntry.isLocked
+                    onPaint: {
+                        let context = getContext("2d");
+                        context.reset();
+                        context.strokeStyle = "#8a77ad";
+                        context.fillStyle = "#8a77ad";
+                        context.lineWidth = 2;
+                        // L'anse.
+                        context.beginPath();
+                        context.arc(width / 2, 6, 4, Math.PI, 0);
+                        context.stroke();
+                        // Le corps.
+                        context.fillRect(1, 7, width - 2, height - 8);
+                    }
+                }
+
             }
 
             // La ligne survolee : sans ca, on ne sait pas ce qu'on est en train de choisir.

@@ -25,6 +25,7 @@
 #include "domain/exercise/AnecdoteBook.h"
 #include "domain/exercise/AnswerGrid.h"
 #include "domain/exercise/ExerciseSession.h"
+#include "domain/exercise/GameMode.h"
 #include "domain/exercise/HintBook.h"
 #include "domain/exercise/PlayerPreferences.h"
 #include "domain/exercise/QuestionLog.h"
@@ -673,7 +674,9 @@ public:
     [[nodiscard]] QString hintText() const;
     [[nodiscard]] bool hasChosenLevel() const noexcept;
     [[nodiscard]] int playerLevel() const noexcept;
-    [[nodiscard]] static QVariantList playerLevels();
+    // Les difficultes proposees, avec leur etat : ouvertes ou FERMEES tant que l'experience ne les a pas meritees. Pas
+    // `static` : elle lit l'etat du joueur (son experience, le code de developpeur), donc elle a besoin de l'instance.
+    [[nodiscard]] QVariantList playerLevels();
 
     [[nodiscard]] bool godModeIsChosen() const noexcept { return m_godModeIsChosen; }
 
@@ -733,8 +736,53 @@ public:
     [[nodiscard]] bool hasUnlimitedLives() const noexcept;
     [[nodiscard]] bool starEarned() const noexcept;
 
-    // Starts a new session and plays its first question. Called by the "Jouer" button.
+    // L'ARCADE : la porte principale depuis que le jeu a quatre modes.
+    //
+    // Vingt-cinq questions au dosage impose - dix intervalles, huit accords, sept modes - et la note etrangere en final.
+    // C'est le SEUL mode qui paie de l'experience, et c'est tout l'interet : un joueur ne peut pas cultiver son niveau en
+    // ne travaillant que ce qu'il sait deja faire.
     Q_INVOKABLE void startSession();
+
+    // Une partie PILOTEE PAR LES REGLAGES, sans plan ni famille imposee : le MOTEUR du jeu, pour les tests qui verifient
+    // une regle et non une porte.
+    //
+    // Ce n'est PAS un bouton - les quatre facons de jouer sont au-dessus - et c'est deliberate : les tests de regle ont
+    // besoin d'un tirage gouverne par les parts, et les modes de l'ecran en imposent chacun une variante (l'Arcade son
+    // plan, l'Entrainement sa famille). Elle paie l'experience comme l'Arcade, ce qui preserve le comportement des tests
+    // qui la lisaient.
+    void startOrdinarySession();
+
+    // L'ENTRAINEMENT : une famille, dix questions, aucune experience.
+    //
+    // p_family est un QuestionFamily (0 intervalles, 1 accords, 2 modes). La famille ouverte garde ses sous-parts, et
+    // compte dans les statistiques - c'est ce qui nourrit le Bilan - mais ne rapporte rien.
+    Q_INVOKABLE void startTrainingSession( int p_family );
+
+    // Le mode de la partie en cours, et s'il paie de l'experience. L'ecran de fin s'en sert pour dire ce qu'il doit dire,
+    // et pour ne PAS afficher d'experience gagnee la ou il n'y en a pas.
+    [[nodiscard]] int gameMode() const noexcept { return static_cast<int>( m_gameMode ); }
+    [[nodiscard]] bool sessionGrantsExperience() const noexcept { return domain::grantsExperience( m_gameMode ); }
+
+    // Le multiplicateur d'experience de l'Arcade, en POUR CENT (100, 120, 200), tel que l'ecran de fin l'affiche.
+    //
+    // Il se lit sur les coeurs PERDUS de la partie qui vient de finir, et il est fige au moment ou la session se conclut :
+    // un ecran qui le recalculerait plus tard lirait un score qui a pu changer.
+    [[nodiscard]] int arcadeMultiplierPercent() const noexcept { return m_lastArcadeMultiplierPercent; }
+
+    // Le plus haut palier de difficulte que l'experience du joueur lui ouvre.
+    //
+    // Les paliers superieurs se FERMENT tant qu'on ne les a pas merites : c'est ce qui donne au GodMode son sens - un
+    // passe-droit pour qui veut tester le jeu sans y etre regulier. Voir unlockAllLevels pour le raccourci de developpeur.
+    Q_INVOKABLE bool isLevelUnlocked( int p_index ) const;
+
+    // Le code de developpeur : choisir GodMode SEPT fois d'affilee deverrouille toutes les difficultes.
+    //
+    // Roger : « pour le dev, on va laisser un cheat code aussi pour pouvoir choisir un niveau de difficulte malgre le
+    // manque de point d'experience du style, choisir GodMode 7 fois d'affile, boom ca debloque le choix de toute les
+    // difficulte ». Le compteur est remis a zero des qu'un autre niveau est choisi.
+    Q_INVOKABLE void noteGodModeSelection();
+
+    [[nodiscard]] bool areAllLevelsUnlocked() const noexcept { return m_allLevelsUnlocked; }
 
     // The player says where he is, once. His answer is remembered, and it decides where his sessions start.
     // Le LIVRE DES PHRASES : donne par la couche de cablage, comme le diapason.
@@ -1174,6 +1222,18 @@ private:
     // Le bilan en cours, et le nombre de questions qui l'ont ouvert. Ces deux valeurs suffisent a dire au joueur ou il
     // en est : l'echauffement est passe, ce qui suit est ce qui lui resiste.
     bool m_isReviewRunning{ false };
+
+    // LE MODE DE LA PARTIE EN COURS, et c'est lui qui decide si elle paie : voir persistSessionOutcome.
+    //
+    // Par defaut l'Arcade, parce que c'est la porte principale - « Jouer » ouvre l'Arcade depuis que le jeu a quatre modes.
+    domain::GameMode m_gameMode{ domain::GameMode::Arcade };
+
+    // Le multiplicateur de la derniere Arcade, en pour cent, FIGE au moment ou elle s'est conclue.
+    int m_lastArcadeMultiplierPercent{ 100 };
+
+    // Le code de developpeur : sept choix de GodMode d'affilee, et toutes les difficultes s'ouvrent.
+    std::size_t m_godModeSelectionCount{ 0 };
+    bool m_allLevelsUnlocked{ false };
 
     // Le chien qui s'invite : arme par la fin d'une partie, desarme par le clic du joueur.
     bool m_isChibaTalking{ false };
