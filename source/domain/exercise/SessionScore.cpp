@@ -30,6 +30,12 @@ void SessionScore::registerSuccess( std::int32_t p_replayCount, std::int32_t p_a
 
     ++m_streak;
 
+    // La plus longue serie DE LA SESSION, et pas seulement la derniere.
+    //
+    // C'est ce que la Survie garde : « ta meilleure serie » n'a de sens que si elle survit a l'erreur qui l'a cassee. La
+    // derniere serie, elle, retombe a chaque erreur et ne raconte rien.
+    m_longestStreak = std::max( m_longestStreak, m_streak );
+
     ++m_completedQuestionCount;
 
     if( p_attemptCount <= 0 )

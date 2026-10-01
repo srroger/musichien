@@ -80,6 +80,11 @@ musichienFunction_AddLibrary(domain
     exercise/ExerciseSession.h
     exercise/ExerciseSession.cpp
 
+    # LES QUATRE FACONS DE JOUER, et celle qui paie : l'Entrainement ouvre une famille, l'Arcade impose son dosage et
+    # gagne seule l'experience, et Infini / Survie sont le jeu libre. Voir GameMode.h.
+    exercise/GameMode.h
+    exercise/GameMode.cpp
+
     # LE PERIMETRE CHOISI par le joueur : le GodMode. Il ne remplace pas les niveaux, il les prend comme modeles.
     exercise/GodModePalette.h
     exercise/GodModePalette.cpp
@@ -146,6 +151,7 @@ if(MUSICHIEN_BUILD_TESTING)
         exercise/AnecdoteBook_test.cpp
         exercise/ExerciseSession_test.cpp
         exercise/GodModePalette_test.cpp
+        exercise/GameMode_test.cpp
         exercise/HintBook_test.cpp
         exercise/LearningOrder_test.cpp
         exercise/PlayerLevel_test.cpp

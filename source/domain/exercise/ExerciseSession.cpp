@@ -143,11 +143,21 @@ Question ExerciseSession::buildQuestion()
     // avant tout tirage : ce qui est decide ne se retire pas.
     const std::optional<QuestionTarget> planned = plannedQuestionAt( m_questionNumber - 1 );
 
+    // Le plan a-t-il decide la CIBLE, ou seulement le GENRE ?
+    //
+    // Un Bilan decide la cible elle-meme (« travaille la sixte »). L'Arcade, elle, decide le DOSAGE et laisse le detail
+    // au tirage : elle porte DRAWN_TARGET, et la cible se tire comme dans une partie ordinaire.
+    const bool targetIsDecided = planned.has_value() && ( planned->target != DRAWN_TARGET );
+
     if( planned.has_value() )
     {
         question.kind = planned->kind;
-        question.target = Interval{ planned->target };
         question.direction = planned->direction;
+
+        if( targetIsDecided )
+        {
+            question.target = Interval{ planned->target };
+        }
     }
     else
     {
@@ -157,6 +167,14 @@ Question ExerciseSession::buildQuestion()
         question.target = drawTarget();
 
         question.kind = drawKind();
+    }
+
+    // Le plan qui n'a decide que le GENRE laisse la cible au tirage, exactement comme une partie ordinaire. Seules les
+    // questions d'INTERVALLE tirent ici : un accord tire sa COULEUR, un mode tire son mode, et chacun le fait dans sa
+    // propre construction, plus bas.
+    if( planned.has_value() && !targetIsDecided && isIntervalQuestion( question.kind ) )
+    {
+        question.target = drawTarget();
     }
 
     if( question.kind == QuestionKind::Rhythm )
@@ -170,7 +188,7 @@ Question ExerciseSession::buildQuestion()
 
     if( question.kind == QuestionKind::Chord )
     {
-        if( planned.has_value() )
+        if( targetIsDecided )
         {
             // Le plan a dit la COULEUR ; la tonique reste tiree, parce qu'un bilan ne teste pas la hauteur, et les
             // choix sont ceux de la palette.
@@ -215,7 +233,7 @@ Question ExerciseSession::buildQuestion()
         return question;
     }
 
-    if( !planned.has_value() )
+    if( !targetIsDecided )
     {
         // Le SENS n'est tire que si personne ne l'a decide : un plan le porte deja.
         if( question.kind == QuestionKind::Sing )
@@ -907,6 +925,9 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
     {
         m_score.registerSuccess( m_currentQuestion.replayCount, m_currentQuestion.wrongAttemptCount );
 
+        // Le compte par famille : la question est CONCLUE, et elle l'est bien. C'est ce que l'ecran de fin d'Arcade lit.
+        m_familyTally.registerQuestion( familyOf( m_currentQuestion.kind ), true );
+
         // A new interval joins the palette every so many successes in a row. The modulo, rather than a
         // simple comparison, is what makes this happen at every step: without it the condition would
         // stay true for ever after the third success, and the palette would grow on every single
@@ -961,6 +982,9 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
         // justement ce qui reste a apprendre quand la partie est perdue.
         m_state = SessionState::Feedback;
 
+        // La question se CONCLUT sur un echec : elle compte comme demandee et ratee dans sa famille.
+        m_familyTally.registerQuestion( familyOf( m_currentQuestion.kind ), false );
+
         return false;
     }
 
@@ -984,6 +1008,9 @@ void ExerciseSession::revealAnswer()
     }
 
     m_score.registerHelpedQuestion();
+
+    // Une question revelee est une question CONCLUE, et manquee : elle compte dans sa famille comme telle.
+    m_familyTally.registerQuestion( familyOf( m_currentQuestion.kind ), false );
 
     m_lastAnswerWasCorrect = false;
 
@@ -1195,6 +1222,70 @@ void ExerciseSession::widenChordPalette()
     // previsible, et une couleur choisie au hasard ferait sauter le joueur du majeur a la septieme majeure sans
     // aucune raison qu'il puisse sentir.
     m_chordPalette = beginnerChordPalette( m_chordPalette.size() + 1 );
+}
+
+QuestionFamily familyOf( QuestionKind p_kind ) noexcept
+{
+    switch( p_kind )
+    {
+        case QuestionKind::NamedInterval:
+        case QuestionKind::Direction:
+        case QuestionKind::Sing:
+            return QuestionFamily::Interval;
+
+        case QuestionKind::Chord:
+            return QuestionFamily::Chord;
+
+        case QuestionKind::Rhythm:
+        case QuestionKind::ModeColour:
+        case QuestionKind::ModeName:
+        case QuestionKind::ModeVamp:
+        case QuestionKind::ForeignNote:
+            // Le rythme est classe avec les MODES, et ce n'est pas un hasard : c'est la famille « le reste », celle qui
+            // n'est ni un intervalle ni une couleur d'accord. Comme il n'est jamais pose (voir isKindOpen), sa place ici
+            // n'a aucune consequence - mais le commutateur doit couvrir tout l'enum pour qu'un genre ajoute demain fasse
+            // echouer le test qui le parcourt.
+            return QuestionFamily::Mode;
+    }
+
+    // Inatteignable tant que le commutateur couvre tous les genres, et c'est voulu.
+    return QuestionFamily::Interval;
+}
+
+void FamilyTally::registerQuestion( QuestionFamily p_family, bool p_wasCorrect ) noexcept
+{
+    const auto index = static_cast<std::size_t>( p_family );
+
+    ++asked.at( index );
+
+    if( p_wasCorrect )
+    {
+        ++correct.at( index );
+    }
+}
+
+std::size_t FamilyTally::askedIn( QuestionFamily p_family ) const noexcept
+{
+    return asked.at( static_cast<std::size_t>( p_family ) );
+}
+
+std::size_t FamilyTally::correctIn( QuestionFamily p_family ) const noexcept
+{
+    return correct.at( static_cast<std::size_t>( p_family ) );
+}
+
+std::size_t FamilyTally::successPercentIn( QuestionFamily p_family ) const noexcept
+{
+    const std::size_t askedCount = askedIn( p_family );
+
+    if( askedCount == 0 )
+    {
+        // Une famille a laquelle on n'a pas joue n'a pas de taux. Zero, et l'ecran sait qu'un zero sur zero demande n'est
+        // pas « nul » mais « absent » - voir askedIn, qu'il lit avant d'afficher.
+        return 0;
+    }
+
+    return ( correctIn( p_family ) * 100 ) / askedCount;
 }
 
 }    // namespace musichien::domain

@@ -28,6 +28,7 @@
 #include "domain/music/PhraseBook.h"
 #include "domain/rhythm/Rhythm.h"
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -167,6 +168,52 @@ enum class QuestionKind
     return false;
 }
 
+// La FAMILLE d'une question : intervalle, accord ou mode.
+//
+// C'est la troisieme lecture de QuestionKind, et elle sert UNE chose : l'Arcade compte ses trois familles separement, et
+// l'Entrainement n'en ouvre qu'une a la fois. Une question appartient exactement a une famille.
+enum class QuestionFamily : std::size_t
+{
+    Interval = 0,
+    Chord = 1,
+    Mode = 2
+};
+
+// Combien de familles, ce qu'un ecran qui les liste a besoin de savoir.
+inline constexpr std::size_t QUESTION_FAMILY_COUNT = 3;
+
+// A quelle famille un genre appartient.
+//
+// Comme isIntervalQuestion, le commutateur couvre TOUS les genres : un genre ajoute sans etre classe ici doit faire
+// echouer le test qui parcourt l'enumeration, pas tomber dans une famille par defaut silencieuse.
+[[nodiscard]] QuestionFamily familyOf( QuestionKind p_kind ) noexcept;
+
+// Ce qu'une session a demande et reussi, famille par famille.
+//
+// C'est le seul endroit d'ou un ecran de fin - celui de l'Arcade - peut dire « tu es plus fort en intervalles qu'en
+// modes » sans recompter quoi que ce soit : la session tient le compte en le vivant.
+struct FamilyTally
+{
+    std::array<std::size_t, QUESTION_FAMILY_COUNT> asked{};
+    std::array<std::size_t, QUESTION_FAMILY_COUNT> correct{};
+
+    void registerQuestion( QuestionFamily p_family, bool p_wasCorrect ) noexcept;
+
+    [[nodiscard]] std::size_t askedIn( QuestionFamily p_family ) const noexcept;
+    [[nodiscard]] std::size_t correctIn( QuestionFamily p_family ) const noexcept;
+
+    // Reussite de cette famille, en pour cent entiers. ZERO quand rien n'a ete demande, et c'est honnete : une famille
+    // a laquelle on n'a pas joue n'a pas de taux, et un ecran qui afficherait « 0 % » mentirait sur un absent.
+    [[nodiscard]] std::size_t successPercentIn( QuestionFamily p_family ) const noexcept;
+};
+
+// Une cible que le PLAN laisse au TIRAGE : la question ne dit que son GENRE.
+//
+// L'Arcade a besoin des deux : elle impose le DOSAGE (dix intervalles, huit accords, sept modes) sans imposer QUELLE
+// seconde ou QUELLE couleur. Un plan decide la repartition, le tirage decide le detail - et c'est ce qui la distingue
+// d'un Bilan, ou la cible ELLE-MEME est decidee.
+inline constexpr std::int32_t DRAWN_TARGET = -1;
+
 // Une question DECIDEE a l'avance : quel genre, quelle cible, dans quel sens.
 //
 // C'est ce qui permet a une session de suivre un PLAN plutot qu'un tirage, et c'est la seule chose dont le Bilan du
@@ -178,6 +225,9 @@ struct QuestionTarget
 
     // La cible, dans l'unite de son genre (voir QuestionRecord::target) : des demi-tons pour un intervalle, l'index
     // d'une qualite pour un accord.
+    //
+    // DRAWN_TARGET quand le plan decide le GENRE sans decider la cible : c'est l'Arcade, qui impose son dosage mais
+    // laisse le tirage choisir quelle seconde ou quelle couleur.
     std::int32_t target{ 0 };
 
     IntervalDirection direction{ IntervalDirection::Ascending };
@@ -554,6 +604,12 @@ public:
     [[nodiscard]] const Question & currentQuestion() const noexcept { return m_currentQuestion; }
     [[nodiscard]] SessionState state() const noexcept { return m_state; }
     [[nodiscard]] const SessionScore & score() const noexcept { return m_score; }
+
+    // Ce que la session a demande et reussi, famille par famille.
+    //
+    // Tenu pendant la partie, et non recalcule a la fin : l'ecran de fin d'Arcade s'en sert pour dire ou le joueur est
+    // fort et ou il resiste, et il ne peut le dire que de ce que la session a vraiment vu.
+    [[nodiscard]] const FamilyTally & familyTally() const noexcept { return m_familyTally; }
     [[nodiscard]] const SessionSettings & settings() const noexcept { return m_settings; }
 
     // Intervals the player is currently up against, from the learning order.
@@ -802,6 +858,9 @@ private:
     // La derniere reponse de mode, pour que le verdict puisse dire ce qui a ete repondu.
     std::optional<Mode> m_lastModeAnswer;
     SessionScore m_score;
+
+    // Le compte demande / reussi par famille, tenu au fil des questions. Voir familyTally().
+    FamilyTally m_familyTally;
 
     // Wrong answers in a row. Two of them, and the next question becomes a guided one - a smaller question the
     // player can still answer, which is help that does not announce itself.
