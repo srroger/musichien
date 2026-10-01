@@ -842,6 +842,12 @@ void ExerciseSession::widenModePalette()
         return;
     }
 
+    // Le plafond, comme pour les intervalles.
+    if( ( m_settings.maximumModeCount > 0 ) && ( m_modePalette.size() >= m_settings.maximumModeCount ) )
+    {
+        return;
+    }
+
     if( m_modePalette.size() >= modeLearningOrder().size() )
     {
         // Tous les modes du jeu sont deja en place : il n'y a plus rien a elargir.
@@ -1173,6 +1179,12 @@ void ExerciseSession::widenPalette()
         return;
     }
 
+    // LE PLAFOND : une Arcade ou un Entrainement ne depassent pas la difficulte de leur niveau. Voir SessionSettings.
+    if( ( m_settings.maximumPaletteSize > 0 ) && ( m_palette.size() >= m_settings.maximumPaletteSize ) )
+    {
+        return;
+    }
+
     if( m_palette.size() >= learningOrderIntervals().size() )
     {
         // Everything the application knows is already in play.
@@ -1208,6 +1220,12 @@ void ExerciseSession::widenChordPalette()
 {
     // Un perimetre choisi ne grandit pas : voir widenPalette.
     if( m_settings.paletteIsFixed )
+    {
+        return;
+    }
+
+    // Le plafond, comme pour les intervalles.
+    if( ( m_settings.maximumChordQualityCount > 0 ) && ( m_chordPalette.size() >= m_settings.maximumChordQualityCount ) )
     {
         return;
     }

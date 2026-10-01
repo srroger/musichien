@@ -415,6 +415,23 @@ class ExerciseSessionController final : public QObject
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
 
+    // L'ECRAN DE FIN D'ARCADE : ce qu'une partie d'Arcade a de plus que les autres, et ce qu'une autre n'a pas.
+    //
+    // Le CHRONO et la PLUS LONGUE SERIE sont figes au moment ou la partie se conclut : un chrono qui court pendant que le
+    // joueur lit son bilan serait un chiffre qui bouge sous ses yeux.
+    Q_PROPERTY( int sessionDurationSeconds READ sessionDurationSeconds NOTIFY sessionChanged )
+    Q_PROPERTY( int sessionLongestStreak READ sessionLongestStreak NOTIFY sessionChanged )
+
+    // L'experience REELLEMENT gagnee, multiplicateur applique. Zero dans tout mode qui ne paie pas.
+    Q_PROPERTY( int arcadeXpEarned READ arcadeXpEarned NOTIFY sessionChanged )
+
+    // Le multiplicateur en pour cent (100, 120, 200), tel que l'ecran l'affiche.
+    Q_PROPERTY( int arcadeMultiplierPercent READ arcadeMultiplierPercent NOTIFY sessionChanged )
+
+    // Le mode de la partie en cours paie-t-il l'experience ? C'est ce qui decide si l'ecran de fin montre le bilan d'Arcade
+    // ou une simple ligne.
+    Q_PROPERTY( bool sessionGrantsExperience READ sessionGrantsExperience NOTIFY sessionChanged )
+
 public:
     // Ce que la question en cours demande : nommer un intervalle, ou dire dans quel sens il a ete joue. La valeur
     // est celle du domaine, transposee en entier pour le QML.
@@ -761,6 +778,13 @@ public:
     // compte dans les statistiques - c'est ce qui nourrit le Bilan - mais ne rapporte rien.
     Q_INVOKABLE void startTrainingSession( int p_family );
 
+    // REJOUER : relance le MEME mode. Un Entrainement rejoue son Entrainement, un Bilan son Bilan.
+    //
+    // Le bouton « Rejouer » de l'ecran de fin appelait l'Arcade quoi qu'il arrive - ce qui transformait silencieusement un
+    // entrainement en Arcade, et gagnait de l'experience alors qu'on venait de comprendre que non. Le mode est retenu ici,
+    // donc le bouton ne peut plus se tromper.
+    Q_INVOKABLE void restartSession();
+
     // Le mode de la partie en cours, et s'il paie de l'experience. L'ecran de fin s'en sert pour dire ce qu'il doit dire,
     // et pour ne PAS afficher d'experience gagnee la ou il n'y en a pas.
     [[nodiscard]] int gameMode() const noexcept { return static_cast<int>( m_gameMode ); }
@@ -771,6 +795,22 @@ public:
     // Il se lit sur les coeurs PERDUS de la partie qui vient de finir, et il est fige au moment ou la session se conclut :
     // un ecran qui le recalculerait plus tard lirait un score qui a pu changer.
     [[nodiscard]] int arcadeMultiplierPercent() const noexcept { return m_lastArcadeMultiplierPercent; }
+
+    // Le chrono de la partie, en secondes, FIGE a la fin. Zero tant que la session n'est pas finie.
+    [[nodiscard]] int sessionDurationSeconds() const noexcept { return m_sessionDurationSeconds; }
+
+    // La plus longue serie de la partie. La derniere serie retombe a chaque erreur et ne raconte rien ; le plus haut que le
+    // compteur soit monte, si.
+    [[nodiscard]] int sessionLongestStreak() const noexcept;
+
+    // L'experience gagnee, multiplicateur applique. Voir persistSessionOutcome, le seul endroit qui l'ecrit.
+    [[nodiscard]] int arcadeXpEarned() const noexcept { return m_arcadeXpEarned; }
+
+    // Les trois familles, avec ce que la partie a demande et reussi : {name, asked, correct, percent}.
+    //
+    // C'est ce que l'ecran de fin d'Arcade lit pour dire ou le joueur est fort et ou il resiste. Les familles sans question
+    // sont EXCLUES : une ligne « 0 sur 0 » n'informe pas, elle remplit.
+    [[nodiscard]] Q_INVOKABLE QVariantList familyResults() const;
 
     // Le plus haut palier de difficulte que l'experience du joueur lui ouvre.
     //
@@ -1231,8 +1271,19 @@ private:
     // Par defaut l'Arcade, parce que c'est la porte principale - « Jouer » ouvre l'Arcade depuis que le jeu a quatre modes.
     domain::GameMode m_gameMode{ domain::GameMode::Arcade };
 
+    // La famille du dernier Entrainement, pour que « Rejouer » rejoue le MEME.
+    int m_lastTrainingFamily{ 0 };
+
     // Le multiplicateur de la derniere Arcade, en pour cent, FIGE au moment ou elle s'est conclue.
     int m_lastArcadeMultiplierPercent{ 100 };
+
+    // L'experience REELLEMENT gagnee par la derniere partie, multiplicateur applique.
+    int m_arcadeXpEarned{ 0 };
+
+    // Le chrono de la partie EN COURS, et sa valeur FIGEE a la fin. Deux membres, parce qu'un seul ne saurait pas dire
+    // « arrete » : le timer court tant que la partie vit, et l'ecran de fin lit le nombre, pas le timer.
+    QElapsedTimer m_sessionClock;
+    int m_sessionDurationSeconds{ 0 };
 
     // Le code de developpeur : sept choix de GodMode d'affilee, et toutes les difficultes s'ouvrent.
     std::size_t m_godModeSelectionCount{ 0 };

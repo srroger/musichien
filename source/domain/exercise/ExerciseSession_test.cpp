@@ -1673,4 +1673,55 @@ TEST( ExerciseSessionTest, the_harmony_is_open_out_of_the_box )
     EXPECT_EQ( 20, defaults.singQuestionShare );
 }
 
+// LE PLAFOND : une session qui en porte un ne grandit plus au-dela. C'est ce qui rend a l'Arcade la difficulte de son
+// niveau - vingt-cinq questions elargissaient deux fois plus qu'une partie de dix, et Roger l'a senti en debutant.
+TEST( ExerciseSessionTest, a_capped_session_never_widens_past_its_ceiling )
+{
+    SessionSettings settings;
+    settings.questionCount = 20;
+    settings.startingPaletteSize = 2;
+    settings.choiceCount = 4;
+    settings.successesBeforeWidening = 1;    // Sans plafond, CHAQUE reussite ajouterait un intervalle.
+    settings.maximumPaletteSize = 2;         // LE PLAFOND, au niveau du depart.
+    settings.lives = std::nullopt;
+
+    ExerciseSession session{ 1, settings };
+
+    const std::size_t startingSize = session.palette().size();
+
+    // Dix reussites d'affilee : sans plafond, la palette aurait largement double.
+    for( int question = 0; question < 10; ++question )
+    {
+        answerCorrectly( session );
+        session.advance();
+    }
+
+    EXPECT_EQ( startingSize, session.palette().size() );
+    EXPECT_EQ( 2U, session.palette().size() );
+}
+
+// Et le JEU LIBRE, lui, garde le droit de grandir : sans plafond, dix reussites elargissent bel et bien la palette.
+TEST( ExerciseSessionTest, an_uncapped_session_still_widens )
+{
+    SessionSettings settings;
+    settings.questionCount = 20;
+    settings.startingPaletteSize = 2;
+    settings.choiceCount = 4;
+    settings.successesBeforeWidening = 1;
+    settings.lives = std::nullopt;
+    // Aucun plafond : maximumPaletteSize reste zero, le defaut.
+
+    ExerciseSession session{ 1, settings };
+
+    const std::size_t startingSize = session.palette().size();
+
+    for( int question = 0; question < 10; ++question )
+    {
+        answerCorrectly( session );
+        session.advance();
+    }
+
+    EXPECT_GT( session.palette().size(), startingSize ) << "sans plafond, la palette doit grandir";
+}
+
 }    // namespace musichien::domain

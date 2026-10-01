@@ -35,6 +35,7 @@ Item {
     // La couleur d'une COULEUR D'ACCORD, comme la couleur d'un intervalle : un code qui se lit avant le nom.
     // La couleur d'une couleur d'accord vient du CONTROLEUR (chordColourName) : elle est la meme sur tous les ecrans, et
     // elle le restera. Deux fichiers QML qui recalculeraient chacun leur teinte finiraient par en montrer deux differentes.
+    // LA FAMILLE OU LE JOUEUR EST LE PLUS FORT, et celle ou il resiste - pendant CETTE partie.
 
     id: exerciseScreen
 
@@ -61,6 +62,42 @@ Item {
     // La meme chose pour un accord : ce que le joueur vient de repondre, et s'il y a quelque chose a montrer.
     readonly property var answeredChordData: ExerciseController.answeredChord
     readonly property bool hasAnsweredChord: answeredChordData !== undefined && answeredChordData.name !== undefined
+
+    // LE CHRONO, en minutes:secondes. Une fonction plutot qu'une expression : elle sert une fois aujourd'hui et servira
+    // partout ou l'on voudra dire un temps.
+    function durationLabel(p_seconds) {
+        var minutes = Math.floor(p_seconds / 60);
+        var seconds = p_seconds % 60;
+        return minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+    }
+
+    // Calcule sur les resultats de la session, jamais sur le journal : c'est ce que la partie vient de montrer, et c'est ce
+    // qui rend le mot vrai au moment ou on le lit. La famille la plus faible n'est proposee que s'il y en a PLUSIEURS : sur
+    // une partie d'un seul genre, la meilleure ET la pire seraient la meme ligne, dite deux fois.
+    function strongestFamily() {
+        var results = ExerciseController.familyResults();
+        var best = null;
+        for (var index = 0; index < results.length; ++index) {
+            if (best === null || results[index].percent > best.percent)
+                best = results[index];
+
+        }
+        return best;
+    }
+
+    function weakestFamily() {
+        var results = ExerciseController.familyResults();
+        if (results.length < 2)
+            return null;
+
+        var worst = null;
+        for (var index = 0; index < results.length; ++index) {
+            if (worst === null || results[index].percent < worst.percent)
+                worst = results[index];
+
+        }
+        return worst;
+    }
 
     // Deliberately NOT an indication of the answer: a colour says "this button is a fifth", never "this
     // button is the one you are looking for".
@@ -1208,19 +1245,129 @@ Item {
             Text {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                text: qsTr("Session terminée")
+                text: ExerciseController.sessionGrantsExperience ? qsTr("Arcade terminée") : qsTr("Session terminée")
                 color: "#ffffff"
                 font.pixelSize: 24
                 font.bold: true
             }
 
+            // LE BILAN DE L'ARCADE : ce qu'aucun autre mode ne montre, parce qu'aucun autre mode ne le gagne.
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: ExerciseController.sessionGrantsExperience
+                spacing: 6
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Text {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        color: "#cbb8e8"
+                        font.pixelSize: 16
+                        text: qsTr("⏱ %1").arg(exerciseScreen.durationLabel(ExerciseController.sessionDurationSeconds))
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        color: "#cbb8e8"
+                        font.pixelSize: 16
+                        text: qsTr("🔥 série %1").arg(ExerciseController.sessionLongestStreak)
+                    }
+
+                }
+
+                // L'EXPERIENCE, et son merite : le multiplicateur ne s'affiche QUE s'il a majore, sinon la ligne dirait
+                // « x1 », ce qui n'est pas une recompense mais un constat.
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#ffd479"
+                    font.pixelSize: 22
+                    font.bold: true
+                    text: ExerciseController.arcadeMultiplierPercent > 100 ? qsTr("+%1 XP  ·  x%2").arg(ExerciseController.arcadeXpEarned).arg(ExerciseController.arcadeMultiplierPercent / 100) : qsTr("+%1 XP").arg(ExerciseController.arcadeXpEarned)
+                }
+
+                // LES TROIS FAMILLES : demandees, reussies, et le taux. C'est la ou le joueur voit ce que la partie a
+                // vraiment mesure.
+                Repeater {
+                    model: ExerciseController.sessionGrantsExperience ? ExerciseController.familyResults() : []
+
+                    delegate: RowLayout {
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#e8dcff"
+                            font.pixelSize: 14
+                            text: modelData.name
+                        }
+
+                        Text {
+                            color: "#8a77ad"
+                            font.pixelSize: 13
+                            text: qsTr("%1 / %2").arg(modelData.correct).arg(modelData.asked)
+                        }
+
+                        Text {
+                            Layout.preferredWidth: 46
+                            horizontalAlignment: Text.AlignRight
+                            color: modelData.percent < 50 ? "#ff8fb0" : "#8ef2b0"
+                            font.pixelSize: 14
+                            font.bold: true
+                            text: qsTr("%1 %").arg(modelData.percent)
+                        }
+
+                    }
+
+                }
+
+                // LE MOT, sous les chiffres : un point fort et un point a travailler, tires de la partie qu'on vient de
+                // jouer. Le second n'apparait que s'il y a PLUSIEURS familles - sinon la meilleure et la pire seraient la
+                // meme ligne, dite deux fois.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.topMargin: 2
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8ef2b0"
+                    font.pixelSize: 13
+                    visible: ExerciseController.isFinished && (exerciseScreen.strongestFamily() !== null)
+                    text: (exerciseScreen.strongestFamily() !== null) ? qsTr("Fort en %1.").arg(exerciseScreen.strongestFamily().name) : ""
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#ff8fb0"
+                    font.pixelSize: 13
+                    visible: ExerciseController.isFinished && (exerciseScreen.weakestFamily() !== null)
+                    text: (exerciseScreen.weakestFamily() !== null) ? qsTr("À travailler : %1.").arg(exerciseScreen.weakestFamily().name) : ""
+                }
+
+            }
+
+            // LES AUTRES MODES ne paient pas, et l'ecran le DIT plutot que d'afficher un gain qui n'a pas eu lieu.
             Text {
                 Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                Layout.minimumWidth: 0
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                color: "#cbb8e8"
-                font.pixelSize: 16
-                text: ExerciseController.starEarned ? qsTr("%1 XP · tout reconnu à l'oreille").arg(ExerciseController.experience) : qsTr("%1 XP · la prochaine fois sera meilleure").arg(ExerciseController.experience)
+                color: "#8a77ad"
+                font.pixelSize: 14
+                visible: !ExerciseController.sessionGrantsExperience
+                text: qsTr("Ici, pas d'expérience : l'Arcade seule en donne. Mais tout compte pour tes statistiques.")
             }
 
             // L'anecdote de sortie : on quitte sur quelque chose a apprendre, comme on est entre. Bornee en largeur
@@ -1246,7 +1393,7 @@ Item {
                 height: 54
                 highlighted: true
                 text: qsTr("▶ Rejouer")
-                onClicked: ExerciseController.startSession()
+                onClicked: ExerciseController.restartSession()
             }
 
             Button {

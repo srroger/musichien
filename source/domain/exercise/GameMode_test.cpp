@@ -208,4 +208,50 @@ TEST( GameModeTest, the_arcade_experience_is_the_score_multiplied )
     EXPECT_EQ( 160, arcadeExperience( 133, 2 ) );
 }
 
+// LE PLAFOND : l'Arcade et l'Entrainement ne grandissent pas au-dela de leur niveau, le jeu libre si.
+TEST( GameModeTest, the_arcade_and_the_training_cap_the_palette )
+{
+    const SessionSettings arcade = arcadeSettingsFor( PlayerLevel::Beginner, 1 );
+
+    EXPECT_EQ( arcade.startingPaletteSize, arcade.maximumPaletteSize );
+    EXPECT_EQ( arcade.startingChordQualityCount, arcade.maximumChordQualityCount );
+    EXPECT_EQ( arcade.startingModeCount, arcade.maximumModeCount );
+
+    const SessionSettings training = trainingSettingsFor( PlayerLevel::Fluent, QuestionFamily::Interval );
+
+    EXPECT_EQ( training.startingPaletteSize, training.maximumPaletteSize );
+    EXPECT_EQ( training.startingModeCount, training.maximumModeCount );
+
+    // Et le JEU LIBRE ne plafonne RIEN : ses reglages ne portent aucun maximum, donc la partie peut grandir.
+    const SessionSettings free = sessionSettingsFor( PlayerLevel::Beginner );
+
+    EXPECT_EQ( 0U, free.maximumPaletteSize );
+    EXPECT_EQ( 0U, free.maximumChordQualityCount );
+    EXPECT_EQ( 0U, free.maximumModeCount );
+}
+
+// LE COMPTAGE PAR FAMILLE : ce que l'ecran de fin d'Arcade lit pour dire ou le joueur est fort.
+TEST( GameModeTest, the_family_tally_counts_by_family )
+{
+    FamilyTally tally;
+
+    tally.registerQuestion( QuestionFamily::Interval, true );
+    tally.registerQuestion( QuestionFamily::Interval, true );
+    tally.registerQuestion( QuestionFamily::Interval, false );
+    tally.registerQuestion( QuestionFamily::Mode, true );
+
+    EXPECT_EQ( 3U, tally.askedIn( QuestionFamily::Interval ) );
+    EXPECT_EQ( 2U, tally.correctIn( QuestionFamily::Interval ) );
+    EXPECT_EQ( 66U, tally.successPercentIn( QuestionFamily::Interval ) );
+
+    EXPECT_EQ( 1U, tally.askedIn( QuestionFamily::Mode ) );
+    EXPECT_EQ( 100U, tally.successPercentIn( QuestionFamily::Mode ) );
+
+    // Une famille JAMAIS demandee n'a pas de taux : zero, et l'ecran sait qu'il doit l'exclure plutot qu'afficher « 0 % »,
+    // qui serait un mensonge sur un absent.
+    EXPECT_EQ( 0U, tally.askedIn( QuestionFamily::Chord ) );
+    EXPECT_EQ( 0U, tally.correctIn( QuestionFamily::Chord ) );
+    EXPECT_EQ( 0U, tally.successPercentIn( QuestionFamily::Chord ) );
+}
+
 }    // namespace musichien::domain

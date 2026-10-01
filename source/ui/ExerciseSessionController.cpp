@@ -924,6 +924,52 @@ bool ExerciseSessionController::starEarned() const noexcept
     return ( m_session != nullptr ) && m_session->hasEarnedStar();
 }
 
+int ExerciseSessionController::sessionLongestStreak() const noexcept
+{
+    return ( m_session != nullptr ) ? static_cast<int>( m_session->score().longestStreak() ) : 0;
+}
+
+QVariantList ExerciseSessionController::familyResults() const
+{
+    QVariantList results;
+
+    if( m_session == nullptr )
+    {
+        return results;
+    }
+
+    // L'ORDRE des familles est celui du jeu, et il ne bouge pas : intervalles, accords, modes. Un ecran de fin qui
+    // rearrangerait les lignes d'une partie a l'autre ne se lirait pas.
+    constexpr std::array<domain::QuestionFamily, domain::QUESTION_FAMILY_COUNT> FAMILIES{
+      domain::QuestionFamily::Interval, domain::QuestionFamily::Chord, domain::QuestionFamily::Mode };
+
+    constexpr std::array<std::string_view, domain::QUESTION_FAMILY_COUNT> FAMILY_NAMES{ "Intervalles", "Accords", "Modes" };
+
+    const domain::FamilyTally & tally = m_session->familyTally();
+
+    for( std::size_t index = 0; index < domain::QUESTION_FAMILY_COUNT; ++index )
+    {
+        const domain::QuestionFamily family = FAMILIES.at( index );
+
+        // Une famille a laquelle on n'a PAS joue est exclue : « 0 sur 0 » n'informe pas, et une Arcade qui n'a pas atteint
+        // les modes ne doit pas afficher une ligne vide a leur sujet.
+        if( tally.askedIn( family ) == 0 )
+        {
+            continue;
+        }
+
+        QVariantMap result;
+        result.insert( QStringLiteral( "name" ), QString::fromUtf8( FAMILY_NAMES.at( index ).data() ) );
+        result.insert( QStringLiteral( "asked" ), static_cast<int>( tally.askedIn( family ) ) );
+        result.insert( QStringLiteral( "correct" ), static_cast<int>( tally.correctIn( family ) ) );
+        result.insert( QStringLiteral( "percent" ), static_cast<int>( tally.successPercentIn( family ) ) );
+
+        results.append( result );
+    }
+
+    return results;
+}
+
 void ExerciseSessionController::leaveReviewMode() noexcept
 {
     // L'etat de bilan ne doit pas SURVIVRE a un bilan. Il vit dans deux membres, et les oublier est exactement ce qui a
@@ -965,11 +1011,41 @@ void ExerciseSessionController::startTrainingSession( int p_family )
 
     m_gameMode = domain::GameMode::Training;
 
+    // La famille est RETENUE : « Rejouer » doit rejouer le meme Entrainement, pas l'Arcade.
+    m_lastTrainingFamily = std::clamp( p_family, 0, 2 );
+
     // Un entrainement ne paie rien, mais il applique le PERIMETRE DU GODMODE quand celui-ci est choisi : c'est meme l'une
     // des raisons d'etre du GodMode - « pour ceux qui veulent juste tester le jeu et ne pas y etre regulier ».
-    const auto family = static_cast<domain::QuestionFamily>( std::clamp( p_family, 0, 2 ) );
+    const auto family = static_cast<domain::QuestionFamily>( m_lastTrainingFamily );
 
     beginSession( domain::trainingSettingsFor( m_playerLevel.value_or( domain::PlayerLevel::Beginner ), family ) );
+}
+
+void ExerciseSessionController::restartSession()
+{
+    // Le MEME mode, et rien d'autre : voir l'en-tete pour WHY ce n'est pas startSession.
+    switch( m_gameMode )
+    {
+        case domain::GameMode::Training:
+            startTrainingSession( m_lastTrainingFamily );
+            break;
+
+        case domain::GameMode::Infinite:
+            startInfiniteSession();
+            break;
+
+        case domain::GameMode::Survival:
+            startSurvivalSession();
+            break;
+
+        case domain::GameMode::Review:
+            startReviewSession();
+            break;
+
+        case domain::GameMode::Arcade:
+            startSession();
+            break;
+    }
 }
 
 void ExerciseSessionController::startInfiniteSession()
@@ -1007,6 +1083,10 @@ void ExerciseSessionController::startSurvivalSession()
 
 void ExerciseSessionController::beginSession( domain::SessionSettings p_settings )
 {
+    // LE CHRONO DE LA PARTIE commence ici, et une seule fois : c'est le seul endroit par lequel toutes les portes passent.
+    m_sessionClock.start();
+    m_sessionDurationSeconds = 0;
+
     // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
     m_notePlayer.playTapCue();
 
@@ -1964,6 +2044,13 @@ void ExerciseSessionController::persistSessionOutcome()
         m_lastArcadeMultiplierPercent =
           static_cast<int>( std::lround( domain::arcadeMultiplier( livesLost ) * 100.0 ) );
     }
+
+    // L'experience GAGNEE, telle que le profil vient de la recevoir : c'est le chiffre que l'ecran de fin affiche, et il
+    // vaut ZERO dans tout mode qui ne paie pas - l'ecran le dira, plutot que d'afficher un gain qui n'a pas eu lieu.
+    m_arcadeXpEarned = static_cast<int>( earnedExperience );
+
+    // ET LE CHRONO S'ARRETE ICI : la duree de la partie est celle qui vient de finir, pas celle qu'on lit.
+    m_sessionDurationSeconds = static_cast<int>( m_sessionClock.elapsed() / 1000 );
 
     // The session is over: its experience, its count and its star become part of the profile, once. Calling this
     // twice would count the same session twice, so it happens only from the transition into "finished".

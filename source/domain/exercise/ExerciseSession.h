@@ -447,6 +447,19 @@ struct SessionSettings
     // choisi serait exactement la « conduite accompagnee » que ce mode est fait pour casser.
     bool paletteIsFixed{ false };
 
+    // LE PLAFOND d'une session, quand elle en a un : la palette ne grandit plus au-dela de ces tailles. ZERO veut dire
+    // « aucun plafond », et c'est le comportement d'origine - les modes libres grandissent tant qu'il y a de la place.
+    //
+    // POURQUOI IL EXISTE : une partie d'ARCADE fait vingt-cinq questions, la ou une partie historique en faisait dix. Une
+    // reussite sur `successesBeforeWidening` elargit la palette, donc une Arcade ajoutait DEUX FOIS PLUS d'elements qu'une
+    // partie d'autrefois - et le joueur se retrouvait a entendre une difficulte qu'il n'avait pas choisie. Roger l'a
+    // ressenti en debutant : « j'ai testé le mode arcade en débutant. Et je galère ». Le plafond rend a la session la
+    // difficulte de son niveau, et c'est l'ARCADE et l'ENTRAINEMENT qui l'ont ; le jeu libre, lui, garde le droit d'aller
+    // loin.
+    std::size_t maximumPaletteSize{ 0 };
+    std::size_t maximumChordQualityCount{ 0 };
+    std::size_t maximumModeCount{ 0 };
+
     // Silence left between the two notes of a question, as heard.
     //
     // A musical value rather than a technical one: too short and the two notes sound like one glide,

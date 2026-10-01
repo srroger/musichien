@@ -37,6 +37,18 @@ void closeFamily( SessionSettings & p_settings, QuestionFamily p_family ) noexce
     }
 }
 
+// LE PLAFOND d'une session cadre e : la palette ne grandit plus au-dela de ce que le NIVEAU donne au depart.
+//
+// C'est ce qui rend a l'Arcade et a l'Entrainement la difficulte qu'on a choisie. Une partie de vingt-cinq questions
+// elargit deux fois plus qu'une partie de dix, et Roger l'a senti tout de suite en debutant - « j'ai testé le mode arcade
+// en débutant. Et je galère ». Le jeu libre, lui, n'appelle jamais cette fonction : il garde le droit d'aller loin.
+void capPaletteAtLevel( SessionSettings & p_settings ) noexcept
+{
+    p_settings.maximumPaletteSize = p_settings.startingPaletteSize;
+    p_settings.maximumChordQualityCount = p_settings.startingChordQualityCount;
+    p_settings.maximumModeCount = p_settings.startingModeCount;
+}
+
 }    // namespace
 
 double arcadeMultiplier( std::int32_t p_livesLost ) noexcept
@@ -110,6 +122,9 @@ SessionSettings arcadeSettingsFor( PlayerLevel p_level, std::uint32_t p_seed )
     settings.lives = ARCADE_STARTING_LIVES;
     settings.plannedQuestions = arcadePlan( p_seed );
 
+    // LE PLAFOND : une Arcade fait la difficulte de son niveau, pas plus. Voir capPaletteAtLevel.
+    capPaletteAtLevel( settings );
+
     return settings;
 }
 
@@ -130,6 +145,9 @@ SessionSettings trainingSettingsFor( PlayerLevel p_level, QuestionFamily p_famil
             closeFamily( settings, family );
         }
     }
+
+    // ET LE PLAFOND, comme l'Arcade : un Entrainement ne depasse pas la difficulte de son niveau.
+    capPaletteAtLevel( settings );
 
     return settings;
 }

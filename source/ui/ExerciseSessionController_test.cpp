@@ -2672,4 +2672,37 @@ TEST( ExerciseSessionControllerTest, the_developer_code_opens_everything_and_is_
     EXPECT_FALSE( controller.isLevelUnlocked( 4 ) );
 }
 
+// REJOUER garde le MEME mode : un Entrainement ne doit pas devenir une Arcade en silence - l'ecran de fin appelait l'Arcade
+// quoi qu'il arrive, ce qui gagnait de l'experience au moment ou l'on venait de comprendre que non.
+TEST( ExerciseSessionControllerTest, replaying_keeps_the_mode )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    constexpr int MODES_FAMILY = 2;
+
+    controller.startTrainingSession( MODES_FAMILY );
+
+    EXPECT_EQ( static_cast<int>( domain::GameMode::Training ), controller.gameMode() );
+    EXPECT_FALSE( controller.sessionGrantsExperience() );
+
+    controller.restartSession();
+
+    EXPECT_EQ( static_cast<int>( domain::GameMode::Training ), controller.gameMode() );
+    EXPECT_FALSE( controller.sessionGrantsExperience() );
+
+    // Et l'Arcade rejoue l'Arcade, elle qui paie.
+    controller.startSession();
+
+    EXPECT_EQ( static_cast<int>( domain::GameMode::Arcade ), controller.gameMode() );
+    EXPECT_TRUE( controller.sessionGrantsExperience() );
+
+    controller.restartSession();
+
+    EXPECT_EQ( static_cast<int>( domain::GameMode::Arcade ), controller.gameMode() );
+    EXPECT_TRUE( controller.sessionGrantsExperience() );
+}
+
 }    // namespace musichien::ui
