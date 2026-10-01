@@ -422,6 +422,23 @@ const domain::SampledInstrument * QAudioNotePlayer::instrumentAt( std::size_t p_
 
 std::size_t QAudioNotePlayer::timbreIndexFor( std::span<const domain::Note> p_notes )
 {
+    // Le joueur a pu DEMANDER de garder le timbre pour la lecture qui suit : c'est ce que fait une comparaison de deux
+    // modes, dont les deux passages n'ont pas les memes notes - et un vamp deplace meme le bourdon. La demande vaut pour
+    // UNE lecture, et elle est consommee ici, comme un jeton.
+    //
+    // CE BLOC A MANQUE, et c'est le bug du clair-obscur. holdTimbre() posait son drapeau pour le BOURDON seul, et
+    // timbreIndexFor ne le lisait pas : l'adaptateur re-tirait donc un timbre, et les deux modes d'une meme question
+    // sonnaient sur deux instruments differents - exactement ce que la comparaison ne doit pas faire entendre.
+    if( m_holdTimbre )
+    {
+        m_holdTimbre = false;
+
+        if( isTimbreEnabled( m_instrumentIndex ) )
+        {
+            return m_instrumentIndex;
+        }
+    }
+
     // The same question is the same NOTES, whatever order the melody played them in: a falling fifth and its
     // feedback chord share the same two notes. Comparing them as an ORDERED sequence would re-draw the instrument
     // between the melody and the chord - the guitar turning into a saxophone in front of the player.
@@ -736,11 +753,12 @@ void QAudioNotePlayer::playPhraseOverDrone( std::span<const domain::Note> p_melo
 
 void QAudioNotePlayer::holdTimbre()
 {
+    // Le timbre de la lecture QUI SUIT sera celui-ci, et la demande est consommee par elle.
+    //
+    // Le drapeau de SESSION n'est PLUS touche, et c'est le fond du bug du clair-obscur : il l'etait, donc le second mode
+    // d'une comparaison rendait la session au tirage - et les deux modes sonnaient sur deux instruments, precisement la
+    // ou le meme timbre est ce qui rend la comparaison possible.
     m_holdTimbre = true;
-
-    // Une comparaison de deux modes tient son timbre pour la duree de la question : c'est un cas d'UN SEUL instant, et il
-    // ne doit pas survivre a la session.
-    m_timbreIsHeldForSession = false;
 }
 
 void QAudioNotePlayer::beginTimbreForSession()

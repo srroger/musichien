@@ -1812,6 +1812,10 @@ void ExerciseSessionController::stopPlayback()
     // battre derriere le banc d'essai.
     stopRhythmLoop();
 
+    // Et le second temps d'une question d'harmonie, pour la meme raison : un minuteur arme qui survit a l'ecran ferait
+    // sonner un mode tout seul, longtemps apres que le joueur est parti.
+    m_modeTimer.stop();
+
     m_notePlayer.stopAll();
 }
 
@@ -2808,6 +2812,15 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
     {
         return;
     }
+
+    // TOUTE nouvelle lecture ANNULE le second temps programme.
+    //
+    // Roger : « la reponse rejoue n'importe quoi, soit deux fois la derniere soit une fois la derniere avec de longues
+    // pauses ». Le minuteur n'etait jamais arrete : une mauvaise reponse rejoue la question - donc le PREMIER mode, et
+    // reprogramme le second - pendant que le minuteur de la question precedente attendait encore son heure, et faisait
+    // sonner « la derniere » par-dessus. Arreter ici, en tete, couvre tous les chemins : la reponse, l'ecoute a nouveau,
+    // et la question suivante.
+    m_modeTimer.stop();
 
     const domain::Question & question = m_session->currentQuestion();
 

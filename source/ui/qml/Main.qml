@@ -82,6 +82,7 @@ ApplicationWindow {
     // Tous les boutons de l'accueil portent le mot de la meme facon : en capitales, dans la police ronde, et avec un
     // peu plus de poids qu'un texte courant. C'est une decision d'ECRAN, pas une propriete de chaque bouton - et c'est
     // ici qu'elle se change.
+    // LA MESURE D'UN LIBELLE, pour les listes deroulantes.
 
     id: mainWindow
 
@@ -211,6 +212,15 @@ ApplicationWindow {
     // Leaving the screen must never leave an audio stream open: on a phone that is a battery drain,
     // and a bug. The view model was given a method for exactly this call.
     onClosing: IntervalController.stopPlayback()
+
+    // Elle vit ICI, a la racine, et non dans le composant DarkComboBox : un composant inline n'accepte pas d'objet
+    // enfant - seule une definition d'objet en accepte - et le declarer la empechait l'ecran entier de s'instancier.
+    // Le texte est pose juste avant chaque mesure, et la largeur lue aussitot.
+    TextMetrics {
+        id: comboTextMetrics
+
+        font: mainWindow.font
+    }
 
     // Roger : « apres une partie, si il atteint un certain niveau d'experience, on pourra lui dire : bravo, tu passes au
     // niveau “Jusqu'a l'octave”, regarde derriere toi tu as fait enormement de progres ». C'est exactement ce qu'elle dit -
@@ -716,6 +726,9 @@ ApplicationWindow {
                             model: ExerciseController.playerLevels
                             textRole: "name"
                             valueRole: "index"
+                            // La liste deroulée montre TOUT ce qu'elle propose : voir DarkComboBox.listWidth. C'est ici
+                            // que Roger l'a demande - « le mode "je débute" ne s'affiche pas si on n'est pas débutant ».
+                            popup.width: listWidth
                             // Le niveau choisi reste marque dans la liste : l'ecran ne laisse jamais de doute sur la
                             // difficulte de la prochaine partie.
                             currentIndex: ExerciseController.playerLevel
@@ -2787,6 +2800,7 @@ ApplicationWindow {
                             model: ExerciseController.temperaments
                             currentIndex: ExerciseController.temperament
                             onActivated: ExerciseController.setTemperament(index)
+                            popup.width: listWidth
                         }
 
                         // L'EXPLICATION du temperament choisi : d'ou il vient, et comment il fonctionne. Elle vient du
@@ -2849,6 +2863,7 @@ ApplicationWindow {
                             model: ExerciseController.tuningRoots
                             currentIndex: ExerciseController.tuningRoot
                             onActivated: ExerciseController.setTuningRoot(index)
+                            popup.width: listWidth
                         }
 
                         Text {
@@ -3198,6 +3213,7 @@ ApplicationWindow {
                         model: RhythmController.patterns
                         currentIndex: RhythmController.currentPattern
                         onActivated: RhythmController.setCurrentPattern(index)
+                        popup.width: listWidth
                     }
 
                     Text {
@@ -3606,6 +3622,8 @@ ApplicationWindow {
                 model: MicrophoneController.inputDeviceNames
                 currentIndex: MicrophoneController.currentDeviceIndex
                 onActivated: MicrophoneController.selectDevice(index)
+                // Les noms de peripheriques sont longs par nature : c'est ici que la liste doit s'elargir le plus.
+                popup.width: listWidth
             }
 
             // La portee miniature : la boule suit la hauteur chantee. Le composant StaffBall porte le style.
@@ -3822,6 +3840,11 @@ ApplicationWindow {
         // Un ComboBox ne doit JAMAIS prendre la largeur de son texte, et ces trois lignes sont la pour ca.
         // LA DIFFICULTE CHOISIE, quand le modele est une liste de FICHES : c'est ce qui permet de traiter le GodMode a part
         // - une autre couleur, une autre graisse, une icone - sans que ce composant ait a connaitre le GodMode lui-meme.
+        // LA LISTE DEPLIEE NE SE CONTRAINT PAS A LA LARGEUR DU CONTROLE.
+        // Roger : « la combobox n'est pas assez large pour tout afficher une fois dépliée, du coup le mode "je débute" ne
+        // s'affiche pas si on n'est pas débutant - bête de devoir scroller pour une option ». Le CONTROLE, lui, peut etre
+        // etroit : il vit dans une colonne, et c'est sa place. La liste, non : elle doit montrer tout ce qu'elle propose,
+        // et un choix qu'on ne voit pas est un choix qu'on ne sait pas avoir.
 
         id: combo
 
@@ -3829,6 +3852,20 @@ ApplicationWindow {
         // simplement a faux, et rien ne change pour elle.
         readonly property var currentEntry: (combo.model !== null) && (combo.currentIndex >= 0) ? combo.model[combo.currentIndex] : null
         readonly property bool currentEntryIsSpecial: currentEntry !== null && currentEntry.isGodMode === true
+        // La largeur se MESURE, et ne s'invente pas : le plus long libelle du modele, plus la place de l'indicateur de
+        // choix. Un nombre ecrit a la main aurait ete faux au premier libelle qui s'allonge.
+        readonly property real listWidth: {
+            let widest = combo.width;
+            const entries = combo.model;
+            if ((entries === null) || (entries === undefined) || (entries.length === undefined))
+                return widest;
+
+            for (let index = 0; index < entries.length; ++index) {
+                comboTextMetrics.text = combo.itemLabel(entries[index]);
+                widest = Math.max(widest, comboTextMetrics.advanceWidth + 56);
+            }
+            return widest;
+        }
 
         // LE TEXTE D'UNE LIGNE, et c'est la fonction qui compte : selon que le modele est une liste de mots (les
         // appareils audio, les temperaments) ou une liste de FICHES (les niveaux de jeu, qui portent un nom, un
