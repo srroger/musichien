@@ -99,6 +99,14 @@ SessionSettings sessionSettingsFor( PlayerLevel p_level )
             // Et TOUTES les couleurs d'accord, comme les intervalles : le mode qui mesure ne cache rien. Le joueur
             // entend un accord et il le nomme sur un clavier complet, sans qu'aucune couleur ne soit arrivee apres lui.
             settings.startingChordQualityCount = CHORD_QUALITY_COUNT;
+
+            // Les SEPT modes aussi, et cette ligne manquait.
+            //
+            // Le commentaire de ce niveau dit « toute la carte des le premier coup » et « le mode qui mesure ne cache
+            // rien » : les intervalles et les accords suivaient, les modes non - un joueur qui maitrise commencait donc
+            // avec deux modes, et attendait trois reussites pour entendre le troisieme. C'est un test du GodMode qui l'a
+            // montre, en comparant le modele du niveau a ce que le niveau donne vraiment.
+            settings.startingModeCount = MODE_COUNT;
             break;
     }
 

@@ -80,6 +80,9 @@ musichienFunction_AddLibrary(domain
     exercise/ExerciseSession.h
     exercise/ExerciseSession.cpp
 
+    # LE PERIMETRE CHOISI par le joueur : le GodMode. Il ne remplace pas les niveaux, il les prend comme modeles.
+    exercise/GodModePalette.h
+    exercise/GodModePalette.cpp
     # Le journal des questions conclues, et ce qu'il permet de dire : la fondation des statistiques
     exercise/QuestionRecord.h
     exercise/QuestionRecord.cpp
@@ -142,6 +145,7 @@ if(MUSICHIEN_BUILD_TESTING)
         exercise/AnswerGrid_test.cpp
         exercise/AnecdoteBook_test.cpp
         exercise/ExerciseSession_test.cpp
+        exercise/GodModePalette_test.cpp
         exercise/HintBook_test.cpp
         exercise/LearningOrder_test.cpp
         exercise/PlayerLevel_test.cpp

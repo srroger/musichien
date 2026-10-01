@@ -72,6 +72,9 @@ ApplicationWindow {
     // Roger a demande que la couleur range les boutons par famille plutot que de les decorer : on JOUE en rouge, les
     // variantes du jeu dans un rouge eteint, les deux OUTILS dans une couleur a eux, et tout le reste en gris. Une
     // famille, une couleur, un endroit ou la changer.
+    // LA CONFIRMATION DE LA REMISE A ZERO DU PROFIL.
+    // LE GODMODE, EN ENTIER.
+    // UNE FAMILLE DE CASES A COCHER : un titre, « tout » et « rien », puis les cases.
     // =================================================================================================================
     // UN BOUTON QUI PARLE LA LANGUE DE LA PAGE
     // =================================================================================================================
@@ -208,6 +211,250 @@ ApplicationWindow {
     // and a bug. The view model was given a method for exactly this call.
     onClosing: IntervalController.stopPlayback()
 
+    // Roger l'a demandee le jour ou l'on a parle du GodMode, et pour la bonne raison : c'est le SEUL chemin de retour en
+    // arriere - effacer le score, c'est repartir - donc le seul geste que personne ne veut faire par accident.
+    Dialog {
+        id: resetProfileDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 420)
+        modal: true
+        padding: 16
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 12
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                wrapMode: Text.WordWrap
+                color: "#ffffff"
+                font.pixelSize: 18
+                font.bold: true
+                text: qsTr("Tout remettre à zéro ?")
+            }
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                wrapMode: Text.WordWrap
+                color: "#cbb8e8"
+                font.pixelSize: 14
+                text: qsTr("L'expérience, les sessions, les étoiles et tout l'historique seront effacés. Ton nom et ton niveau restent. On ne pourra pas revenir en arrière.")
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                spacing: 10
+
+                MenuButton {
+                    Layout.fillWidth: true
+                    text: qsTr("Annuler")
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        resetProfileDialog.close();
+                    }
+                }
+
+                TintedMenuButton {
+                    Layout.fillWidth: true
+                    tintColour: mainWindow.questColour
+                    labelColour: mainWindow.questLabelColour
+                    text: qsTr("Tout effacer")
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        ExerciseController.resetProfile();
+                        resetProfileDialog.close();
+                    }
+                }
+
+            }
+
+        }
+
+    }
+
+    // Roger : « ca ouvrirait une grosse page avec plein de checkbox ». La promesse de cette page est que ses clics ne
+    // changent RIEN tant qu'on n'a pas appuye sur Sauvegarder : c'est ce qui donne son sens au mot sauvegarde, et c'est ce
+    // que dit le libelle « non sauvegarde ».
+    Dialog {
+        id: godModeDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.96, 560)
+        height: mainWindow.height * 0.94
+        modal: true
+        padding: 12
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        contentItem: ScrollView {
+            id: godModeScroll
+
+            clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            // Meme correction que partout ailleurs : rien ne depasse en largeur, donc rien ne doit glisser de cote.
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            contentWidth: availableWidth
+
+            ColumnLayout {
+                width: godModeScroll.availableWidth
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    wrapMode: Text.WordWrap
+                    color: "#ffffff"
+                    font.pixelSize: 22
+                    font.bold: true
+                    text: ExerciseController.godModeHasUnsavedChanges ? qsTr("GodMode · non sauvegardé") : qsTr("GodMode")
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    wrapMode: Text.WordWrap
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    text: qsTr("Choisis toi-même ce que tu travailles. Les cinq niveaux restent là : ils pré-remplissent ces cases, et c'est tout.")
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    color: "#8a77ad"
+                    font.pixelSize: 14
+                    text: qsTr("Partir d'un niveau")
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Repeater {
+                        model: ExerciseController.playerLevels
+
+                        delegate: MenuButton {
+                            required property var modelData
+
+                            // Les cinq niveaux seulement : le GodMode n'est pas un modele de lui-meme.
+                            visible: !modelData.isGodMode
+                            text: modelData.name
+                            onClicked: {
+                                ExerciseController.playTapCue();
+                                ExerciseController.prefillGodModeFromLevel(modelData.index);
+                            }
+                        }
+
+                    }
+
+                }
+
+                // CE QUI EMPECHE DE JOUER, dit en une phrase et au bon endroit : « coche au moins deux intervalles » se
+                // corrige, « configuration invalide » ne se corrige pas.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.topMargin: 6
+                    wrapMode: Text.WordWrap
+                    visible: text !== ""
+                    color: "#ff8fb0"
+                    font.pixelSize: 14
+                    text: ExerciseController.godModeProblem
+                }
+
+                GodModeFamilySection {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Intervalles")
+                    entries: ExerciseController.godModeIntervals
+                    indexKey: "semitones"
+                    onToggled: (index) => {
+                        return ExerciseController.toggleGodModeInterval(index);
+                    }
+                    onAllChecked: (checked) => {
+                        return ExerciseController.setEveryGodModeIntervalChecked(checked);
+                    }
+                }
+
+                GodModeFamilySection {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Accords")
+                    entries: ExerciseController.godModeChords
+                    indexKey: "index"
+                    onToggled: (index) => {
+                        return ExerciseController.toggleGodModeChord(index);
+                    }
+                    onAllChecked: (checked) => {
+                        return ExerciseController.setEveryGodModeChordChecked(checked);
+                    }
+                }
+
+                GodModeFamilySection {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Modes")
+                    entries: ExerciseController.godModeModes
+                    indexKey: "index"
+                    onToggled: (index) => {
+                        return ExerciseController.toggleGodModeMode(index);
+                    }
+                    onAllChecked: (checked) => {
+                        return ExerciseController.setEveryGodModeModeChecked(checked);
+                    }
+                }
+
+                Item {
+                    Layout.preferredHeight: 16
+                }
+
+            }
+
+        }
+
+        footer: RowLayout {
+            spacing: 8
+
+            TintedMenuButton {
+                Layout.fillWidth: true
+                tintColour: mainWindow.questColour
+                labelColour: mainWindow.questLabelColour
+                text: qsTr("Sauvegarder")
+                enabled: ExerciseController.godModeCanStart
+                onClicked: {
+                    ExerciseController.playTapCue();
+                    ExerciseController.saveGodMode();
+                }
+            }
+
+            MenuButton {
+                Layout.fillWidth: true
+                text: qsTr("Fermer")
+                onClicked: {
+                    ExerciseController.playTapCue();
+                    godModeDialog.close();
+                }
+            }
+
+        }
+
+    }
+
     // La demande d'autorisation part un peu APRES le premier affichage : le joueur voit d'abord la page, et la boite
     // d'Android arrive ensuite, sur quelque chose qui existe. Posee pendant la construction de l'ecran, elle
     // apparaitrait sur une fenetre encore vide, ce qui ressemble a un plantage plutot qu'a une question.
@@ -272,6 +519,7 @@ ApplicationWindow {
                 // aujourd'hui - sur deux lignes, chacune de la largeur d'un bouton. Roger l'a demande tel quel :
                 // « il faudrait faire la combobox pour les niveaux, ca allegerait pas mal ».
                 // Les DEUX GRANDS OUTILS, en icones.
+                // LE GODMODE N'EST PAS UN NIVEAU, ET SES CLICS NE SONT PAS ENCORE ACTIFS.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -384,6 +632,19 @@ ApplicationWindow {
                         }
                     }
 
+                }
+
+                // Roger a demande ce mot exactement - « ca repasse en mode Custom (not saved) » - et sans lui, le joueur
+                // croirait que ses clics ont deja change la partie : ils ne la changent qu'apres Sauvegarder.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: ExerciseController.godModeIsChosen && ExerciseController.godModeHasUnsavedChanges
+                    color: "#ffd479"
+                    font.pixelSize: 12
+                    text: qsTr("GodMode non sauvegardé : tu joues encore l'ancienne configuration.")
                 }
 
                 Item {
@@ -1660,6 +1921,11 @@ ApplicationWindow {
                 // LES STATISTIQUES
                 // Ce que le joueur travaille vraiment, ce qu'il delaisse sans le savoir, et combien de temps il joue.
                 // LE CAMEMBERT : la part de chaque genre de question, pour voir d'un coup d'oeil ce qui est travaille.
+                // LA PORTE DU GODMODE, ici et pas dans les reglages : c'est une facon de JOUER, et non un reglage de
+                // confort - et Roger l'a voulue dans le profil.
+                // Remet l'experience, les sessions, les etoiles ET les statistiques a zero : un score efface qui garderait
+                // son journal continuerait de raconter une histoire que le joueur vient d'effacer. Le nom et le niveau
+                // restent : ce sont des choix, pas un score.
 
                 width: profileScroll.availableWidth
                 spacing: 10
@@ -2027,16 +2293,25 @@ ApplicationWindow {
                     onClicked: ExerciseController.testReminder()
                 }
 
-                // Remet l'experience, les sessions, les etoiles ET les statistiques a zero : un score efface qui garderait
-                // son journal continuerait de raconter une histoire que le joueur vient d'effacer. Le nom et le niveau
-                // restent : ce sont des choix, pas un score. Aucune confirmation pour l'instant - l'application est en
-                // developpement.
+                // Le libelle dit l'etat, et c'est la seule chose qui distingue « j'ai sauvegarde » de « j'ai touche a
+                // quelque chose » : le nom du mode, et rien de plus.
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    text: ExerciseController.godModeHasUnsavedChanges ? qsTr("GodMode · non sauvegardé") : qsTr("GodMode")
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        godModeDialog.open();
+                    }
+                }
+
+                // Et il DEMANDE CONFIRMATION, maintenant : Roger l'a demande le jour ou ce bouton est devenu le seul chemin
+                // de retour en arriere du GodMode.
                 Button {
                     Layout.alignment: Qt.AlignRight
                     text: qsTr("Remise à zéro complète")
                     onClicked: {
                         ExerciseController.playTapCue();
-                        ExerciseController.resetProfile();
+                        resetProfileDialog.open();
                     }
                 }
 
@@ -2929,6 +3204,68 @@ ApplicationWindow {
                 color: "#cbb8e8"
                 font.pixelSize: 12
                 text: qsTr("touche l'écran pour continuer")
+            }
+
+        }
+
+    }
+
+    // Trois familles, et un seul composant : trois copies auraient fini par diverger, et la quatrieme famille - le jour ou
+    // une question de plus existera - se branchera en trois lignes.
+    component GodModeFamilySection: ColumnLayout {
+        id: godModeSection
+
+        property string title: ""
+        property var entries: []
+        // Le nom de la cle qui identifie un element : des DEMI-TONS pour un intervalle, un index pour un accord ou un mode.
+        property string indexKey: "semitones"
+
+        signal toggled(int index)
+        signal allChecked(bool checked)
+
+        spacing: 2
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Text {
+                Layout.fillWidth: true
+                color: "#ffffff"
+                font.pixelSize: 17
+                font.bold: true
+                text: godModeSection.title
+            }
+
+            MenuButton {
+                text: qsTr("Tout")
+                onClicked: godModeSection.allChecked(true)
+            }
+
+            MenuButton {
+                text: qsTr("Rien")
+                onClicked: godModeSection.allChecked(false)
+            }
+
+        }
+
+        // Les cases, en vrac dans la largeur : c'est une grosse liste, et Roger l'a acceptee telle quelle - « pour l'instant
+        // l'interface peut etre moche, juste une grosse liste ».
+        Flow {
+            Layout.fillWidth: true
+            spacing: 2
+
+            Repeater {
+                model: godModeSection.entries
+
+                delegate: CheckBox {
+                    required property var modelData
+
+                    text: modelData.name
+                    checked: modelData.checked
+                    onClicked: godModeSection.toggled(modelData[godModeSection.indexKey])
+                }
+
             }
 
         }

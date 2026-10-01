@@ -70,6 +70,16 @@ constexpr const char * MODE_VAMP_QUESTION_SHARE_KEY = "player/mode-vamp-question
 constexpr const char * REMINDER_HOUR_KEY = "player/reminder-hour";
 constexpr const char * REMINDER_MINUTE_KEY = "player/reminder-minute";
 
+// LE GODMODE : trois listes de NOMBRES, et non de drapeaux.
+//
+// Elles disent CE QUE le joueur a choisi, dans les identites du domaine : les DEMI-TONS d'un intervalle, l'index d'une
+// qualite d'accord, l'index d'un mode. Aucune ne depend de l'ordre d'une liste qui pourrait changer un jour, et un
+// fichier de reglages reste lisible - « 0, 7, 12 » se comprend a l'oeil.
+constexpr const char * GOD_MODE_INTERVALS_KEY = "player/god-mode-intervals";
+constexpr const char * GOD_MODE_CHORDS_KEY = "player/god-mode-chords";
+constexpr const char * GOD_MODE_MODES_KEY = "player/god-mode-modes";
+constexpr const char * GOD_MODE_CHOSEN_KEY = "player/god-mode-chosen";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -92,6 +102,79 @@ void QSettingsPlayerPreferences::storeLevel( domain::PlayerLevel p_level )
     QSettings settings;
 
     settings.setValue( LEVEL_KEY, static_cast<int>( p_level ) );
+}
+
+bool QSettingsPlayerPreferences::storedGodModeIsChosen() const
+{
+    const QSettings settings;
+
+    return settings.value( GOD_MODE_CHOSEN_KEY, false ).toBool();
+}
+
+void QSettingsPlayerPreferences::storeGodModeIsChosen( bool p_isChosen )
+{
+    QSettings settings;
+
+    settings.setValue( GOD_MODE_CHOSEN_KEY, p_isChosen );
+}
+
+std::optional<domain::GodModePalette> QSettingsPlayerPreferences::storedGodModePalette() const
+{
+    const QSettings settings;
+
+    if( !settings.contains( GOD_MODE_INTERVALS_KEY ) )
+    {
+        // Rien stocke n'est PAS une palette vide : c'est une palette qui n'a jamais ete sauvegardee, et la page du
+        // GodMode a besoin de la difference pour savoir si elle a quelque chose a montrer ou une page a remplir.
+        return std::nullopt;
+    }
+
+    domain::GodModePalette palette;
+
+    for( const QVariant & semitones : settings.value( GOD_MODE_INTERVALS_KEY ).toList() )
+    {
+        palette.intervals.push_back( domain::Interval{ semitones.toInt() } );
+    }
+
+    for( const QVariant & quality : settings.value( GOD_MODE_CHORDS_KEY ).toList() )
+    {
+        palette.chords.push_back( static_cast<domain::ChordQuality>( quality.toInt() ) );
+    }
+
+    for( const QVariant & mode : settings.value( GOD_MODE_MODES_KEY ).toList() )
+    {
+        palette.modes.push_back( static_cast<domain::Mode>( mode.toInt() ) );
+    }
+
+    return palette;
+}
+
+void QSettingsPlayerPreferences::storeGodModePalette( const domain::GodModePalette & p_palette )
+{
+    QVariantList intervals;
+    QVariantList chords;
+    QVariantList modes;
+
+    for( const domain::Interval & interval : p_palette.intervals )
+    {
+        intervals.append( interval.semitones() );
+    }
+
+    for( const domain::ChordQuality quality : p_palette.chords )
+    {
+        chords.append( static_cast<int>( quality ) );
+    }
+
+    for( const domain::Mode mode : p_palette.modes )
+    {
+        modes.append( static_cast<int>( mode ) );
+    }
+
+    QSettings settings;
+
+    settings.setValue( GOD_MODE_INTERVALS_KEY, intervals );
+    settings.setValue( GOD_MODE_CHORDS_KEY, chords );
+    settings.setValue( GOD_MODE_MODES_KEY, modes );
 }
 
 std::vector<bool> QSettingsPlayerPreferences::storedEnabledInstruments() const

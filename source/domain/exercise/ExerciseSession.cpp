@@ -76,12 +76,52 @@ bool isKindOpen( const SessionSettings & p_settings, QuestionKind p_kind ) noexc
     return false;
 }
 
+namespace
+{
+
+// La palette d'intervalles avec laquelle une seance DEMARRE : celle que le joueur a choisie quand il en a choisi une -
+// c'est le GodMode - et sinon le prefixe de l'ordre d'apprentissage, exactement comme avant.
+//
+// Les trois fonctions qui suivent sont lues par la liste d'initialisation du constructeur, donc elles ne peuvent pas
+// dependre de membres deja construits : elles prennent les reglages, et rien d'autre.
+[[nodiscard]] std::vector<Interval> initialIntervalPalette( const SessionSettings & p_settings )
+{
+    if( !p_settings.intervalPalette.empty() )
+    {
+        return p_settings.intervalPalette;
+    }
+
+    return beginnerPalette( p_settings.startingPaletteSize );
+}
+
+[[nodiscard]] std::vector<ChordQuality> initialChordPalette( const SessionSettings & p_settings )
+{
+    if( !p_settings.chordPalette.empty() )
+    {
+        return p_settings.chordPalette;
+    }
+
+    return beginnerChordPalette( p_settings.startingChordQualityCount );
+}
+
+[[nodiscard]] std::vector<Mode> initialModePalette( const SessionSettings & p_settings )
+{
+    if( !p_settings.modePalette.empty() )
+    {
+        return p_settings.modePalette;
+    }
+
+    return beginnerModePalette( p_settings.startingModeCount );
+}
+
+}    // namespace
+
 ExerciseSession::ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings, const PhraseBook * p_phraseBook )
   : m_randomEngine{ p_seed }
   , m_settings{ p_settings }
-  , m_palette{ beginnerPalette( m_settings.startingPaletteSize ) }
-  , m_chordPalette{ beginnerChordPalette( m_settings.startingChordQualityCount ) }
-  , m_modePalette{ beginnerModePalette( m_settings.startingModeCount ) }
+  , m_palette{ initialIntervalPalette( m_settings ) }
+  , m_chordPalette{ initialChordPalette( m_settings ) }
+  , m_modePalette{ initialModePalette( m_settings ) }
   , m_phraseBook{ p_phraseBook }
   , m_score{ m_settings.lives }
   , m_currentQuestion{ buildQuestion() }
@@ -773,6 +813,12 @@ void ExerciseSession::buildVampQuestion( Question & p_question )
 
 void ExerciseSession::widenModePalette()
 {
+    // Un perimetre choisi ne grandit pas : voir widenPalette.
+    if( m_settings.paletteIsFixed )
+    {
+        return;
+    }
+
     if( m_modePalette.size() >= modeLearningOrder().size() )
     {
         // Tous les modes du jeu sont deja en place : il n'y a plus rien a elargir.
@@ -1088,6 +1134,13 @@ bool ExerciseSession::hasEarnedStar() const noexcept
 
 void ExerciseSession::widenPalette()
 {
+    // Un perimetre CHOISI ne s'elargit pas : c'est le GodMode, et c'est toute sa promesse - le joueur a decide ce qu'il
+    // travaille, le jeu n'y ajoute rien.
+    if( m_settings.paletteIsFixed )
+    {
+        return;
+    }
+
     if( m_palette.size() >= learningOrderIntervals().size() )
     {
         // Everything the application knows is already in play.
@@ -1102,6 +1155,13 @@ void ExerciseSession::widenPalette()
 
 void ExerciseSession::narrowPalette()
 {
+    if( m_settings.paletteIsFixed )
+    {
+        // Ni elargissement, ni retrecissement : voir widenPalette. Une erreur ne doit pas retirer au joueur un
+        // intervalle qu'il a explicitement demande a travailler.
+        return;
+    }
+
     if( m_palette.size() <= m_settings.startingPaletteSize )
     {
         // Never below where the player started: someone already at the beginning would be left with
@@ -1114,6 +1174,12 @@ void ExerciseSession::narrowPalette()
 
 void ExerciseSession::widenChordPalette()
 {
+    // Un perimetre choisi ne grandit pas : voir widenPalette.
+    if( m_settings.paletteIsFixed )
+    {
+        return;
+    }
+
     if( m_chordPalette.size() >= chordLearningOrder().size() )
     {
         // Toutes les couleurs du jeu sont deja en place : il n'y a plus rien a elargir.

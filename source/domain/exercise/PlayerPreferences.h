@@ -14,6 +14,7 @@
 // reasonable people want different things.
 // =====================================================================================================================
 
+#include "domain/exercise/GodModePalette.h"
 #include "domain/exercise/PlayerLevel.h"
 #include "domain/exercise/ReminderSchedule.h"
 #include "domain/music/Temperament.h"
@@ -42,6 +43,28 @@ public:
     [[nodiscard]] virtual std::optional<PlayerLevel> storedLevel() const = 0;
 
     virtual void storeLevel( PlayerLevel p_level ) = 0;
+
+    // -------------------------------------------------------------------------------------------------------------
+    // LE GODMODE
+    // -------------------------------------------------------------------------------------------------------------
+    // La difficulte choisie est-elle le GodMode ?
+    //
+    // Un DRAPEAU, et non une sixieme valeur de PlayerLevel, parce que les deux ne disent pas la meme chose : un niveau
+    // dit ce que le joueur SAIT, le GodMode dit qu'il a decide de choisir lui-meme. Les melanger dans une enumeration
+    // ferait croire que « Je debute » et « GodMode » sont deux points de la meme echelle, alors que l'un est une marche
+    // et l'autre une porte de sortie.
+    [[nodiscard]] virtual bool storedGodModeIsChosen() const = 0;
+
+    virtual void storeGodModeIsChosen( bool p_isChosen ) = 0;
+
+    // Et la palette qu'il a sauvegardee.
+    //
+    // RIEN veut dire « il n'en a jamais sauvegarde une », et ce n'est pas la meme chose qu'une palette vide : une palette
+    // vide est un choix que le joueur a fait - tout decocher - et il doit s'entendre dire pourquoi la partie ne peut pas
+    // commencer. Sans cette distinction, un GodMode jamais ouvert passerait pour un GodMode tout decoche.
+    [[nodiscard]] virtual std::optional<GodModePalette> storedGodModePalette() const = 0;
+
+    virtual void storeGodModePalette( const GodModePalette & p_palette ) = 0;
 
     // Which instruments the player WANTS to hear, one flag per instrument, in the order the application loads
     // them.
@@ -205,6 +228,14 @@ public:
 
     void storeLevel( PlayerLevel p_level ) override { m_level = p_level; }
 
+    [[nodiscard]] bool storedGodModeIsChosen() const override { return m_godModeIsChosen; }
+
+    void storeGodModeIsChosen( bool p_isChosen ) override { m_godModeIsChosen = p_isChosen; }
+
+    [[nodiscard]] std::optional<GodModePalette> storedGodModePalette() const override { return m_godModePalette; }
+
+    void storeGodModePalette( const GodModePalette & p_palette ) override { m_godModePalette = p_palette; }
+
     [[nodiscard]] std::vector<bool> storedEnabledInstruments() const override
     {
         return m_enabledInstruments;
@@ -292,6 +323,10 @@ public:
 private:
     std::optional<PlayerLevel> m_level;
 
+    // Le GodMode : s'il a ete choisi, et la palette qu'il a laissee. Un optional, comme le niveau, et pour la meme
+    // raison - « rien » et « vide » ne veulent pas dire la meme chose.
+    bool m_godModeIsChosen{ false };
+    std::optional<GodModePalette> m_godModePalette;
     std::vector<bool> m_enabledInstruments;
 
     std::string m_playerName;

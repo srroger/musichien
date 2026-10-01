@@ -30,6 +30,14 @@ public:
 
     void storeLevel( domain::PlayerLevel p_level ) override;
 
+    [[nodiscard]] bool storedGodModeIsChosen() const override;
+
+    void storeGodModeIsChosen( bool p_isChosen ) override;
+
+    [[nodiscard]] std::optional<domain::GodModePalette> storedGodModePalette() const override;
+
+    void storeGodModePalette( const domain::GodModePalette & p_palette ) override;
+
     [[nodiscard]] std::vector<bool> storedEnabledInstruments() const override;
 
     void storeEnabledInstruments( std::vector<bool> p_enabledInstruments ) override;

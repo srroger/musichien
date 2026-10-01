@@ -377,6 +377,23 @@ struct SessionSettings
     // au plus difficile, et l'on finit par ce qui resiste.
     std::vector<QuestionTarget> plannedQuestions;
 
+    // -------------------------------------------------------------------------------------------------------------
+    // LE PERIMETRE, quand le joueur l'a choisi lui-meme : c'est le GodMode.
+    //
+    // Vides partout ailleurs, et c'est ce vide qui garde aux cinq niveaux leur comportement : une palette vide se lit
+    // « prends le prefixe de l'ordre d'apprentissage », exactement comme avant.
+    // -------------------------------------------------------------------------------------------------------------
+    std::vector<Interval> intervalPalette;
+    std::vector<ChordQuality> chordPalette;
+    std::vector<Mode> modePalette;
+
+    // Un perimetre FIGE ne s'elargit plus sur une reussite, et ne se retrecit plus sur une erreur.
+    //
+    // C'est toute la difference entre un niveau et le GodMode : un niveau fait GRANDIR une palette dont il sait ou il va,
+    // le GodMode travaille celle qu'on lui a donnee et n'y touche plus. Une reussite qui ajouterait un intervalle non
+    // choisi serait exactement la « conduite accompagnee » que ce mode est fait pour casser.
+    bool paletteIsFixed{ false };
+
     // Silence left between the two notes of a question, as heard.
     //
     // A musical value rather than a technical one: too short and the two notes sound like one glide,

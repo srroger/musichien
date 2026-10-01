@@ -262,7 +262,41 @@ class ExerciseSessionController final : public QObject
     //
     // Static because it reads nothing of this object: the list of levels is a fact of the domain, and saying
     // so in the signature is cheaper than a comment. Qt hands it to the screen all the same.
+    //
+    // ET LE GODMODE EST LA DERNIERE ENTREE, sans etre un niveau du domaine : il ne dit pas ce que le joueur sait, il dit
+    // qu'il a decide de choisir. Il porte donc un drapeau de plus, et c'est ce drapeau que l'ecran lit.
     Q_PROPERTY( QVariantList playerLevels READ playerLevels CONSTANT )
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // LE GODMODE
+    //
+    // Ce que Roger a demande : une difficulte ou le joueur choisit lui-meme ce qu'il travaille. Il ne REMPLACE pas les
+    // cinq niveaux - ceux-ci gardent leur progression, qui compte dans l'avancement - il les prend comme modeles et
+    // casse la conduite accompagnee. L'XP, les statistiques et les bilans continuent : « c'est un dieu, il a tous les
+    // pouvoirs ».
+    // ---------------------------------------------------------------------------------------------------------------
+
+    // La difficulte choisie est-elle le GodMode ?
+    Q_PROPERTY( bool godModeIsChosen READ godModeIsChosen NOTIFY godModeChanged )
+
+    // Une palette a-t-elle deja ete sauvegardee ? C'est ce qui distingue « il n'a jamais ouvert cette page » de « il a
+    // tout decoche », et les deux ne se reparent pas de la meme facon.
+    Q_PROPERTY( bool godModeIsSaved READ godModeIsSaved NOTIFY godModeChanged )
+
+    // Le brouillon a-t-il ete touche depuis la derniere sauvegarde ? C'est ce qui fait apparaitre « non sauvegarde » a
+    // cote du nom, et rien d'autre.
+    Q_PROPERTY( bool godModeHasUnsavedChanges READ godModeHasUnsavedChanges NOTIFY godModeChanged )
+
+    // La palette en cours peut-elle poser une partie ? Faux, l'ecran doit dire POURQUOI (voir godModeProblem).
+    Q_PROPERTY( bool godModeCanStart READ godModeCanStart NOTIFY godModeChanged )
+
+    // La raison, en une phrase, quand la palette n'est pas jouable. Vide quand tout va bien.
+    Q_PROPERTY( QString godModeProblem READ godModeProblem NOTIFY godModeChanged )
+
+    // Les trois familles, chacune prete a afficher : l'index a renvoyer, le nom, et si la case est cochee.
+    Q_PROPERTY( QVariantList godModeIntervals READ godModeIntervals NOTIFY godModeChanged )
+    Q_PROPERTY( QVariantList godModeChords READ godModeChords NOTIFY godModeChanged )
+    Q_PROPERTY( QVariantList godModeModes READ godModeModes NOTIFY godModeChanged )
 
     // The instruments the player wants to hear, each with its index, its name and whether it is enabled.
     //
@@ -620,6 +654,42 @@ public:
     [[nodiscard]] bool hasChosenLevel() const noexcept;
     [[nodiscard]] int playerLevel() const noexcept;
     [[nodiscard]] static QVariantList playerLevels();
+
+    [[nodiscard]] bool godModeIsChosen() const noexcept { return m_godModeIsChosen; }
+
+    [[nodiscard]] bool godModeIsSaved() const noexcept { return m_godModeIsSaved; }
+
+    [[nodiscard]] bool godModeHasUnsavedChanges() const;
+
+    [[nodiscard]] bool godModeCanStart() const;
+
+    // La raison, en une phrase, quand la palette ne peut pas poser de partie. Le message vient de l'ecran (tr) et la
+    // regle du domaine : c'est la seule facon de dire « il manque des accords » sans que l'ecran ait a recompter.
+    [[nodiscard]] QString godModeProblem() const;
+
+    [[nodiscard]] QVariantList godModeIntervals() const;
+    [[nodiscard]] QVariantList godModeChords() const;
+    [[nodiscard]] QVariantList godModeModes() const;
+
+    // Coche ou decoche un element du brouillon. Rien n'est ecrit sur le disque : c'est le bouton Sauvegarder qui ecrit,
+    // et c'est ce qui rend « non sauvegarde » vrai.
+    Q_INVOKABLE void toggleGodModeInterval( int p_semitones );
+    Q_INVOKABLE void toggleGodModeChord( int p_qualityIndex );
+    Q_INVOKABLE void toggleGodModeMode( int p_modeIndex );
+
+    // Tout cocher ou tout decocher une famille : c'est le geste qu'on veut pour « je veux repartir de zero », et le faire
+    // case par case serait une punition.
+    Q_INVOKABLE void setEveryGodModeIntervalChecked( bool p_checked );
+    Q_INVOKABLE void setEveryGodModeChordChecked( bool p_checked );
+    Q_INVOKABLE void setEveryGodModeModeChecked( bool p_checked );
+
+    // Pré-remplit le brouillon avec le modele d'un niveau. C'est le geste que Roger a decrit : « je debute, ca coche les
+    // deux premiers intervalles », et il sert aussi a repartir d'une base connue.
+    Q_INVOKABLE void prefillGodModeFromLevel( int p_level );
+
+    // Ecrit le brouillon, et RIEN d'autre : c'est la seule ecriture, donc la seule chose qui puisse faire passer
+    // « non sauvegarde » a « sauvegarde ».
+    Q_INVOKABLE void saveGodMode();
     [[nodiscard]] QVariantList instruments() const;
 
     // The flags as the rest of the application needs them: main.cpp filters the loaded instruments with this,
@@ -815,6 +885,8 @@ signals:
     // The player has just said where he is, or the application has just remembered it.
     void playerLevelChanged();
 
+    void godModeChanged();
+
     // The player has just turned an instrument on or off.
     void instrumentsChanged();
 
@@ -909,6 +981,20 @@ private:
     // profil - un test, ou une application qui n'a nulle part ou ecrire - les reglages passes au constructeur restent
     // en place, et rien n'est ecrase.
     void applyStoredQuestionShares( domain::SessionSettings & p_settings ) const;
+
+    // Applique la palette du GodMode aux reglages d'une partie, et SEULEMENT quand c'est la difficulte choisie.
+    //
+    // Le Bilan n'y passe pas : il a ses propres questions decidees, du plus facile au plus difficile, et elles n'ont rien
+    // a voir avec un perimetre choisi a la main. C'est ce que Roger a demande - « le bilan va au plus simple ».
+    void applyGodModeIfChosen( domain::SessionSettings & p_settings ) const;
+
+    // Les trois listes du brouillon, chacune rangee dans l'ordre du jeu.
+    [[nodiscard]] domain::GodModePalette orderedDraft() const;
+
+    // Ecrit une famille du brouillon d'un coup : tout, ou rien.
+    [[nodiscard]] static std::vector<domain::Interval> everyIntervalChecked( bool p_checked );
+    [[nodiscard]] static std::vector<domain::ChordQuality> everyChordChecked( bool p_checked );
+    [[nodiscard]] static std::vector<domain::Mode> everyModeChecked( bool p_checked );
 
     // L'etat de bilan ne doit jamais survivre a un bilan : cette fonction le referme, et c'est le seul endroit qui le fait.
     void leaveReviewMode() noexcept;
@@ -1059,6 +1145,21 @@ private:
     // has no business being read that often.
     std::optional<domain::PlayerLevel> m_playerLevel;
 
+    // LE BROUILLON DU GODMODE, et l'etat de sa sauvegarde.
+    //
+    // Le brouillon est la palette telle que la page la montre ; la sauvegarde est ce qui est ecrit. Les deux peuvent
+    // differer, et c'est exactement ce que « GodMode (non sauvegarde) » veut dire : tant que le joueur n'a pas appuye,
+    // ses clics ne changent RIEN a ce qu'il jouera - et c'est ce qui rend le bouton utile plutot que decoratif.
+    domain::GodModePalette m_godModeDraft;
+    bool m_godModeIsChosen{ false };
+    bool m_godModeIsSaved{ false };
+
+    // LA PALETTE QUI JOUE : celle qui a ete sauvegardee, ou, au premier lancement, celle du niveau courant.
+    //
+    // Elle est distincte du brouillon, et c'est la decision de Roger : « il peut faire ses changements PUIS appuyer sur
+    // sauvegarder POUR POUVOIR JOUER de cette maniere ». Tant qu'il n'a pas appuye, ses clics ne changent rien a ce qu'il
+    // jouera - et c'est ce qui donne un sens au mot « sauvegarde ».
+    domain::GodModePalette m_godModeSavedPalette;
     // One flag per instrument, in the order of domain::INSTRUMENT_NAMES. Empty means "everything", which is
     // what a first run has and what the screen must show as all enabled.
     std::vector<bool> m_enabledInstruments;

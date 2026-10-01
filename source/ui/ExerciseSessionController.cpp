@@ -55,6 +55,13 @@ constexpr std::chrono::milliseconds MODE_NOTE_GAP{ 40 };
 constexpr std::chrono::milliseconds PHRASE_NOTE_GAP{ 70 };
 constexpr std::int32_t FALLBACK_PHRASE_TEMPO = 72;
 
+// L'INDEX DU GODMODE dans la liste des difficultes : juste apres les cinq niveaux.
+//
+// Il n'appartient PAS a domain::PlayerLevel, et ce n'est pas un detail de rangement : un GodMode n'est pas une marche de
+// plus. Il n'y a rien a « savoir » pour etre en GodMode, il y a un joueur qui decide de choisir lui-meme. L'ecran, lui,
+// n'a qu'un combo a remplir, donc un seul nombre a comparer.
+constexpr int GOD_MODE_DIFFICULTY_INDEX = static_cast<int>( domain::PLAYER_LEVEL_COUNT );
+
 // Le bourdon sonne SEUL avant la melodie, et apres : c'est ce qui installe le centre avant que la couleur n'arrive.
 constexpr std::chrono::milliseconds MODE_LEAD_IN{ 800 };
 constexpr std::chrono::milliseconds MODE_TAIL{ 600 };
@@ -177,6 +184,32 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
     {
         m_enabledInstruments = m_levelStore->storedEnabledInstruments();
     }
+
+    // LE GODMODE : la difficulte choisie, la palette qui JOUE, et le brouillon que la page montrera.
+    //
+    // La palette qui joue est celle qui a ete SAUVEGARDEE ; au premier lancement il n'y en a pas, et elle est alors celle du
+    // NIVEAU courant. C'est la migration, et elle est invisible a dessein : un joueur qui choisit le GodMode sans avoir
+    // jamais ouvert sa page doit pouvoir jouer, avec exactement le perimetre de son niveau. Sans cela, il tomberait sur une
+    // configuration vide et une partie impossible a lancer.
+    if( m_levelStore != nullptr )
+    {
+        m_godModeIsChosen = m_levelStore->storedGodModeIsChosen();
+
+        const std::optional<domain::GodModePalette> saved = m_levelStore->storedGodModePalette();
+
+        m_godModeIsSaved = saved.has_value();
+
+        m_godModeSavedPalette = saved.has_value()
+                                  ? *saved
+                                  : domain::paletteForLevel( m_playerLevel.value_or( domain::PlayerLevel::Beginner ) );
+    }
+    else
+    {
+        m_godModeSavedPalette = domain::paletteForLevel( domain::PlayerLevel::Beginner );
+    }
+
+    // Le brouillon part de ce qui joue : tant que le joueur ne touche a rien, la page montre exactement ce qu'il jouera.
+    m_godModeDraft = m_godModeSavedPalette;
 
     if( m_enabledInstruments.empty() )
     {
@@ -481,6 +514,14 @@ bool ExerciseSessionController::hasChosenLevel() const noexcept
 
 int ExerciseSessionController::playerLevel() const noexcept
 {
+    // LE GODMODE EST LA SIXIEME ENTREE, et il n'est PAS un niveau : le combo de la page de garde offre six difficultes, et
+    // la derniere dit « choisis toi-meme ». C'est ce nombre que l'ecran compare pour savoir quoi afficher, donc il doit
+    // dire les deux choses - le niveau, ou le GodMode.
+    if( m_godModeIsChosen )
+    {
+        return GOD_MODE_DIFFICULTY_INDEX;
+    }
+
     return m_playerLevel.has_value() ? static_cast<int>( *m_playerLevel ) : -1;
 }
 
@@ -496,6 +537,46 @@ void ExerciseSessionController::choosePlayerLevel( int p_level )
     // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
     m_notePlayer.playTapCue();
 
+    // LE GODMODE, quand c'est lui qu'on choisit.
+    //
+    // Il ne touche PAS au niveau memorise : le joueur reste « jusqu'a l'octave » sous son GodMode, et le jour ou il
+    // revient en arriere il retrouve exactement ou il en etait. C'est ce que Roger a demande - « si le joueur veut revenir
+    // en arriere » - et cela veut dire que les deux choix vivent cote a cote, chacun dans sa case.
+    if( p_level == GOD_MODE_DIFFICULTY_INDEX )
+    {
+        const bool changed = !m_godModeIsChosen;
+
+        m_godModeIsChosen = true;
+
+        if( m_levelStore != nullptr )
+        {
+            m_levelStore->storeGodModeIsChosen( true );
+        }
+
+        if( changed )
+        {
+            emit godModeChanged();
+        }
+
+        emit playerLevelChanged();
+
+        return;
+    }
+
+    // Et revenir a un niveau REMET le drapeau a faux : c'est la seule facon de sortir du GodMode sans effacer son profil,
+    // et Roger a voulu que le profil se remette a zero SEPAREMENT, avec une confirmation.
+    if( m_godModeIsChosen )
+    {
+        m_godModeIsChosen = false;
+
+        if( m_levelStore != nullptr )
+        {
+            m_levelStore->storeGodModeIsChosen( false );
+        }
+
+        emit godModeChanged();
+    }
+
     const domain::PlayerLevel level = domain::playerLevelFromIndex( static_cast<std::size_t>( p_level ) );
 
     m_playerLevel = level;
@@ -509,6 +590,19 @@ void ExerciseSessionController::choosePlayerLevel( int p_level )
     if( m_levelStore != nullptr )
     {
         m_levelStore->storeLevel( level );
+    }
+
+    // Et CHANGER DE NIVEAU PRE-REMPLIT le GodMode, tant que le joueur n'a jamais sauvegarde le sien.
+    //
+    // C'est exactement ce que Roger a decrit : « le combo a juste pour effet de lui pre-remplir ces checkbox ». Une palette
+    // sauvegardee, en revanche, ne bouge plus : elle appartient au joueur, et non a son niveau - sinon le dieu verrait ses
+    // cases se decocher parce qu'il a change de marche.
+    if( !m_godModeIsSaved )
+    {
+        m_godModeSavedPalette = domain::paletteForLevel( level );
+        m_godModeDraft = m_godModeSavedPalette;
+
+        emit godModeChanged();
     }
 
     emit playerLevelChanged();
@@ -585,9 +679,21 @@ QVariantList ExerciseSessionController::playerLevels()
         QVariantMap level;
         level.insert( QStringLiteral( "index" ), static_cast<int>( index ) );
         level.insert( QStringLiteral( "name" ), nameOfLevel( domain::playerLevelFromIndex( index ) ) );
+        level.insert( QStringLiteral( "isGodMode" ), false );
 
         levels.append( level );
     }
+
+    // ET LE GODMODE, EN DERNIER.
+    //
+    // Il n'est pas une sixieme marche : il est la porte qui sort de l'echelle. Le nom se suffit a lui-meme, et le drapeau
+    // permet a l'ecran de le traiter autrement - le montrer en majuscules, ou l'annoncer comme un choix qui casse le jeu.
+    QVariantMap godMode;
+    godMode.insert( QStringLiteral( "index" ), GOD_MODE_DIFFICULTY_INDEX );
+    godMode.insert( QStringLiteral( "name" ), ExerciseSessionController::tr( "GodMode" ) );
+    godMode.insert( QStringLiteral( "isGodMode" ), true );
+
+    levels.append( godMode );
 
     return levels;
 }
@@ -753,6 +859,16 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
 {
     // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
     m_notePlayer.playTapCue();
+
+    // LE PERIMETRE DU GODMODE, quand c'est lui qui joue - et JAMAIS dans un Bilan.
+    //
+    // Un Bilan a ses propres questions decidees, du plus facile au plus difficile : elles n'ont rien a voir avec un
+    // perimetre choisi a la main, et Roger a tranche - « le bilan, va au plus simple ». Un seul endroit, donc rien a
+    // oublier dans les trois facons de commencer une partie.
+    if( !m_isReviewRunning )
+    {
+        applyGodModeIfChosen( p_settings );
+    }
 
     // The seed is drawn HERE, in the interface layer, and never inside the domain.
     //
@@ -3053,6 +3169,312 @@ void ExerciseSessionController::playCurrentQuestionAsChord()
     const std::array<domain::Note, 2> notes{ rootNote, upperNote };
 
     m_notePlayer.playChord( notes );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// LE GODMODE
+// ---------------------------------------------------------------------------------------------------------------------
+
+std::vector<domain::Interval> ExerciseSessionController::everyIntervalChecked( bool p_checked )
+{
+    if( !p_checked )
+    {
+        return {};
+    }
+
+    const std::array<domain::Interval, domain::SUPPORTED_INTERVAL_COUNT> & all = domain::allSupportedIntervals();
+
+    return { all.begin(), all.end() };
+}
+
+std::vector<domain::ChordQuality> ExerciseSessionController::everyChordChecked( bool p_checked )
+{
+    if( !p_checked )
+    {
+        return {};
+    }
+
+    const std::span<const domain::ChordQuality> order = domain::chordLearningOrder();
+
+    return { order.begin(), order.end() };
+}
+
+std::vector<domain::Mode> ExerciseSessionController::everyModeChecked( bool p_checked )
+{
+    if( !p_checked )
+    {
+        return {};
+    }
+
+    const std::span<const domain::Mode> order = domain::modeLearningOrder();
+
+    return { order.begin(), order.end() };
+}
+
+domain::GodModePalette ExerciseSessionController::orderedDraft() const
+{
+    return domain::orderedPalette( m_godModeDraft );
+}
+
+bool ExerciseSessionController::godModeHasUnsavedChanges() const
+{
+    // Les deux palettes, rangees dans le meme ordre avant d'etre comparees : sans cela, deux listes qui contiennent
+    // exactement la meme chose dans un ordre different passeraient pour deux palettes differentes.
+    const domain::GodModePalette draft = orderedDraft();
+
+    return !( ( draft.intervals == m_godModeSavedPalette.intervals )
+              && ( draft.chords == m_godModeSavedPalette.chords )
+              && ( draft.modes == m_godModeSavedPalette.modes ) );
+}
+
+QString ExerciseSessionController::godModeProblem() const
+{
+    // Les PARTS du joueur, et non une regle generale : on n'exige pas deux accords de quelqu'un qui a mis la part des
+    // accords a zero. C'est la meme regle que le domaine, lue avec les reglages du joueur.
+    domain::SessionSettings shares;
+    applyStoredQuestionShares( shares );
+
+    const domain::GodModePalette draft = orderedDraft();
+
+    const bool intervalsAsked = ( shares.namedIntervalQuestionShare + shares.singQuestionShare
+                                  + shares.foreignNoteQuestionShare )
+                                > 0;
+    const bool chordsAsked = shares.chordQuestionShare > 0;
+    const bool modesAsked = ( shares.modeColourQuestionShare + shares.modeNameQuestionShare
+                              + shares.modeVampQuestionShare )
+                            > 0;
+
+    // Le message NOMME la famille qui manque, et dit POURQUOI : « au moins deux » sans raison ressemble a une lubie. Avec
+    // un seul choix, la reponse serait toujours la meme, et le joueur repondrait juste sans ecouter.
+    if( intervalsAsked && ( draft.intervals.size() < domain::MINIMUM_GOD_MODE_CHOICES ) )
+    {
+        return tr( "Coche au moins deux intervalles : avec un seul, la réponse serait toujours la même." );
+    }
+
+    if( chordsAsked && ( draft.chords.size() < domain::MINIMUM_GOD_MODE_CHOICES ) )
+    {
+        return tr( "Coche au moins deux accords : avec un seul, la réponse serait toujours la même." );
+    }
+
+    if( modesAsked && ( draft.modes.size() < domain::MINIMUM_GOD_MODE_CHOICES ) )
+    {
+        return tr( "Coche au moins deux modes : avec un seul, la réponse serait toujours la même." );
+    }
+
+    return {};
+}
+
+bool ExerciseSessionController::godModeCanStart() const
+{
+    return godModeProblem().isEmpty();
+}
+
+QVariantList ExerciseSessionController::godModeIntervals() const
+{
+    const domain::GodModePalette draft = orderedDraft();
+
+    QVariantList family;
+
+    // TOUS les intervalles du jeu sont proposes, meme ceux que le niveau du joueur n'a pas encore ouverts : c'est la
+    // promesse du GodMode - il choisit, et le jeu ne lui cache rien.
+    for( const domain::Interval & interval : domain::allSupportedIntervals() )
+    {
+        QVariantMap entry = describeInterval( interval );
+
+        entry.insert( QStringLiteral( "semitones" ), interval.semitones() );
+
+        entry.insert( QStringLiteral( "checked" ),
+                      std::ranges::find( draft.intervals, interval ) != draft.intervals.end() );
+
+        family.append( entry );
+    }
+
+    return family;
+}
+
+QVariantList ExerciseSessionController::godModeChords() const
+{
+    const domain::GodModePalette draft = orderedDraft();
+
+    QVariantList family;
+
+    for( const domain::ChordQuality quality : domain::chordLearningOrder() )
+    {
+        QVariantMap entry;
+
+        entry.insert( QStringLiteral( "index" ), static_cast<int>( quality ) );
+
+        // LE NOM D'UN ACCORD, en notation anglo-saxonne, comme partout ailleurs : « C », « Cm », « C7 », « Cm7b5 ». On ne
+        // nomme pas la TONIQUE ici - ce serait mentir sur un choix qui ne porte que la COULEUR -, donc un « C » neutre sert
+        // de repere, exactement comme dans la grille de reponse.
+        const std::string_view suffix = domain::chordQualitySymbolSuffix( quality );
+
+        entry.insert( QStringLiteral( "name" ),
+                      QStringLiteral( "C" ) + QString::fromUtf8( suffix.data(), static_cast<int>( suffix.size() ) ) );
+
+        entry.insert( QStringLiteral( "checked" ), std::ranges::find( draft.chords, quality ) != draft.chords.end() );
+
+        family.append( entry );
+    }
+
+    return family;
+}
+
+QVariantList ExerciseSessionController::godModeModes() const
+{
+    const domain::GodModePalette draft = orderedDraft();
+
+    QVariantList family;
+
+    for( const domain::Mode mode : domain::modeLearningOrder() )
+    {
+        QVariantMap entry = describeMode( mode );
+
+        entry.insert( QStringLiteral( "checked" ), std::ranges::find( draft.modes, mode ) != draft.modes.end() );
+
+        family.append( entry );
+    }
+
+    return family;
+}
+
+void ExerciseSessionController::toggleGodModeInterval( int p_semitones )
+{
+    // Un intervalle s'identifie par ses DEMI-TONS, et jamais par sa place dans une liste : c'est ce qui permet de
+    // sauvegarder un choix et de le relire des annees plus tard, meme si l'ordre d'apprentissage change un jour.
+    if( ( p_semitones < 0 ) || ( p_semitones > domain::MAXIMUM_INTERVAL_SEMITONES ) )
+    {
+        return;
+    }
+
+    const domain::Interval interval{ p_semitones };
+
+    const auto found = std::ranges::find( m_godModeDraft.intervals, interval );
+
+    if( found == m_godModeDraft.intervals.end() )
+    {
+        m_godModeDraft.intervals.push_back( interval );
+    }
+    else
+    {
+        m_godModeDraft.intervals.erase( found );
+    }
+
+    emit godModeChanged();
+}
+
+void ExerciseSessionController::toggleGodModeChord( int p_qualityIndex )
+{
+    if( ( p_qualityIndex < 0 ) || ( p_qualityIndex >= static_cast<int>( domain::CHORD_QUALITY_COUNT ) ) )
+    {
+        return;
+    }
+
+    const auto quality = static_cast<domain::ChordQuality>( p_qualityIndex );
+
+    const auto found = std::ranges::find( m_godModeDraft.chords, quality );
+
+    if( found == m_godModeDraft.chords.end() )
+    {
+        m_godModeDraft.chords.push_back( quality );
+    }
+    else
+    {
+        m_godModeDraft.chords.erase( found );
+    }
+
+    emit godModeChanged();
+}
+
+void ExerciseSessionController::toggleGodModeMode( int p_modeIndex )
+{
+    if( ( p_modeIndex < 0 ) || ( p_modeIndex >= static_cast<int>( domain::MODE_COUNT ) ) )
+    {
+        return;
+    }
+
+    const auto mode = static_cast<domain::Mode>( p_modeIndex );
+
+    const auto found = std::ranges::find( m_godModeDraft.modes, mode );
+
+    if( found == m_godModeDraft.modes.end() )
+    {
+        m_godModeDraft.modes.push_back( mode );
+    }
+    else
+    {
+        m_godModeDraft.modes.erase( found );
+    }
+
+    emit godModeChanged();
+}
+
+void ExerciseSessionController::setEveryGodModeIntervalChecked( bool p_checked )
+{
+    m_godModeDraft.intervals = everyIntervalChecked( p_checked );
+
+    emit godModeChanged();
+}
+
+void ExerciseSessionController::setEveryGodModeChordChecked( bool p_checked )
+{
+    m_godModeDraft.chords = everyChordChecked( p_checked );
+
+    emit godModeChanged();
+}
+
+void ExerciseSessionController::setEveryGodModeModeChecked( bool p_checked )
+{
+    m_godModeDraft.modes = everyModeChecked( p_checked );
+
+    emit godModeChanged();
+}
+
+void ExerciseSessionController::prefillGodModeFromLevel( int p_level )
+{
+    // Le MODELE d'un niveau, et non son etat courant : un joueur qui a deja gagne trois intervalles en jouant ne doit pas
+    // les retrouver coches ici, sinon deux joueurs du meme niveau n'auraient pas le meme point de depart.
+    m_godModeDraft = domain::paletteForLevel( domain::playerLevelFromIndex( static_cast<std::size_t>( p_level ) ) );
+
+    emit godModeChanged();
+}
+
+void ExerciseSessionController::saveGodMode()
+{
+    // On n'ecrit JAMAIS une palette qui ne pourrait pas poser de partie : elle serait sauvegardee, puis refusee au moment
+    // de jouer, sans que personne ne comprenne ce qui s'est passe. L'ecran, lui, dit deja pourquoi - voir godModeProblem.
+    if( !godModeProblem().isEmpty() )
+    {
+        return;
+    }
+
+    const domain::GodModePalette ordered = orderedDraft();
+
+    if( m_levelStore != nullptr )
+    {
+        m_levelStore->storeGodModePalette( ordered );
+    }
+
+    // Ce qui joue devient ce qui vient d'etre ecrit, et le brouillon est range dans le meme ordre : deux listes qui
+    // diraient la meme chose dans deux ordres differents feraient apparaitre « non sauvegarde » juste apres avoir sauve.
+    m_godModeSavedPalette = ordered;
+    m_godModeDraft = ordered;
+    m_godModeIsSaved = true;
+
+    emit godModeChanged();
+}
+
+void ExerciseSessionController::applyGodModeIfChosen( domain::SessionSettings & p_settings ) const
+{
+    if( !m_godModeIsChosen )
+    {
+        return;
+    }
+
+    // La palette SAUVEGARDEE, et non le brouillon : Roger l'a dit exactement comme ca - « il peut faire ses changements
+    // puis appuyer sur sauvegarder POUR POUVOIR JOUER de cette maniere ». Tant qu'il n'a pas appuye, ses clics ne changent
+    // rien a ce qu'il jouera, et c'est ce qui donne son sens au mot « sauvegarde ».
+    p_settings = domain::sessionSettingsFor( m_godModeSavedPalette, p_settings );
 }
 
 }    // namespace musichien::ui

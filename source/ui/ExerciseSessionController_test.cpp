@@ -171,6 +171,23 @@ void storeIntervalOnlyShares( domain::PlayerPreferencesFake & p_store )
 //
 // Toutes les parts de question sont epinglees ENSEMBLE, et les trois parts d'harmonie le sont aussi : une seule laissee
 // a sa valeur par defaut, et le test tombe sur un autre genre une fois sur cinq.
+// Combien d'intervalles sont coches dans la page du GodMode. C'est la mesure de ce que le joueur a en main, et elle ne
+// depend pas du nombre de boutons que la grille affiche.
+[[nodiscard]] int checkedIntervalCount( const ExerciseSessionController & p_controller )
+{
+    int checked = 0;
+
+    for( const QVariant & entry : p_controller.godModeIntervals() )
+    {
+        if( entry.toMap().value( QStringLiteral( "checked" ) ).toBool() )
+        {
+            ++checked;
+        }
+    }
+
+    return checked;
+}
+
 void storeNamedModeOnlyShares( domain::PlayerPreferencesFake & p_store )
 {
     p_store.storeNamedIntervalQuestionShare( 0 );
@@ -178,6 +195,22 @@ void storeNamedModeOnlyShares( domain::PlayerPreferencesFake & p_store )
     p_store.storeChordQuestionShare( 0 );
     p_store.storeModeColourQuestionShare( 0 );
     p_store.storeModeNameQuestionShare( 100 );
+    p_store.storeModeVampQuestionShare( 0 );
+}
+
+// Ne garder QUE les intervalles nommes : c'est le seul genre dont la grille de reponse soit faite de la palette, donc le
+// seul qui permette de lire ce que la partie joue vraiment.
+//
+// Sans cela, une part d'accord restee ouverte par defaut ferait poser une question d'accord, dont la grille est vide - et
+// un test qui lit cette grille croirait a une palette vide plutot qu'a un autre genre de question.
+void storeNamedIntervalOnlyShares( domain::PlayerPreferencesFake & p_store )
+{
+    p_store.storeNamedIntervalQuestionShare( 100 );
+    p_store.storeSingQuestionShare( 0 );
+    p_store.storeForeignNoteQuestionShare( 0 );
+    p_store.storeChordQuestionShare( 0 );
+    p_store.storeModeColourQuestionShare( 0 );
+    p_store.storeModeNameQuestionShare( 0 );
     p_store.storeModeVampQuestionShare( 0 );
 }
 
@@ -823,6 +856,132 @@ TEST( ExerciseSessionControllerTest, a_name_question_is_heard_as_a_melody )
     EXPECT_GT( controller.modeSoundDurationMs(), scaleController.modeSoundDurationMs() );
 }
 
+TEST( ExerciseSessionControllerTest, the_god_mode_plays_the_perimeter_the_player_saved )
+{
+    // Ce que Roger a demande : le joueur choisit lui-meme, et le jeu joue ce qu'il a SAUVEGARDE. Le temoin est la grille de
+    // reponse - elle contient exactement les intervalles en jeu, donc elle dit ce que la partie pose vraiment.
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    storeNamedIntervalOnlyShares( levelStore );
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    // Un joueur ordinaire : la grille vient de son NIVEAU, et elle est large.
+    controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+    controller.startSession();
+
+    const int levelChoiceCount = controller.choices().size();
+
+    // Il passe en GodMode - la SIXIEME difficulte du combo - et choisit un perimetre etroit.
+    controller.choosePlayerLevel( 5 );
+
+    EXPECT_TRUE( controller.godModeIsChosen() );
+
+    // Aucune palette n'a jamais ete sauvegardee : la page a du travail a montrer, et le drapeau le dit.
+    EXPECT_FALSE( controller.godModeIsSaved() );
+
+    controller.setEveryGodModeIntervalChecked( false );
+    controller.toggleGodModeInterval( 0 );
+    controller.toggleGodModeInterval( 5 );
+    controller.toggleGodModeInterval( 7 );
+
+    EXPECT_TRUE( controller.godModeCanStart() );
+    EXPECT_TRUE( controller.godModeHasUnsavedChanges() );
+
+    controller.saveGodMode();
+
+    EXPECT_TRUE( controller.godModeIsSaved() );
+    EXPECT_FALSE( controller.godModeHasUnsavedChanges() );
+
+    controller.startSession();
+
+    std::vector<std::int32_t> played;
+
+    for( const QVariant & choice : controller.choices() )
+    {
+        played.push_back( choice.toMap().value( QStringLiteral( "semitones" ) ).toInt() );
+    }
+
+    std::ranges::sort( played );
+
+    // Les trois intervalles demandes, et RIEN d'autre : c'est tout le GodMode.
+    EXPECT_EQ( ( std::vector<std::int32_t>{ 0, 5, 7 } ), played );
+
+    // Et la grille a RETRECI au lieu de suivre le niveau : c'est ce qui prouve que le perimetre choisi a remplace celui du
+    // niveau, et non qu'il s'y est ajoute.
+    EXPECT_LT( controller.choices().size(), levelChoiceCount );
+}
+
+TEST( ExerciseSessionControllerTest, the_god_mode_refuses_a_perimeter_that_could_not_ask )
+{
+    // « Au moins deux » : avec UN seul choix, la reponse serait toujours la meme, et le joueur repondrait juste sans
+    // ecouter. La regle ne sert a rien si elle ne va pas jusqu'au bout - donc on n'ecrit pas non plus une palette qui ne
+    // pourrait pas poser de partie : elle serait sauvegardee, puis refusee au moment de jouer, sans que personne ne
+    // comprenne ce qui s'est passe.
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    storeNamedIntervalOnlyShares( levelStore );
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    controller.choosePlayerLevel( 5 );
+
+    controller.setEveryGodModeIntervalChecked( false );
+    controller.toggleGodModeInterval( 7 );
+
+    EXPECT_FALSE( controller.godModeCanStart() );
+    EXPECT_FALSE( controller.godModeProblem().isEmpty() );
+
+    controller.saveGodMode();
+
+    EXPECT_FALSE( controller.godModeIsSaved() );
+
+    // Le modele d'un niveau remet tout d'aplomb : c'est le geste que Roger a decrit - « je debute, ca coche les deux
+    // premiers intervalles ».
+    controller.prefillGodModeFromLevel( static_cast<int>( domain::PlayerLevel::Fluent ) );
+
+    EXPECT_TRUE( controller.godModeCanStart() );
+
+    controller.saveGodMode();
+
+    EXPECT_TRUE( controller.godModeIsSaved() );
+}
+
+TEST( ExerciseSessionControllerTest, the_god_mode_falls_back_on_the_level_until_a_palette_is_saved )
+{
+    // LA MIGRATION, et elle est invisible a dessein : un joueur qui choisit le GodMode sans avoir jamais ouvert sa page doit
+    // pouvoir jouer, avec exactement le perimetre de son niveau. Sans elle, il tomberait sur une configuration vide et une
+    // partie impossible a lancer - le seul vrai piege de cette fonctionnalite.
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    storeNamedIntervalOnlyShares( levelStore );
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
+
+    // LE NIVEAU PRE-REMPLIT LES CASES : c'est exactement ce que Roger a decrit - « je debute, ca coche les deux premiers
+    // intervalles » - et c'est aussi ce qui garantit qu'un joueur qui passe en GodMode sans avoir jamais ouvert la page
+    // joue le perimetre de son niveau, et non une configuration vide.
+    EXPECT_EQ( 12, checkedIntervalCount( controller ) );
+
+    controller.choosePlayerLevel( 5 );
+
+    EXPECT_TRUE( controller.godModeIsChosen() );
+
+    // La palette n'a pas change en choisissant le GodMode : elle est simplement devenue celle qui joue.
+    EXPECT_EQ( 12, checkedIntervalCount( controller ) );
+
+    controller.startSession();
+
+    // Et la grille de la partie offre ces DOUZE intervalles, la ou une partie de niveau n'en montrait que huit : le GodMode
+    // n'a pas de plafond, il donne tout ce qui a ete coche.
+    EXPECT_EQ( 12, controller.choices().size() );
+}
+
 TEST( ExerciseSessionControllerTest, a_harmony_question_offers_no_interval_hint )
 {
     // Roger : « pour les bourdons quand je fail, je vois l'indice des intervalles apparaitre ».
@@ -1047,7 +1206,9 @@ TEST( ExerciseSessionControllerTest, the_levels_to_offer_are_ready_to_display )
 
     const QVariantList levels = controller.playerLevels();
 
-    ASSERT_EQ( domain::PLAYER_LEVEL_COUNT, static_cast<std::size_t>( levels.size() ) );
+    // LES CINQ NIVEAUX, ET LE GODMODE : six entrees, parce que le combo de la page de garde offre les deux - un niveau est
+    // une marche, le GodMode est la porte qui sort de l'echelle.
+    ASSERT_EQ( domain::PLAYER_LEVEL_COUNT + 1, static_cast<std::size_t>( levels.size() ) );
 
     for( int index = 0; index < levels.size(); ++index )
     {
@@ -1056,6 +1217,10 @@ TEST( ExerciseSessionControllerTest, the_levels_to_offer_are_ready_to_display )
         // Every entry an index and a name: the screen displays them and never composes one.
         EXPECT_EQ( index, level.value( "index" ).toInt() );
         EXPECT_FALSE( level.value( "name" ).toString().isEmpty() );
+
+        // Et le drapeau dit LAQUELLE n'est pas un niveau : c'est ce qui permet a l'ecran de les traiter differemment, et
+        // notamment de ne pas proposer le GodMode comme modele de lui-meme.
+        EXPECT_EQ( index == static_cast<int>( domain::PLAYER_LEVEL_COUNT ), level.value( "isGodMode" ).toBool() );
     }
 }
 
