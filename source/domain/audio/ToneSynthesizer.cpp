@@ -538,9 +538,13 @@ std::vector<float> ToneSynthesizer::mixRenderedMelodyOverDrone( std::span<const 
 
         // La melodie est DECALEE du temps ou le bourdon sonne seul. C'est ce decalage qui fait entendre le centre
         // avant la couleur, et c'est tout l'interet de l'encadrement.
+        //
+        // L'ACCES SE FAIT PAR L'OPERATEUR, et non par at() : la melodie est desormais un span, et std::span::at()
+        // n'existe pas sur le compilateur du NDK Android. C'est la troisieme fois que ce projet butte sur la meme
+        // difference, et le build Android l'a attrape une fois de plus - l'index est donc verifie AVANT d'etre lu.
         if( ( index >= leadInSampleCount ) && ( ( index - leadInSampleCount ) < p_melodySamples.size() ) )
         {
-            melodySample = p_melodySamples.at( index - leadInSampleCount );
+            melodySample = p_melodySamples[index - leadInSampleCount];
         }
 
         mixedSamples.at( index ) = melodySample + ( droneSample * DRONE_GAIN );
