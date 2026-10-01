@@ -222,15 +222,15 @@ TEST( PlayerLevelTest, the_experience_earned_offers_the_next_step )
 {
     // Le jeu PROPOSE, il n'impose pas : ce que l'experience merite, et les seuils qui le disent.
     //
-    // Roger les a voulus LARGES - « pour aller haut, il faut faire de longues series » - et une partie de dix questions vaut
-    // entre cent et deux cents points : les paliers se comptent donc en dizaines de parties, jamais en une soiree.
+    // Roger les a voulus LARGES - « pour aller haut, il faut faire de longues series » - et ils le sont devenus POUR DE VRAI
+    // le 02/10/2026 : une Arcade parfaite vaut environ neuf cents points, et les paliers se comptent en Arcades.
     EXPECT_EQ( PlayerLevel::Beginner, levelEarnedBy( 0 ) );
-    EXPECT_EQ( PlayerLevel::Beginner, levelEarnedBy( 249 ) );
-    EXPECT_EQ( PlayerLevel::Fluent, levelEarnedBy( 250 ) );
-    EXPECT_EQ( PlayerLevel::Fluent, levelEarnedBy( 999 ) );
-    EXPECT_EQ( PlayerLevel::Advanced, levelEarnedBy( 1000 ) );
-    EXPECT_EQ( PlayerLevel::BeyondTheOctave, levelEarnedBy( 2500 ) );
-    EXPECT_EQ( PlayerLevel::Master, levelEarnedBy( 6000 ) );
+    EXPECT_EQ( PlayerLevel::Beginner, levelEarnedBy( 1499 ) );
+    EXPECT_EQ( PlayerLevel::Fluent, levelEarnedBy( 1500 ) );
+    EXPECT_EQ( PlayerLevel::Fluent, levelEarnedBy( 5999 ) );
+    EXPECT_EQ( PlayerLevel::Advanced, levelEarnedBy( 6000 ) );
+    EXPECT_EQ( PlayerLevel::BeyondTheOctave, levelEarnedBy( 18000 ) );
+    EXPECT_EQ( PlayerLevel::Master, levelEarnedBy( 45000 ) );
 
     // Et il n'y a AUCUN plafond : celui qui joue beaucoup continue d'ouvrir le jeu - « sky is the limit ».
     EXPECT_EQ( PlayerLevel::Master, levelEarnedBy( 1'000'000 ) );

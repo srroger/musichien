@@ -82,8 +82,20 @@ inline constexpr std::int32_t ARCADE_STARTING_LIVES = 10;
 // nombre que le modele applique vraiment.
 [[nodiscard]] double arcadeMultiplier( std::int32_t p_livesLost ) noexcept;
 
-// L'experience finale d'une Arcade : le score multiplie par le multiplicateur, arrondi au plus proche.
-[[nodiscard]] std::int32_t arcadeExperience( std::int32_t p_baseExperience, std::int32_t p_livesLost ) noexcept;
+// L'experience finale d'une Arcade : le score, multiplie par le merite des coeurs, puis par ce qui a ete JOUE.
+//
+// LE DERNIER FACTEUR EST LE PLUS SEVERE, et c'est une decision de Roger : « il faudrait drastiquement reduire l'experience
+// gagnee quand on perd avant la fin ». Une Arcade qui s'arrete au huitieme des vingt-cinq ne rapporte donc QUE huit
+// vingt-cinquiemes de ce qu'elle a produit - la partie inachevee ne paie pas comme une partie tenue. Sans ce facteur,
+// perdre en boucle rapportait autant qu'une partie complete, et Roger l'a vu : « j'ai perdu plein de fois le mode arcade,
+// et ca m'a fait grinder assez d'experience pour passer au niveau suivant ».
+//
+// p_totalQuestions a zero (theorique) vaut une partie complete : une division par zero n'a pas de sens ici, et refuser de
+// payer serait pire que payer.
+[[nodiscard]] std::int32_t arcadeExperience( std::int32_t p_baseExperience,
+                                             std::int32_t p_livesLost,
+                                             std::size_t p_completedQuestions,
+                                             std::size_t p_totalQuestions ) noexcept;
 
 // Le PLAN d'une Arcade : vingt-cinq questions dont le DOSAGE est fixe.
 //

@@ -900,7 +900,8 @@ TEST( ExerciseSessionControllerTest, the_game_offers_the_next_step_when_the_expe
     EXPECT_FALSE( controller.levelInvitationIsAvailable() );
 
     // Le voila avec assez d'experience pour la suite : la fleche doree apparait.
-    levelStore.storeTotalExperience( 1200 );
+    // Les seuils ont TRIPLE le 02/10/2026 (voir PlayerLevel) : « Jusqu'a l'octave » demande maintenant six mille points.
+    levelStore.storeTotalExperience( 7000 );
 
     EXPECT_TRUE( controller.levelInvitationIsAvailable() );
     EXPECT_EQ( static_cast<int>( domain::PlayerLevel::Advanced ), controller.invitedLevel() );

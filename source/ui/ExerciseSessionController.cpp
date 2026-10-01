@@ -2038,7 +2038,10 @@ void ExerciseSessionController::persistSessionOutcome()
         const std::int32_t livesLost =
           remainingLives.has_value() ? std::max( 0, domain::ARCADE_STARTING_LIVES - *remainingLives ) : 0;
 
-        earnedExperience = domain::arcadeExperience( m_session->score().experience(), livesLost );
+        earnedExperience = domain::arcadeExperience( m_session->score().experience(),
+                                                     livesLost,
+                                                     m_session->score().completedQuestionCount(),
+                                                     m_session->settings().questionCount );
 
         // FIGE au moment ou la partie se conclut : un ecran de fin qui le relirait plus tard lirait un score qui a change.
         m_lastArcadeMultiplierPercent =

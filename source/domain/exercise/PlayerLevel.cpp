@@ -11,16 +11,21 @@ namespace
 
 // L'EXPERIENCE CUMULEE QU'UN NIVEAU DEMANDE, et c'est une decision de GAME DESIGN autant que de musique.
 //
-// L'ordre de grandeur : une partie de dix questions rapporte entre cent et deux cents points, selon la serie et les
-// reecoutes. Les seuils sont donc en dizaines de parties :
+// LE CALIBRAGE, chiffre en main : une ARCADE parfaite - vingt-cinq reussites, aucun coeur perdu - rapporte environ NEUF
+// CENTS points (470 de score, doubles par le merite des coeurs). C'est la seule partie qui paie, donc c'est la seule
+// unite qui compte, et les paliers se lisent en Arcades parfaites :
 //
-//   * « A l'aise » apres deux ou trois parties : le joueur a montre qu'il entend les couleurs de base ;
-//   * « Jusqu'a l'octave » apres une dizaine : c'est le palier ou l'on s'installe, et celui que beaucoup de joueurs
-//     garderont ;
-//   * « Les composes » apres une vingtaine-cinq : le palier charniere, celui de Roger - « ce qui separe le joueur
-//     intermediaire du joueur avance » ;
-//   * « Je maitrise » apres une quarantaine. Loin, et volontairement : c'est le niveau ou l'application n'aide plus.
-constexpr std::array<std::int64_t, PLAYER_LEVEL_COUNT> EXPERIENCE_THRESHOLDS{ 0, 250, 1000, 2500, 6000 };
+//   * « A l'aise » apres DEUX Arcades parfaites. Le joueur a montre qu'il tient une partie entiere ;
+//   * « Jusqu'a l'octave » apres sept : c'est le palier ou l'on s'installe, et celui que beaucoup garderont ;
+//   * « Les composes » apres vingt : le palier charniere, celui de Roger - « ce qui separe le joueur intermediaire du
+//     joueur avance » ;
+//   * « Je maitrise » apres cinquante. Loin, et volontairement : c'est le niveau ou l'application n'aide plus.
+//
+// POURQUOI CES CHIFFRES ONT TRIPLE (02/10/2026) : les premiers etaient calibres sur l'ancienne partie de dix questions,
+// qui payait moins. Roger a joue les Arcades, en a perdu beaucoup, et a quand meme passe un palier : « ca m'a fait
+// "Grinder" assez d'experience pour passer au niveau suivant ». Deux corrections ensemble - l'experience d'une partie
+// PERDUE est desormais raboteuse (voir arcadeExperience), et les paliers sont BEAUCOUP plus hauts.
+constexpr std::array<std::int64_t, PLAYER_LEVEL_COUNT> EXPERIENCE_THRESHOLDS{ 0, 1500, 6000, 18000, 45000 };
 
 }    // namespace
 

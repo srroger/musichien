@@ -37,16 +37,33 @@ void closeFamily( SessionSettings & p_settings, QuestionFamily p_family ) noexce
     }
 }
 
-// LE PLAFOND d'une session cadre e : la palette ne grandit plus au-dela de ce que le NIVEAU donne au depart.
+// LE PLAFOND d'une session cadre e : la palette part de la difficulte du NIVEAU CHOISI, peut grandir vers celle du niveau
+// AU-DESSUS, et ne va pas plus loin. Le PLANCHER, lui, est deja celui du niveau - voir narrowPalette, qui redescend sur une
+// erreur sans jamais passer sous ce avec quoi on a commence.
 //
-// C'est ce qui rend a l'Arcade et a l'Entrainement la difficulte qu'on a choisie. Une partie de vingt-cinq questions
-// elargit deux fois plus qu'une partie de dix, et Roger l'a senti tout de suite en debutant - « j'ai testé le mode arcade
-// en débutant. Et je galère ». Le jeu libre, lui, n'appelle jamais cette fonction : il garde le droit d'aller loin.
-void capPaletteAtLevel( SessionSettings & p_settings ) noexcept
+// C'EST LE RUBBER-BANDING DE ROGER : « je pensais garder la progression mais la plafonner au niveau supérieur non ? Et
+// redescendre la difficulte quand le joueur se trompe. Un peu comme en arcade des jeux de combat, la difficulte du CPU
+// augmente avec les combats, mais quand il perd elle rediminue. » Une partie qui reussit s'approche du niveau suivant sans
+// l'atteindre ; une partie qui rate retombe sur ses appuis.
+//
+// POURQUOI CE PLAFOND EXISTE, ET PAS CELUI DU NIVEAU COURANT : le premier jet plafonnait a la palette du niveau de depart,
+// ce qui SUPPRIMAIT toute progression dans la partie. Roger l'a corrige le jour meme - il veut la montee, bornee.
+void capPaletteAtNextLevel( SessionSettings & p_settings, PlayerLevel p_level ) noexcept
 {
-    p_settings.maximumPaletteSize = p_settings.startingPaletteSize;
-    p_settings.maximumChordQualityCount = p_settings.startingChordQualityCount;
-    p_settings.maximumModeCount = p_settings.startingModeCount;
+    const auto levelIndex = static_cast<std::size_t>( p_level );
+
+    if( levelIndex + 1 >= PLAYER_LEVEL_COUNT )
+    {
+        // Le DERNIER palier n'a pas de suivant : sa partie ne plafonne rien - et il n'y a de toute facon plus rien a
+        // elargir, puisque « Je maitrise » ouvre tout des le depart.
+        return;
+    }
+
+    const SessionSettings nextLevel = sessionSettingsFor( playerLevelFromIndex( levelIndex + 1 ) );
+
+    p_settings.maximumPaletteSize = nextLevel.startingPaletteSize;
+    p_settings.maximumChordQualityCount = nextLevel.startingChordQualityCount;
+    p_settings.maximumModeCount = nextLevel.startingModeCount;
 }
 
 }    // namespace
@@ -66,11 +83,20 @@ double arcadeMultiplier( std::int32_t p_livesLost ) noexcept
     return 1.0;
 }
 
-std::int32_t arcadeExperience( std::int32_t p_baseExperience, std::int32_t p_livesLost ) noexcept
+std::int32_t arcadeExperience( std::int32_t p_baseExperience,
+                               std::int32_t p_livesLost,
+                               std::size_t p_completedQuestions,
+                               std::size_t p_totalQuestions ) noexcept
 {
     const double multiplied = static_cast<double>( p_baseExperience ) * arcadeMultiplier( p_livesLost );
 
-    return static_cast<std::int32_t>( std::lround( multiplied ) );
+    // LA PART JOUEE : ce que la partie a couvert de sa longueur. Une partie terminee vaut 1 ; une partie perdue au huitieme
+    // des vingt-cinq vaut 0,32. Voir l'en-tete pour WHY ce facteur existe.
+    const double completion = ( p_totalQuestions == 0 )
+                                ? 1.0
+                                : std::min( 1.0, static_cast<double>( p_completedQuestions ) / static_cast<double>( p_totalQuestions ) );
+
+    return static_cast<std::int32_t>( std::lround( multiplied * completion ) );
 }
 
 std::vector<QuestionTarget> arcadePlan( std::uint32_t p_seed )
@@ -122,8 +148,8 @@ SessionSettings arcadeSettingsFor( PlayerLevel p_level, std::uint32_t p_seed )
     settings.lives = ARCADE_STARTING_LIVES;
     settings.plannedQuestions = arcadePlan( p_seed );
 
-    // LE PLAFOND : une Arcade fait la difficulte de son niveau, pas plus. Voir capPaletteAtLevel.
-    capPaletteAtLevel( settings );
+    // LE PLAFOND : une Arcade part de son niveau, monte vers le suivant, et s'y arrete. Voir capPaletteAtNextLevel.
+    capPaletteAtNextLevel( settings, p_level );
 
     return settings;
 }
@@ -146,8 +172,8 @@ SessionSettings trainingSettingsFor( PlayerLevel p_level, QuestionFamily p_famil
         }
     }
 
-    // ET LE PLAFOND, comme l'Arcade : un Entrainement ne depasse pas la difficulte de son niveau.
-    capPaletteAtLevel( settings );
+    // ET LE PLAFOND, comme l'Arcade : un Entrainement part de son niveau et monte vers le suivant, sans le depasser.
+    capPaletteAtNextLevel( settings, p_level );
 
     return settings;
 }

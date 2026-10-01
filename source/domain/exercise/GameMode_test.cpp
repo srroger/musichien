@@ -196,35 +196,53 @@ TEST( GameModeTest, the_multiplier_rewards_the_untouched_run )
     EXPECT_DOUBLE_EQ( 1.0, arcadeMultiplier( 10 ) );
 }
 
-// L'experience finale arrondit, et elle applique bien le multiplicateur.
+// L'experience finale : le score, le merite des coeurs, ET la part de la partie qui a ete jouee.
 TEST( GameModeTest, the_arcade_experience_is_the_score_multiplied )
 {
-    EXPECT_EQ( 200, arcadeExperience( 100, 0 ) );
-    EXPECT_EQ( 120, arcadeExperience( 100, 3 ) );
-    EXPECT_EQ( 100, arcadeExperience( 100, 7 ) );
+    // Une partie COMPLETE - vingt-cinq sur vingt-cinq - ne subit que le multiplicateur.
+    EXPECT_EQ( 200, arcadeExperience( 100, 0, 25, 25 ) );
+    EXPECT_EQ( 120, arcadeExperience( 100, 3, 25, 25 ) );
+    EXPECT_EQ( 100, arcadeExperience( 100, 7, 25, 25 ) );
 
-    // L'arrondi : 125 x 1.2 = 150, et 133 x 1.2 = 159.6 -> 160.
-    EXPECT_EQ( 150, arcadeExperience( 125, 2 ) );
-    EXPECT_EQ( 160, arcadeExperience( 133, 2 ) );
+    // Et l'arrondi : 125 x 1.2 = 150, et 133 x 1.2 = 159.6 -> 160.
+    EXPECT_EQ( 150, arcadeExperience( 125, 2, 25, 25 ) );
+    EXPECT_EQ( 160, arcadeExperience( 133, 2, 25, 25 ) );
 }
 
-// LE PLAFOND : l'Arcade et l'Entrainement ne grandissent pas au-dela de leur niveau, le jeu libre si.
-TEST( GameModeTest, the_arcade_and_the_training_cap_the_palette )
+// LA PART JOUEE : une Arcade perdue tot ne paie presque rien. C'est la seconde moitie de la correction du 02/10/2026.
+TEST( GameModeTest, an_unfinished_arcade_barely_pays )
 {
-    const SessionSettings arcade = arcadeSettingsFor( PlayerLevel::Beginner, 1 );
+    // Perdue au huitieme des vingt-cinq, tous les coeurs y sont passes : huit vingt-cinquiemes de cent.
+    EXPECT_EQ( 32, arcadeExperience( 100, 10, 8, 25 ) );
 
-    EXPECT_EQ( arcade.startingPaletteSize, arcade.maximumPaletteSize );
-    EXPECT_EQ( arcade.startingChordQualityCount, arcade.maximumChordQualityCount );
-    EXPECT_EQ( arcade.startingModeCount, arcade.maximumModeCount );
+    // Et meme SANS avoir perdu un coeur, une partie arretee tot ne paie que sa part.
+    EXPECT_EQ( 80, arcadeExperience( 100, 0, 10, 25 ) );
 
-    const SessionSettings training = trainingSettingsFor( PlayerLevel::Fluent, QuestionFamily::Interval );
+    // La meme partie TERMINEE vaudrait le double. C'est tout l'ecart que Roger voulait : « reduire drastiquement
+    // l'experience gagnee quand on perd avant la fin ».
+    EXPECT_EQ( 200, arcadeExperience( 100, 0, 25, 25 ) );
+}
 
-    EXPECT_EQ( training.startingPaletteSize, training.maximumPaletteSize );
-    EXPECT_EQ( training.startingModeCount, training.maximumModeCount );
+// LE PLAFOND : l'Arcade et l'Entrainement montent vers le NIVEAU SUIVANT, et s'y arretent. Le jeu libre, lui, ne plafonne
+// rien.
+TEST( GameModeTest, the_arcade_and_the_training_cap_the_palette_at_the_next_level )
+{
+    const SessionSettings beginnerArcade = arcadeSettingsFor( PlayerLevel::Beginner, 1 );
+    const SessionSettings fluentLevel = sessionSettingsFor( PlayerLevel::Fluent );
 
-    // Et le JEU LIBRE ne plafonne RIEN : ses reglages ne portent aucun maximum, donc la partie peut grandir.
+    // Un DEBUTANT part de deux intervalles, et peut monter jusqu'aux cinq du niveau au-dessus.
+    EXPECT_EQ( 2U, beginnerArcade.startingPaletteSize );
+    EXPECT_EQ( fluentLevel.startingPaletteSize, beginnerArcade.maximumPaletteSize );
+    EXPECT_GT( beginnerArcade.maximumPaletteSize, beginnerArcade.startingPaletteSize );
+    EXPECT_EQ( fluentLevel.startingModeCount, beginnerArcade.maximumModeCount );
+
+    // Le DERNIER palier n'a pas de suivant : sa partie ne plafonne rien.
+    const SessionSettings masterArcade = arcadeSettingsFor( PlayerLevel::Master, 1 );
+    EXPECT_EQ( 0U, masterArcade.maximumPaletteSize );
+    EXPECT_EQ( 0U, masterArcade.maximumModeCount );
+
+    // Et le JEU LIBRE ne plafonne RIEN non plus : ses reglages ne portent aucun maximum.
     const SessionSettings free = sessionSettingsFor( PlayerLevel::Beginner );
-
     EXPECT_EQ( 0U, free.maximumPaletteSize );
     EXPECT_EQ( 0U, free.maximumChordQualityCount );
     EXPECT_EQ( 0U, free.maximumModeCount );
