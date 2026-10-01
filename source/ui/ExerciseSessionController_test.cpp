@@ -242,7 +242,7 @@ TEST( ExerciseSessionControllerTest, the_sung_offset_is_kept_even_though_the_mic
     MicrophoneController microphone{ QStringList{}, {}, nullptr, &notePlayer };
 
     controller.setMicrophoneController( &microphone );
-    controller.startSession();
+    controller.startOrdinarySession();
 
     ASSERT_TRUE( controller.isAsking() );
     ASSERT_EQ( 2, controller.questionKind() );
@@ -257,7 +257,7 @@ TEST( ExerciseSessionControllerTest, a_session_without_singing_keeps_no_offset )
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // Aucun chant n'a ete juge : l'ecran doit lire zero, et non une mesure inventee - ou, pire, celle du chant
     // precedent restee en memoire.
@@ -271,7 +271,7 @@ TEST( ExerciseSessionControllerTest, starting_a_session_asks_the_first_question 
 
     EXPECT_FALSE( controller.running() );
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     EXPECT_TRUE( controller.running() );
     EXPECT_TRUE( controller.isAsking() );
@@ -289,7 +289,7 @@ TEST( ExerciseSessionControllerTest, every_choice_is_ready_to_display )
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     const QVariantList choices = controller.choices();
 
@@ -309,7 +309,7 @@ TEST( ExerciseSessionControllerTest, the_right_answer_scores_and_the_verdict_is_
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
     answerCorrectly( controller );
 
     EXPECT_TRUE( controller.wasLastAnswerCorrect() );
@@ -328,7 +328,7 @@ TEST( ExerciseSessionControllerTest, a_wrong_answer_is_played_again_and_announce
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     int wrongAnswerCount = 0;
 
@@ -363,7 +363,7 @@ TEST( ExerciseSessionControllerTest, a_correct_answer_is_heard_again_as_a_chord 
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
     answerCorrectly( controller );
 
     // One melody for the question, and ONE CHORD for the verdict: the two notes together are twice as
@@ -382,7 +382,7 @@ TEST( ExerciseSessionControllerTest, the_answer_is_offered_after_three_wrong_one
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     const std::int32_t wrongDistance = heardDistance( controller ) + 1;
 
@@ -408,7 +408,7 @@ TEST( ExerciseSessionControllerTest, a_perfect_session_earns_its_star )
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     for( std::size_t question = 0; question < SESSION_QUESTION_COUNT; ++question )
     {
@@ -429,7 +429,7 @@ TEST( ExerciseSessionControllerTest, replaying_counts_and_costs_experience )
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     controller.replay();
 
@@ -447,7 +447,7 @@ TEST( ExerciseSessionControllerTest, leaving_the_loop_releases_the_sound_and_the
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     controller.stopSession();
 
@@ -480,7 +480,7 @@ TEST( ExerciseSessionControllerTest, a_wrong_answer_is_heard_as_a_cue_and_felt )
                                           {},
                                           [&vibrationCount] { ++vibrationCount; } };
 
-    controller.startSession();
+    controller.startOrdinarySession();
     controller.answer( heardDistance( controller ) + 1 );
 
     EXPECT_EQ( 1, notePlayer.mistakeCueCount() );
@@ -499,7 +499,7 @@ TEST( ExerciseSessionControllerTest, a_correct_answer_neither_sounds_the_cue_nor
                                           {},
                                           [&vibrationCount] { ++vibrationCount; } };
 
-    controller.startSession();
+    controller.startOrdinarySession();
     answerCorrectly( controller );
 
     EXPECT_EQ( 0, notePlayer.mistakeCueCount() );
@@ -512,7 +512,7 @@ TEST( ExerciseSessionControllerTest, a_device_that_cannot_vibrate_still_hears_th
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
     controller.answer( heardDistance( controller ) + 1 );
 
     EXPECT_EQ( 1, notePlayer.mistakeCueCount() );
@@ -533,7 +533,7 @@ TEST( ExerciseSessionControllerTest, the_hint_waits_for_a_mistake )
                                           ascendingOnlySettings(),
                                           hintBookForEveryAscendingInterval() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // Nothing yet: an interval offered before the player has tried would just be a second question.
     EXPECT_TRUE( controller.hintText().isEmpty() );
@@ -555,7 +555,7 @@ TEST( ExerciseSessionControllerTest, the_hint_stays_for_the_verdict_and_leaves_w
                                           ascendingOnlySettings(),
                                           hintBookForEveryAscendingInterval() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
     controller.answer( heardDistance( controller ) + 1 );
 
     ASSERT_FALSE( controller.hintText().isEmpty() );
@@ -579,7 +579,7 @@ TEST( ExerciseSessionControllerTest, an_interval_without_a_hint_shows_nothing )
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
     controller.answer( heardDistance( controller ) + 1 );
 
     EXPECT_TRUE( controller.hintText().isEmpty() );
@@ -634,7 +634,7 @@ TEST( ExerciseSessionControllerTest, a_share_of_zero_in_the_profile_never_poses_
         ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
         controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
-        controller.startSession();
+        controller.startOrdinarySession();
 
         if( controller.isModeQuestion() )
         {
@@ -675,7 +675,7 @@ TEST( ExerciseSessionControllerTest, a_realistic_share_poses_foreign_note_questi
         ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
         controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
-        controller.startSession();
+        controller.startOrdinarySession();
 
         if( controller.isForeignNoteQuestion() )
         {
@@ -701,7 +701,7 @@ TEST( ExerciseSessionControllerTest, a_foreign_note_question_offers_the_seven_no
     ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
 
     controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
-    controller.startSession();
+    controller.startOrdinarySession();
 
     ASSERT_TRUE( controller.isForeignNoteQuestion() );
 
@@ -768,7 +768,7 @@ TEST( ExerciseSessionControllerTest, a_two_mode_question_announces_twice_the_sou
 
     ExerciseSessionController nameController{ notePlayer, {}, {}, {}, {}, &nameStore };
     nameController.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
-    nameController.startSession();
+    nameController.startOrdinarySession();
 
     const int oneMode = nameController.modeSoundDurationMs();
 
@@ -779,7 +779,7 @@ TEST( ExerciseSessionControllerTest, a_two_mode_question_announces_twice_the_sou
 
     ExerciseSessionController colourController{ notePlayer, {}, {}, {}, {}, &colourStore };
     colourController.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
-    colourController.startSession();
+    colourController.startOrdinarySession();
 
     // Plus du double : les deux modes, ET le silence qui les separe.
     EXPECT_GT( colourController.modeSoundDurationMs(), oneMode * 2 );
@@ -787,7 +787,7 @@ TEST( ExerciseSessionControllerTest, a_two_mode_question_announces_twice_the_sou
     // Et une question qui ne parle pas de mode n'annonce aucune duree : la pause de l'ecran est alors celle des
     // intervalles, et une valeur inventee ici la rallongerait sans raison.
     ExerciseSessionController intervalController{ notePlayer, { intervalOnlySettings() } };
-    intervalController.startSession();
+    intervalController.startOrdinarySession();
 
     EXPECT_EQ( 0, intervalController.modeSoundDurationMs() );
 }
@@ -827,7 +827,7 @@ TEST( ExerciseSessionControllerTest, a_name_question_is_heard_as_a_melody )
     controller.setPhraseBook( phraseBook );
 
     controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
-    controller.startSession();
+    controller.startOrdinarySession();
 
     ASSERT_EQ( static_cast<int>( domain::QuestionKind::ModeName ), controller.questionKind() );
 
@@ -854,7 +854,7 @@ TEST( ExerciseSessionControllerTest, a_name_question_is_heard_as_a_melody )
     // reponse pendant que la melodie joue encore.
     ExerciseSessionController scaleController{ notePlayer, {}, {}, {}, {}, &levelStore };
     scaleController.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
-    scaleController.startSession();
+    scaleController.startOrdinarySession();
 
     ASSERT_EQ( static_cast<int>( domain::QuestionKind::ModeName ), scaleController.questionKind() );
 
@@ -943,7 +943,7 @@ TEST( ExerciseSessionControllerTest, the_god_mode_plays_the_perimeter_the_player
 
     // Un joueur ordinaire : la grille vient de son NIVEAU, et elle est large.
     controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
-    controller.startSession();
+    controller.startOrdinarySession();
 
     const int levelChoiceCount = controller.choices().size();
 
@@ -968,7 +968,7 @@ TEST( ExerciseSessionControllerTest, the_god_mode_plays_the_perimeter_the_player
     EXPECT_TRUE( controller.godModeIsSaved() );
     EXPECT_FALSE( controller.godModeHasUnsavedChanges() );
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     std::vector<std::int32_t> played;
 
@@ -1049,7 +1049,7 @@ TEST( ExerciseSessionControllerTest, the_god_mode_falls_back_on_the_level_until_
     // La palette n'a pas change en choisissant le GodMode : elle est simplement devenue celle qui joue.
     EXPECT_EQ( 12, checkedIntervalCount( controller ) );
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // Et la grille de la partie offre ces DOUZE intervalles, la ou une partie de niveau n'en montrait que huit : le GodMode
     // n'a pas de plafond, il donne tout ce qui a ete coche.
@@ -1074,7 +1074,7 @@ TEST( ExerciseSessionControllerTest, a_harmony_question_offers_no_interval_hint 
     ExerciseSessionController controller{ notePlayer, {}, hintBookForEveryAscendingInterval(), {}, {}, &levelStore };
 
     controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Advanced ) );
-    controller.startSession();
+    controller.startOrdinarySession();
 
     ASSERT_EQ( static_cast<int>( domain::QuestionKind::ModeName ), controller.questionKind() );
 
@@ -1215,7 +1215,7 @@ TEST( ExerciseSessionControllerTest, a_level_decides_where_the_sessions_start )
     // And it is REMEMBERED, which is the whole difference between a level and a setting.
     EXPECT_TRUE( levelStore.storedLevel().has_value() );
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // A player who says he knows the intervals is not asked to tell two of them apart: the grid he is offered
     // is wide, where a beginner gets two choices.
@@ -1247,7 +1247,7 @@ TEST( ExerciseSessionControllerTest, a_level_changes_the_palette_and_nothing_els
     ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, &levelStore };
 
     controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Beginner ) );
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // The same ten questions, the same lives, the same scoring as always: a level says WHERE to start, never
     // HOW the game is played.
@@ -1268,7 +1268,7 @@ TEST( ExerciseSessionControllerTest, an_application_with_nowhere_to_remember_sti
     EXPECT_FALSE( controller.hasChosenLevel() );
     EXPECT_EQ( -1, controller.playerLevel() );
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     EXPECT_TRUE( controller.running() );
 }
@@ -1309,7 +1309,7 @@ TEST( ExerciseSessionControllerTest, every_choice_is_on_the_circle_at_the_place_
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, ascendingOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     for( int question = 0; question < static_cast<int>( SESSION_QUESTION_COUNT ); ++question )
     {
@@ -1382,7 +1382,7 @@ TEST( ExerciseSessionControllerTest, a_place_holds_every_octave_of_its_class )
 
     ExerciseSessionController controller{ notePlayer, settings };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // L'unisson, l'octave et la quinzieme sont la meme note a une ou deux octaves pres : une seule place.
     const std::size_t unisonSlot = domain::circleOfFifthsSlot( domain::Interval{ 0 } );
@@ -1423,7 +1423,7 @@ TEST( ExerciseSessionControllerTest, a_guided_question_reports_its_kind_and_take
 
     ExerciseSessionController controller{ notePlayer, settings };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // Le mode guide est annonce a l'ecran...
     EXPECT_EQ( 1, controller.questionKind() );
@@ -1448,7 +1448,7 @@ TEST( ExerciseSessionControllerTest, the_session_experience_joins_the_profile_to
 
     ExerciseSessionController controller{ notePlayer, settings, {}, {}, {}, &store };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // Deux questions jouees jusqu'au bout, toutes les deux justes.
     while( !controller.isFinished() )
@@ -1586,7 +1586,7 @@ TEST( ExerciseSessionControllerTest, tapping_on_an_interval_question_changes_not
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // La meme mesure de surete que le domaine : une frappe sur une question d'intervalle ne juge rien, et ne fait
     // aucun bruit - il n'y a pas de batterie derriere.
@@ -1615,7 +1615,7 @@ TEST( ExerciseSessionControllerTest, a_chord_question_is_played_as_a_block )
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     EXPECT_TRUE( controller.isChordQuestion() );
     EXPECT_EQ( 4, controller.questionKind() );
@@ -1634,7 +1634,7 @@ TEST( ExerciseSessionControllerTest, the_chord_choices_and_the_accord_are_ready_
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     const QVariantList choices = controller.chordChoices();
 
@@ -1674,7 +1674,7 @@ TEST( ExerciseSessionControllerTest, naming_the_heard_colour_scores_and_the_acco
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     const int quality = controller.heardChord().value( "quality" ).toInt();
 
@@ -1695,7 +1695,7 @@ TEST( ExerciseSessionControllerTest, an_index_that_is_not_a_colour_is_refused )
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // Un ecran qui inventerait un index ne doit pas pouvoir repondre : la question reste posee, et rien ne bouge.
     controller.answerChord( 99 );
@@ -1710,7 +1710,7 @@ TEST( ExerciseSessionControllerTest, an_interval_question_offers_no_chord )
     domain::NotePlayerFake notePlayer;
     ExerciseSessionController controller{ notePlayer, intervalOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // Les proprietes d'accord sont vides plutot que fausses : un ecran qui les lirait par erreur n'afficherait rien.
     EXPECT_FALSE( controller.isChordQuestion() );
@@ -1766,7 +1766,7 @@ TEST( ExerciseSessionControllerTest, a_concluded_question_is_written_to_the_jour
     ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
     controller.setQuestionLog( &log );
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // Rien tant que la question n'est pas conclue : une question posee n'est pas encore une lecon.
     EXPECT_EQ( 0U, log.size() );
@@ -1796,7 +1796,7 @@ TEST( ExerciseSessionControllerTest, a_wrong_answer_that_leaves_the_question_ope
     ExerciseSessionController controller{ notePlayer, settings };
     controller.setQuestionLog( &log );
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     controller.answerChord( wrongChordChoice( controller ) );
 
@@ -1821,7 +1821,7 @@ TEST( ExerciseSessionControllerTest, answering_twice_writes_one_line )
     ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
     controller.setQuestionLog( &log );
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     const int correctQuality = controller.heardChord().value( "quality" ).toInt();
 
@@ -1839,7 +1839,7 @@ TEST( ExerciseSessionControllerTest, a_revealed_question_is_recorded_as_help_not
     ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
     controller.setQuestionLog( &log );
 
-    controller.startSession();
+    controller.startOrdinarySession();
     controller.revealAnswer();
 
     ASSERT_EQ( 1U, log.size() );
@@ -1857,7 +1857,7 @@ TEST( ExerciseSessionControllerTest, a_session_without_a_journal_still_plays )
     // fonctionner exactement pareil - des statistiques, pas une regle du jeu.
     ExerciseSessionController controller{ notePlayer, chordOnlySettings() };
 
-    controller.startSession();
+    controller.startOrdinarySession();
     controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
 
     EXPECT_TRUE( controller.isFeedbackVisible() );
@@ -1993,7 +1993,7 @@ TEST( ExerciseSessionControllerTest, the_dog_barks_when_the_session_ends )
 
     ExerciseSessionController controller{ notePlayer, settings };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     EXPECT_EQ( 0, notePlayer.dogBarkCount() );
 
@@ -2035,7 +2035,7 @@ TEST( ExerciseSessionControllerTest, the_circle_carries_the_step_of_each_note )
 
     ExerciseSessionController controller{ notePlayer, settings };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     ASSERT_TRUE( controller.isForeignNoteQuestion() );
 
@@ -2109,7 +2109,7 @@ TEST( ExerciseSessionControllerTest, a_foreign_note_question_is_a_harmony_questi
     foreignOnly.foreignNoteQuestionShare = 100;
 
     ExerciseSessionController harmonyController{ notePlayer, foreignOnly };
-    harmonyController.startSession();
+    harmonyController.startOrdinarySession();
 
     EXPECT_TRUE( harmonyController.isForeignNoteQuestion() );
     EXPECT_TRUE( harmonyController.isHarmonyQuestion() );
@@ -2119,7 +2119,7 @@ TEST( ExerciseSessionControllerTest, a_foreign_note_question_is_a_harmony_questi
     intervalsOnly.namedIntervalQuestionShare = 100;
 
     ExerciseSessionController intervalController{ notePlayer, intervalsOnly };
-    intervalController.startSession();
+    intervalController.startOrdinarySession();
 
     EXPECT_FALSE( intervalController.isHarmonyQuestion() );
 }
@@ -2144,7 +2144,7 @@ TEST( ExerciseSessionControllerTest, a_foreign_note_question_offers_seven_notes_
 
     ExerciseSessionController controller{ notePlayer, settings };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     ASSERT_TRUE( controller.isForeignNoteQuestion() );
 
@@ -2188,7 +2188,7 @@ TEST( ExerciseSessionControllerTest, only_the_vamp_comes_out_when_only_the_vamp_
 
     ExerciseSessionController controller{ notePlayer, settings };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     int questionCount = 0;
     int vampCount = 0;
@@ -2234,13 +2234,13 @@ TEST( ExerciseSessionControllerTest, the_dog_only_talks_after_a_session_that_end
     EXPECT_FALSE( controller.isChibaTalking() );
 
     // Une partie qu'on quitte en cours : le chien se tait.
-    controller.startSession();
+    controller.startOrdinarySession();
     controller.stopSession();
 
     EXPECT_FALSE( controller.isChibaTalking() );
 
     // Une partie menee jusqu'au bout : il parle, et une seule fois par partie.
-    controller.startSession();
+    controller.startOrdinarySession();
 
     for( int index = 0; ( index < 500 ) && !controller.isFinished(); ++index )
     {
@@ -2289,7 +2289,7 @@ TEST( ExerciseSessionControllerTest, a_plain_game_after_a_review_is_not_a_review
 
     // Le joueur quitte le bilan, puis joue : ce n'est plus un bilan.
     controller.stopSession();
-    controller.startSession();
+    controller.startOrdinarySession();
 
     EXPECT_FALSE( controller.isReviewRunning() );
 
@@ -2333,7 +2333,7 @@ TEST( ExerciseSessionControllerTest, the_encouragement_speaks_only_during_a_revi
     controller.setQuestionLog( &log );
 
     // Une partie ordinaire ne dit RIEN : l'ecran reste silencieux, et c'est ce qui donne du poids aux mots du bilan.
-    controller.startSession();
+    controller.startOrdinarySession();
 
     EXPECT_TRUE( controller.encouragementText().isEmpty() );
 
@@ -2383,7 +2383,7 @@ TEST( ExerciseSessionControllerTest, resetting_the_profile_also_wipes_the_statis
     ExerciseSessionController controller{ notePlayer, chordOnlySettings(), {}, {}, {}, &levelStore };
     controller.setQuestionLog( &log );
 
-    controller.startSession();
+    controller.startOrdinarySession();
     controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
 
     ASSERT_EQ( 1U, log.size() );
@@ -2407,7 +2407,7 @@ TEST( ExerciseSessionControllerTest, the_chord_hint_removes_a_choice_from_the_sc
 
     ExerciseSessionController controller{ notePlayer, settings };
 
-    controller.startSession();
+    controller.startOrdinarySession();
 
     // Rien avant d'avoir essaye : l'indice attend un premier essai rate.
     EXPECT_FALSE( controller.isChordHintAvailable() );
@@ -2457,7 +2457,7 @@ TEST( ExerciseSessionControllerTest, the_arpeggio_is_offered_even_when_nothing_c
 
     ExerciseSessionController controller{ notePlayer, settings };
 
-    controller.startSession();
+    controller.startOrdinarySession();
     controller.answerChord( wrongChordChoice( controller ) );
 
     EXPECT_FALSE( controller.isChordHintAvailable() );

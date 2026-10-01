@@ -148,7 +148,7 @@ namespace
     static ExerciseSessionController * controller = [] {
         auto * created = new ExerciseSessionController{ notePlayer, wholeMapSettings() };
 
-        created->startSession();
+        created->startOrdinarySession();
 
         return created;
     }();

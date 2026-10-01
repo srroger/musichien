@@ -183,7 +183,14 @@ TEST( MainScreenTest, the_main_screen_shows_its_main_actions )
         } );
     };
 
-    EXPECT_TRUE( hasTextContaining( QStringLiteral( "Jouer" ) ) ) << "le bouton Jouer est absent de l'ecran principal";
+    // L'ARCADE a remplace « Jouer » quand le jeu a recu ses quatre modes : c'est la porte principale, et celle qui paie.
+    EXPECT_TRUE( hasTextContaining( QStringLiteral( "ARCADE" ) ) ) << "le bouton Arcade est absent de l'ecran principal";
+
+    // Et les TROIS FAMILLES, juste sous lui : ce sont les portes de l'Entrainement, et Roger les a voulues a cette place.
+    // Ce qui n'est pas nomme ici ne se trouve pas depuis l'accueil.
+    EXPECT_TRUE( hasTextContaining( QStringLiteral( "Intervalles" ) ) ) << "l'entrainement aux intervalles est absent";
+    EXPECT_TRUE( hasTextContaining( QStringLiteral( "Accords" ) ) ) << "l'entrainement aux accords est absent";
+    EXPECT_TRUE( hasTextContaining( QStringLiteral( "Modes" ) ) ) << "l'entrainement aux modes est absent";
 
     // Et la page construit vraiment quelque chose : une vingtaine de textes, c'est le minimum d'une page de reglages
     // qui en compte des dizaines.
