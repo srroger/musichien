@@ -75,6 +75,7 @@
         <file alias="assets/images/chibaSpeak4.png">../../assets/images/chibaSpeak4.png</file>
         <file alias="assets/images/chibaWin.png">../../assets/images/chibaWin.png</file>
         <file alias="assets/images/chibaLose.png">../../assets/images/chibaLose.png</file>
+        <file alias="assets/images/shibaBoss.png">../../assets/images/shibaBoss.png</file>
     <!--
       Les echantillons d instruments : meme motif que les fichiers de contenu, alias compris,
       pour que le chemin de ressource soit celui du disque sur le PC comme sur le telephone.

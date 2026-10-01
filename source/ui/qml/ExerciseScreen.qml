@@ -36,6 +36,10 @@ Item {
     // La couleur d'une couleur d'accord vient du CONTROLEUR (chordColourName) : elle est la meme sur tous les ecrans, et
     // elle le restera. Deux fichiers QML qui recalculeraient chacun leur teinte finiraient par en montrer deux differentes.
     // LA FAMILLE OU LE JOUEUR EST LE PLUS FORT, et celle ou il resiste - pendant CETTE partie.
+    // =================================================================================================================
+    // LE BOSS
+    // La derniere question d'une Arcade est la NOTE ETRANGERE, et Roger l'a voulue comme un combat de fin : « le chien
+    // levite lentement en plein milieu de la page, et tout le fond devient en fondu doux rouge feu ».
 
     id: exerciseScreen
 
@@ -239,6 +243,81 @@ Item {
         anchors.fill: parent
         enabled: ExerciseController.isFeedbackVisible
         onClicked: ExerciseController.continueToNextQuestion()
+    }
+
+    // IL SE POSE DERRIERE TOUT : c'est un DECOR, pas une couche. Le laisser devant cacherait la question, et le joueur ne
+    // pourrait plus repondre a ce qu'on lui demande. Un Item sans gestionnaire de souris ne consomme aucun clic, donc le
+    // « touche pour passer » continue de marcher a travers lui.
+    // =================================================================================================================
+    Rectangle {
+        id: bossBackdrop
+
+        anchors.fill: parent
+        // Il ne s'allume que pour la question du boss, et jamais une fois la partie finie : le rouge doit s'eteindre.
+        visible: opacity > 0
+        opacity: (ExerciseController.isForeignNoteQuestion && !ExerciseController.isFinished) ? 1 : 0
+
+        Image {
+            id: bossImage
+
+            // Position de repos : au MILIEU de la page, comme Roger l'a imagine.
+            readonly property real restingY: (parent.height - height) / 2
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(parent.width * 0.58, 260)
+            height: width
+            fillMode: Image.PreserveAspectFit
+            source: "qrc:/assets/images/shibaBoss.png"
+            opacity: 0.9
+            y: bossImage.restingY
+
+            // ET IL LEVITE : un va-et-vient lent, de bas en haut, sans fin. Deux animations enchainees, parce qu'une
+            // seule ne saurait pas revenir.
+            SequentialAnimation on y {
+                loops: Animation.Infinite
+                running: bossBackdrop.visible
+
+                NumberAnimation {
+                    from: bossImage.restingY - 16
+                    to: bossImage.restingY + 16
+                    duration: 2800
+                    easing.type: Easing.InOutSine
+                }
+
+                NumberAnimation {
+                    from: bossImage.restingY + 16
+                    to: bossImage.restingY - 16
+                    duration: 2800
+                    easing.type: Easing.InOutSine
+                }
+
+            }
+
+        }
+
+        gradient: Gradient {
+            GradientStop {
+                position: 0
+                color: "#3a0c11"
+            }
+
+            GradientStop {
+                position: 1
+                color: "#7c1a1c"
+            }
+
+        }
+
+        // LE FONDU, dans les deux sens : « un fondu doux » a l'arrivee, et le retour a la nuit violette quand le boss
+        // tombe. Sans ce retour, la page resterait rouge pour la suite du jeu.
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 900
+                easing.type: Easing.InOutQuad
+            }
+
+        }
+
     }
 
     // An explicit width and height rather than anchors: an item cannot both be anchored and have its x
