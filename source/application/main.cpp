@@ -404,6 +404,7 @@ int main( int p_argumentCount, char * p_arguments[] )
     // synthesiser keeps the mistake cue, which must not be beautiful, and stays the fallback if a sample is
     // missing.
     std::vector<musichien::domain::SampledInstrument> instruments;
+    instruments.reserve( SAMPLED_INSTRUMENT_NAMES.size() );
 
     for( const char * instrumentName : SAMPLED_INSTRUMENT_NAMES )
     {

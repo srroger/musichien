@@ -577,10 +577,16 @@ std::vector<float> ToneSynthesizer::mixRenderedMelodyOverDrone( std::span<const 
 //
 // The three spectra are the POINT: the sine has no harmonic, the sawtooth has every harmonic falling as 1/n, the
 // square only the odd ones. They are the honest tools for hearing a temperament, because nothing else is in the way.
-// La forme d'onde d'un "Waveform", calculée à une phase donnée. STATIQUE, et non libre : clang-tidy le demande, et il a
-// raison - elle n'est appelée que par ce fichier, donc tout autre nom qu'un lien interne invite un autre fichier à
-// croire qu'elle existe, et à en dépendre un jour.
-[[nodiscard]] static float waveformSample( Waveform p_waveform, double p_phase ) noexcept
+// La forme d'onde d'un "Waveform", calculee a une phase donnee.
+//
+// DANS UN NAMESPACE ANONYME, et le commentaire precedent disait l'inverse : il justifiait un `static`, ce que clang-tidy
+// refusait deja. Le lien interne est bien ce qu'on veut - cette fonction n'appartient qu'a ce fichier, et aucun autre ne
+// doit pouvoir croire qu'elle existe - mais l'ecrire par un namespace anonyme le dit a la lecture comme a l'editeur de
+// liens, sans laisser croire a un nom exporte.
+namespace
+{
+
+[[nodiscard]] float waveformSample( Waveform p_waveform, double p_phase ) noexcept
 {
     const double cycle = p_phase - std::floor( p_phase );
 
@@ -622,6 +628,8 @@ std::vector<float> ToneSynthesizer::mixRenderedMelodyOverDrone( std::span<const 
 
     return 0.0F;
 }
+
+}    // namespace
 
 std::vector<float> ToneSynthesizer::renderWaveNote( const Note & p_note,
                                                     Waveform p_waveform,

@@ -190,7 +190,7 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
                                                       QObject * p_parent )
   : QObject{ p_parent }
   , m_notePlayer{ p_notePlayer }
-  , m_settings{ p_settings }
+  , m_settings{ std::move( p_settings ) }
   , m_hintBook{ std::move( p_hintBook ) }
   , m_anecdoteBook{ std::move( p_anecdoteBook ) }
   , m_vibrate{ std::move( p_vibrate ) }
@@ -1567,7 +1567,7 @@ void ExerciseSessionController::answerModeName( int p_modeIndex )
         return;
     }
 
-    if( static_cast<std::size_t>( p_modeIndex ) >= domain::MODE_COUNT )
+    if( std::cmp_greater_equal( p_modeIndex, domain::MODE_COUNT ) )
     {
         return;
     }
@@ -3436,7 +3436,7 @@ void ExerciseSessionController::toggleGodModeInterval( int p_semitones )
 
 void ExerciseSessionController::toggleGodModeChord( int p_qualityIndex )
 {
-    if( ( p_qualityIndex < 0 ) || ( p_qualityIndex >= static_cast<int>( domain::CHORD_QUALITY_COUNT ) ) )
+    if( ( p_qualityIndex < 0 ) || std::cmp_greater_equal( p_qualityIndex, domain::CHORD_QUALITY_COUNT ) )
     {
         return;
     }
@@ -3459,7 +3459,7 @@ void ExerciseSessionController::toggleGodModeChord( int p_qualityIndex )
 
 void ExerciseSessionController::toggleGodModeMode( int p_modeIndex )
 {
-    if( ( p_modeIndex < 0 ) || ( p_modeIndex >= static_cast<int>( domain::MODE_COUNT ) ) )
+    if( ( p_modeIndex < 0 ) || std::cmp_greater_equal( p_modeIndex, domain::MODE_COUNT ) )
     {
         return;
     }

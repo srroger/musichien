@@ -21,7 +21,7 @@ GodModePalette paletteForLevel( PlayerLevel p_level )
     return palette;
 }
 
-GodModePalette orderedPalette( GodModePalette p_palette )
+GodModePalette orderedPalette( const GodModePalette & p_palette )
 {
     const auto inLearningOrder = []( const auto & p_all, const auto & p_chosen ) {
         using Item = std::ranges::range_value_t<decltype( p_all )>;

@@ -118,7 +118,7 @@ std::vector<float> DrumSynthesizer::renderDrum( Drum p_drum ) const
                 const double timeSeconds = static_cast<double>( sampleIndex ) / static_cast<double>( m_sampleRate );
 
                 const float noise = distribution( engine );
-                const float tone = static_cast<float>( std::sin( 2.0 * std::numbers::pi * 180.0 * timeSeconds ) );
+                const auto tone = static_cast<float>( std::sin( 2.0 * std::numbers::pi * 180.0 * timeSeconds ) );
 
                 samples.at( sampleIndex ) = ( 0.7F * noise ) + ( 0.3F * tone );
             }

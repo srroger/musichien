@@ -136,7 +136,7 @@ std::optional<domain::GodModePalette> QSettingsPlayerPreferences::storedGodModeP
 
     for( const QVariant & semitones : settings.value( GOD_MODE_INTERVALS_KEY ).toList() )
     {
-        palette.intervals.push_back( domain::Interval{ semitones.toInt() } );
+        palette.intervals.emplace_back( semitones.toInt() );
     }
 
     for( const QVariant & quality : settings.value( GOD_MODE_CHORDS_KEY ).toList() )

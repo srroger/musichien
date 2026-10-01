@@ -66,7 +66,7 @@ constexpr std::size_t MINIMUM_STEP_COUNT = 3;
         // Un degre est un chiffre de 1 a 7, comme un musicien les compte. Le domaine sait replier un degre hors bornes,
         // et c'est justement pourquoi le contenu doit etre strict : un « 8 » saisi par erreur deviendrait la tonique
         // sans que rien ne le dise.
-        if( ( degreeValue < 1 ) || ( degreeValue > static_cast<std::int32_t>( domain::DEGREE_COUNT ) ) )
+        if( ( degreeValue < 1 ) || std::cmp_greater( degreeValue, domain::DEGREE_COUNT ) )
         {
             return std::nullopt;
         }

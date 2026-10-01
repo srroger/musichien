@@ -76,7 +76,7 @@ namespace
 
     const double denominator = 2.0 * ( ( 2.0 * here ) - above - below );
 
-    double refinedBin = static_cast<double>( best );
+    auto refinedBin = static_cast<double>( best );
 
     if( std::abs( denominator ) > 1e-30 )
     {
@@ -213,7 +213,7 @@ double PitchEstimator::estimate( std::span<const double> p_window, double p_samp
 
     const double denominator = 2.0 * ( ( 2.0 * here ) - above - below );
 
-    double refinedTau = static_cast<double>( tau );
+    auto refinedTau = static_cast<double>( tau );
 
     if( std::abs( denominator ) > 1e-12 )
     {

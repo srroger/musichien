@@ -68,7 +68,10 @@ inline constexpr std::size_t MINIMUM_GOD_MODE_CHOICES = 2;
 [[nodiscard]] GodModePalette paletteForLevel( PlayerLevel p_level );
 
 // La meme palette, rangee dans l'ordre d'apprentissage de chaque famille.
-[[nodiscard]] GodModePalette orderedPalette( GodModePalette p_palette );
+//
+// La reference est CONSTANTE et non par valeur : rien n'est modifie ici, et la fonction quitte pour rentrer dans les
+// cas ordinaires de la session.
+[[nodiscard]] GodModePalette orderedPalette( const GodModePalette & p_palette );
 
 // Vrai si la palette peut poser des questions : au moins deux elements dans chaque famille dont la part n'est pas nulle.
 //

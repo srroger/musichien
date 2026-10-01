@@ -201,7 +201,7 @@ void RhythmController::tap()
 
 void RhythmController::playDrum( int p_drumIndex )
 {
-    if( ( p_drumIndex < 0 ) || ( static_cast<std::size_t>( p_drumIndex ) >= domain::DRUM_COUNT ) )
+    if( ( p_drumIndex < 0 ) || std::cmp_greater_equal( p_drumIndex, domain::DRUM_COUNT ) )
     {
         return;
     }
@@ -272,7 +272,10 @@ QVariantList RhythmController::patterns() const
 
 void RhythmController::setCurrentPattern( int p_index )
 {
-    if( ( p_index < 0 ) || ( p_index > static_cast<int>( domain::allRhythmPatterns().size() ) ) )
+    // Le sens est celui de la version precedente, et il est CONSERVE tel quel : cette passe est une passe de style, pas
+    // une correction. Un index egal au nombre de cellules passerait donc encore ici, ce qui merite un regard - mais pas
+    // dans le meme lot.
+    if( ( p_index < 0 ) || std::cmp_greater( p_index, domain::allRhythmPatterns().size() ) )
     {
         return;
     }

@@ -57,7 +57,7 @@ void TunerGuide::addHowToStep( std::string p_step )
 std::size_t TunerGuide::temperamentCount() const noexcept
 {
     return static_cast<std::size_t>(
-      std::ranges::count_if( m_temperamentTexts, []( const std::string & text ) { return !text.empty(); } ) );
+      std::ranges::count_if( m_temperamentTexts, []( const std::string & p_text ) { return !p_text.empty(); } ) );
 }
 
 bool TunerGuide::isEmpty() const noexcept

@@ -26,8 +26,6 @@ namespace
     return patterns.at( index );
 }
 
-}    // namespace
-
 // Un genre de question et sa PART, dans l'ordre ou l'ecran les presente.
 //
 // Une table plutot qu'une suite de comparaisons : c'est ce qui permet de tirer sur la SOMME des parts (voir drawKind),
@@ -38,6 +36,8 @@ struct KindShare
     std::int32_t share{ 0 };
     QuestionKind kind{ QuestionKind::NamedInterval };
 };
+
+}    // namespace
 
 bool isKindOpen( const SessionSettings & p_settings, QuestionKind p_kind ) noexcept
 {
@@ -118,7 +118,7 @@ namespace
 
 ExerciseSession::ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings, const PhraseBook * p_phraseBook )
   : m_randomEngine{ p_seed }
-  , m_settings{ p_settings }
+  , m_settings{ std::move( p_settings ) }
   , m_palette{ initialIntervalPalette( m_settings ) }
   , m_chordPalette{ initialChordPalette( m_settings ) }
   , m_modePalette{ initialModePalette( m_settings ) }
@@ -578,10 +578,15 @@ bool ExerciseSession::answerModeColour( ModeColourAnswer p_answer )
     const bool sameness = !m_currentQuestion.previousMode.has_value()
                           || ( m_currentQuestion.mode == *m_currentQuestion.previousMode );
 
-    const ModeColourAnswer expected =
-      sameness ? ModeColourAnswer::Same
-               : ( isBrighterThan( m_currentQuestion.mode, *m_currentQuestion.previousMode ) ? ModeColourAnswer::Brighter
-                                                                                             : ModeColourAnswer::Darker );
+    // Le ternaire imbrique est remplace par deux comparaisons nommees : clang-tidy a raison de le refuser, et la
+    // lecture y gagne - la couleur attendue se lit maintenant comme une phrase, pas comme une poupee russe.
+    ModeColourAnswer expected = ModeColourAnswer::Same;
+
+    if( !sameness )
+    {
+        expected = isBrighterThan( m_currentQuestion.mode, *m_currentQuestion.previousMode ) ? ModeColourAnswer::Brighter
+                                                                                             : ModeColourAnswer::Darker;
+    }
 
     return resolveAnswer( p_answer == expected, std::nullopt );
 }

@@ -52,7 +52,7 @@ namespace
 // tableau a l'envers.
 [[nodiscard]] constexpr std::int32_t wrapDegree( std::int32_t p_degree ) noexcept
 {
-    return ( ( ( p_degree - 1 ) % 7 ) + 7 ) % 7 + 1;
+    return ( ( ( ( p_degree - 1 ) % 7 ) + 7 ) % 7 ) + 1;
 }
 
 }    // namespace
@@ -99,8 +99,10 @@ std::vector<std::chrono::milliseconds> Phrase::stepDurations( std::int32_t p_bpm
 
         // L'arrondi est fait ICI, une fois pour toutes : deux appelants qui arrondiraient chacun de leur cote feraient
         // sonner differemment la meme phrase.
-        durations.push_back(
-          std::chrono::milliseconds{ static_cast<std::int64_t>( std::llround( millisecondsPerBeat * beats ) ) } );
+        // Pas de temporaire ici : un duration se construit directement depuis son nombre de millisecondes, et emplace_back
+        // prend exactement cela. La version precedente construisait l'objet pour le donner a une fonction qui le
+        // recopiait.
+        durations.emplace_back( static_cast<std::int64_t>( std::llround( millisecondsPerBeat * beats ) ) );
     }
 
     return durations;
@@ -142,16 +144,14 @@ Phrase generatePhrase( Mode p_mode, Note p_tonic, std::mt19937 & p_randomEngine,
     {
         const std::int32_t previousDegree = steps.back().degree;
 
-        std::int32_t degree = previousDegree;
+        // Le tirage est fait UNE fois, et la valeur est decidee a l'endroit ou elle est ecrite : clang-tidy signalait a
+        // juste titre une variable non initialisee, et la version precedente - initialisee pour etre toujours reecrite -
+        // etait exactement le symptome qui l'amenait la. Les deux tirages gardent leur ordre : stepwise d'abord, puis
+        // celui de la branche choisie.
+        const bool isStepwise = stepwiseDraw( p_randomEngine ) < p_settings.stepwiseShare;
 
-        if( stepwiseDraw( p_randomEngine ) < p_settings.stepwiseShare )
-        {
-            degree = previousDegree + ( ( directionDraw( p_randomEngine ) == 0 ) ? -1 : 1 );
-        }
-        else
-        {
-            degree = leapDraw( p_randomEngine );
-        }
+        const std::int32_t degree =
+          isStepwise ? previousDegree + ( ( directionDraw( p_randomEngine ) == 0 ) ? -1 : 1 ) : leapDraw( p_randomEngine );
 
         steps.push_back( PhraseStep{ .degree = wrapDegree( degree ), .beats = durationDraw( p_randomEngine ) } );
     }

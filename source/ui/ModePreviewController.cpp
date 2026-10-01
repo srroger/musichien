@@ -75,7 +75,7 @@ void ModePreviewController::playMode( int p_index )
         return;
     }
 
-    if( static_cast<std::size_t>( p_index ) >= domain::MODE_COUNT )
+    if( std::cmp_greater_equal( p_index, domain::MODE_COUNT ) )
     {
         return;
     }
@@ -172,7 +172,7 @@ int ModePreviewController::phraseCountForMode( int p_index ) const
 {
     // Le test du SIGNE avant la borne, comme partout : convertir un index negatif en size_t en ferait un tres grand
     // nombre, et la comparaison suivante passerait pour la mauvaise raison.
-    if( ( m_phraseBook == nullptr ) || ( p_index < 0 ) || ( static_cast<std::size_t>( p_index ) >= domain::MODE_COUNT ) )
+    if( ( m_phraseBook == nullptr ) || ( p_index < 0 ) || std::cmp_greater_equal( p_index, domain::MODE_COUNT ) )
     {
         return 0;
     }
@@ -182,8 +182,7 @@ int ModePreviewController::phraseCountForMode( int p_index ) const
 
 void ModePreviewController::playPhraseOfMode( int p_index )
 {
-    if( ( m_phraseBook == nullptr ) || ( p_index < 0 )
-        || ( static_cast<std::size_t>( p_index ) >= domain::MODE_COUNT ) )
+    if( ( m_phraseBook == nullptr ) || ( p_index < 0 ) || std::cmp_greater_equal( p_index, domain::MODE_COUNT ) )
     {
         return;
     }
