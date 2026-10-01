@@ -1547,27 +1547,67 @@ ApplicationWindow {
                     spacing: 4
 
                     Repeater {
+                        // Un bouton d'ECOUTE, a cote de chaque instrument.
+
                         model: ExerciseController.instruments
 
-                        delegate: CheckBox {
+                        delegate: Row {
                             required property var modelData
 
                             width: (settingsColumn.width / 2) - 6
-                            // Material reserve une cible tactile de 48 dp : dans une LIGNE de liste, c'est deux fois trop.
-                            // Un Layout n'obéit qu'a Layout.preferredHeight, jamais a `height`.
-                            Layout.preferredHeight: 34
-                            text: modelData.name
-                            checked: modelData.enabled
-                            onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+                            height: 34
 
-                            // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre. Le leftPadding
-                            // remet le texte a droite de la case, sinon il se pose par-dessus l'indicateur.
-                            contentItem: Text {
-                                text: parent.text
-                                color: "#e8dcff"
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: parent.indicator.width + parent.spacing
-                                font.pixelSize: 13
+                            CheckBox {
+                                id: instrumentCheckBox
+
+                                // Le bouton d'ecoute prend sa place, et le nom garde le reste : c'est le nom qu'on
+                                // lit, c'est le bouton qu'on pousse.
+                                width: parent.width - instrumentPreviewButton.width
+                                height: parent.height
+                                text: modelData.name
+                                checked: modelData.enabled
+                                onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+
+                                // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre. Le
+                                // leftPadding remet le texte a droite de la case, sinon il se pose par-dessus
+                                // l'indicateur.
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: "#e8dcff"
+                                    verticalAlignment: Text.AlignVCenter
+                                    leftPadding: parent.indicator.width + parent.spacing
+                                    font.pixelSize: 13
+                                }
+
+                            }
+
+                            // Roger : « ce serait pas mal d'avoir un bouton play a cote du choix des instruments, qui
+                            // joue une gamme phrygienne montante et descendante puis un accord caracteristique du
+                            // phrygien ». Un nom sur une case ne dit rien de ce qu'on entendra - et onze timbres, c'est
+                            // onze fois le meme probleme.
+                            Button {
+                                id: instrumentPreviewButton
+
+                                width: 30
+                                height: parent.height
+                                text: "\u25B6"
+                                onClicked: ExerciseController.previewInstrument(modelData.index)
+
+                                // Le bouton ne pose pas de fond tant qu'on ne le touche pas : la ligne doit rester une
+                                // liste d'instruments, pas une rangee de boutons.
+                                background: Rectangle {
+                                    color: instrumentPreviewButton.down ? "#3a2a5c" : "transparent"
+                                    radius: 4
+                                }
+
+                                contentItem: Text {
+                                    text: instrumentPreviewButton.text
+                                    color: "#ffd479"
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    font.pixelSize: 13
+                                }
+
                             }
 
                         }

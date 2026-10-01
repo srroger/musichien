@@ -44,6 +44,16 @@ constexpr float PLAIN_CLICK_GAIN = 0.7F;
 constexpr float FALLBACK_ACCENTED_CLICK_GAIN = 0.30F;
 constexpr float FALLBACK_PLAIN_CLICK_GAIN = 0.18F;
 
+// Le silence entre la gamme et l'accord d'un APERCU d'instrument. Assez long pour que l'oreille quitte la gamme, assez
+// court pour que l'ecoute reste UNE ecoute : on choisit un timbre, on ne compare pas deux morceaux.
+constexpr std::chrono::milliseconds PREVIEW_SILENCE{ 400 };
+
+// L'accord d'un apercu est tenu cinq fois la duree d'une note de gamme : la duree d'une petite phrase. C'est une couleur
+// qu'on ecoute - il faut le temps de l'entendre battre - et non un pas qu'on enchaine. Le corps par defaut du port tient
+// le meme temps, et il doit le tenir : un adaptateur qui n'a qu'un timbre fait entendre la meme chose que celui qui en a
+// onze, simplement sans la difference.
+constexpr std::int32_t PREVIEW_CHORD_DURATION_MULTIPLIER = 5;
+
 }    // namespace
 
 QAudioNotePlayer::QAudioNotePlayer() = default;
@@ -327,6 +337,36 @@ void QAudioNotePlayer::playChordFor( std::span<const domain::Note> p_notes,
     playSamples( renderChordFor( p_notes, p_duration ) );
 }
 
+void QAudioNotePlayer::playInstrumentPreview( std::span<const domain::Note> p_scale,
+                                              std::span<const domain::Note> p_chord,
+                                              std::size_t p_instrumentIndex,
+                                              std::chrono::milliseconds p_noteDuration,
+                                              std::chrono::milliseconds p_gap )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // Le timbre est IMPOSE, et rien d'autre n'est touche : ni le tirage, ni le timbre retenu pour la session. Ecouter ce
+    // qu'un instrument donnerait ne doit pas decider a la place du joueur de ce qu'il entendra ensuite.
+    const auto sampleRate = static_cast<std::size_t>( std::max( 1, m_audioFormat.sampleRate() ) );
+    const auto silenceSampleCount = static_cast<std::size_t>( sampleRate * PREVIEW_SILENCE.count() / 1000 );
+
+    std::vector<float> preview = renderMelodyWithIndex( p_scale, p_noteDuration, p_gap, p_instrumentIndex );
+
+    preview.insert( preview.end(), silenceSampleCount, 0.0F );
+
+    const std::vector<float> chord =
+      renderChordWithIndex( p_chord, p_noteDuration * PREVIEW_CHORD_DURATION_MULTIPLIER, p_instrumentIndex );
+
+    preview.insert( preview.end(), chord.begin(), chord.end() );
+
+    playSamples( preview );
+}
+
 void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_instruments,
                                        std::vector<domain::Waveform> p_waveforms )
 {
@@ -406,22 +446,32 @@ std::vector<float> QAudioNotePlayer::renderNoteFor( std::span<const domain::Note
 std::vector<float> QAudioNotePlayer::renderChordFor( std::span<const domain::Note> p_notes,
                                                      std::chrono::milliseconds p_duration )
 {
-    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
-
-    if( timbreCount == 0 )
+    if( m_instruments.empty() && m_waveforms.empty() )
     {
         return m_synthesizer->renderChord( p_notes, p_duration, m_tuning );
     }
 
-    const std::size_t index = timbreIndexFor( p_notes );
+    return renderChordWithIndex( p_notes, p_duration, timbreIndexFor( p_notes ) );
+}
 
-    if( index < m_instruments.size() )
+std::vector<float> QAudioNotePlayer::renderChordWithIndex( std::span<const domain::Note> p_notes,
+                                                           std::chrono::milliseconds p_duration,
+                                                           std::size_t p_timbreIndex )
+{
+    if( p_timbreIndex < m_instruments.size() )
     {
-        return m_instruments.at( index ).renderChord( p_notes, p_duration, m_audioFormat.sampleRate(), m_tuning );
+        return m_instruments.at( p_timbreIndex ).renderChord( p_notes, p_duration, m_audioFormat.sampleRate(), m_tuning );
+    }
+
+    // Un index au-dela des deux listes retombe sur la synthese, comme un appareil sans echantillons : mieux vaut un
+    // accord synthetise qu'un apercu muet.
+    if( p_timbreIndex >= m_instruments.size() + m_waveforms.size() )
+    {
+        return m_synthesizer->renderChord( p_notes, p_duration, m_tuning );
     }
 
     return m_synthesizer->renderWaveChord( p_notes,
-                                           m_waveforms.at( index - m_instruments.size() ),
+                                           m_waveforms.at( p_timbreIndex - m_instruments.size() ),
                                            p_duration,
                                            m_tuning );
 }
@@ -430,26 +480,32 @@ std::vector<float> QAudioNotePlayer::renderMelodyFor( std::span<const domain::No
                                                       std::chrono::milliseconds p_noteDuration,
                                                       std::chrono::milliseconds p_gap )
 {
-    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
-
-    if( timbreCount == 0 )
+    if( m_instruments.empty() && m_waveforms.empty() )
     {
         return m_synthesizer->renderMelody( p_notes, p_noteDuration, p_gap, m_tuning );
     }
 
-    const std::size_t index = timbreIndexFor( p_notes );
+    return renderMelodyWithIndex( p_notes, p_noteDuration, p_gap, timbreIndexFor( p_notes ) );
+}
 
-    if( index < m_instruments.size() )
+std::vector<float> QAudioNotePlayer::renderMelodyWithIndex( std::span<const domain::Note> p_notes,
+                                                            std::chrono::milliseconds p_noteDuration,
+                                                            std::chrono::milliseconds p_gap,
+                                                            std::size_t p_timbreIndex )
+{
+    if( p_timbreIndex < m_instruments.size() )
     {
-        return m_instruments.at( index ).renderMelody( p_notes,
-                                                       p_noteDuration,
-                                                       p_gap,
-                                                       m_audioFormat.sampleRate(),
-                                                       m_tuning );
+        return m_instruments.at( p_timbreIndex ).renderMelody( p_notes, p_noteDuration, p_gap, m_audioFormat.sampleRate(), m_tuning );
+    }
+
+    // Un index au-dela des deux listes retombe sur la synthese : mieux vaut une gamme synthetisee qu'un apercu muet.
+    if( p_timbreIndex >= m_instruments.size() + m_waveforms.size() )
+    {
+        return m_synthesizer->renderMelody( p_notes, p_noteDuration, p_gap, m_tuning );
     }
 
     return m_synthesizer->renderWaveMelody( p_notes,
-                                            m_waveforms.at( index - m_instruments.size() ),
+                                            m_waveforms.at( p_timbreIndex - m_instruments.size() ),
                                             p_noteDuration,
                                             p_gap,
                                             m_tuning );

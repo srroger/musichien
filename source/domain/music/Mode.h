@@ -133,6 +133,23 @@ inline constexpr std::array<std::int32_t, MODE_COUNT> MODE_ROTATION_INDEX{ 3, 0,
 // dire dans la langue du code. Le nom AFFICHE, lui, se traduit dans l'interface, comme le reste.
 [[nodiscard]] std::string_view modeIdentifier( Mode p_mode ) noexcept;
 
+// La gamme d'un mode, MONTEE puis DESCENDUE : les degres dans l'ordre, puis les memes en revenant, sans repeter le
+// sommet.
+//
+// Une couleur s'entend mieux quand elle va et vient, et c'est la DESCENTE qui fait entendre ou se trouve le centre :
+// c'est en revenant sur la tonique qu'un mode se dit, et une gamme qui monte seulement laisse la phrase en l'air. Le
+// banc d'essai des modes et l'apercu d'un instrument font donc le MEME geste, et il est ecrit ici une seule fois -
+// deux versions du meme aller-retour finiraient par designer deux musiques differentes.
+[[nodiscard]] std::vector<Note> modeScaleUpAndDown( Note p_tonic, Mode p_mode );
+
+// L'ACCORD qui dit le PHRYGIEN : le majeur pose une seconde MINEURE au-dessus de la tonique, son deuxieme degre.
+//
+// C'est la signature du mode, et elle n'appartient qu'a lui : le phrygien est le seul mode de la gamme majeure dont le
+// deuxieme degre soit a un demi-ton du centre. Une gamme seule se confond avec d'autres - six des sept modes
+// partagent la meme fenetre de notes - mais ce majeur-la dit le mode a lui seul, et c'est de la que vient la couleur
+// andalouse. C'est donc la chose la plus courte a faire entendre quand on veut reconnaitre un phrygien.
+[[nodiscard]] std::vector<Note> phrygianSignatureChord( Note p_tonic );
+
 // L'ecart, en demi-tons, entre la tonique d'un mode et celle d'un autre, quand les deux partagent la MEME gamme.
 //
 // C'est la difference de leurs degres dans la gamme majeure : le dorien en est le deuxieme, le mixolydien le cinquieme,

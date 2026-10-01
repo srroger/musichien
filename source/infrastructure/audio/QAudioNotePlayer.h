@@ -55,6 +55,17 @@ public:
     // The sustained chord: the same notes, held for the given duration, so the beating between them can be counted.
     void playChordFor( std::span<const domain::Note> p_notes, std::chrono::milliseconds p_duration ) override;
 
+    // Fait ENTENDRE un instrument : la gamme, un silence, puis l'accord, tous deux avec CE timbre et aucun autre.
+    //
+    // TOUT TIENT DANS UN SEUL TAMPON, et c'est la seule facon de faire : deux appels a playSamples se SUPERPOSENT, parce
+    // que le mixeur melange les voix au lieu de les enchainer. L'accord sonnerait donc par-dessus la gamme - soit
+    // exactement le contraire de ce qu'un apercu doit faire entendre.
+    void playInstrumentPreview( std::span<const domain::Note> p_scale,
+                                std::span<const domain::Note> p_chord,
+                                std::size_t p_instrumentIndex,
+                                std::chrono::milliseconds p_noteDuration,
+                                std::chrono::milliseconds p_gap ) override;
+
     // Les timbres du bourdon, charges depuis les ressources.
     //
     // PLUSIEURS peuvent etre offerts, et c'est un TIRAGE qui decide lequel accompagne une question - exactement comme
@@ -234,9 +245,21 @@ private:
     [[nodiscard]] std::vector<float> renderChordFor( std::span<const domain::Note> p_notes,
                                                      std::chrono::milliseconds p_duration );
 
+    // Les memes, mais avec un TIMBRE IMPOSE : c'est ce qu'un apercu demande. Le tirage et l'enregistrement de la
+    // question en cours appartiennent aux versions ci-dessus, et a elles seules - un apercu ne doit pas changer le
+    // timbre de la session en cours.
+    [[nodiscard]] std::vector<float> renderChordWithIndex( std::span<const domain::Note> p_notes,
+                                                           std::chrono::milliseconds p_duration,
+                                                           std::size_t p_timbreIndex );
+
     [[nodiscard]] std::vector<float> renderMelodyFor( std::span<const domain::Note> p_notes,
                                                       std::chrono::milliseconds p_noteDuration,
                                                       std::chrono::milliseconds p_gap );
+
+    [[nodiscard]] std::vector<float> renderMelodyWithIndex( std::span<const domain::Note> p_notes,
+                                                            std::chrono::milliseconds p_noteDuration,
+                                                            std::chrono::milliseconds p_gap,
+                                                            std::size_t p_timbreIndex );
 
     // The sampled instruments, empty when there are none.
     std::vector<domain::SampledInstrument> m_instruments;

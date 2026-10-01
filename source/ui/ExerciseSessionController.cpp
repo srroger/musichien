@@ -47,6 +47,15 @@ constexpr std::chrono::milliseconds ARPEGGIO_NOTE_GAP{ 450 };
 constexpr std::chrono::milliseconds MODE_NOTE_DURATION{ 340 };
 constexpr std::chrono::milliseconds MODE_NOTE_GAP{ 40 };
 
+// L'APERCU D'UN INSTRUMENT : la meme tonique que le banc d'essai des modes, pour que ce qu'on ecoute en reglant ses
+// instruments soit dans la region ou ils sonneront en exercice.
+constexpr std::int32_t PREVIEW_TONIC_MIDI_NUMBER = 62;
+
+// Plus vif qu'une question, et c'est voulu : l'apercu n'est pas une devinette a resoudre, c'est un timbre a entendre.
+// Toute la gamme - treize notes, montee et descendue - tient ainsi en moins de quatre secondes.
+constexpr std::chrono::milliseconds PREVIEW_NOTE_DURATION{ 240 };
+constexpr std::chrono::milliseconds PREVIEW_NOTE_GAP{ 50 };
+
 // L'ecart entre deux pas d'une PHRASE, et le tempo de secours quand aucun reglage n'a ete lu.
 //
 // Les deux valeurs sont celles du banc d'essai des modes, et ce n'est pas une coincidence : c'est la MEME phrase, et elle
@@ -783,6 +792,40 @@ void ExerciseSessionController::setInstrumentEnabled( int p_index, bool p_isEnab
     }
 
     emit instrumentsChanged();
+}
+
+void ExerciseSessionController::previewInstrument( int p_index )
+{
+    // Le bouton a repondu : le meme clic discret que la case a cocher, pour que la main soit entendue.
+    m_notePlayer.playTapCue();
+
+    // Deux tests plutot qu'un, comme pour la case a cocher : comparer un index signe et un compte non signe dans la
+    // meme expression est exactement ce qui laisse passer un index negatif.
+    if( p_index < 0 )
+    {
+        return;
+    }
+
+    if( std::cmp_greater_equal( p_index, domain::INSTRUMENT_COUNT ) )
+    {
+        return;
+    }
+
+    // LE PHRYGIEN, et l'accord qui le signe sont demandes au DOMAINE : ils sont de la musique, pas de la restitution, et
+    // le banc d'essai des modes fait le meme aller-retour pour la meme raison.
+    const domain::Note tonic{ PREVIEW_TONIC_MIDI_NUMBER };
+
+    const std::vector<domain::Note> scale = domain::modeScaleUpAndDown( tonic, domain::Mode::Phrygian );
+
+    const std::vector<domain::Note> chord = domain::phrygianSignatureChord( tonic );
+
+    // L'INDEX passe tel quel : c'est celui du domaine, et l'adaptateur choisit avec quel son il le joue - la synthese
+    // restant le repli pour un appareil sans echantillons.
+    m_notePlayer.playInstrumentPreview( scale,
+                                        chord,
+                                        static_cast<std::size_t>( p_index ),
+                                        PREVIEW_NOTE_DURATION,
+                                        PREVIEW_NOTE_GAP );
 }
 
 int ExerciseSessionController::experience() const noexcept

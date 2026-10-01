@@ -1,5 +1,7 @@
 #include "domain/music/Mode.h"
 
+#include "domain/music/Chord.h"
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -326,6 +328,52 @@ TEST( ModeTest, the_rank_of_the_tonic_in_its_own_arc_is_what_tells_the_modes_apa
     // demande a l'oreille de suivre.
     EXPECT_TRUE( rankOfTheTonicInItsArc( modeCircleNotes( Mode::Lydian, 5 ) )
                  < rankOfTheTonicInItsArc( modeCircleNotes( Mode::Ionian, 0 ) ) );
+}
+
+TEST( ModeTest, a_scale_goes_up_and_comes_back_down_to_its_tonic )
+{
+    // Le geste commun au banc d'essai des modes et a l'apercu d'un instrument : une couleur va et vient, et c'est la
+    // DESCENTE qui dit ou se trouve le centre - un mode se dit en revenant sur sa tonique.
+    const std::vector<Note> played = modeScaleUpAndDown( Note{ 62 }, Mode::Phrygian );
+
+    // Les sept degres montes, puis les six qui redescendent : le sommet n'est joue QU'UNE fois, sans quoi le demi-tour
+    // serait une hesitation.
+    ASSERT_EQ( 13U, played.size() );
+
+    EXPECT_EQ( 62, played.front().midiNumber() );
+    EXPECT_EQ( 62, played.back().midiNumber() );
+
+    for( std::size_t index = 1; index < 7; ++index )
+    {
+        EXPECT_LT( played.at( index - 1 ).midiNumber(), played.at( index ).midiNumber() );
+    }
+
+    for( std::size_t index = 8; index < played.size(); ++index )
+    {
+        EXPECT_GT( played.at( index - 1 ).midiNumber(), played.at( index ).midiNumber() );
+    }
+
+    // Et le phrygien est bien LA : sa seconde est a un demi-ton de la tonique, jamais un ton.
+    EXPECT_EQ( 63, played.at( 1 ).midiNumber() );
+}
+
+TEST( ModeTest, the_phrygian_signature_chord_is_a_major_a_semitone_above_the_tonic )
+{
+    // Ce qui dit le phrygien quand la gamme seule ne le dit plus : le majeur pose sur son deuxieme degre. Six des sept
+    // modes partagent la meme fenetre de notes, mais ce majeur-la n'appartient qu'au phrygien - c'est la couleur
+    // andalouse, et c'est la chose la plus courte a faire entendre pour le reconnaitre.
+    const std::vector<Note> chord = phrygianSignatureChord( Note{ 62 } );
+
+    ASSERT_EQ( 3U, chord.size() );
+
+    EXPECT_EQ( 63, chord.at( 0 ).midiNumber() );
+
+    // Et ce sont les intervalles d'un MAJEUR, demandes a la regle de l'accord : une tierce majeure, puis une quinte
+    // juste. Rien n'est recompte ici, ce qui est exactement le point - la couleur d'un accord vit a un seul endroit.
+    for( std::size_t index = 0; index < chord.size(); ++index )
+    {
+        EXPECT_EQ( 63 + chordIntervals( ChordQuality::Major ).at( index ), chord.at( index ).midiNumber() );
+    }
 }
 
 }    // namespace musichien::domain

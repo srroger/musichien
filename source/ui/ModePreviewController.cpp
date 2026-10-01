@@ -111,18 +111,10 @@ void ModePreviewController::playMode( int p_index )
     const auto noteDuration = millisecondsPerBeat / 2;
     const auto gap = noteDuration / 6;
 
-    // La gamme MONTEE puis DESCENDUE.
-    //
-    // Une couleur s'entend mieux quand elle va et vient, et la descente est ce qui fait entendre ou se trouve le
-    // centre : c'est en revenant sur la tonique qu'un mode se dit. Monter seulement laisserait la phrase en l'air.
-    const std::vector<domain::Note> ascending = domain::notesOfMode( tonic, mode );
-
-    std::vector<domain::Note> melody = ascending;
-
-    for( auto note = ascending.rbegin() + 1; note != ascending.rend(); ++note )
-    {
-        melody.push_back( *note );
-    }
+    // La gamme MONTEE puis DESCENDUE : la regle vit dans le DOMAINE, parce que l'apercu d'un instrument fait exactement
+    // le meme geste. Une couleur s'entend mieux quand elle va et vient, et c'est la descente qui fait entendre ou se
+    // trouve le centre : c'est en revenant sur la tonique qu'un mode se dit.
+    const std::vector<domain::Note> melody = domain::modeScaleUpAndDown( tonic, mode );
 
     const std::array<domain::Note, 2> drone{ domain::Note{ DRONE_ROOT_MIDI_NUMBER },
                                              domain::Note{ DRONE_ROOT_MIDI_NUMBER + FIFTH_IN_SEMITONES } };

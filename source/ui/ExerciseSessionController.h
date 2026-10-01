@@ -756,6 +756,17 @@ public:
     // in it is a game with no sound.
     Q_INVOKABLE void setInstrumentEnabled( int p_index, bool p_isEnabled );
 
+    // Fait ENTENDRE un instrument, pour que le joueur puisse le choisir a l'oreille.
+    //
+    // Roger : « pour l'utilisateur, c'est un peu complique de choisir son instrument car c'est complique de l'entendre ».
+    // Un nom sur une case ne dit rien de ce qu'on entendra : onze instruments sont offerts, et le seul moyen de choisir
+    // est de les ecouter. C'est une gamme phrygienne qui les presente - montee, descendue, puis l'accord du bII - parce
+    // que c'est le mode qui trahit le mieux un timbre : sa seconde mineure fait entendre tout de suite un son qui
+    // grince ou qui bave, la ou une gamme majeure les laisserait tous paraitre agreables.
+    //
+    // C'est un APERCU, et rien de plus : ni le timbre de la session en cours, ni les reglages ne bougent.
+    Q_INVOKABLE void previewInstrument( int p_index );
+
     // Leaves the loop and goes back to the bench. Stops the sound first: a stream left open on a phone
     // is a battery drain.
     Q_INVOKABLE void stopSession();

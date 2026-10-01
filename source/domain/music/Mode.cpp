@@ -1,8 +1,11 @@
 #include "domain/music/Mode.h"
 
+#include "domain/music/Chord.h"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -36,6 +39,45 @@ std::vector<Note> notesOfMode( Note p_tonic, Mode p_mode )
     for( const std::int32_t offset : modeDegreeOffsets( p_mode ) )
     {
         notes.emplace_back( tonicMidiNumber + offset );
+    }
+
+    return notes;
+}
+
+std::vector<Note> modeScaleUpAndDown( Note p_tonic, Mode p_mode )
+{
+    const std::vector<Note> ascending = notesOfMode( p_tonic, p_mode );
+
+    std::vector<Note> melody = ascending;
+    melody.reserve( ( ascending.size() * 2 ) - 1 );
+
+    // Le sommet n'est joue QU'UNE FOIS : le repeter ferait une hesitation, pas un demi-tour. C'est aussi ce que fait le
+    // banc d'essai des modes, et les deux doivent sonner pareil.
+    for( auto note = ascending.rbegin() + 1; note != ascending.rend(); ++note )
+    {
+        melody.push_back( *note );
+    }
+
+    return melody;
+}
+
+std::vector<Note> phrygianSignatureChord( Note p_tonic )
+{
+    // Le deuxieme degre du phrygien : un demi-ton au-dessus de la tonique, toujours.
+    constexpr std::int32_t SECOND_DEGREE_IN_SEMITONES = 1;
+
+    const Note root = p_tonic.transposedBy( SECOND_DEGREE_IN_SEMITONES );
+
+    // Un MAJEUR, et la qualite dit tout : le reste (trois notes, une tierce majeure, une quinte juste) appartient a la
+    // regle de l'accord, pas a cette fonction. Une autre couleur phrygienne se contenterait de changer ce nom.
+    const std::span<const std::int32_t> intervals = chordIntervals( ChordQuality::Major );
+
+    std::vector<Note> notes;
+    notes.reserve( intervals.size() );
+
+    for( const std::int32_t interval : intervals )
+    {
+        notes.push_back( root.transposedBy( interval ) );
     }
 
     return notes;

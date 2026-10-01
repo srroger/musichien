@@ -2551,4 +2551,48 @@ TEST( ExerciseSessionControllerTest, the_daily_reminder_is_active_at_the_first_l
     EXPECT_FALSE( levelStore.dailyReminderEnabled() );
 }
 
+TEST( ExerciseSessionControllerTest, hearing_an_instrument_is_what_lets_a_player_choose_it )
+{
+    // Roger : « pour l'utilisateur, c'est un peu complique de choisir son instrument car c'est complique de l'entendre ».
+    // Le bouton d'ecoute joue donc, pour l'instrument demande, la gamme phrygienne montee puis descendue, et l'accord qui
+    // signe le mode.
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, nullptr };
+
+    controller.previewInstrument( 4 );
+
+    ASSERT_EQ( 1U, notePlayer.playedMelodies().size() );
+
+    const std::vector<domain::Note> & scale = notePlayer.playedMelodies().front().notes;
+
+    // Treize notes : sept qui montent, six qui redescendent.
+    ASSERT_EQ( 13U, scale.size() );
+
+    // La gamme part de la tonique ET y revient : c'est la descente qui fait entendre ou se trouve le centre.
+    EXPECT_EQ( scale.front().midiNumber(), scale.back().midiNumber() );
+
+    ASSERT_EQ( 1U, notePlayer.playedChords().size() );
+
+    const std::vector<domain::Note> & chord = notePlayer.playedChords().front().notes;
+
+    ASSERT_EQ( 3U, chord.size() );
+
+    // L'accord du bII majeur, la signature du phrygien, sur la meme tonique que la gamme entendue.
+    EXPECT_EQ( scale.front().midiNumber() + 1, chord.front().midiNumber() );
+}
+
+TEST( ExerciseSessionControllerTest, an_instrument_that_does_not_exist_is_not_played )
+{
+    // L'index vient de l'ecran, donc il est verifie ici - et deux tests plutot qu'un, parce que comparer un index signe
+    // avec un compte non signe est exactement ce qui laisse passer un index negatif.
+    domain::NotePlayerFake notePlayer;
+    ExerciseSessionController controller{ notePlayer, intervalOnlySettings(), {}, {}, {}, nullptr };
+
+    controller.previewInstrument( static_cast<int>( domain::INSTRUMENT_COUNT ) );
+    controller.previewInstrument( -1 );
+
+    EXPECT_TRUE( notePlayer.playedMelodies().empty() );
+    EXPECT_TRUE( notePlayer.playedChords().empty() );
+}
+
 }    // namespace musichien::ui

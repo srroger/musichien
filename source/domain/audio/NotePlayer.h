@@ -58,6 +58,41 @@ public:
         playChord( p_notes );
     }
 
+    // Fait ENTENDRE un instrument, pour qu'on puisse le CHOISIR : la gamme demandee, puis l'accord demande, avec CE
+    // timbre et aucun autre.
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // Pourquoi cette methode est dans le port, et pas dans l'adaptateur
+    //
+    // Choisir un timbre se fait a l'oreille, et l'oreille ne peut pas choisir ce qu'elle n'a pas entendu : la page des
+    // reglages offre onze instruments, et un nom ne dit rien de ce qu'on entendra. C'est Roger qui a demande ce bouton -
+    // « pour l'utilisateur, c'est un peu complique de choisir son instrument car c'est complique de l'entendre ».
+    //
+    // La demande passe par le PORT parce que c'est la seule facon de rester testable : un NotePlayerFake enregistre la
+    // gamme ET l'accord, donc un test verifie la musique entendue sans carte son. L'ADAPTATEUR, lui, garde ce qui n'est
+    // pas a nous : rendre les deux dans UN SEUL tampon, car deux appels successifs se superposeraient et l'accord
+    // sonnerait PAR-DESSUS la gamme.
+    //
+    // p_instrumentIndex est un index du domaine (INSTRUMENT_NAMES), jamais un rang interne a l'adaptateur.
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // Un corps par defaut, comme playChordFor : un adaptateur qui n'a qu'un timbre joue quand meme la gamme et l'accord
+    // - il ne montre simplement pas de difference, ce qui est exactement ce qu'il a a montrer.
+    virtual void playInstrumentPreview( std::span<const Note> p_scale,
+                                        std::span<const Note> p_chord,
+                                        std::size_t p_instrumentIndex,
+                                        std::chrono::milliseconds p_noteDuration,
+                                        std::chrono::milliseconds p_gap )
+    {
+        (void)p_instrumentIndex;
+
+        playMelody( p_scale, p_gap );
+
+        // L'accord est TENU bien plus longtemps qu'une note - cinq fois, comme dans l'adaptateur : c'est une couleur qu'on
+        // ecoute, pas un pas qu'on enchaine, et il faut le temps de l'entendre battre.
+        playChordFor( p_chord, p_noteDuration * 5 );
+    }
+
     // Plays a melody heard OVER a drone held under it: the two sound TOGETHER, from the first note to the last.
     //
     // -------------------------------------------------------------------------------------------------------------
