@@ -93,6 +93,32 @@
         <file alias="assets/soundfonts/saxo_c3.wav">../../assets/soundfonts/saxo_c3.wav</file>
         <file alias="assets/soundfonts/saxo_c4.wav">../../assets/soundfonts/saxo_c4.wav</file>
         <file alias="assets/soundfonts/saxo_c5.wav">../../assets/soundfonts/saxo_c5.wav</file>
+        <file alias="assets/soundfonts/saxo_c6.wav">../../assets/soundfonts/saxo_c6.wav</file>
+        <file alias="assets/soundfonts/flute_c2.wav">../../assets/soundfonts/flute_c2.wav</file>
+        <file alias="assets/soundfonts/flute_c3.wav">../../assets/soundfonts/flute_c3.wav</file>
+        <file alias="assets/soundfonts/flute_c4.wav">../../assets/soundfonts/flute_c4.wav</file>
+        <file alias="assets/soundfonts/flute_c5.wav">../../assets/soundfonts/flute_c5.wav</file>
+        <file alias="assets/soundfonts/flute_c6.wav">../../assets/soundfonts/flute_c6.wav</file>
+        <file alias="assets/soundfonts/cordes_c2.wav">../../assets/soundfonts/cordes_c2.wav</file>
+        <file alias="assets/soundfonts/cordes_c3.wav">../../assets/soundfonts/cordes_c3.wav</file>
+        <file alias="assets/soundfonts/cordes_c4.wav">../../assets/soundfonts/cordes_c4.wav</file>
+        <file alias="assets/soundfonts/cordes_c5.wav">../../assets/soundfonts/cordes_c5.wav</file>
+        <file alias="assets/soundfonts/cordes_c6.wav">../../assets/soundfonts/cordes_c6.wav</file>
+        <file alias="assets/soundfonts/clarinette_c2.wav">../../assets/soundfonts/clarinette_c2.wav</file>
+        <file alias="assets/soundfonts/clarinette_c3.wav">../../assets/soundfonts/clarinette_c3.wav</file>
+        <file alias="assets/soundfonts/clarinette_c4.wav">../../assets/soundfonts/clarinette_c4.wav</file>
+        <file alias="assets/soundfonts/clarinette_c5.wav">../../assets/soundfonts/clarinette_c5.wav</file>
+        <file alias="assets/soundfonts/clarinette_c6.wav">../../assets/soundfonts/clarinette_c6.wav</file>
+        <file alias="assets/soundfonts/marimba_c2.wav">../../assets/soundfonts/marimba_c2.wav</file>
+        <file alias="assets/soundfonts/marimba_c3.wav">../../assets/soundfonts/marimba_c3.wav</file>
+        <file alias="assets/soundfonts/marimba_c4.wav">../../assets/soundfonts/marimba_c4.wav</file>
+        <file alias="assets/soundfonts/marimba_c5.wav">../../assets/soundfonts/marimba_c5.wav</file>
+        <file alias="assets/soundfonts/marimba_c6.wav">../../assets/soundfonts/marimba_c6.wav</file>
+        <file alias="assets/soundfonts/harpe_c2.wav">../../assets/soundfonts/harpe_c2.wav</file>
+        <file alias="assets/soundfonts/harpe_c3.wav">../../assets/soundfonts/harpe_c3.wav</file>
+        <file alias="assets/soundfonts/harpe_c4.wav">../../assets/soundfonts/harpe_c4.wav</file>
+        <file alias="assets/soundfonts/harpe_c5.wav">../../assets/soundfonts/harpe_c5.wav</file>
+        <file alias="assets/soundfonts/harpe_c6.wav">../../assets/soundfonts/harpe_c6.wav</file>
     <!--
       Les bourdons enregistres : trois timbres tenus (cordes, choeur, nappe), rendus depuis la meme banque libre que
       les instruments, par scripts/render_drone_samples.py. Deux notes chacun (re 2 et la 2), de quoi transposer le

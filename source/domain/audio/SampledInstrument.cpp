@@ -439,6 +439,20 @@ std::vector<float> SampledInstrument::renderMelody( std::span<const Note> p_note
                                                     std::int32_t p_sampleRate,
                                                     TuningContext p_tuning ) const
 {
+    // La version uniforme est le cas PARTICULIER d'une duree repetee, exactement comme dans le domaine et pour la meme
+    // raison : deux boucles qui font la meme chose finissent toujours par diverger, et c'est la phrase qu'on entendrait
+    // differemment selon celle qui a servi.
+    const std::vector<std::chrono::milliseconds> durations( p_notes.size(), p_noteDuration );
+
+    return renderMelody( p_notes, durations, p_gap, p_sampleRate, p_tuning );
+}
+
+std::vector<float> SampledInstrument::renderMelody( std::span<const Note> p_notes,
+                                                    std::span<const std::chrono::milliseconds> p_durations,
+                                                    std::chrono::milliseconds p_gap,
+                                                    std::int32_t p_sampleRate,
+                                                    TuningContext p_tuning ) const
+{
     std::vector<float> melodySamples;
 
     if( ( p_sampleRate <= 0 ) || p_notes.empty() )
@@ -446,16 +460,25 @@ std::vector<float> SampledInstrument::renderMelody( std::span<const Note> p_note
         return melodySamples;
     }
 
-    const auto exactGapSampleCount = ( static_cast<double>( p_gap.count() ) / 1000.0 ) * static_cast<double>( p_sampleRate );
+    const auto exactGapSampleCount =
+      ( static_cast<double>( p_gap.count() ) / 1000.0 ) * static_cast<double>( p_sampleRate );
 
     const auto gapSampleCount = static_cast<std::size_t>( std::llround( exactGapSampleCount ) );
 
     const Note root = p_notes.front();
 
-    for( const Note & note : p_notes )
+    for( std::size_t index = 0; index < p_notes.size(); ++index )
     {
-        const std::vector<float> noteSamples =
-          renderNoteAt( note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), p_noteDuration, p_sampleRate );
+        // Une duree MANQUANTE retombe sur la premiere : une phrase dont le contenu serait plus court que la melodie doit
+        // sonner de travers, pas s'arreter au milieu. L'index est verifie avant d'etre lu, parce que std::span::at()
+        // n'existe pas sur le NDK Android.
+        const std::chrono::milliseconds noteDuration = ( index < p_durations.size() ) ? p_durations[index]
+                                                                                      : p_durations.front();
+
+        const Note note = p_notes[index];
+
+        const std::vector<float> noteSamples = renderNoteAt(
+          note, frequencyFor( note, root, p_tuning.temperament, p_tuning.referencePitchHz ), noteDuration, p_sampleRate );
 
         melodySamples.insert( melodySamples.end(), noteSamples.begin(), noteSamples.end() );
 

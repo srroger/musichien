@@ -133,6 +133,15 @@ public:
     // boutons de la difficulte ». Un adaptateur qui n'a pas d'aboiement continuera donc de repondre quelque chose.
     virtual void playDogBark() { playTapCue(); }
 
+    // LE TIMBRE D'UNE SESSION, choisi une fois et garde jusqu'au bout.
+    //
+    // Roger a mis le doigt sur une incoherence en ecoutant : le timbre changeait a CHAQUE question, donc un joueur qui
+    // entendait un saxo sur une seconde et un piano sur une quinte comparait deux choses differentes - alors que la
+    // question porte sur l'intervalle. Un timbre par session, et l'oreille ne juge plus que ce qu'on lui demande.
+    //
+    // Un corps par defaut, comme playChordFor : un adaptateur qui n'a pas de timbre a choisir n'a rien a faire ici.
+    virtual void beginTimbreForSession() {}
+
     // Le clic du métronome : un temps simple, ou le PREMIER temps d'une mesure (accentué). Un corps par défaut, comme
     // le clic de menu : un adaptateur sans métronome se contente du clic ordinaire.
     virtual void playMetronomeClick( bool p_accented )

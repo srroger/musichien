@@ -285,6 +285,21 @@ public:
                                                          TuningContext p_tuning = {},
                                                          DroneFraming p_framing = {} ) const;
 
+    // LA MEME REGLE D'ASSEMBLAGE, quand la melodie vient d'un INSTRUMENT plutot que de la synthese.
+    //
+    // C'est la correction du 01/10/2026. Dans une question de mode, le bourdon etait deja un instrument ENREGISTRE - un
+    // chœur, des cordes, une nappe - pendant que la melodie restait synthetisee. Les deux n'ont ni la meme matiere ni la
+    // meme queue, et Roger l'a entendu tout de suite : « les voix pour les modes, je trouve ca un peu bizarre ».
+    //
+    // L'assemblage reste le travail du DOMAINE, et c'est ce qui compte : la gamme d'un mode et la phrase d'un mode sont
+    // decalees du meme silence et au meme niveau, parce qu'elles passent par la meme regle.
+    //
+    // Une melodie VIDE est rendue telle quelle : il n'y a rien a poser sur le bourdon, et un tampon vide se joue comme un
+    // silence plutot que comme une erreur.
+    [[nodiscard]] std::vector<float> mixRenderedMelodyOverDrone( std::span<const float> p_melodySamples,
+                                                                 std::span<const float> p_droneSamples,
+                                                                 DroneFraming p_framing = {} ) const;
+
     // Le niveau du bourdon, avant que la somme ne soit normalisee.
     //
     // Inferieur a un, et c'est une decision d'ecoute, pas une precaution technique : le bourdon doit etre SENTI

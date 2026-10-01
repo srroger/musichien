@@ -2179,6 +2179,13 @@ TEST( ExerciseSessionControllerTest, only_the_vamp_comes_out_when_only_the_vamp_
     settings.modeNameQuestionShare = 0;
     settings.modeVampQuestionShare = 100;
 
+    // ET LA NOTE ETRANGERE, qui n'existait pas encore ici quand ce test a ete ecrit.
+    //
+    // Elle est passee inapercue tant que sa part valait zero par defaut. Depuis que l'harmonie s'ouvre a l'installation
+    // (01/10/2026), une question sur onze n'etait plus un vamp - et le test, qui dit « seul le vamp ouvert ne pose QUE des
+    // vamps », avait raison de le signaler.
+    settings.foreignNoteQuestionShare = 0;
+
     ExerciseSessionController controller{ notePlayer, settings };
 
     controller.startSession();
@@ -2512,7 +2519,9 @@ TEST( ExerciseSessionControllerTest, a_first_run_offers_a_piano_and_a_guitar )
 
     const QVariantList instruments = controller.instruments();
 
-    ASSERT_EQ( 6, instruments.size() );
+    // Le NOMBRE vient du DOMAINE, et non d'un nombre ecrit ici : ajouter un timbre au jeu ne doit pas casser un test qui
+    // parle d'autre chose. La liste elle-meme est verifiee juste apres, et c'est elle qui compte.
+    ASSERT_EQ( static_cast<int>( domain::INSTRUMENT_COUNT ), instruments.size() );
 
     // Un premier lancement doit sonner JUSTE : piano et guitare, deux sons neutres, et le reste a portee de reglage.
     EXPECT_TRUE( instruments.at( 0 ).toMap().value( QStringLiteral( "enabled" ) ).toBool() );

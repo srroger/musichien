@@ -433,6 +433,10 @@ Item {
                     Text {
                         // Le "Écoute bien…" est le prompt des questions d'OREILLE. Sur une question de rythme, c'est la
                         // zone rythmique qui dit ou en est la boucle, et le meme mot y serait faux la moitie du temps.
+                        // LE MODE EST ANNONCE, et c'est une correction de Roger : « il faut afficher le mode qui est en
+                        // train d'etre joue des le debut, car sans rien c'est beaucoup trop difficile - il doit a la fois
+                        // trouver le mode ainsi que la note qui ne va pas ». La gamme jouee EST le mode, donc le nommer
+                        // n'enleve rien a l'exercice : il enleve une devinette.
 
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
@@ -442,11 +446,6 @@ Item {
                         // exactement ce qu'une consigne ne doit pas faire.
                         visible: !ExerciseController.isFeedbackVisible && ExerciseController.questionKind !== 3 && ExerciseController.questionKind !== 4
                         text: {
-                            // LE MODE EST ANNONCE, et c'est une correction de Roger : « il faut afficher le mode qui est en
-                            // train d'etre joue des le debut, car sans rien c'est beaucoup trop difficile - il doit a la fois
-                            // trouver le mode ainsi que la note qui ne va pas ». La gamme jouee EST le mode, donc le nommer
-                            // n'enleve rien a l'exercice : il enleve une devinette.
-
                             // Le VAMP : deux fois la meme gamme, sur deux centres differents. La consigne doit le dire,
                             // parce que c'est justement ce que le joueur ne peut pas deviner - il entend deux fois les
                             // memes notes, et c'est pourtant deux modes.

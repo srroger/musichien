@@ -872,6 +872,10 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
     // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
     m_notePlayer.playTapCue();
 
+    // LE TIMBRE DE LA SESSION, choisi UNE fois : voir NotePlayer::beginTimbreForSession. C'est ce qui fait qu'une seconde
+    // mineure et une quinte, dans la meme partie, sont jouees par le meme instrument - Roger a entendu le contraire.
+    m_notePlayer.beginTimbreForSession();
+
     // LE PERIMETRE DU GODMODE, quand c'est lui qui joue - et JAMAIS dans un Bilan.
     //
     // Un Bilan a ses propres questions decidees, du plus facile au plus difficile : elles n'ont rien a voir avec un

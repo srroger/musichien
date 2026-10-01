@@ -89,6 +89,8 @@ public:
 
     // Garde le meme timbre pour la lecture suivante : la demande du domaine, mise en oeuvre ici.
     void holdTimbre() override;
+
+    void beginTimbreForSession() override;
     // Le clic de menu : un accuse de reception, pas une reponse.
     void playTapCue() override;
 
@@ -245,6 +247,10 @@ private:
     // Le domaine a demande de garder le timbre pour la lecture suivante. Consomme par la lecture qui suit, comme un
     // jeton : une demande, une lecture.
     bool m_holdTimbre{ false };
+
+    // Le timbre est TENU pour toute la session quand ce drapeau est pose : voir beginTimbreForSession. Il est remis a faux
+    // par holdTimbre, qui est une decision d'une seule question - une comparaison de deux modes.
+    bool m_timbreIsHeldForSession{ false };
 
     // Le timbre de bourdon tire pour la question en cours, et le bourdon qu'elle accompagnait : c'est ce qui garde le
     // meme son tant que la question ne change pas.

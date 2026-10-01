@@ -350,22 +350,34 @@ void QAudioNotePlayer::useDroneInstruments( std::vector<domain::SampledInstrumen
 
 std::size_t QAudioNotePlayer::timbreIndexFor( std::span<const domain::Note> p_notes )
 {
-    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
-
     // The same question is the same NOTES, whatever order the melody played them in: a falling fifth and its
     // feedback chord share the same two notes. Comparing them as an ORDERED sequence would re-draw the instrument
     // between the melody and the chord - the guitar turning into a saxophone in front of the player.
-    const bool sameQuestion = ( p_notes.size() == m_lastPlayedNotes.size() )
-                              && std::is_permutation( p_notes.begin(), p_notes.end(), m_lastPlayedNotes.begin() );
+    const bool sameQuestion =
+      !m_lastPlayedNotes.empty() && ( p_notes.size() == m_lastPlayedNotes.size() )
+      && std::is_permutation( p_notes.begin(), p_notes.end(), m_lastPlayedNotes.begin() );
 
-    if( !sameQuestion )
+    // Les notes entendues sont retenues dans TOUS les cas : c'est ce qui permet a la question suivante de savoir si elle a
+    // change, y compris quand le timbre, lui, ne change plus.
+    m_lastPlayedNotes.assign( p_notes.begin(), p_notes.end() );
+
+    // ET LE TIMBRE DE LA SESSION NE BOUGE PLUS : voir beginTimbreForSession. Une nouvelle question ne retire donc plus de
+    // timbre, et l'oreille ne compare plus que ce qu'on lui demande - l'intervalle, jamais l'instrument.
+    if( sameQuestion || m_timbreIsHeldForSession )
     {
-        m_lastPlayedNotes.assign( p_notes.begin(), p_notes.end() );
-
-        std::uniform_int_distribution<std::size_t> distribution{ 0, timbreCount - 1 };
-
-        m_instrumentIndex = distribution( m_instrumentRandomEngine );
+        return m_instrumentIndex;
     }
+
+    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
+
+    if( timbreCount == 0 )
+    {
+        return m_instrumentIndex;
+    }
+
+    std::uniform_int_distribution<std::size_t> distribution{ 0, timbreCount - 1 };
+
+    m_instrumentIndex = distribution( m_instrumentRandomEngine );
 
     return m_instrumentIndex;
 }
@@ -495,6 +507,25 @@ void QAudioNotePlayer::playMelodyOverDrone( std::span<const domain::Note> p_melo
                              m_audioFormat.sampleRate(),
                              m_tuning );
 
+        // LA MELODIE PAR UN INSTRUMENT, quand il y en a un.
+        //
+        // C'est la correction du 01/10/2026 : le bourdon etait deja ENREGISTRE - un chœur, des cordes - pendant que la
+        // melodie restait synthetisee. Deux matieres qui ne s'accordent pas, et Roger l'a entendu tout de suite : « les voix
+        // pour les modes, je trouve ca un peu bizarre ».
+        //
+        // Le REPLI reste la synthese, et il n'est pas decoratif : un appareil dont les echantillons manquent doit quand
+        // meme entendre la question.
+        const std::size_t timbreIndex = timbreIndexFor( p_melody );
+
+        if( timbreIndex < m_instruments.size() )
+        {
+            const std::vector<float> melodySamples = m_instruments.at( timbreIndex ).renderMelody( p_melody, p_noteDuration, p_gap, m_audioFormat.sampleRate(), m_tuning );
+
+            playSamples( m_synthesizer->mixRenderedMelodyOverDrone( melodySamples, droneSamples, p_framing ) );
+
+            return;
+        }
+
         playSamples(
           m_synthesizer->mixMelodyOverDrone( p_melody, droneSamples, p_noteDuration, p_gap, m_tuning, p_framing ) );
 
@@ -547,6 +578,19 @@ void QAudioNotePlayer::playPhraseOverDrone( std::span<const domain::Note> p_melo
                              m_audioFormat.sampleRate(),
                              m_tuning );
 
+        // LA PHRASE PAR UN INSTRUMENT, comme la gamme : voir playMelodyOverDrone. C'est ce qui fait qu'un mode s'entend
+        // d'une seule matiere, que la question joue une phrase ou une gamme.
+        const std::size_t timbreIndex = timbreIndexFor( p_melody );
+
+        if( timbreIndex < m_instruments.size() )
+        {
+            const std::vector<float> melodySamples = m_instruments.at( timbreIndex ).renderMelody( p_melody, p_durations, p_gap, m_audioFormat.sampleRate(), m_tuning );
+
+            playSamples( m_synthesizer->mixRenderedMelodyOverDrone( melodySamples, droneSamples, p_framing ) );
+
+            return;
+        }
+
         playSamples(
           m_synthesizer->mixMelodyOverDrone( p_melody, droneSamples, p_durations, p_gap, m_tuning, p_framing ) );
 
@@ -559,6 +603,38 @@ void QAudioNotePlayer::playPhraseOverDrone( std::span<const domain::Note> p_melo
 void QAudioNotePlayer::holdTimbre()
 {
     m_holdTimbre = true;
+
+    // Une comparaison de deux modes tient son timbre pour la duree de la question : c'est un cas d'UN SEUL instant, et il
+    // ne doit pas survivre a la session.
+    m_timbreIsHeldForSession = false;
+}
+
+void QAudioNotePlayer::beginTimbreForSession()
+{
+    // UN timbre pour toute la session, et un nouveau a chaque session : le tirage a lieu ICI, une fois, puis
+    // timbreIndexFor ne le touche plus.
+    //
+    // Roger a entendu le probleme avant de le nommer : « les instruments parfois ca rend bizarre dans certains
+    // intervalles ». Le timbre changeait a chaque question, donc une seconde mineure et une quinte n'etaient pas jouees
+    // par le meme instrument - et l'oreille comparait deux choses au lieu d'une.
+    m_holdTimbre = false;
+    m_timbreIsHeldForSession = false;
+    m_lastPlayedNotes.clear();
+
+    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
+
+    if( timbreCount == 0 )
+    {
+        // Rien a choisir : la synthese jouera, comme partout ou un echantillon manque.
+        return;
+    }
+
+    std::uniform_int_distribution<std::size_t> distribution{ 0, timbreCount - 1 };
+
+    m_instrumentIndex = distribution( m_instrumentRandomEngine );
+
+    // Et le timbre est TENU : c'est la seule chose qui distingue ce tirage des autres.
+    m_timbreIsHeldForSession = true;
 }
 
 void QAudioNotePlayer::playMistakeCue()

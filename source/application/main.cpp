@@ -236,7 +236,17 @@ constexpr const char * MODAL_PHRASES_RESOURCE = ":/assets/content/modal-phrases.
 }
 
 // The instruments the game plays with, in the order they are offered.
-constexpr std::array<const char *, 3> INSTRUMENT_NAMES{ "piano", "guitare", "saxo" };
+//
+// CE SONT DES NOMS, ET RIEN D'AUTRE : l'application charge <nom>_c2.wav a <nom>_c6.wav. Ajouter un timbre, c'est donc une
+// ligne ici, une ligne dans INSTRUMENT_NAMES (le domaine, qui en connait aussi les trois formes d'onde) et cinq fichiers
+// declares dans resources.qrc. En retirer un, c'est les memes lignes et ses fichiers. Voir
+// scripts/render_instrument_samples.py, qui les fabrique.
+//
+// Les cinq derniers sont DOUX, et c'est une demande de Roger : « j'utilise que la guitare et le piano, les autres sont
+// trop agressifs. N'hesite pas a rajouter des timbres doux ». Une seconde mineure deja dissonante devient boueuse avec un
+// timbre riche, et un timbre qui grince fait fermer l'application.
+constexpr std::array<const char *, 8> SAMPLED_INSTRUMENT_NAMES{
+  "piano", "guitare", "saxo", "flute", "cordes", "clarinette", "marimba", "harpe" };
 
 // Les trois bourdons enregistres, et l'ordre dans lequel ils sont offerts.
 //
@@ -395,7 +405,7 @@ int main( int p_argumentCount, char * p_arguments[] )
     // missing.
     std::vector<musichien::domain::SampledInstrument> instruments;
 
-    for( const char * instrumentName : INSTRUMENT_NAMES )
+    for( const char * instrumentName : SAMPLED_INSTRUMENT_NAMES )
     {
         musichien::domain::SampledInstrument instrument = loadInstrument( QString::fromLatin1( instrumentName ) );
 

@@ -47,10 +47,10 @@ namespace musichien::domain
 // The last three are NOT samples: they are the pure waveforms the synthesiser renders (see Waveform), offered so
 // that a change of temperament can be HEARD for what it is. They are listed here so that the settings screen offers
 // them exactly like a recording.
-inline constexpr std::size_t INSTRUMENT_COUNT = 6;
+inline constexpr std::size_t INSTRUMENT_COUNT = 11;
 
 inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{
-  "piano", "guitare", "saxo", "sinusoïdal", "dent de scie", "carré" };
+  "piano", "guitare", "saxo", "flute", "cordes", "clarinette", "marimba", "harpe", "sinusoïdal", "dent de scie", "carré" };
 
 // Les instruments d'un PREMIER lancement : le piano et la guitare, et rien d'autre. Les timbres restants sont trop
 // etranges pour etre imposes tels quels ; c'est une decision de conception, et elle vit ici comme les autres regles du
@@ -107,6 +107,16 @@ public:
 
     [[nodiscard]] std::vector<float> renderMelody( std::span<const Note> p_notes,
                                                    std::chrono::milliseconds p_noteDuration,
+                                                   std::chrono::milliseconds p_gap,
+                                                   std::int32_t p_sampleRate,
+                                                   TuningContext p_tuning = {} ) const;
+
+    // La MEME chose, pour une phrase dont chaque note a sa duree.
+    //
+    // Ajoutee le 01/10/2026 pour que les phrases modales soient jouees par un INSTRUMENT : elles etaient synthetisees, et
+    // posees sur un bourdon enregistre - deux matieres que l'oreille n'accorde pas.
+    [[nodiscard]] std::vector<float> renderMelody( std::span<const Note> p_notes,
+                                                   std::span<const std::chrono::milliseconds> p_durations,
                                                    std::chrono::milliseconds p_gap,
                                                    std::int32_t p_sampleRate,
                                                    TuningContext p_tuning = {} ) const;

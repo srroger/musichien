@@ -505,9 +505,25 @@ std::vector<float> ToneSynthesizer::mixMelodyOverDrone( std::span<const Note> p_
         return melodySamples;
     }
 
+    // Le mixage lui-meme vit dans mixRenderedMelodyOverDrone : la phrase et la gamme d'un mode passent par la MEME regle,
+    // qu'elles viennent de la synthese ou d'un instrument.
+    return mixRenderedMelodyOverDrone( melodySamples, p_droneSamples, p_framing );
+}
+
+std::vector<float> ToneSynthesizer::mixRenderedMelodyOverDrone( std::span<const float> p_melodySamples,
+                                                                std::span<const float> p_droneSamples,
+                                                                DroneFraming p_framing ) const
+{
+    if( p_melodySamples.empty() )
+    {
+        // Rien a poser sur le bourdon : on rend une melodie vide, qui se joue comme un silence. Le bourdon seul serait une
+        // autre question, et ce n'est pas a cette fonction d'en decider.
+        return {};
+    }
+
     const std::size_t leadInSampleCount = sampleCountFor( p_framing.leadIn );
 
-    const std::size_t sampleCount = std::max( p_droneSamples.size(), leadInSampleCount + melodySamples.size() );
+    const std::size_t sampleCount = std::max( p_droneSamples.size(), leadInSampleCount + p_melodySamples.size() );
 
     std::vector<float> mixedSamples( sampleCount, 0.0F );
 
@@ -522,9 +538,9 @@ std::vector<float> ToneSynthesizer::mixMelodyOverDrone( std::span<const Note> p_
 
         // La melodie est DECALEE du temps ou le bourdon sonne seul. C'est ce decalage qui fait entendre le centre
         // avant la couleur, et c'est tout l'interet de l'encadrement.
-        if( ( index >= leadInSampleCount ) && ( ( index - leadInSampleCount ) < melodySamples.size() ) )
+        if( ( index >= leadInSampleCount ) && ( ( index - leadInSampleCount ) < p_melodySamples.size() ) )
         {
-            melodySample = melodySamples.at( index - leadInSampleCount );
+            melodySample = p_melodySamples.at( index - leadInSampleCount );
         }
 
         mixedSamples.at( index ) = melodySample + ( droneSample * DRONE_GAIN );
