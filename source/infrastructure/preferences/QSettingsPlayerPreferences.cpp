@@ -80,6 +80,9 @@ constexpr const char * GOD_MODE_CHORDS_KEY = "player/god-mode-chords";
 constexpr const char * GOD_MODE_MODES_KEY = "player/god-mode-modes";
 constexpr const char * GOD_MODE_CHOSEN_KEY = "player/god-mode-chosen";
 
+// Le dernier palier pour lequel le jeu a FELICITE le joueur : une seule felicitation par palier, jamais deux.
+constexpr const char * ANNOUNCED_LEVEL_KEY = "player/announced-level";
+
 }    // namespace
 
 std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedLevel() const
@@ -175,6 +178,27 @@ void QSettingsPlayerPreferences::storeGodModePalette( const domain::GodModePalet
     settings.setValue( GOD_MODE_INTERVALS_KEY, intervals );
     settings.setValue( GOD_MODE_CHORDS_KEY, chords );
     settings.setValue( GOD_MODE_MODES_KEY, modes );
+}
+
+std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedAnnouncedLevel() const
+{
+    const QSettings settings;
+
+    if( !settings.contains( ANNOUNCED_LEVEL_KEY ) )
+    {
+        // Rien annonce : le jeu n'a jamais felicite ce joueur, et la premiere felicitation lui appartient.
+        return std::nullopt;
+    }
+
+    return domain::playerLevelFromIndex(
+      static_cast<std::size_t>( settings.value( ANNOUNCED_LEVEL_KEY ).toInt() ) );
+}
+
+void QSettingsPlayerPreferences::storeAnnouncedLevel( domain::PlayerLevel p_level )
+{
+    QSettings settings;
+
+    settings.setValue( ANNOUNCED_LEVEL_KEY, static_cast<int>( p_level ) );
 }
 
 std::vector<bool> QSettingsPlayerPreferences::storedEnabledInstruments() const

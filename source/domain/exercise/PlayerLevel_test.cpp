@@ -218,4 +218,34 @@ TEST( PlayerLevelTest, every_level_says_exactly_what_it_gives )
     EXPECT_FALSE( master.aidsAllowed );
 }
 
+TEST( PlayerLevelTest, the_experience_earned_offers_the_next_step )
+{
+    // Le jeu PROPOSE, il n'impose pas : ce que l'experience merite, et les seuils qui le disent.
+    //
+    // Roger les a voulus LARGES - « pour aller haut, il faut faire de longues series » - et une partie de dix questions vaut
+    // entre cent et deux cents points : les paliers se comptent donc en dizaines de parties, jamais en une soiree.
+    EXPECT_EQ( PlayerLevel::Beginner, levelEarnedBy( 0 ) );
+    EXPECT_EQ( PlayerLevel::Beginner, levelEarnedBy( 249 ) );
+    EXPECT_EQ( PlayerLevel::Fluent, levelEarnedBy( 250 ) );
+    EXPECT_EQ( PlayerLevel::Fluent, levelEarnedBy( 999 ) );
+    EXPECT_EQ( PlayerLevel::Advanced, levelEarnedBy( 1000 ) );
+    EXPECT_EQ( PlayerLevel::BeyondTheOctave, levelEarnedBy( 2500 ) );
+    EXPECT_EQ( PlayerLevel::Master, levelEarnedBy( 6000 ) );
+
+    // Et il n'y a AUCUN plafond : celui qui joue beaucoup continue d'ouvrir le jeu - « sky is the limit ».
+    EXPECT_EQ( PlayerLevel::Master, levelEarnedBy( 1'000'000 ) );
+
+    // Une experience negative - un fichier edite a la main - ne merite pas moins que le premier palier : le jeu propose, il
+    // ne retire jamais.
+    EXPECT_EQ( PlayerLevel::Beginner, levelEarnedBy( -50 ) );
+
+    // Et les deux fonctions se REPONDENT : le seuil d'un niveau est exactement l'experience qui fait qu'on le merite. C'est
+    // ce qui garantit qu'un seuil deplace ne laisse pas un palier inatteignable.
+    for( const PlayerLevel level : EVERY_LEVEL )
+    {
+        EXPECT_EQ( level, levelEarnedBy( experienceRequiredFor( level ) ) )
+          << "niveau " << static_cast<int>( level );
+    }
+}
+
 }    // namespace musichien::domain

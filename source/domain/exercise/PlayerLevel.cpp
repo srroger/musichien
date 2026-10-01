@@ -1,7 +1,51 @@
 #include "domain/exercise/PlayerLevel.h"
 
+#include <array>
+#include <cstdint>
+
 namespace musichien::domain
 {
+
+namespace
+{
+
+// L'EXPERIENCE CUMULEE QU'UN NIVEAU DEMANDE, et c'est une decision de GAME DESIGN autant que de musique.
+//
+// L'ordre de grandeur : une partie de dix questions rapporte entre cent et deux cents points, selon la serie et les
+// reecoutes. Les seuils sont donc en dizaines de parties :
+//
+//   * « A l'aise » apres deux ou trois parties : le joueur a montre qu'il entend les couleurs de base ;
+//   * « Jusqu'a l'octave » apres une dizaine : c'est le palier ou l'on s'installe, et celui que beaucoup de joueurs
+//     garderont ;
+//   * « Les composes » apres une vingtaine-cinq : le palier charniere, celui de Roger - « ce qui separe le joueur
+//     intermediaire du joueur avance » ;
+//   * « Je maitrise » apres une quarantaine. Loin, et volontairement : c'est le niveau ou l'application n'aide plus.
+constexpr std::array<std::int64_t, PLAYER_LEVEL_COUNT> EXPERIENCE_THRESHOLDS{ 0, 250, 1000, 2500, 6000 };
+
+}    // namespace
+
+std::int64_t experienceRequiredFor( PlayerLevel p_level ) noexcept
+{
+    return EXPERIENCE_THRESHOLDS.at( static_cast<std::size_t>( p_level ) );
+}
+
+PlayerLevel levelEarnedBy( std::int64_t p_experience ) noexcept
+{
+    // On descend depuis le plus haut : le premier seuil atteint est celui qui merite d'etre propose. L'ecriture « depuis
+    // le haut » est celle qui n'oublie pas un palier le jour ou l'on en ajoute un.
+    for( std::size_t index = PLAYER_LEVEL_COUNT; index > 0; --index )
+    {
+        const auto levelIndex = index - 1;
+
+        if( p_experience >= EXPERIENCE_THRESHOLDS.at( levelIndex ) )
+        {
+            return playerLevelFromIndex( levelIndex );
+        }
+    }
+
+    // Une experience negative - un fichier edite a la main - ne merite rien de plus que le premier palier.
+    return PlayerLevel::Beginner;
+}
 
 namespace
 {

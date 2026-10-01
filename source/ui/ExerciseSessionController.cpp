@@ -62,6 +62,31 @@ constexpr std::int32_t FALLBACK_PHRASE_TEMPO = 72;
 // n'a qu'un combo a remplir, donc un seul nombre a comparer.
 constexpr int GOD_MODE_DIFFICULTY_INDEX = static_cast<int>( domain::PLAYER_LEVEL_COUNT );
 
+// LE NOM D'UN NIVEAU, ecrit UNE fois : il sert a la liste des difficultes ET a la felicitation de palier. Deux listes de
+// noms finiraient par diverger, et c'est exactement ce que le projet evite partout ailleurs.
+[[nodiscard]] QString levelName( domain::PlayerLevel p_level )
+{
+    switch( p_level )
+    {
+        case domain::PlayerLevel::Beginner:
+            return ExerciseSessionController::tr( "Je débute" );
+
+        case domain::PlayerLevel::Fluent:
+            return ExerciseSessionController::tr( "À l'aise" );
+
+        case domain::PlayerLevel::Advanced:
+            return ExerciseSessionController::tr( "Jusqu'à l'octave" );
+
+        case domain::PlayerLevel::BeyondTheOctave:
+            return ExerciseSessionController::tr( "Les composés" );
+
+        case domain::PlayerLevel::Master:
+            return ExerciseSessionController::tr( "Je maîtrise" );
+    }
+
+    return {};
+}
+
 // Le bourdon sonne SEUL avant la melodie, et apres : c'est ce qui installe le centre avant que la couleur n'arrive.
 constexpr std::chrono::milliseconds MODE_LEAD_IN{ 800 };
 constexpr std::chrono::milliseconds MODE_TAIL{ 600 };
@@ -614,6 +639,9 @@ void ExerciseSessionController::choosePlayerLevel( int p_level )
     }
 
     emit playerLevelChanged();
+
+    // Le palier a change : la fleche doree peut devoir disparaitre, ou apparaitre.
+    emit levelInvitationChanged();
 }
 
 domain::SessionSettings ExerciseSessionController::sessionSettingsForLevel( domain::PlayerLevel p_level ) const
@@ -656,37 +684,13 @@ void ExerciseSessionController::applyStoredQuestionShares( domain::SessionSettin
 
 QVariantList ExerciseSessionController::playerLevels()
 {
-    // The names live here, and not in the QML, for the same reason the answer grid is built here: a list that
-    // exists twice drifts.
-    const auto nameOfLevel = []( domain::PlayerLevel p_level ) {
-        switch( p_level )
-        {
-            case domain::PlayerLevel::Beginner:
-                return ExerciseSessionController::tr( "Je débute" );
-
-            case domain::PlayerLevel::Fluent:
-                return ExerciseSessionController::tr( "À l'aise" );
-
-            case domain::PlayerLevel::Advanced:
-                return ExerciseSessionController::tr( "Jusqu'à l'octave" );
-
-            case domain::PlayerLevel::BeyondTheOctave:
-                return ExerciseSessionController::tr( "Les composés" );
-
-            case domain::PlayerLevel::Master:
-                return ExerciseSessionController::tr( "Je maîtrise" );
-        }
-
-        return QString{};
-    };
-
     QVariantList levels;
 
     for( std::size_t index = 0; index < domain::PLAYER_LEVEL_COUNT; ++index )
     {
         QVariantMap level;
         level.insert( QStringLiteral( "index" ), static_cast<int>( index ) );
-        level.insert( QStringLiteral( "name" ), nameOfLevel( domain::playerLevelFromIndex( index ) ) );
+        level.insert( QStringLiteral( "name" ), levelName( domain::playerLevelFromIndex( index ) ) );
         level.insert( QStringLiteral( "isGodMode" ), false );
 
         levels.append( level );
@@ -1796,6 +1800,12 @@ void ExerciseSessionController::persistSessionOutcome()
     {
         m_levelStore->storeStarCount( m_levelStore->starCount() + 1 );
     }
+
+    // ET C'EST ICI QUE LA FELICITATION PEUT NAITRE : l'experience vient d'augmenter, donc le palier merite peut avoir change.
+    //
+    // Une seule emission, au seul endroit qui augmente le total - c'est ce qui garantit que l'ecran de fin de partie voit
+    // l'invitation au bon moment, et pas un tour plus tard.
+    emit levelInvitationChanged();
 
     emit totalExperienceChanged();
 }
@@ -3483,6 +3493,64 @@ void ExerciseSessionController::applyGodModeIfChosen( domain::SessionSettings & 
     // puis appuyer sur sauvegarder POUR POUVOIR JOUER de cette maniere ». Tant qu'il n'a pas appuye, ses clics ne changent
     // rien a ce qu'il jouera, et c'est ce qui donne son sens au mot « sauvegarde ».
     p_settings = domain::sessionSettingsFor( m_godModeSavedPalette, p_settings );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// LA FELICITATION DE PALIER
+// ---------------------------------------------------------------------------------------------------------------------
+
+int ExerciseSessionController::invitedLevel() const
+{
+    return static_cast<int>( domain::levelEarnedBy( totalExperience() ) );
+}
+
+QString ExerciseSessionController::invitedLevelName() const
+{
+    return levelName( domain::levelEarnedBy( totalExperience() ) );
+}
+
+bool ExerciseSessionController::levelInvitationIsAvailable() const
+{
+    // Le GODMODE ne propose RIEN : le joueur a deja decide de choisir lui-meme, et lui offrir un palier serait lui reprendre
+    // la main qu'il vient de prendre.
+    if( m_godModeIsChosen )
+    {
+        return false;
+    }
+
+    // Le palier merite doit etre STRICTEMENT au-dessus du palier actuel. A egalite il n'y a rien a proposer, et un joueur qui
+    // a choisi plus haut que son experience ne doit surtout pas se voir proposer de redescendre.
+    return domain::levelEarnedBy( totalExperience() ) > m_playerLevel.value_or( domain::PlayerLevel::Beginner );
+}
+
+bool ExerciseSessionController::levelInvitationAnnounced() const
+{
+    if( m_levelStore == nullptr )
+    {
+        // Sans memoire, il n'y a pas de « premiere fois » : on n'annonce rien plutot que de repeter.
+        return true;
+    }
+
+    const std::optional<domain::PlayerLevel> announced = m_levelStore->storedAnnouncedLevel();
+
+    return announced.has_value() && ( *announced == domain::levelEarnedBy( totalExperience() ) );
+}
+
+void ExerciseSessionController::acceptLevelInvitation()
+{
+    // Par le MEME chemin que la liste des difficultes : c'est ce qui evite un second mecanisme a tenir a jour, et ce qui
+    // garantit que le joueur obtient exactement ce qu'il aurait eu en cliquant lui-meme.
+    choosePlayerLevel( invitedLevel() );
+}
+
+void ExerciseSessionController::markLevelInvitationAnnounced()
+{
+    if( m_levelStore != nullptr )
+    {
+        m_levelStore->storeAnnouncedLevel( domain::levelEarnedBy( totalExperience() ) );
+    }
+
+    emit levelInvitationChanged();
 }
 
 }    // namespace musichien::ui

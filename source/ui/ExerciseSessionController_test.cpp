@@ -877,6 +877,51 @@ TEST( ExerciseSessionControllerTest, putting_the_settings_back_to_default_brings
     EXPECT_TRUE( controller.dailyReminderEnabled() );
 }
 
+TEST( ExerciseSessionControllerTest, the_game_offers_the_next_step_when_the_experience_earns_it )
+{
+    // « Apres une partie, on pourra lui dire : bravo ». Le jeu PROPOSE et c'est l'ecran qui annonce - une seule fois, parce
+    // qu'une bonne nouvelle repetee devient une machine a sous.
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    // Un joueur qui debute, et pas encore d'experience : rien a proposer.
+    controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Beginner ) );
+
+    EXPECT_FALSE( controller.levelInvitationIsAvailable() );
+
+    // Le voila avec assez d'experience pour la suite : la fleche doree apparait.
+    levelStore.storeTotalExperience( 1200 );
+
+    EXPECT_TRUE( controller.levelInvitationIsAvailable() );
+    EXPECT_EQ( static_cast<int>( domain::PlayerLevel::Advanced ), controller.invitedLevel() );
+    EXPECT_EQ( QStringLiteral( "Jusqu'à l'octave" ), controller.invitedLevelName() );
+
+    // La felicitation de CE palier n'a pas encore ete annoncee : l'ecran de fin la montrera.
+    EXPECT_FALSE( controller.levelInvitationAnnounced() );
+
+    controller.markLevelInvitationAnnounced();
+
+    EXPECT_TRUE( controller.levelInvitationAnnounced() );
+
+    // Et si le joueur ACCEPTE, il monte par le MEME chemin que la liste des difficultes - donc rien de plus a tenir a jour.
+    controller.acceptLevelInvitation();
+
+    EXPECT_EQ( static_cast<int>( domain::PlayerLevel::Advanced ), controller.playerLevel() );
+
+    // La fleche disparait : il est a son palier.
+    EXPECT_FALSE( controller.levelInvitationIsAvailable() );
+
+    // EN GODMODE, le jeu ne propose rien : le joueur a deja decide de choisir lui-meme, et lui offrir un palier serait lui
+    // reprendre la main qu'il vient de prendre.
+    controller.choosePlayerLevel( 5 );
+    levelStore.storeTotalExperience( 9000 );
+
+    EXPECT_TRUE( controller.godModeIsChosen() );
+    EXPECT_FALSE( controller.levelInvitationIsAvailable() );
+}
+
 TEST( ExerciseSessionControllerTest, the_god_mode_plays_the_perimeter_the_player_saved )
 {
     // Ce que Roger a demande : le joueur choisit lui-meme, et le jeu joue ce qu'il a SAUVEGARDE. Le temoin est la grille de

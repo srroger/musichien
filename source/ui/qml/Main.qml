@@ -72,6 +72,7 @@ ApplicationWindow {
     // Roger a demande que la couleur range les boutons par famille plutot que de les decorer : on JOUE en rouge, les
     // variantes du jeu dans un rouge eteint, les deux OUTILS dans une couleur a eux, et tout le reste en gris. Une
     // famille, une couleur, un endroit ou la changer.
+    // LA FELICITATION DE PALIER.
     // LA CONFIRMATION DE LA REMISE A ZERO DU PROFIL.
     // LE GODMODE, EN ENTIER.
     // UNE FAMILLE DE CASES A COCHER : un titre, « tout » et « rien », puis les cases.
@@ -210,6 +211,86 @@ ApplicationWindow {
     // Leaving the screen must never leave an audio stream open: on a phone that is a battery drain,
     // and a bug. The view model was given a method for exactly this call.
     onClosing: IntervalController.stopPlayback()
+
+    // Roger : « apres une partie, si il atteint un certain niveau d'experience, on pourra lui dire : bravo, tu passes au
+    // niveau “Jusqu'a l'octave”, regarde derriere toi tu as fait enormement de progres ». C'est exactement ce qu'elle dit -
+    // et elle ne dit RIEN d'autre, parce qu'un ecran qui felicite et qui vend en meme temps ne felicite plus.
+    Dialog {
+        id: levelUpDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 460)
+        modal: true
+        padding: 16
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#ffd479"
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 12
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                color: "#ffd479"
+                font.pixelSize: 21
+                font.bold: true
+                text: qsTr("Bravo !")
+            }
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                wrapMode: Text.WordWrap
+                color: "#ffffff"
+                font.pixelSize: 15
+                text: qsTr("Tu as joué assez pour la suite : le palier « %1 » t'attend. Regarde derrière toi, tu as fait du chemin.").arg(ExerciseController.invitedLevelName)
+            }
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                wrapMode: Text.WordWrap
+                color: "#cbb8e8"
+                font.pixelSize: 13
+                text: qsTr("Tu peux y passer maintenant, ou continuer encore un peu : la flèche de la liste des difficultés garde ce choix ouvert.")
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                spacing: 10
+
+                MenuButton {
+                    Layout.fillWidth: true
+                    text: qsTr("Plus tard")
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        levelUpDialog.close();
+                    }
+                }
+
+                TintedMenuButton {
+                    Layout.fillWidth: true
+                    tintColour: mainWindow.questColour
+                    labelColour: mainWindow.questLabelColour
+                    text: qsTr("Passer")
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        ExerciseController.acceptLevelInvitation();
+                        levelUpDialog.close();
+                    }
+                }
+
+            }
+
+        }
+
+    }
 
     // Roger l'a demandee le jour ou l'on a parle du GodMode, et pour la bonne raison : c'est le SEUL chemin de retour en
     // arriere - effacer le score, c'est repartir - donc le seul geste que personne ne veut faire par accident.
@@ -520,6 +601,10 @@ ApplicationWindow {
                 // « il faudrait faire la combobox pour les niveaux, ca allegerait pas mal ».
                 // Les DEUX GRANDS OUTILS, en icones.
                 // LE GODMODE N'EST PAS UN NIVEAU, ET SES CLICS NE SONT PAS ENCORE ACTIFS.
+                // Le composant est celui des reglages, et il est ANCRE dans un Item de la largeur des boutons : ses
+                // propres Layout.* visent un parent qui est un Layout, et ici le parent n'en est pas un - la largeur
+                // vient donc du bouton qui la porte, ce qui est exactement ce qu'on veut.
+                // LA DIFFICULTE, ET LA FLECHE QUI DIT QU'ON PEUT MONTER.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -609,27 +694,73 @@ ApplicationWindow {
                     text: ExerciseController.hasChosenLevel ? qsTr("Ton niveau") : qsTr("Pour commencer : tu en es où ?")
                 }
 
-                // Le composant est celui des reglages, et il est ANCRE dans un Item de la largeur des boutons : ses
-                // propres Layout.* visent un parent qui est un Layout, et ici le parent n'en est pas un - la largeur
-                // vient donc du bouton qui la porte, ce qui est exactement ce qu'on veut.
-                Item {
+                // Roger l'a voulue ici : « je mettrais bien dans la combobox de difficulte, si il est invite a augmenter de
+                // palier, un bouton d'icone de fleche doree vers le haut ». C'est la que se change un palier, donc c'est la
+                // qu'un rappel a un sens - et nulle part ailleurs.
+                RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
-                    Layout.preferredHeight: levelCombo.implicitHeight
+                    spacing: 8
 
-                    DarkComboBox {
-                        id: levelCombo
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: levelCombo.implicitHeight
 
-                        anchors.fill: parent
-                        model: ExerciseController.playerLevels
-                        textRole: "name"
-                        valueRole: "index"
-                        // Le niveau choisi reste marque dans la liste : l'ecran ne laisse jamais de doute sur la
-                        // difficulte de la prochaine partie.
-                        currentIndex: ExerciseController.playerLevel
-                        onActivated: {
-                            ExerciseController.choosePlayerLevel(currentValue);
+                        DarkComboBox {
+                            id: levelCombo
+
+                            anchors.fill: parent
+                            model: ExerciseController.playerLevels
+                            textRole: "name"
+                            valueRole: "index"
+                            // Le niveau choisi reste marque dans la liste : l'ecran ne laisse jamais de doute sur la
+                            // difficulte de la prochaine partie.
+                            currentIndex: ExerciseController.playerLevel
+                            onActivated: {
+                                ExerciseController.choosePlayerLevel(currentValue);
+                            }
                         }
+
+                    }
+
+                    // LA FLECHE DOREE, et elle dure tant que le palier n'a pas ete pris : c'est un RAPPEL, pas une
+                    // obligation. Un joueur qui a dit « plus tard » la retrouve la, et reste libre de son rythme.
+                    MenuButton {
+                        Layout.preferredWidth: 52
+                        Layout.preferredHeight: levelCombo.implicitHeight
+                        visible: ExerciseController.levelInvitationIsAvailable
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            levelUpDialog.open();
+                        }
+
+                        // Dessinee comme l'engrenage du GodMode : une hampe et une pointe, vers le haut.
+                        Canvas {
+                            anchors.centerIn: parent
+                            width: 22
+                            height: 22
+                            antialiasing: true
+                            onPaint: {
+                                const ctx = getContext("2d");
+                                ctx.reset();
+                                ctx.strokeStyle = "#ffd479";
+                                ctx.lineWidth = 3;
+                                ctx.lineCap = "round";
+                                ctx.lineJoin = "round";
+                                // La hampe.
+                                ctx.beginPath();
+                                ctx.moveTo(11, 19);
+                                ctx.lineTo(11, 6);
+                                ctx.stroke();
+                                // Et la pointe.
+                                ctx.beginPath();
+                                ctx.moveTo(5, 11);
+                                ctx.lineTo(11, 4);
+                                ctx.lineTo(17, 11);
+                                ctx.stroke();
+                            }
+                        }
+
                     }
 
                 }
@@ -3126,12 +3257,22 @@ ApplicationWindow {
     // =================================================================================================================
     Item {
         // Le chien parle : sa bulle est au-dessus de lui, et elle porte l'anecdote.
+        // ET LA FELICITATION ARRIVE ICI, UNE SEULE FOIS.
 
         id: chibaPopup
 
         anchors.fill: parent
         z: 1000
         visible: ExerciseController.isChibaTalking
+        // Le chien parle a la fin d'une partie : c'est donc le meme moment, et Roger l'a decrit exactement comme ca -
+        // « apres une partie, on pourra lui dire : bravo ». On la marque en l'ouvrant, sinon elle reviendrait apres chaque
+        // partie ; la fleche de la liste des difficultes, elle, reste tant que le palier n'est pas pris.
+        onVisibleChanged: {
+            if (visible && ExerciseController.levelInvitationIsAvailable && !ExerciseController.levelInvitationAnnounced) {
+                ExerciseController.markLevelInvitationAnnounced();
+                levelUpDialog.open();
+            }
+        }
 
         // Un voile : il dit que la page est en pause, et il est cliquable EN ENTIER - y compris a cote du chien, parce
         // qu'un bouton qu'il faut viser est un bouton qu'on rate.

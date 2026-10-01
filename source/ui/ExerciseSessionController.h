@@ -298,6 +298,26 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( QVariantList godModeChords READ godModeChords NOTIFY godModeChanged )
     Q_PROPERTY( QVariantList godModeModes READ godModeModes NOTIFY godModeChanged )
 
+    // ---------------------------------------------------------------------------------------------------------------
+    // LA FELICITATION DE PALIER
+    //
+    // Le jeu PROPOSE, il n'impose pas : un joueur qui a joue assez pour la suite s'entend offrir le palier suivant.
+    // Roger : « apres une partie, si il atteint un certain niveau d'experience, on pourra lui dire : bravo, tu passes au
+    // niveau “Jusqu'a l'octave”, regarde derriere toi tu as fait enormement de progres ».
+    // ---------------------------------------------------------------------------------------------------------------
+
+    // Le joueur a-t-il merite mieux que son palier actuel ? C'est ce qui fait apparaitre la fleche doree dans la liste des
+    // difficultes.
+    Q_PROPERTY( bool levelInvitationIsAvailable READ levelInvitationIsAvailable NOTIFY levelInvitationChanged )
+
+    // La felicitation de ce palier a-t-elle deja ete annoncee ? L'ecran de fin de partie ne la montre qu'une fois : une
+    // bonne nouvelle repetee devient une machine a sous.
+    Q_PROPERTY( bool levelInvitationAnnounced READ levelInvitationAnnounced NOTIFY levelInvitationChanged )
+
+    // Le palier propose, et son nom, tout prets pour la popup.
+    Q_PROPERTY( int invitedLevel READ invitedLevel NOTIFY levelInvitationChanged )
+    Q_PROPERTY( QString invitedLevelName READ invitedLevelName NOTIFY levelInvitationChanged )
+
     // The instruments the player wants to hear, each with its index, its name and whether it is enabled.
     //
     // See PlayerPreferences: a saxophone at the same level as a piano is aggressive, and a timbre that grates
@@ -671,6 +691,18 @@ public:
     [[nodiscard]] QVariantList godModeChords() const;
     [[nodiscard]] QVariantList godModeModes() const;
 
+    [[nodiscard]] bool levelInvitationIsAvailable() const;
+    [[nodiscard]] bool levelInvitationAnnounced() const;
+    [[nodiscard]] int invitedLevel() const;
+    [[nodiscard]] QString invitedLevelName() const;
+
+    // Accepter la felicitation, c'est choisir ce palier - et par le MEME chemin que si le joueur l'avait pris dans la liste,
+    // donc sans second mecanisme a tenir a jour.
+    Q_INVOKABLE void acceptLevelInvitation();
+
+    // L'ecran a annonce la felicitation : on la marque, pour ne pas la repeter apres chaque partie.
+    Q_INVOKABLE void markLevelInvitationAnnounced();
+
     // Coche ou decoche un element du brouillon. Rien n'est ecrit sur le disque : c'est le bouton Sauvegarder qui ecrit,
     // et c'est ce qui rend « non sauvegarde » vrai.
     Q_INVOKABLE void toggleGodModeInterval( int p_semitones );
@@ -886,6 +918,8 @@ signals:
     void playerLevelChanged();
 
     void godModeChanged();
+
+    void levelInvitationChanged();
 
     // The player has just turned an instrument on or off.
     void instrumentsChanged();

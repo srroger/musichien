@@ -66,6 +66,15 @@ public:
 
     virtual void storeGodModePalette( const GodModePalette & p_palette ) = 0;
 
+    // Le dernier palier pour lequel le jeu a FELICITE le joueur.
+    //
+    // C'est ce qui empeche la meme felicitation de revenir apres chaque partie : une bonne nouvelle repetee devient une
+    // machine a sous, et le joueur finit par ne plus la lire. La fleche doree de la liste des difficultes, elle, RESTE -
+    // c'est un rappel qu'il peut monter quand il veut, et ce n'est pas la meme chose qu'un message qui s'impose.
+    [[nodiscard]] virtual std::optional<PlayerLevel> storedAnnouncedLevel() const = 0;
+
+    virtual void storeAnnouncedLevel( PlayerLevel p_level ) = 0;
+
     // Which instruments the player WANTS to hear, one flag per instrument, in the order the application loads
     // them.
     //
@@ -236,6 +245,10 @@ public:
 
     void storeGodModePalette( const GodModePalette & p_palette ) override { m_godModePalette = p_palette; }
 
+    [[nodiscard]] std::optional<PlayerLevel> storedAnnouncedLevel() const override { return m_announcedLevel; }
+
+    void storeAnnouncedLevel( PlayerLevel p_level ) override { m_announcedLevel = p_level; }
+
     [[nodiscard]] std::vector<bool> storedEnabledInstruments() const override
     {
         return m_enabledInstruments;
@@ -327,6 +340,7 @@ private:
     // raison - « rien » et « vide » ne veulent pas dire la meme chose.
     bool m_godModeIsChosen{ false };
     std::optional<GodModePalette> m_godModePalette;
+    std::optional<PlayerLevel> m_announcedLevel;
     std::vector<bool> m_enabledInstruments;
 
     std::string m_playerName;
