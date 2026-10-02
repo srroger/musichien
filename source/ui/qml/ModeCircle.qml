@@ -77,9 +77,13 @@ Item {
         if (p_degrees !== undefined)
             playbackDegrees = p_degrees;
 
+        // LA DUREE SE POSE SUR L'ANIMATION, et c'est une CORRECTION : `restart()` ne prend AUCUN argument, donc celle que
+        // je lui passais etait ignoree - et le parcours se faisait en une fraction de seconde. Roger l'a vu avant moi :
+        // « le trait se dessine hyper vite, genre en une fraction de seconde ».
+        headAnimation.duration = Math.max(1, p_durationMs);
         playbackHead = 0;
         playing = true;
-        headAnimation.restart(p_durationMs);
+        headAnimation.restart();
     }
 
     implicitWidth: span
@@ -92,6 +96,9 @@ Item {
         property: "playbackHead"
         from: 0
         to: Math.max(0, root.playbackPath.length - 1)
+        // Une duree par DEFAUT, posee par startPlayback avant chaque depart. Une animation a zero dure une fraction de
+        // seconde, et c'est exactement ce que Roger a entendu.
+        duration: 2000
         easing.type: Easing.Linear
     }
 

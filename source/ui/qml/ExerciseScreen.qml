@@ -449,6 +449,8 @@ Item {
             RowLayout {
                 // LES COEURS. Un par vie, et ils passent a la ligne quand la partie en accorde beaucoup : avec le reglage
                 // qui monte jusqu'a vingt-cinq, une seule ligne de coeurs deborderait de l'ecran.
+                // Les coeurs sont poses sur la MEME ligne que « Quitter », a droite - et leur largeur est CALCULEE, jamais
+                // prise a celle du dessin.
 
                 Layout.fillWidth: true
 
@@ -487,11 +489,24 @@ Item {
                     Layout.fillWidth: true
                 }
 
-                // Au-dela de dix ils RETRECISSENT et se replient : Roger a demande les deux - « il faudrait peut etre les
-                // retrecir et qu'ils prennent qu'au dessus de 10, qu'ils soient sur 2 lignes ».
+                // C'etait le bug : la largeur venait de `implicitWidth`, qui vaut ZERO tant que le Repeater n'a rien
+                // construit. La rangee recevait donc une largeur nulle au premier passage, les coeurs se posaient UN PAR
+                // LIGNE - une colonne - et cette colonne poussait la zone de jeu vers le haut. Roger l'a vu tout de suite.
                 Flow {
+                    id: heartsFlow
+
+                    // La taille d'un coeur, et la largeur d'une ligne : au-dela de dix, ils retrecissent et se replient
+                    // sur DEUX lignes.
+                    readonly property int heartCount: ExerciseController.hasUnlimitedLives ? 1 : Math.max(1, ExerciseController.lives)
+                    readonly property int heartSize: heartCount > 10 ? 13 : 21
+                    readonly property real heartsWidth: (heartCount > 10 ? Math.ceil(heartCount / 2) : heartCount) * heartSize
+
                     Layout.alignment: Qt.AlignRight
-                    Layout.preferredWidth: Math.min(ExerciseController.lives > 10 ? 170 : implicitWidth, exerciseScreen.width * 0.6)
+                    Layout.preferredWidth: heartsWidth
+                    // ET LA LARGEUR EST TENUE : sans un minimum, QtQuick.Layouts peut reduire la rangee a la largeur d'un
+                    // seul coeur, et le repli se fait alors une note par ligne.
+                    Layout.minimumWidth: heartsWidth
+                    Layout.maximumWidth: heartsWidth
                     spacing: 1
 
                     Text {
@@ -507,7 +522,7 @@ Item {
                         delegate: Text {
                             text: "♥"
                             color: "#ff8fa3"
-                            font.pixelSize: ExerciseController.lives > 10 ? 12 : 20
+                            font.pixelSize: heartsFlow.heartSize
                         }
 
                     }
