@@ -58,6 +58,79 @@ Item {
     // Horizontal offset of the whole screen during the shake. Zero is the resting state, and it is both
     // where the animation starts and where it ends.
     property real shakeOffset: 0
+
+    // LE COMPTE QUI GRIMPE, ET SON BRUITAGE.
+    //
+    // Roger : « une animation sur les nombres en mode nombre qui s'incremente tres vite jusqu'au nombre atteint », puis
+    // « un bruitage de jeux video gling gling gling, ou de machine a sous quand ces chiffres s'incrementent ... et un
+    // bruitage ou melodie ou accord de victoire ». Et il l'assume pour ce que c'est : « c'est juste un bruitage pour
+    // rendre le jeu moins austere, et faire appel a des biais cognitifs d'addiction, comme dans les machines a sous ».
+    //
+    // UN SEUL compte pour TOUS les nombres - XP, serie, pourcentages. Un compteur par nombre les ferait arriver les uns
+    // apres les autres, alors que le plaisir est justement de les voir grimper ENSEMBLE.
+    property real rewardCountUp: 0
+    // Vrai des que le compte de CETTE fin de partie a demarre : c'est ce qui empeche `sessionChanged`, qui passe a
+    // chaque question, de relancer l'animation pendant qu'elle tourne.
+    property bool rewardCountUpStarted: false
+
+    // Le nombre AFFICHE, a un instant donne du compte : la valeur finale, multipliee par l'avancement. Arrondi, parce
+    // qu'un compteur montre des entiers - et c'est l'arrondi qui fait le dechiffrement rapide qu'on vient chercher.
+    function rewardValue(p_final) {
+        return Math.round(p_final * rewardCountUp);
+    }
+
+    NumberAnimation {
+        id: rewardCountUpAnimation
+
+        target: exerciseScreen
+        property: "rewardCountUp"
+        from: 0
+        to: 1
+        // Assez long pour qu'on ait le temps de voir le chiffre grimper, assez court pour qu'on ne s'impatiente pas
+        // devant un ecran qui a deja tout dit.
+        duration: 1300
+        // L'essentiel du chemin se fait au debut : le chiffre part vite et se pose. C'est la courbe d'une machine a
+        // sous, pas celle d'un ascenseur.
+        easing.type: Easing.OutCubic
+
+        onStopped: {
+            // LA FANFARE arrive QUAND LE COMPTE ARRIVE, et seulement s'il est alle au bout : une animation interrompue -
+            // l'ecran quitte, une nouvelle partie lancee - ne doit pas sonner comme une victoire.
+            if (exerciseScreen.rewardCountUp >= 1)
+                ExerciseController.playVictoryFanfare();
+        }
+    }
+
+    // LE TIC : un minuteur plutot qu'un appel par image.
+    //
+    // Par image, le tic suivrait le rafraichissement de l'ecran - soixante par seconde sur ce telephone - et le
+    // bruitage deviendrait un bourdonnement continu. Trente-huit millisecondes font une vingtaine de crans par seconde :
+    // assez pour que ca crepite, pas assez pour que ca se confonde.
+    Timer {
+        interval: 38
+        repeat: true
+        running: rewardCountUpAnimation.running
+        onTriggered: ExerciseController.playScoreTick(Math.round(exerciseScreen.rewardCountUp * 100))
+    }
+
+    Connections {
+        target: ExerciseController
+
+        function onSessionChanged() {
+            // Une nouvelle partie remet le compteur a zero : le gain de la precedente ne doit pas rester affiche.
+            if (!ExerciseController.isFinished) {
+                exerciseScreen.rewardCountUpStarted = false;
+                exerciseScreen.rewardCountUp = 0;
+                return;
+            }
+
+            if (exerciseScreen.rewardCountUpStarted)
+                return;
+
+            exerciseScreen.rewardCountUpStarted = true;
+            rewardCountUpAnimation.restart();
+        }
+    }
     // The interval the player chose, when there is one.
     readonly property var answeredInterval: ExerciseController.answeredInterval
     // Both checks, and not just the second one: reading a property of something that does not exist yet
@@ -1420,7 +1493,7 @@ Item {
                         horizontalAlignment: Text.AlignHCenter
                         color: "#cbb8e8"
                         font.pixelSize: 16
-                        text: qsTr("⏱ %1").arg(exerciseScreen.durationLabel(ExerciseController.sessionDurationSeconds))
+                        text: qsTr("⏱ %1").arg(exerciseScreen.durationLabel(exerciseScreen.rewardValue(ExerciseController.sessionDurationSeconds)))
                     }
 
                     Text {
@@ -1428,7 +1501,7 @@ Item {
                         horizontalAlignment: Text.AlignHCenter
                         color: "#cbb8e8"
                         font.pixelSize: 16
-                        text: qsTr("🔥 série %1").arg(ExerciseController.sessionLongestStreak)
+                        text: qsTr("🔥 série %1").arg(exerciseScreen.rewardValue(ExerciseController.sessionLongestStreak))
                     }
 
                 }
@@ -1441,7 +1514,7 @@ Item {
                     color: "#ffd479"
                     font.pixelSize: 22
                     font.bold: true
-                    text: ExerciseController.arcadeMultiplierPercent > 100 ? qsTr("+%1 XP  ·  x%2").arg(ExerciseController.arcadeXpEarned).arg(ExerciseController.arcadeMultiplierPercent / 100) : qsTr("+%1 XP").arg(ExerciseController.arcadeXpEarned)
+                    text: ExerciseController.arcadeMultiplierPercent > 100 ? qsTr("+%1 XP  ·  x%2").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned)).arg(ExerciseController.arcadeMultiplierPercent / 100) : qsTr("+%1 XP").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned))
                 }
 
                 // LES TROIS FAMILLES : demandees, reussies, et le taux. C'est la ou le joueur voit ce que la partie a
@@ -1474,7 +1547,7 @@ Item {
                             color: modelData.percent < 50 ? "#ff8fb0" : "#8ef2b0"
                             font.pixelSize: 14
                             font.bold: true
-                            text: qsTr("%1 %").arg(modelData.percent)
+                            text: qsTr("%1 %").arg(exerciseScreen.rewardValue(modelData.percent))
                         }
 
                     }

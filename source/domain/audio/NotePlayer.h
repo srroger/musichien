@@ -168,6 +168,24 @@ public:
     // boutons de la difficulte ». Un adaptateur qui n'a pas d'aboiement continuera donc de repondre quelque chose.
     virtual void playDogBark() { playTapCue(); }
 
+    // LE TIC DU COMPTE QUI GRIMPE, ET LA FANFARE DE VICTOIRE.
+    //
+    // Roger : « une animation sur les nombres ... et un bruitage de jeux video gling gling gling, ou de machine a sous
+    // ... et un bruitage ou melodie ou accord de victoire ». Et il l'assume pour ce que c'est : « c'est juste un
+    // bruitage pour rendre le jeu moins austere, et faire appel a des biais cognitifs d'addiction, comme dans les
+    // machines a sous ».
+    //
+    // Deux CORPS PAR DEFAUT, comme playTapCue et playDogBark : un adaptateur sans retour sonore n'a rien a implementer,
+    // et un test qui ne compte que les notes n'a rien a entendre. Ce qui appartient au DOMAINE est qu'un gain soit
+    // AUDIBLE - jamais ce qu'il sonne.
+    //
+    // p_progressPercent dit OU EN EST le compte, de 0 a 100 : c'est ce qui permet au tic de MONTER avec le chiffre. Le
+    // domaine n'en fait rien, mais l'adaptateur a besoin de le savoir, et le lui redemander a l'ecran serait une
+    // dependance de plus pour rien.
+    virtual void playScoreTick( int p_progressPercent ) { (void)p_progressPercent; }
+
+    virtual void playVictoryFanfare() {}
+
     // LE TIMBRE D'UNE SESSION, choisi une fois et garde jusqu'au bout.
     //
     // Roger a mis le doigt sur une incoherence en ecoutant : le timbre changeait a CHAQUE question, donc un joueur qui

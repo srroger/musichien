@@ -149,6 +149,14 @@ public:
     // Et il se joue quand le chien ouvre la bouche : une seule fois, sans boucle, par-dessus ce qui joue deja.
     void playDogBark() override;
 
+    // LE BRUITAGE DE GAIN : le tic qui grimpe avec le compte, et la fanfare qui le conclut.
+    //
+    // Ce sont des BRUITAGES, pas de la musique : ils ne transposent rien, ne s'accordent a rien, et leur seul role est
+    // de rendre un gain agreable a regarder s'afficher. Voir le port, NotePlayer::playScoreTick.
+    void playScoreTick( int p_progressPercent ) override;
+
+    void playVictoryFanfare() override;
+
     // Le petit arpège de l'accueil : montant, ouvert, au piano, et VOLONTAIREMENT discret.
     //
     // Il est discret pour deux raisons : un accord de trois notes au niveau des exercices arrive comme une porte qui

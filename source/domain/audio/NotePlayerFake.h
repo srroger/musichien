@@ -124,6 +124,22 @@ public:
         ++m_dogBarkCount;
     }
 
+    // Le tic du compte et la fanfare de victoire, comptes a part comme le wouf : c'est ce qui permet a un test de dire
+    // QUAND ils sonnent - a la fin d'une partie, et pas pendant.
+    //
+    // Le DERNIER progres recu est garde : le tic doit MONTER avec le chiffre, et « il a sonne » ne suffirait pas a le
+    // verifier.
+    void playScoreTick( int p_progressPercent ) override
+    {
+        ++m_scoreTickCount;
+        m_lastScoreTickProgress = p_progressPercent;
+    }
+
+    void playVictoryFanfare() override
+    {
+        ++m_victoryFanfareCount;
+    }
+
     // Le metronome et la batterie sont des sons A PART : les compter separement est ce qui permet a un test de dire
     // "le clic ET la caisse claire ont ete demandes", et donc de tenir le bug du mixage ferme.
     void playMetronomeClick( bool p_accented ) override
@@ -212,6 +228,13 @@ public:
     // compteur qui permet de le verifier.
     [[nodiscard]] int dogBarkCount() const noexcept { return m_dogBarkCount; }
 
+    [[nodiscard]] int scoreTickCount() const noexcept { return m_scoreTickCount; }
+
+    // Le dernier progres annonce par l'ecran pendant que le compte grimpe, de 0 a 100.
+    [[nodiscard]] int lastScoreTickProgress() const noexcept { return m_lastScoreTickProgress; }
+
+    [[nodiscard]] int victoryFanfareCount() const noexcept { return m_victoryFanfareCount; }
+
     [[nodiscard]] int stopCount() const noexcept { return m_stopCount; }
 
     [[nodiscard]] int metronomeClickCount() const noexcept { return m_metronomeClickCount; }
@@ -261,6 +284,9 @@ public:
         m_phrasesOverDrones.clear();
         m_mistakeCueCount = 0;
         m_dogBarkCount = 0;
+        m_scoreTickCount = 0;
+        m_lastScoreTickProgress = 0;
+        m_victoryFanfareCount = 0;
         m_stopCount = 0;
         m_metronomeClickCount = 0;
         m_accentedClickCount = 0;
@@ -282,6 +308,10 @@ private:
     std::vector<PlayedPhraseOverDrone> m_phrasesOverDrones;
     int m_mistakeCueCount{ 0 };
     int m_dogBarkCount{ 0 };
+
+    int m_scoreTickCount{ 0 };
+    int m_lastScoreTickProgress{ 0 };
+    int m_victoryFanfareCount{ 0 };
     int m_stopCount{ 0 };
     int m_metronomeClickCount{ 0 };
     int m_accentedClickCount{ 0 };

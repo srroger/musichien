@@ -2834,6 +2834,26 @@ TEST( ExerciseSessionControllerTest, the_reward_announcement_is_cleared_at_every
 
 
 // LES TITRES ET LES TROPHEES se lisent des compteurs du Bilan, et rien d'autre.
+TEST( ExerciseSessionControllerTest, the_end_screen_sounds_go_through_to_the_port )
+{
+    // Le compte qui grimpe et la fanfare de victoire sont du GAME FEEL - Roger les a demandes comme des bruitages
+    // « pour rendre le jeu moins austere ». Mais ils passent par le PORT comme tout le reste : c'est ce qui permet a un
+    // adaptateur sans son de les ignorer, et a ce test de dire qu'ils ont bien ete demandes.
+    //
+    // Le PROGRES fait partie de la demande : c'est lui qui fait monter le tic avec le chiffre, et l'oublier rendrait un
+    // tic monotone sans que rien ne le signale.
+    domain::NotePlayerFake notePlayer;
+
+    ExerciseSessionController controller{ notePlayer, { intervalOnlySettings() } };
+
+    controller.playScoreTick( 40 );
+    controller.playVictoryFanfare();
+
+    EXPECT_EQ( 1, notePlayer.scoreTickCount() );
+    EXPECT_EQ( 40, notePlayer.lastScoreTickProgress() );
+    EXPECT_EQ( 1, notePlayer.victoryFanfareCount() );
+}
+
 TEST( ExerciseSessionControllerTest, the_title_and_the_trophies_come_from_the_bilan )
 {
     domain::NotePlayerFake notePlayer;

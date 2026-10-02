@@ -445,6 +445,16 @@ void ExerciseSessionController::pickChibaImage()
     m_chibaImageSource = QString::fromLatin1( CHIBA_IMAGES.at( draw( entropySource ) ) );
 }
 
+void ExerciseSessionController::playScoreTick( int p_progressPercent )
+{
+    m_notePlayer.playScoreTick( p_progressPercent );
+}
+
+void ExerciseSessionController::playVictoryFanfare()
+{
+    m_notePlayer.playVictoryFanfare();
+}
+
 void ExerciseSessionController::tellAnotherAnecdote()
 {
     // Le chien de l'accueil : il raconte quand on lui demande. C'est le meme chemin que la fin de partie - une anecdote

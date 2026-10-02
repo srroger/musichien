@@ -707,6 +707,17 @@ public:
     // Le joueur appuie sur le chien : il raconte autre chose.
     Q_INVOKABLE void tellAnotherAnecdote();
 
+    // LE BRUITAGE D'UN GAIN QUI S'AFFICHE, et l'ecran seul sait quand il sonne.
+    //
+    // Roger : « une animation sur les nombres ... et un bruitage de jeux video gling gling gling ... et un bruitage ou
+    // melodie ou accord de victoire ». C'est du GAME FEEL, donc cela appartient a l'ecran : LUI seul sait quand le
+    // compte commence, ou il en est, et quand il arrive. Le controleur ne fait que porter la demande jusqu'au son.
+    //
+    // p_progressPercent dit ou en est le compte, de 0 a 100 - c'est ce qui fait monter le tic avec le chiffre.
+    Q_INVOKABLE void playScoreTick( int p_progressPercent );
+
+    Q_INVOKABLE void playVictoryFanfare();
+
     // Tire une des quatre humeurs du chien. Privee : c'est le deroulement - la fin d'une partie, ou le clic du joueur -
     // qui la declenche, jamais l'ecran.
     void pickChibaImage();

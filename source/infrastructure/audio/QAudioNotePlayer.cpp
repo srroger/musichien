@@ -57,6 +57,31 @@ constexpr std::chrono::milliseconds PREVIEW_SILENCE{ 400 };
 // onze, simplement sans la difference.
 constexpr std::int32_t PREVIEW_CHORD_DURATION_MULTIPLIER = 5;
 
+// LE BRUITAGE D'UN GAIN QUI S'AFFICHE : le tic du compte, et la fanfare qui le conclut.
+//
+// Roger les a demandes comme des BRUITAGES, et c'est le mot juste : « c'est juste un bruitage pour rendre le jeu moins
+// austere, et faire appel a des biais cognitifs d'addiction, comme dans les machines a sous ». Rien de musical la-dedans
+// - et c'est pour cela que la forme d'onde est CARREE : ses harmoniques impaires sonnent creux et brillant, exactement
+// ce qu'un jeu video fait sonner depuis quarante ans, la ou une corde frappee sonnerait un instrument.
+//
+// LE TIC est TRES court - 45 ms - parce qu'un bruitage plus long deviendrait une note, et qu'une note, elle, se
+// reconnait. Et son HAUTEUR MONTE avec le chiffre : le tic grimpe, et l'oreille entend le gain grandir avant de le lire.
+constexpr std::int32_t SCORE_TICK_LOWEST_MIDI = 79;
+constexpr std::int32_t SCORE_TICK_HIGHEST_MIDI = 91;
+constexpr std::chrono::milliseconds SCORE_TICK_DURATION{ 45 };
+
+// Discret : le tic sonne des dizaines de fois en une seconde, donc fort il deviendrait vite insupportable. C'est le
+// volume d'un compteur qui tourne, pas celui d'une reponse.
+constexpr float SCORE_TICK_GAIN = 0.16F;
+
+// LA FANFARE DE VICTOIRE : un accord parfait MAJEUR, monte.
+//
+// Majeur, et c'est toute la difference avec l'aperge de l'accueil : celui-la est OUVERT - do, sol, do, sans tierce - pour
+// ne rien affirmer et laisser flotter. Ici la TIERCE MAJEURE dit « gagne », et c'est exactement ce qu'on veut dire.
+constexpr std::chrono::milliseconds VICTORY_NOTE_DURATION{ 150 };
+constexpr std::chrono::milliseconds VICTORY_GAP{ 25 };
+constexpr float VICTORY_GAIN = 0.32F;
+
 }    // namespace
 
 QAudioNotePlayer::QAudioNotePlayer() = default;
@@ -1197,6 +1222,64 @@ void QAudioNotePlayer::playGreeting()
     }
 
     playSamples( std::move( samples ) );
+}
+
+void QAudioNotePlayer::playScoreTick( int p_progressPercent )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // OU EN EST LE COMPTE, ramene dans les bornes : c'est l'ecran qui l'annonce, et un ecran ne doit pas pouvoir faire
+    // sortir de la gamme de hauteurs prevue.
+    const int progress = std::clamp( p_progressPercent, 0, 100 );
+
+    const std::int32_t midiNumber = SCORE_TICK_LOWEST_MIDI
+                                    + ( ( SCORE_TICK_HIGHEST_MIDI - SCORE_TICK_LOWEST_MIDI ) * progress / 100 );
+
+    std::vector<float> samples = m_synthesizer->renderWaveNote( domain::Note{ midiNumber },
+                                                                domain::Waveform::Square,
+                                                                SCORE_TICK_DURATION );
+
+    for( float & sample : samples )
+    {
+        sample *= SCORE_TICK_GAIN;
+    }
+
+    // AJOUTE, et non substitué : les tics se suivent a quelques dizaines de millisecondes, et le suivant ne doit pas
+    // COUPER le precedent - une machine a sous ne s'interrompt pas entre deux crans.
+    mixSamples( std::move( samples ) );
+}
+
+void QAudioNotePlayer::playVictoryFanfare()
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // DO, MI, SOL, DO : l'accord parfait majeur, monte. La tierce est la tout ce qui compte - sans elle, l'aperge serait
+    // ouvert, et un accord ouvert ne dit pas qu'on a gagne.
+    const std::array<domain::Note, 4> fanfare{ domain::Note{ 72 }, domain::Note{ 76 }, domain::Note{ 79 }, domain::Note{ 84 } };
+
+    std::vector<float> samples = m_synthesizer->renderWaveMelody( fanfare,
+                                                                  domain::Waveform::Square,
+                                                                  VICTORY_NOTE_DURATION,
+                                                                  VICTORY_GAP );
+
+    for( float & sample : samples )
+    {
+        sample *= VICTORY_GAIN;
+    }
+
+    // AJOUTE aussi : la fanfare arrive sur le dernier tic, et les deux doivent s'entendre ensemble - le tic comme la
+    // virgule, la fanfare comme la phrase.
+    mixSamples( std::move( samples ) );
 }
 
 }    // namespace musichien::infrastructure
