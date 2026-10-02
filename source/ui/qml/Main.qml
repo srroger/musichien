@@ -1420,7 +1420,12 @@ ApplicationWindow {
                             highlighted: wasHeard
                             Material.background: Qt.rgba(0.18 + (0.62 * modelData.brightness), 0.14 + (0.56 * modelData.brightness), 0.3 + (0.48 * modelData.brightness), 1)
                             Material.foreground: isBright ? "#1d1033" : "#ffffff"
-                            onClicked: ModeController.playMode(modelData.index)
+                            onClicked: {
+                                ModeController.playMode(modelData.index);
+                                // ET LA ROUE S'ANIME : sa tete part de la tonique et parcourt la gamme, de note en
+                                // note. La duree vient du CONTROLEUR - c'est le temps que la gamme met vraiment a sonner.
+                                modeBenchCircle.startPlayback(ModeController.playbackDurationMs);
+                            }
                         }
 
                     }
@@ -1478,6 +1483,8 @@ ApplicationWindow {
                 // Ici elle ne cache rien - le banc d'essai fait écouter à loisir - et c'est justement à quoi elle sert :
                 // voir la fenêtre de notes pendant qu'on l'entend, jusqu'à ce que l'oreille la reconnaisse seule.
                 ModeCircle {
+                    id: modeBenchCircle
+
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 12
                     visible: ModeController.playedModeCircle.length > 0
@@ -2311,6 +2318,45 @@ ApplicationWindow {
                     font.italic: true
                     wrapMode: Text.WordWrap
                     text: ExerciseController.playerTitle().motto
+                }
+
+                // TOUTE L'ECHELLE DES TITRES, et pas seulement celui du moment. Roger : « on peut voir la liste dans la page
+                // de profil (mais en grise). Histoire de donner des "objectifs" au joueur. » Le titre porte est dore et
+                // gras ; ceux d'au-dessus sont un objectif, ceux d'en dessous une etape deja passee.
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    spacing: 2
+
+                    Repeater {
+                        model: ExerciseController.allTitles()
+
+                        delegate: RowLayout {
+                            required property var modelData
+
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                Layout.preferredWidth: 18
+                                color: modelData.earned ? "#ffd479" : "#5c4a80"
+                                font.pixelSize: 13
+                                text: modelData.earned ? "★" : "☆"
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 0
+                                Layout.minimumWidth: 0
+                                color: modelData.earned ? "#e8dcff" : "#6f5b93"
+                                font.pixelSize: 12
+                                text: modelData.name + " · " + modelData.motto
+                            }
+
+                        }
+
+                    }
+
                 }
 
                 ColumnLayout {

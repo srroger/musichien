@@ -827,6 +827,19 @@ public:
     // LES TROPHEES, avec leur etat : {identifier, name, description, earned}. Gagnes au Bilan, gardes pour de bon.
     [[nodiscard]] Q_INVOKABLE QVariantList trophies() const;
 
+    // TOUS les titres, du plus modeste au plus haut, avec leur etat. Roger veut les VOIR, meme non acquis : « on peut
+    // voir la liste dans la page de profil (mais en grise). Histoire de donner des "objectifs" au joueur. » L'echelle
+    // entiere est donc un objectif, et pas seulement le titre du moment.
+    [[nodiscard]] Q_INVOKABLE QVariantList allTitles() const;
+
+    // CE QUE LE DERNIER BILAN VIENT DE RAPPORTER : les trophees tout neufs, et si le titre a monte.
+    //
+    // Roger : « a la fin du bilan, si il a gagne un trophee ou une recompense, il faut lui dire (et lui dire qu'ils sont
+    // dans "profil") ». Vides et faux pour tout autre mode, et remis a zero au debut de chaque partie : une annonce qui
+    // survivrait a sa partie serait une annonce qui ment.
+    [[nodiscard]] Q_INVOKABLE QVariantList newlyEarnedTrophies() const { return m_newlyEarnedTrophies; }
+    [[nodiscard]] Q_INVOKABLE bool titleJustIncreased() const noexcept { return m_titleJustIncreased; }
+
     // Le plus haut palier de difficulte que l'experience du joueur lui ouvre.
     //
     // Les paliers superieurs se FERMENT tant qu'on ne les a pas merites : c'est ce qui donne au GodMode son sens - un
@@ -1025,6 +1038,10 @@ signals:
 
     // Le nombre de coeurs de l'Arcade a change : la page de reglages se redessine, et la prochaine partie en tiendra compte.
     void arcadeLivesChanged();
+
+    // La gamme d'un mode vient de partir : l'ecran s'en sert pour faire voyager la tete de sa roue, de note en note. Emis
+    // au moment ou le son part, jamais avant - un dessin qui demarre avant la musique montre autre chose qu'elle.
+    void modePlaybackStarted();
     void scoreChanged();
 
     // A wrong answer has just been given, and the question is still being asked.
@@ -1309,6 +1326,11 @@ private:
     // « arrete » : le timer court tant que la partie vit, et l'ecran de fin lit le nombre, pas le timer.
     QElapsedTimer m_sessionClock;
     int m_sessionDurationSeconds{ 0 };
+
+    // Ce que le dernier BILAN a rapporte de neuf : les trophees tout frais, et si le titre a monte. Voir
+    // newlyEarnedTrophies : remis a zero au debut de chaque partie.
+    QVariantList m_newlyEarnedTrophies;
+    bool m_titleJustIncreased{ false };
 
     // Le code de developpeur : sept choix de GodMode d'affilee, et toutes les difficultes s'ouvrent.
     std::size_t m_godModeSelectionCount{ 0 };

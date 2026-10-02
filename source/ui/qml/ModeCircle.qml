@@ -18,6 +18,16 @@ import QtQuick
 // qu'il a fait entendre.
 // =====================================================================================================================
 Item {
+    // -----------------------------------------------------------------------------------------------------------------
+    // LE CHEMIN DE LECTURE : le « train » qui parcourt la gamme, de note en note.
+    // Roger : « quand ils sont joues, un truc se fasse de point en point en partant de la tonique. Ca aide l'utilisateur
+    // a se reperer dans le cercle et a voir quelle note est en train d'etre jouee. En plus ca va faire de jolies formes
+    // geometriques a la fin. »
+    // LANCE le parcours : la duree vient du CONTROLEUR, donc du domaine - c'est le temps que la gamme met vraiment a
+    // sonner, et une constante ecrite ici mentirait le jour ou le tempo change.
+    // LE DESSIN DU PARCOURS : la trainee et la tete, DERRIERE les pastilles - elles doivent rester lisibles pendant que
+    // le chemin se dessine.
+
     id: root
 
     // Les douze entrees, dans l'ordre des quintes en partant de la tonique.
@@ -33,12 +43,111 @@ Item {
     // Il suffit d'appuyer sur un de ces boutons non ? »
     property bool selectable: false
     readonly property real radius: (Math.min(width, height) / 2) - (dotSize / 2) - 4
+    // LES DEGRES, dans l'ordre ou ils sonnent : la gamme monte puis descend, comme le domaine la joue. Le chemin en
+    // INDICES DU CERCLE s'en deduit, parce que chaque case porte le degre de sa note (voir describeModeCircle).
+    property var playbackDegrees: [0, 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1, 0]
+    property real playbackHead: 0
+    property bool playing: false
+    readonly property var playbackPath: {
+        var path = [];
+        for (var step = 0; step < playbackDegrees.length; ++step) {
+            for (var index = 0; index < notes.length; ++index) {
+                if (notes[index].stepIndex === playbackDegrees[step]) {
+                    path.push(index);
+                    break;
+                }
+            }
+        }
+        return path;
+    }
 
     // Le pas de la gamme de la note choisie : c'est ce que le domaine a mis dans chaque case (voir describeModeCircle).
     signal noteChosen(int p_stepIndex)
 
+    // Le centre d'une CASE, en coordonnees locales. Une seule fonction, donc le dessin du chemin et celui de la tete ne
+    // peuvent pas diverger.
+    function dotCentre(p_circleIndex) {
+        var angle = ((-90 + (p_circleIndex * 30)) * Math.PI) / 180;
+        return Qt.point((width / 2) + (Math.cos(angle) * radius), (height / 2) + (Math.sin(angle) * radius));
+    }
+
+    // p_degrees est OPTIONNEL : le banc d'essai joue la gamme MONTEE puis DESCENDUE, et l'exercice la joue MONTE seulement
+    // (une question doit tenir en quelques secondes). Le chemin suit ce qu'on entend, donc il se règle avec lui.
+    function startPlayback(p_durationMs, p_degrees) {
+        if (p_degrees !== undefined)
+            playbackDegrees = p_degrees;
+
+        playbackHead = 0;
+        playing = true;
+        headAnimation.restart(p_durationMs);
+    }
+
     implicitWidth: span
     implicitHeight: span
+
+    NumberAnimation {
+        id: headAnimation
+
+        target: root
+        property: "playbackHead"
+        from: 0
+        to: Math.max(0, root.playbackPath.length - 1)
+        easing.type: Easing.Linear
+    }
+
+    // Un Canvas, comme le camembert des statistiques : aucun module a deployer pour un trait. Il est repeint a chaque
+    // mouvement de la tete, et c'est le seul moyen de faire GRANDIR la trainee : une trainee figee ne montrerait pas le
+    // chemin, et c'est le chemin qui apprend quelque chose.
+    Canvas {
+        id: trailCanvas
+
+        anchors.fill: parent
+        visible: root.playing
+        onPaint: {
+            var context = getContext("2d");
+            context.reset();
+            if (!root.playing || (root.playbackPath.length < 2))
+                return ;
+
+            var head = Math.min(root.playbackHead, root.playbackPath.length - 1);
+            var whole = Math.floor(head);
+            var fraction = head - whole;
+            context.strokeStyle = "#ffffff";
+            context.lineWidth = 2.5;
+            context.lineCap = "round";
+            context.lineJoin = "round";
+            context.beginPath();
+            var start = root.dotCentre(root.playbackPath[0]);
+            context.moveTo(start.x, start.y);
+            for (var index = 1; index <= whole; ++index) {
+                var point = root.dotCentre(root.playbackPath[index]);
+                context.lineTo(point.x, point.y);
+            }
+            // Le segment EN COURS, interpole : entre deux notes, la tete est presque toujours au milieu d'un trait.
+            var nextIndex = Math.min(whole + 1, root.playbackPath.length - 1);
+            var from = root.dotCentre(root.playbackPath[whole]);
+            var to = root.dotCentre(root.playbackPath[nextIndex]);
+            if (fraction > 0)
+                context.lineTo(from.x + ((to.x - from.x) * fraction), from.y + ((to.y - from.y) * fraction));
+
+            context.stroke();
+            // LA TETE, un rond plein qui se voit de loin : c'est elle qu'on suit des yeux.
+            context.beginPath();
+            context.arc(from.x + ((to.x - from.x) * fraction), from.y + ((to.y - from.y) * fraction), root.dotSize * 0.22, 0, 2 * Math.PI);
+            context.fillStyle = "#ffffff";
+            context.fill();
+        }
+
+        // Un Canvas ne se repeint pas tout seul : c'est le mouvement de la tete qui le lui dit.
+        Connections {
+            function onPlaybackHeadChanged() {
+                trailCanvas.requestPaint();
+            }
+
+            target: root
+        }
+
+    }
 
     Repeater {
         model: root.notes

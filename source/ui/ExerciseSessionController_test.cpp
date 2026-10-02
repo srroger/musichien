@@ -2774,6 +2774,17 @@ TEST( ExerciseSessionControllerTest, the_title_and_the_trophies_come_from_the_bi
     EXPECT_TRUE( earnedNamed( QStringLiteral( "Bilan parfait" ) ) );
     EXPECT_FALSE( earnedNamed( QStringLiteral( "Cinq d'affilée" ) ) );
     EXPECT_FALSE( earnedNamed( QStringLiteral( "Assidu" ) ) );
+
+    // ET TOUTE L'ECHELLE, que Roger veut voir meme non acquise - « en grise [...] histoire de donner des objectifs ».
+    const QVariantList titles = controller.allTitles();
+
+    ASSERT_EQ( static_cast<int>( domain::TITLE_COUNT ), titles.size() );
+
+    // Le titre porte est acquis, ceux d'AU-DESSUS ne le sont pas : c'est ce qui en fait des objectifs.
+    EXPECT_TRUE( titles.at( 0 ).toMap().value( QStringLiteral( "earned" ) ).toBool() );     // Toutou
+    EXPECT_TRUE( titles.at( 2 ).toMap().value( QStringLiteral( "earned" ) ).toBool() );     // Chef de Meute
+    EXPECT_FALSE( titles.at( 3 ).toMap().value( QStringLiteral( "earned" ) ).toBool() );    // Soliste
+    EXPECT_FALSE( titles.at( 5 ).toMap().value( QStringLiteral( "earned" ) ).toBool() );    // Ouafstro
 }
 
 }    // namespace musichien::ui

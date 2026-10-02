@@ -1018,6 +1018,10 @@ void ExerciseSessionController::recordBilanOutcome()
         return;
     }
 
+    // L'ETAT AVANT, garde pour pouvoir dire ce qui vient d'etre GAGNE : sans lui, on saurait seulement ce que le joueur
+    // possede, et jamais ce que ce bilan lui a apporte.
+    const domain::BilanRecord before = bilanRecord();
+
     const domain::SessionScore & score = m_session->score();
 
     // UN BILAN REUSSI : il a merite son etoile, c'est-a-dire qu'il a trouve l'essentiel du premier coup sans se faire
@@ -1052,6 +1056,42 @@ void ExerciseSessionController::recordBilanOutcome()
     {
         m_levelStore->storePerfectBilanCount( m_levelStore->storedPerfectBilanCount() + 1 );
     }
+
+    // ET CE QUE CE BILAN A RAPPORTE : les trophees qui ne l'etaient pas AVANT, et le titre s'il a monte.
+    const domain::BilanRecord after = bilanRecord();
+
+    for( const domain::Trophy & trophy : domain::trophiesFor( after ) )
+    {
+        if( !trophy.earned )
+        {
+            continue;
+        }
+
+        const auto wasAlreadyEarned = [&before]( std::string_view p_identifier ) {
+            for( const domain::Trophy & previous : domain::trophiesFor( before ) )
+            {
+                if( previous.identifier == p_identifier )
+                {
+                    return previous.earned;
+                }
+            }
+
+            return false;
+        };
+
+        if( wasAlreadyEarned( trophy.identifier ) )
+        {
+            continue;
+        }
+
+        QVariantMap entry;
+        entry.insert( QStringLiteral( "name" ), QString::fromUtf8( trophy.name.data() ) );
+        entry.insert( QStringLiteral( "description" ), QString::fromUtf8( trophy.description.data() ) );
+
+        m_newlyEarnedTrophies.append( entry );
+    }
+
+    m_titleJustIncreased = domain::titleEarnedBy( after ) > domain::titleEarnedBy( before );
 }
 
 QVariantMap ExerciseSessionController::playerTitle() const
@@ -1077,6 +1117,28 @@ QVariantList ExerciseSessionController::trophies() const
         entry.insert( QStringLiteral( "name" ), QString::fromUtf8( trophy.name.data() ) );
         entry.insert( QStringLiteral( "description" ), QString::fromUtf8( trophy.description.data() ) );
         entry.insert( QStringLiteral( "earned" ), trophy.earned );
+
+        described.append( entry );
+    }
+
+    return described;
+}
+
+QVariantList ExerciseSessionController::allTitles() const
+{
+    // Le titre PORTE est le plus haut merite ; tous ceux d'en dessous sont acquis, tous ceux au-dessus sont un objectif.
+    const domain::Title earned = domain::titleEarnedBy( bilanRecord() );
+
+    QVariantList described;
+
+    for( std::size_t index = 0; index < domain::TITLE_COUNT; ++index )
+    {
+        const auto title = static_cast<domain::Title>( index );
+
+        QVariantMap entry;
+        entry.insert( QStringLiteral( "name" ), QString::fromUtf8( domain::titleName( title ).data() ) );
+        entry.insert( QStringLiteral( "motto" ), QString::fromUtf8( domain::titleMotto( title ).data() ) );
+        entry.insert( QStringLiteral( "earned" ), index <= static_cast<std::size_t>( earned ) );
 
         described.append( entry );
     }
@@ -1201,6 +1263,11 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
     // LE CHRONO DE LA PARTIE commence ici, et une seule fois : c'est le seul endroit par lequel toutes les portes passent.
     m_sessionClock.start();
     m_sessionDurationSeconds = 0;
+
+    // Et l'annonce de la partie PRECEDENTE s'efface : un trophee gagne hier ne doit pas s'afficher a la fin de la partie
+    // d'aujourd'hui. Un bilan le remplira de nouveau, s'il y a lieu.
+    m_newlyEarnedTrophies.clear();
+    m_titleJustIncreased = false;
 
     // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
     m_notePlayer.playTapCue();
@@ -3209,6 +3276,10 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
     const domain::DroneFraming framing{ MODE_LEAD_IN, MODE_TAIL };
 
     m_notePlayer.playMelodyOverDrone( melody, drone, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+
+    // LA ROUE S'ANIME : l'ecran part de la tonique et parcourt la gamme, de note en note. Le signal est emis ICI, au
+    // moment ou le son part - donc le dessin et la musique commencent ensemble, sans un decalage que rien n'expliquerait.
+    emit modePlaybackStarted();
 
     // Sur une question de COULEUR, le second mode est programme pour quand le premier a fini de sonner.
     //

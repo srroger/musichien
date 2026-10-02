@@ -116,6 +116,10 @@ void ModePreviewController::playMode( int p_index )
     // trouve le centre : c'est en revenant sur la tonique qu'un mode se dit.
     const std::vector<domain::Note> melody = domain::modeScaleUpAndDown( tonic, mode );
 
+    // LA DUREE TOTALE de la gamme, pour que la roue sache en combien de temps parcourir son chemin. Elle se calcule a
+    // partir des MEMES valeurs que le son qui va suivre, donc le dessin ne peut pas prendre du retard sur la musique.
+    m_lastScaleDurationMs = static_cast<int>( melody.size() * ( noteDuration + gap ).count() );
+
     const std::array<domain::Note, 2> drone{ domain::Note{ DRONE_ROOT_MIDI_NUMBER },
                                              domain::Note{ DRONE_ROOT_MIDI_NUMBER + FIFTH_IN_SEMITONES } };
 

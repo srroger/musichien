@@ -1090,6 +1090,12 @@ Item {
                 // « il suffit d'appuyer sur un de ces boutons non ? » - et il a raison : les pastilles sont plus grandes que
                 // les petits boutons de note qu'elles remplacent, et elles sont deja la pour montrer la gamme.
                 ModeCircle {
+                    // LA ROUE S'ANIME : sa tete part de la tonique et parcourt la gamme, de note en note, pendant que la
+                    // musique joue. Roger l'a voulue ici - « dans les exercices, quand on affiche les modes dans leur
+                    // cercle » - parce qu'elle dit QUELLE note sonne, et qu'a la fin le chemin laisse une forme.
+
+                    id: modeCircle
+
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 6
                     span: 288
@@ -1100,6 +1106,22 @@ Item {
                     onNoteChosen: (p_stepIndex) => {
                         ExerciseController.answerForeignNote(p_stepIndex);
                     }
+
+                    // La gamme de l'exercice MONTE seulement : le chemin le suit, donc il monte aussi.
+                    Connections {
+                        function onModePlaybackStarted() {
+                            modeCircle.startPlayback(ExerciseController.modeSoundDurationMs, [0, 1, 2, 3, 4, 5, 6]);
+                        }
+
+                        // Et la trainee S'EFFACE quand la question change : un chemin qui survivrait a sa musique montrerait
+                        // un trajet que personne n'a entendu.
+                        function onQuestionChanged() {
+                            modeCircle.playing = false;
+                        }
+
+                        target: ExerciseController
+                    }
+
                 }
 
                 // Le verdict de l'intrus : quel pas, et quelle note il portait au lieu de celle de la gamme.
@@ -1304,6 +1326,8 @@ Item {
         // The end of the session
         // -----------------------------------------------------------------------------------------------------
         ColumnLayout {
+            // CE QUE LE BILAN VIENT DE RAPPORTER : les trophees tout neufs, et le titre s'il a monte.
+
             anchors.fill: parent
             anchors.margins: 24
             visible: ExerciseController.isFinished
@@ -1469,6 +1493,55 @@ Item {
                 font.pixelSize: 14
                 visible: !ExerciseController.sessionGrantsExperience
                 text: qsTr("Ici, pas d'expérience : l'Arcade seule en donne. Mais tout compte pour tes statistiques.")
+            }
+
+            // Roger : « a la fin du bilan, si il a gagne un trophee ou une recompense, il faut lui dire (et lui dire qu'ils
+            // sont dans "profil") - du coup il va y aller et se rendre compte qu'il y en a d'autres a gagner ». C'est
+            // exactement le but : le renvoyer voir la liste, ou les suivants attendent.
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                visible: (ExerciseController.newlyEarnedTrophies().length > 0) || ExerciseController.titleJustIncreased
+                spacing: 4
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#ffd479"
+                    font.pixelSize: 17
+                    font.bold: true
+                    text: ExerciseController.titleJustIncreased ? qsTr("🏆 Nouveau titre : %1").arg(ExerciseController.playerTitle().name) : qsTr("🏆 Récompense !")
+                }
+
+                Repeater {
+                    model: ExerciseController.newlyEarnedTrophies()
+
+                    delegate: Text {
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        color: "#e8dcff"
+                        font.pixelSize: 13
+                        text: "★ " + modelData.name + " · " + modelData.description
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    text: qsTr("Tout est dans ton profil.")
+                }
+
             }
 
             // L'anecdote de sortie : on quitte sur quelque chose a apprendre, comme on est entre. Bornee en largeur

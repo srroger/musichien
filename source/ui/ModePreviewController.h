@@ -60,6 +60,12 @@ class ModePreviewController final : public QObject
     // la fenetre de notes pendant qu'on l'entend est exactement ce qui apprend a la reconnaitre.
     Q_PROPERTY( QVariantList playedModeCircle READ playedModeCircle NOTIFY playedModeCircleChanged )
 
+    // COMBIEN DE TEMPS la gamme du dernier mode a sonne, en millisecondes.
+    //
+    // La roue s'en sert pour faire voyager sa tete de note en note : la duree vient du CONTROLEUR, donc du domaine et de
+    // son tempo, et une constante ecrite dans le QML mentirait le jour ou le tempo change.
+    Q_PROPERTY( int playbackDurationMs READ playbackDurationMs NOTIFY playedModeCircleChanged )
+
 public:
     explicit ModePreviewController( domain::NotePlayer & p_notePlayer, QObject * p_parent = nullptr );
 
@@ -67,6 +73,8 @@ public:
     [[nodiscard]] QVariantMap lastPlayedMode() const;
     [[nodiscard]] QVariantMap lastPlayedPhrase() const;
     [[nodiscard]] QVariantList playedModeCircle() const;
+
+    [[nodiscard]] int playbackDurationMs() const noexcept { return m_lastScaleDurationMs; }
 
     // Le temperament et le diapason, donnes par la couche de cablage - comme pour les intervalles.
     void setTuning( domain::TuningContext p_tuning );
@@ -111,6 +119,9 @@ private:
     QVariantMap m_lastPlayedMode;
     QVariantMap m_lastPlayedPhrase;
     QVariantList m_playedModeCircle;
+
+    // La duree de la derniere gamme jouee, en millisecondes. Voir playbackDurationMs.
+    int m_lastScaleDurationMs{ 0 };
 
     // Les reglages du joueur : nul tant qu'ils n'ont pas ete donnes, et c'est un cas normal.
     const domain::PlayerPreferences * m_preferences{ nullptr };
