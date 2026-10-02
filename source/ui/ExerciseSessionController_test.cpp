@@ -2033,6 +2033,56 @@ TEST( ExerciseSessionControllerTest, the_dog_barks_when_the_session_ends )
     EXPECT_EQ( 1, notePlayer.dogBarkCount() );
 }
 
+TEST( ExerciseSessionControllerTest, a_foreign_note_question_walks_the_wheel_along_the_expected_scale )
+{
+    // LA ROUE S'ANIME AUSSI SUR UNE NOTE ETRANGERE, et c'est Roger qui l'a demande : « j'aimerais bien que pour la note
+    // etrangere il y ait aussi ces lignes ».
+    //
+    // Ce qu'elle dessine est le chemin que la gamme AURAIT DU suivre, et non celui qu'on entend : les sept pas dans
+    // l'ordre. C'est la tout l'interet - la ligne est la REFERENCE, et c'est l'ecart entre elle et le son qui fait
+    // entendre l'intrus. Sans ce signal, la roue restait muette sur cette question.
+    domain::NotePlayerFake notePlayer;
+
+    domain::SessionSettings settings;
+    settings.namedIntervalQuestionShare = 0;
+    settings.singQuestionShare = 0;
+    settings.chordQuestionShare = 0;
+    settings.modeColourQuestionShare = 0;
+    settings.modeNameQuestionShare = 0;
+    settings.modeVampQuestionShare = 0;
+    settings.foreignNoteQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+
+    controller.startOrdinarySession();
+
+    ASSERT_TRUE( controller.isForeignNoteQuestion() );
+
+    // Un COMPTEUR branche sur le signal, et non QSignalSpy : le module Qt Test n'est pas lie a ces tests, et une
+    // connexion directe dit exactement la meme chose.
+    //
+    // Il est branche APRES le demarrage, parce que le demarrage joue deja la question : ce qui est compte ici est la
+    // relecture, donc l'appel que fait l'ecran quand on appuie sur « ecouter encore ».
+    int playbackCount = 0;
+
+    QObject::connect( &controller,
+                      &ExerciseSessionController::modePlaybackStarted,
+                      &controller,
+                      [&playbackCount]() { ++playbackCount; } );
+
+    controller.replay();
+
+    EXPECT_EQ( 1, playbackCount );
+
+    // Et les deux nombres que la roue consomme decrivent bien cette gamme-la : une question de note etrangere compte
+    // PARMI les questions de mode. Sans eux, la roue partirait a l'instant zero, et avancerait a une autre vitesse que
+    // les sept notes qu'on entend.
+    EXPECT_GT( controller.modeSoundLeadInMs(), 0 );
+    EXPECT_GT( controller.modeSoundNoteStepMs(), 0 );
+    EXPECT_GT( controller.modeSoundDurationMs(), 0 );
+}
+
+
 TEST( ExerciseSessionControllerTest, the_circle_carries_the_step_of_each_note )
 {
     // La roue est rangée par QUINTES, la gamme par DEGRÉS : « appuyer sur une pastille pour répondre » n'a donc de sens

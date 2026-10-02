@@ -215,6 +215,18 @@ public:
     // staying on a dead device.
     void reopenAudioOutput();
 
+    // FERME la sortie audio, sans la rouvrir. Tout ce qui sonnait s'arrete avec elle.
+    //
+    // C'est ce qui REPARE UN CRASH, et il faut le dire ici pour que personne ne la supprime comme une precaution
+    // inutile. Roger : « j'ai observe des crash quand je sors de l'application sans la fermer, et que je reviens ».
+    // La pile de l'accident est dans le chemin du son - AudioMixer::playAt -> QAudioSink, sur une adresse LIBEREE.
+    //
+    // Android REND l'appareil audio quand l'application passe en arriere-plan. Le flux qui le tenait survit a ce
+    // deuil : au retour, sa premiere note ecrit dans un objet que la plateforme a deja detruit. Le fermer a la mise
+    // en veille est la seule facon de ne jamais ecrire dans un flux mort - et il se rouvre tout seul, sur l'appareil
+    // du moment, a la premiere note.
+    void closeAudioOutput();
+
     // False when no audio output could be opened.
 
     //

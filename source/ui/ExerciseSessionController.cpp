@@ -1914,6 +1914,19 @@ void ExerciseSessionController::playForeignNoteQuestion()
                                       MODE_NOTE_DURATION,
                                       MODE_NOTE_GAP,
                                       domain::DroneFraming{ MODE_LEAD_IN, MODE_TAIL } );
+
+    // LA ROUE S'ANIME ICI AUSSI, et c'est Roger qui l'a demande : « j'aimerais bien que pour la note etrangere il y
+    // ait aussi ces lignes ».
+    //
+    // ELLE MONTRE LE CHEMIN QUE LA GAMME AURAIT DU SUIVRE, et non celui qu'on entend : les sept pas dans l'ordre, de la
+    // tonique au septieme degre. C'est tout l'interet - la ligne est la REFERENCE, et c'est l'ecart entre elle et le son
+    // qui fait entendre l'intrus. Une trainee qui suivrait la note etrangere ferait un bond hors du cercle, et
+    // montrerait la reponse.
+    //
+    // Les deux nombres que la roue consomme decrivent cette gamme-la, et ils sont deja les siens : voir
+    // modeSoundLeadInMs et modeSoundNoteStepMs, qui comptent la note etrangere parmi les questions de mode. Le dessin et
+    // le son partent donc ensemble, sans un decalage que rien n'expliquerait.
+    emit modePlaybackStarted();
 }
 
 void ExerciseSessionController::answerModeColour( bool p_secondIsBrighter )

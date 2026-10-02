@@ -40,6 +40,7 @@
 #include <QQuickStyle>
 #include <QStandardPaths>
 #include <QString>
+#include <QTimer>
 #include <QUrl>
 #include <QtQml>
 
@@ -493,10 +494,45 @@ int main( int p_argumentCount, char * p_arguments[] )
     // rebranchees toutes seules : on avertit, et les reglages permettent de rechoisir le micro.
     QMediaDevices mediaDevices;
 
-    QObject::connect( &mediaDevices, &QMediaDevices::audioOutputsChanged, &mediaDevices, [&notePlayer]() {
-        std::cerr << "Musichien: audio outputs changed, reopening the output.\n";
-        notePlayer.reopenAudioOutput();
+    QObject::connect( &mediaDevices, &QMediaDevices::audioOutputsChanged, &mediaDevices, [&mediaDevices, &notePlayer]() {
+        // DIFFERE D'UN TOUR DE BOUCLE, et ce n'est pas une precaution de principe : rouvrir DETRUIT la sortie.
+        //
+        // Le signal peut arriver pendant qu'on ECRIT dedans - AudioMixer::playAt emet readyRead de facon SYNCHRONE, et
+        // c'est exactement ce chemin qui figure en tete de deux plantages observes sur l'appareil. Detruire la sortie a
+        // cet instant laisserait le code en cours sur un objet mort. Un tour de boucle plus tard, plus personne n'est
+        // dedans.
+        QTimer::singleShot( 0, &mediaDevices, [&notePlayer]() {
+            qInfo() << "Musichien: audio outputs changed, reopening the output.";
+
+            notePlayer.reopenAudioOutput();
+        } );
     } );
+
+    // LE CYCLE DE VIE DE L'APPLICATION, et c'est un CRASH qu'il repare.
+    //
+    // Roger : « j'ai observe des crash quand je sors de l'application sans la fermer, et que je reviens ». La pile de
+    // l'accident est dans le chemin du son - AudioMixer::playAt -> QAudioSink, sur une adresse LIBEREE - et deux
+    // tombstones de l'appareil, dont un ANTERIEUR a ce lot, portent la meme trace.
+    //
+    // Android REND l'appareil audio quand l'application passe en arriere-plan. Le flux qui le tenait survit a ce
+    // deuil, et la premiere note du retour ecrit dans un objet que la plateforme a deja detruit. La sortie est donc
+    // FERMEE ici, et elle se rouvre toute seule a la premiere note - le meme chemin que 'prepareAudioOutput'.
+    //
+    // ApplicationSuspended, et NON ApplicationInactive : sur un ordinateur de bureau, la seconde se declenche a chaque
+    // fois que la fenetre perd le FOCUS, et fermer le son parce qu'on a clique ailleurs serait absurde.
+    QObject::connect( qApp,
+                      &QGuiApplication::applicationStateChanged,
+                      qApp,
+                      [&notePlayer]( Qt::ApplicationState p_state ) {
+                          if( p_state != Qt::ApplicationSuspended )
+                          {
+                              return;
+                          }
+
+                          qInfo() << "Musichien: going to the background, closing the audio output.";
+
+                          notePlayer.closeAudioOutput();
+                      } );
 
     QObject::connect( &mediaDevices, &QMediaDevices::audioInputsChanged, &mediaDevices, []() {
         std::cerr << "Musichien: audio inputs changed - reopen the settings to pick the new microphone.\n";

@@ -76,6 +76,20 @@ void QAudioNotePlayer::prepareAudioOutput()
 
 void QAudioNotePlayer::reopenAudioOutput()
 {
+    closeAudioOutput();
+
+    ensureAudioOutputIsOpen();
+
+    if( !isAudioOutputAvailable() )
+    {
+        std::cerr << "Musichien: the audio device changed and no output could be opened. Playback stays silent until one appears.\n";
+    }
+}
+
+void QAudioNotePlayer::closeAudioOutput()
+{
+    // TOUT ce qui sonnait s'arrete ici : le mix est vide, donc rien ne sera repris a la reouverture. Une note coupee
+    // par la mise en veille ne doit pas ressortir plus tard, hors de son exercice.
     stopAll();
 
     // The sink and the two synthesisers were built for the OLD device's sample rate: they are discarded, and the
@@ -91,13 +105,6 @@ void QAudioNotePlayer::reopenAudioOutput()
     m_mixer = nullptr;
     m_isSinkRunning = false;
     m_outputDescription = "not opened yet";
-
-    ensureAudioOutputIsOpen();
-
-    if( !isAudioOutputAvailable() )
-    {
-        std::cerr << "Musichien: the audio device changed and no output could be opened. Playback stays silent until one appears.\n";
-    }
 }
 
 bool QAudioNotePlayer::isAudioOutputAvailable() const noexcept
