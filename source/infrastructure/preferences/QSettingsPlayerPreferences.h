@@ -116,6 +116,26 @@ public:
     [[nodiscard]] std::int32_t storedModeVampQuestionShare() const override;
 
     void storeModeVampQuestionShare( std::int32_t p_share ) override;
+
+    [[nodiscard]] std::int32_t storedArcadeLives() const override;
+
+    void storeArcadeLives( std::int32_t p_lives ) override;
+
+    [[nodiscard]] std::int64_t storedBilanCount() const override;
+
+    void storeBilanCount( std::int64_t p_count ) override;
+
+    [[nodiscard]] std::int64_t storedPerfectBilanCount() const override;
+
+    void storePerfectBilanCount( std::int64_t p_count ) override;
+
+    [[nodiscard]] std::int64_t storedBilanSuccessStreak() const override;
+
+    void storeBilanSuccessStreak( std::int64_t p_streak ) override;
+
+    [[nodiscard]] std::int64_t storedLongestBilanSuccessStreak() const override;
+
+    void storeLongestBilanSuccessStreak( std::int64_t p_streak ) override;
 };
 
 }    // namespace musichien::infrastructure

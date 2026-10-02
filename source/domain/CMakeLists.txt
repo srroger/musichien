@@ -85,6 +85,10 @@ musichienFunction_AddLibrary(domain
     exercise/GameMode.h
     exercise/GameMode.cpp
 
+    # LES TITRES ET LES TROPHEES, gagnes au Bilan. Voir Trophy.h.
+    exercise/Trophy.h
+    exercise/Trophy.cpp
+
     # LE PERIMETRE CHOISI par le joueur : le GodMode. Il ne remplace pas les niveaux, il les prend comme modeles.
     exercise/GodModePalette.h
     exercise/GodModePalette.cpp
@@ -152,6 +156,7 @@ if(MUSICHIEN_BUILD_TESTING)
         exercise/ExerciseSession_test.cpp
         exercise/GodModePalette_test.cpp
         exercise/GameMode_test.cpp
+        exercise/Trophy_test.cpp
         exercise/HintBook_test.cpp
         exercise/LearningOrder_test.cpp
         exercise/PlayerLevel_test.cpp

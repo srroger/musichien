@@ -2706,4 +2706,74 @@ TEST( ExerciseSessionControllerTest, replaying_keeps_the_mode )
     EXPECT_TRUE( controller.sessionGrantsExperience() );
 }
 
+// LES COEURS D'ARCADE sont reglables, et bornes : c'est le raccourci que Roger a demande pour enfin voir le boss.
+TEST( ExerciseSessionControllerTest, the_arcade_hearts_are_configurable )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    // Dix par defaut : c'est la valeur d'installation.
+    EXPECT_EQ( 10, controller.arcadeLives() );
+
+    controller.setArcadeLives( 25 );
+    EXPECT_EQ( 25, controller.arcadeLives() );
+
+    // Et les bornes tiennent : un fichier edite a la main, ou un curseur pousse trop loin, ne casse pas une partie.
+    controller.setArcadeLives( 99 );
+    EXPECT_EQ( 25, controller.arcadeLives() );
+
+    controller.setArcadeLives( 0 );
+    EXPECT_EQ( 1, controller.arcadeLives() );
+}
+
+// LES TITRES ET LES TROPHEES se lisent des compteurs du Bilan, et rien d'autre.
+TEST( ExerciseSessionControllerTest, the_title_and_the_trophies_come_from_the_bilan )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    // Un joueur neuf est un Toutou, et n'a rien fait : aucun trophee.
+    EXPECT_EQ( QStringLiteral( "Toutou" ), controller.playerTitle().value( QStringLiteral( "name" ) ).toString() );
+
+    const QVariantList freshTrophies = controller.trophies();
+    ASSERT_FALSE( freshTrophies.isEmpty() );
+
+    for( const QVariant & entry : freshTrophies )
+    {
+        EXPECT_FALSE( entry.toMap().value( QStringLiteral( "earned" ) ).toBool() );
+    }
+
+    // Trois bilans reussis d'affilee, et un bilan parfait plus tard : le titre monte, et les trophees tombent.
+    levelStore.storeBilanCount( 4 );
+    levelStore.storeLongestBilanSuccessStreak( 3 );
+    levelStore.storePerfectBilanCount( 1 );
+
+    EXPECT_EQ( QStringLiteral( "Chef de Meute" ), controller.playerTitle().value( QStringLiteral( "name" ) ).toString() );
+    EXPECT_FALSE( controller.playerTitle().value( QStringLiteral( "motto" ) ).toString().isEmpty() );
+
+    QVariantList trophies = controller.trophies();
+
+    const auto earnedNamed = [&trophies]( const QString & p_name ) {
+        for( const QVariant & entry : trophies )
+        {
+            if( entry.toMap().value( QStringLiteral( "name" ) ).toString() == p_name )
+            {
+                return entry.toMap().value( QStringLiteral( "earned" ) ).toBool();
+            }
+        }
+
+        return false;
+    };
+
+    EXPECT_TRUE( earnedNamed( QStringLiteral( "Premier Bilan" ) ) );
+    EXPECT_TRUE( earnedNamed( QStringLiteral( "Trois d'affilée" ) ) );
+    EXPECT_TRUE( earnedNamed( QStringLiteral( "Bilan parfait" ) ) );
+    EXPECT_FALSE( earnedNamed( QStringLiteral( "Cinq d'affilée" ) ) );
+    EXPECT_FALSE( earnedNamed( QStringLiteral( "Assidu" ) ) );
+}
+
 }    // namespace musichien::ui

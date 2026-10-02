@@ -1,5 +1,6 @@
 #include "ui/ExerciseSessionController.h"
 
+#include "domain/exercise/Trophy.h"
 #include "domain/exercise/Weekend.h"
 #include "domain/music/ChordTree.h"
 #include "domain/music/Interval.h"
@@ -410,6 +411,9 @@ void ExerciseSessionController::resetPreferences()
     setPhraseTempoVariation( 20 );
     setTemperament( 0 );
     setReferencePitch( 440.0 );
+
+    // Les COEURS D'ARCADE reviennent a DIX : c'est leur valeur a l'installation, et « Par defaut » promet exactement cela.
+    setArcadeLives( 10 );
 
     // LE RAPPEL REVIENT ACTIF, et c'est une CORRECTION : c'est son etat au premier lancement - voir
     // QSettingsPlayerPreferences::dailyReminderEnabled, qui lit « vrai » quand la cle n'existe pas encore. Roger l'a vu le
@@ -970,6 +974,116 @@ QVariantList ExerciseSessionController::familyResults() const
     return results;
 }
 
+int ExerciseSessionController::arcadeLives() const
+{
+    return ( m_levelStore != nullptr ) ? static_cast<int>( m_levelStore->storedArcadeLives() ) : 10;
+}
+
+void ExerciseSessionController::setArcadeLives( int p_lives )
+{
+    if( m_levelStore == nullptr )
+    {
+        return;
+    }
+
+    m_levelStore->storeArcadeLives( std::clamp( p_lives, 1, 25 ) );
+
+    // Le bouton a repondu : un clic court, pour que la main soit entendue - comme tous les reglages.
+    m_notePlayer.playTapCue();
+
+    emit arcadeLivesChanged();
+}
+
+domain::BilanRecord ExerciseSessionController::bilanRecord() const
+{
+    domain::BilanRecord record;
+
+    if( m_levelStore == nullptr )
+    {
+        return record;
+    }
+
+    record.bilanCount = m_levelStore->storedBilanCount();
+    record.perfectBilanCount = m_levelStore->storedPerfectBilanCount();
+    record.successStreak = m_levelStore->storedBilanSuccessStreak();
+    record.longestSuccessStreak = m_levelStore->storedLongestBilanSuccessStreak();
+
+    return record;
+}
+
+void ExerciseSessionController::recordBilanOutcome()
+{
+    if( ( m_levelStore == nullptr ) || ( m_session == nullptr ) || ( m_gameMode != domain::GameMode::Review ) )
+    {
+        return;
+    }
+
+    const domain::SessionScore & score = m_session->score();
+
+    // UN BILAN REUSSI : il a merite son etoile, c'est-a-dire qu'il a trouve l'essentiel du premier coup sans se faire
+    // souffler une reponse. C'est la meme regle que partout ailleurs, donc rien de nouveau a tenir.
+    const bool wasSuccessful = m_session->hasEarnedStar();
+
+    // UN BILAN PARFAIT : aucune reponse revelee, ET tout trouve du premier coup. Le plus dur des deux, et le seul qui
+    // merite un trophee a lui.
+    const bool wasPerfect = ( score.helpedQuestionCount() == 0 )
+                            && ( score.firstTrySuccessCount() == score.completedQuestionCount() )
+                            && ( score.completedQuestionCount() > 0 );
+
+    std::int64_t streak = m_levelStore->storedBilanSuccessStreak();
+
+    if( wasSuccessful )
+    {
+        ++streak;
+    }
+    else
+    {
+        // Une suite CASSEE, et pas seulement non augmentee : c'est ce que « d'affilee » veut dire.
+        streak = 0;
+    }
+
+    m_levelStore->storeBilanSuccessStreak( streak );
+    m_levelStore->storeLongestBilanSuccessStreak(
+      std::max( m_levelStore->storedLongestBilanSuccessStreak(), streak ) );
+
+    m_levelStore->storeBilanCount( m_levelStore->storedBilanCount() + 1 );
+
+    if( wasPerfect )
+    {
+        m_levelStore->storePerfectBilanCount( m_levelStore->storedPerfectBilanCount() + 1 );
+    }
+}
+
+QVariantMap ExerciseSessionController::playerTitle() const
+{
+    const domain::Title title = domain::titleEarnedBy( bilanRecord() );
+
+    QVariantMap described;
+    described.insert( QStringLiteral( "name" ), QString::fromUtf8( domain::titleName( title ).data() ) );
+    described.insert( QStringLiteral( "motto" ), QString::fromUtf8( domain::titleMotto( title ).data() ) );
+    described.insert( QStringLiteral( "index" ), static_cast<int>( title ) );
+
+    return described;
+}
+
+QVariantList ExerciseSessionController::trophies() const
+{
+    QVariantList described;
+
+    for( const domain::Trophy & trophy : domain::trophiesFor( bilanRecord() ) )
+    {
+        QVariantMap entry;
+        entry.insert( QStringLiteral( "identifier" ), QString::fromUtf8( trophy.identifier.data() ) );
+        entry.insert( QStringLiteral( "name" ), QString::fromUtf8( trophy.name.data() ) );
+        entry.insert( QStringLiteral( "description" ), QString::fromUtf8( trophy.description.data() ) );
+        entry.insert( QStringLiteral( "earned" ), trophy.earned );
+
+        described.append( entry );
+    }
+
+    return described;
+}
+
 void ExerciseSessionController::leaveReviewMode() noexcept
 {
     // L'etat de bilan ne doit pas SURVIVRE a un bilan. Il vit dans deux membres, et les oublier est exactement ce qui a
@@ -990,7 +1104,8 @@ void ExerciseSessionController::startSession()
     std::random_device entropySource;
 
     beginSession( domain::arcadeSettingsFor( m_playerLevel.value_or( domain::PlayerLevel::Beginner ),
-                                             entropySource() ) );
+                                             entropySource(),
+                                             arcadeLives() ) );
 }
 
 void ExerciseSessionController::startOrdinarySession()
@@ -2036,7 +2151,7 @@ void ExerciseSessionController::persistSessionOutcome()
         // la constante de l'Arcade - dix.
         const std::optional<std::int32_t> remainingLives = m_session->score().remainingLives();
         const std::int32_t livesLost =
-          remainingLives.has_value() ? std::max( 0, domain::ARCADE_STARTING_LIVES - *remainingLives ) : 0;
+          remainingLives.has_value() ? std::max( 0, arcadeLives() - *remainingLives ) : 0;
 
         earnedExperience = domain::arcadeExperience( m_session->score().experience(),
                                                      livesLost,
@@ -2054,6 +2169,10 @@ void ExerciseSessionController::persistSessionOutcome()
 
     // ET LE CHRONO S'ARRETE ICI : la duree de la partie est celle qui vient de finir, pas celle qu'on lit.
     m_sessionDurationSeconds = static_cast<int>( m_sessionClock.elapsed() / 1000 );
+
+    // LE BILAN LAISSE UNE TRACE, et c'est la SEULE chose qui donne des titres et des trophees. Roger l'a voulu reserve au
+    // bilan : « note qu'on mettra surement des trophees et/ou des certificats, accessibles seulement via le Bilan ».
+    recordBilanOutcome();
 
     // The session is over: its experience, its count and its star become part of the profile, once. Calling this
     // twice would count the same session twice, so it happens only from the transition into "finished".
@@ -2490,6 +2609,13 @@ void ExerciseSessionController::resetProfile()
     m_levelStore->storeTotalExperience( 0 );
     m_levelStore->storeSessionCount( 0 );
     m_levelStore->storeStarCount( 0 );
+
+    // ET CE QUE LE BILAN A LAISSE : les titres et les trophees sont un score comme un autre, et « remise a zero » les
+    // efface avec le reste. Le joueur qui repart de zero ne garde pas un titre qu'il vient d'effacer.
+    m_levelStore->storeBilanCount( 0 );
+    m_levelStore->storePerfectBilanCount( 0 );
+    m_levelStore->storeBilanSuccessStreak( 0 );
+    m_levelStore->storeLongestBilanSuccessStreak( 0 );
 
     // ET LES STATISTIQUES AUSSI. Un score remis a zero qui garderait son journal serait un demi-mensonge : la page de
     // statistiques continuerait de raconter une histoire que le joueur vient d'effacer.

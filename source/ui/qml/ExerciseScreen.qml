@@ -447,6 +447,9 @@ Item {
             }
 
             RowLayout {
+                // LES COEURS. Un par vie, et ils passent a la ligne quand la partie en accorde beaucoup : avec le reglage
+                // qui monte jusqu'a vingt-cinq, une seule ligne de coeurs deborderait de l'ecran.
+
                 Layout.fillWidth: true
 
                 Button {
@@ -484,12 +487,31 @@ Item {
                     Layout.fillWidth: true
                 }
 
-                Text {
-                    // An empty lives property shows a heart count; an unlimited session shows the symbol
-                    // rather than a number that would have to lie.
-                    text: ExerciseController.hasUnlimitedLives ? "∞" : "♥".repeat(ExerciseController.lives)
-                    color: "#ff8fa3"
-                    font.pixelSize: 20
+                // Au-dela de dix ils RETRECISSENT et se replient : Roger a demande les deux - « il faudrait peut etre les
+                // retrecir et qu'ils prennent qu'au dessus de 10, qu'ils soient sur 2 lignes ».
+                Flow {
+                    Layout.alignment: Qt.AlignRight
+                    Layout.preferredWidth: Math.min(ExerciseController.lives > 10 ? 170 : implicitWidth, exerciseScreen.width * 0.6)
+                    spacing: 1
+
+                    Text {
+                        visible: ExerciseController.hasUnlimitedLives
+                        text: "∞"
+                        color: "#ff8fa3"
+                        font.pixelSize: 20
+                    }
+
+                    Repeater {
+                        model: ExerciseController.hasUnlimitedLives ? 0 : ExerciseController.lives
+
+                        delegate: Text {
+                            text: "♥"
+                            color: "#ff8fa3"
+                            font.pixelSize: ExerciseController.lives > 10 ? 12 : 20
+                        }
+
+                    }
+
                 }
 
             }

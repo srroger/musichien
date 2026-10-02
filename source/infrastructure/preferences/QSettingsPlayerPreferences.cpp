@@ -2,6 +2,7 @@
 
 #include <QSettings>
 
+#include <algorithm>
 #include <cstddef>
 
 namespace musichien::infrastructure
@@ -64,6 +65,13 @@ constexpr const char * CHORD_QUESTION_SHARE_KEY = "player/chord-question-share";
 constexpr const char * MODE_COLOUR_QUESTION_SHARE_KEY = "player/mode-colour-question-share";
 constexpr const char * MODE_NAME_QUESTION_SHARE_KEY = "player/mode-name-question-share";
 constexpr const char * MODE_VAMP_QUESTION_SHARE_KEY = "player/mode-vamp-question-share";
+
+// LES COEURS DE L'ARCADE, et les compteurs du Bilan (les trophees et les titres s'y lisent).
+constexpr const char * ARCADE_LIVES_KEY = "player/arcade-lives";
+constexpr const char * BILAN_COUNT_KEY = "player/bilan-count";
+constexpr const char * PERFECT_BILAN_COUNT_KEY = "player/perfect-bilan-count";
+constexpr const char * BILAN_SUCCESS_STREAK_KEY = "player/bilan-success-streak";
+constexpr const char * LONGEST_BILAN_SUCCESS_STREAK_KEY = "player/longest-bilan-success-streak";
 
 // L'heure du rappel, en deux nombres separes : une heure et une minute se lisent dans un fichier de reglages plus
 // facilement qu'un instant encode, et un joueur curieux doit pouvoir comprendre ce qu'il lit.
@@ -563,6 +571,75 @@ void QSettingsPlayerPreferences::storeModeVampQuestionShare( std::int32_t p_shar
     QSettings settings;
 
     settings.setValue( MODE_VAMP_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedArcadeLives() const
+{
+    // Le domaine decide des bornes (dix par defaut, vingt-cinq au plus) ; ceci n'en garde qu'une valeur lisible, et une
+    // valeur hors bornes retombe sur le defaut plutot que de casser une partie.
+    const std::int32_t stored = QSettings{}.value( ARCADE_LIVES_KEY, 10 ).toInt();
+
+    if( stored < 0 || stored > 25 )
+    {
+        return 10;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeArcadeLives( std::int32_t p_lives )
+{
+    QSettings settings;
+
+    settings.setValue( ARCADE_LIVES_KEY, p_lives );
+}
+
+std::int64_t QSettingsPlayerPreferences::storedBilanCount() const
+{
+    return std::max<std::int64_t>( 0, QSettings{}.value( BILAN_COUNT_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeBilanCount( std::int64_t p_count )
+{
+    QSettings settings;
+
+    settings.setValue( BILAN_COUNT_KEY, static_cast<qlonglong>( p_count ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::storedPerfectBilanCount() const
+{
+    return std::max<std::int64_t>( 0, QSettings{}.value( PERFECT_BILAN_COUNT_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storePerfectBilanCount( std::int64_t p_count )
+{
+    QSettings settings;
+
+    settings.setValue( PERFECT_BILAN_COUNT_KEY, static_cast<qlonglong>( p_count ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::storedBilanSuccessStreak() const
+{
+    return std::max<std::int64_t>( 0, QSettings{}.value( BILAN_SUCCESS_STREAK_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeBilanSuccessStreak( std::int64_t p_streak )
+{
+    QSettings settings;
+
+    settings.setValue( BILAN_SUCCESS_STREAK_KEY, static_cast<qlonglong>( p_streak ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::storedLongestBilanSuccessStreak() const
+{
+    return std::max<std::int64_t>( 0, QSettings{}.value( LONGEST_BILAN_SUCCESS_STREAK_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeLongestBilanSuccessStreak( std::int64_t p_streak )
+{
+    QSettings settings;
+
+    settings.setValue( LONGEST_BILAN_SUCCESS_STREAK_KEY, static_cast<qlonglong>( p_streak ) );
 }
 
 }    // namespace musichien::infrastructure

@@ -31,6 +31,7 @@
 #include "domain/exercise/QuestionLog.h"
 #include "domain/exercise/QuestionStatistics.h"
 #include "domain/exercise/Rank.h"
+#include "domain/exercise/Trophy.h"
 #include "domain/music/TunerGuide.h"
 
 #include <QElapsedTimer>
@@ -432,6 +433,9 @@ class ExerciseSessionController final : public QObject
     // ou une simple ligne.
     Q_PROPERTY( bool sessionGrantsExperience READ sessionGrantsExperience NOTIFY sessionChanged )
 
+    // COMBIEN DE COEURS une Arcade accorde : dix par defaut, jusqu'a vingt-cinq. Le raccourci de Roger.
+    Q_PROPERTY( int arcadeLives READ arcadeLives NOTIFY arcadeLivesChanged )
+
 public:
     // Ce que la question en cours demande : nommer un intervalle, ou dire dans quel sens il a ete joue. La valeur
     // est celle du domaine, transposee en entier pour le QML.
@@ -812,6 +816,17 @@ public:
     // sont EXCLUES : une ligne « 0 sur 0 » n'informe pas, elle remplit.
     [[nodiscard]] Q_INVOKABLE QVariantList familyResults() const;
 
+    // COMBIEN DE COEURS une Arcade accorde. Le reglage de Roger, et le seul qui rende le boss atteignable quand on
+    // n'arrive a rien.
+    [[nodiscard]] int arcadeLives() const;
+    Q_INVOKABLE void setArcadeLives( int p_lives );
+
+    // LE TITRE du joueur, d'apres ses bilans reussis - et sa devise, en une phrase.
+    [[nodiscard]] Q_INVOKABLE QVariantMap playerTitle() const;
+
+    // LES TROPHEES, avec leur etat : {identifier, name, description, earned}. Gagnes au Bilan, gardes pour de bon.
+    [[nodiscard]] Q_INVOKABLE QVariantList trophies() const;
+
     // Le plus haut palier de difficulte que l'experience du joueur lui ouvre.
     //
     // Les paliers superieurs se FERMENT tant qu'on ne les a pas merites : c'est ce qui donne au GodMode son sens - un
@@ -1007,6 +1022,9 @@ signals:
     void runningChanged();
     void questionChanged();
     void sessionChanged();
+
+    // Le nombre de coeurs de l'Arcade a change : la page de reglages se redessine, et la prochaine partie en tiendra compte.
+    void arcadeLivesChanged();
     void scoreChanged();
 
     // A wrong answer has just been given, and the question is still being asked.
@@ -1137,6 +1155,13 @@ private:
 
     // Adds the session's outcome - its experience, its count, its star - to the profile, once, when it ends.
     void persistSessionOutcome();
+
+    // Ce qu'un BILAN laisse derriere lui : les quatre compteurs qui donnent les titres et les trophees. Appelee UNIQUEMENT
+    // quand la partie qui se conclut etait un bilan - voir persistSessionOutcome.
+    void recordBilanOutcome();
+
+    // Ce qu'un joueur a fait de ses bilans, lu des preferences. Une seule fonction, donc une seule verite.
+    [[nodiscard]] domain::BilanRecord bilanRecord() const;
 
     // Plays the interval of the question being asked, from its own root note.
     void playCurrentQuestion();

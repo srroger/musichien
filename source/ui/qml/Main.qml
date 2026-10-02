@@ -1947,6 +1947,57 @@ ApplicationWindow {
 
                 }
 
+                // LES COEURS DE L'ARCADE. Dix par defaut, vingt-cinq au plus, et c'est un RACCOURCI assume : Roger l'a
+                // demande tel quel - « juste un cheatcode pour rendre l'arcade plus facile » - pour pouvoir enfin tenir
+                // une partie jusqu'au boss. Il ne change ni le bareme du multiplicateur ni la longueur de l'Arcade.
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 16
+                    spacing: 6
+
+                    Text {
+                        Layout.fillWidth: true
+                        color: "#e8dcff"
+                        font.pixelSize: 14
+                        font.bold: true
+                        text: qsTr("Cœurs d'Arcade")
+                    }
+
+                    Text {
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
+                        Layout.fillWidth: true
+                        color: "#8a77ad"
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Combien de fois tu peux te tromper dans une Arcade. Monte à 25 pour voir le boss tranquillement.")
+                    }
+
+                    RowLayout {
+                        spacing: 10
+
+                        Slider {
+                            Layout.fillWidth: true
+                            from: 1
+                            to: 25
+                            stepSize: 1
+                            value: ExerciseController.arcadeLives
+                            onMoved: ExerciseController.setArcadeLives(value)
+                        }
+
+                        DarkSpinBox {
+                            Layout.preferredWidth: 86
+                            from: 1
+                            to: 25
+                            stepSize: 1
+                            value: ExerciseController.arcadeLives
+                            onValueModified: ExerciseController.setArcadeLives(value)
+                        }
+
+                    }
+
+                }
+
                 // « Par defaut » est a gauche et discret : c'est un geste rare, et il ne touche JAMAIS au score - voir
                 // resetPreferences. Un bouton qui efface les etoiles sans le dire serait un piege.
                 RowLayout {
@@ -2237,6 +2288,68 @@ ApplicationWindow {
                     font.pixelSize: 14
                     font.bold: true
                     text: StatisticsController.playingDayStreak > 1 ? qsTr("🔥 %1 jours d'affilée !").arg(StatisticsController.playingDayStreak) : qsTr("🔥 C'est parti pour une série")
+                }
+
+                // LE TITRE, et les TROPHEES : ce que le BILAN laisse derriere lui. Roger a voulu les deux reserves au bilan -
+                // « des trophées et/ou des certificats, accessibles seulement via le Bilan ». Le titre dit ou le joueur en
+                // est ; les trophees disent ce qu'il a fait.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 8
+                    color: "#ffd479"
+                    font.pixelSize: 20
+                    font.bold: true
+                    text: ExerciseController.playerTitle().name
+                }
+
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.fillWidth: true
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    font.italic: true
+                    wrapMode: Text.WordWrap
+                    text: ExerciseController.playerTitle().motto
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 6
+                    spacing: 3
+
+                    Repeater {
+                        model: ExerciseController.trophies()
+
+                        delegate: RowLayout {
+                            required property var modelData
+
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            // Une etoile PLEINE pour ce qui est acquis, creuse pour le reste : le joueur voit d'un coup
+                            // d'oeil ce qu'il a fait, et ce qu'il lui reste a faire.
+                            Text {
+                                Layout.preferredWidth: 20
+                                color: modelData.earned ? "#ffd479" : "#5c4a80"
+                                font.pixelSize: 15
+                                text: modelData.earned ? "★" : "☆"
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 0
+                                Layout.minimumWidth: 0
+                                color: modelData.earned ? "#e8dcff" : "#6f5b93"
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                                text: modelData.name + " · " + modelData.description
+                            }
+
+                        }
+
+                    }
+
                 }
 
                 // Tout vient du JOURNAL, et de lui seul : chaque question conclue y laisse une ligne, et cette page est ce

@@ -107,7 +107,10 @@ inline constexpr std::int32_t ARCADE_STARTING_LIVES = 10;
 [[nodiscard]] std::vector<QuestionTarget> arcadePlan( std::uint32_t p_seed );
 
 // Les reglages d'une Arcade pour un joueur de ce niveau : sa palette, son echelle d'aide, et le plan ci-dessus.
-[[nodiscard]] SessionSettings arcadeSettingsFor( PlayerLevel p_level, std::uint32_t p_seed );
+//
+// p_startingLives est REGLABLE, et c'est un raccourci assume : Roger a demande un reglage jusqu'a vingt-cinq coeurs -
+// « juste un cheatcode pour rendre l'arcade plus facile » - pour pouvoir ENFIN tenir une partie jusqu'au boss.
+[[nodiscard]] SessionSettings arcadeSettingsFor( PlayerLevel p_level, std::uint32_t p_seed, std::int32_t p_startingLives );
 
 // Les reglages d'un Entrainement : UNE famille, dix questions, et rien d'autre.
 //

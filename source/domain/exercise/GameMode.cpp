@@ -140,12 +140,13 @@ std::vector<QuestionTarget> arcadePlan( std::uint32_t p_seed )
     return plan;
 }
 
-SessionSettings arcadeSettingsFor( PlayerLevel p_level, std::uint32_t p_seed )
+SessionSettings arcadeSettingsFor( PlayerLevel p_level, std::uint32_t p_seed, std::int32_t p_startingLives )
 {
     SessionSettings settings = sessionSettingsFor( p_level );
 
     settings.questionCount = ARCADE_QUESTION_COUNT;
-    settings.lives = ARCADE_STARTING_LIVES;
+    // Le nombre de coeurs vient du REGLAGE, jamais d'une constante : c'est le raccourci que Roger a demande.
+    settings.lives = std::max( 1, p_startingLives );
     settings.plannedQuestions = arcadePlan( p_seed );
 
     // LE PLAFOND : une Arcade part de son niveau, monte vers le suivant, et s'y arrete. Voir capPaletteAtNextLevel.

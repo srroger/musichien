@@ -227,6 +227,41 @@ public:
     [[nodiscard]] virtual std::int32_t storedModeVampQuestionShare() const = 0;
 
     virtual void storeModeVampQuestionShare( std::int32_t p_share ) = 0;
+
+    // -------------------------------------------------------------------------------------------------------------
+    // LES COEURS DE L'ARCADE
+    // -------------------------------------------------------------------------------------------------------------
+    // Combien de coeurs une Arcade accorde. DIX par defaut, et reglable jusqu'a vingt-cinq.
+    //
+    // C'est un RACCOURCI assume, et Roger l'a demande comme tel : « juste un cheatcode pour rendre l'arcade plus facile ».
+    // Il ne touche ni au bareme du multiplicateur ni a la longueur de la partie - il donne seulement le droit de se
+    // tromper plus souvent, ce qui est exactement ce qu'il faut pour ENFIN voir le boss.
+    [[nodiscard]] virtual std::int32_t storedArcadeLives() const = 0;
+
+    virtual void storeArcadeLives( std::int32_t p_lives ) = 0;
+
+    // -------------------------------------------------------------------------------------------------------------
+    // LE BILAN : ce qu'il faut retenir pour les TROPHEES et les TITRES
+    // -------------------------------------------------------------------------------------------------------------
+    // Combien de bilans joues, combien PARFAITS (aucune question revelee, tout du premier coup), la suite de bilans
+    // REUSSIS en cours, et la plus longue jamais atteinte.
+    //
+    // Quatre compteurs, et non un journal : ce sont des FAITS qu'on ne recalcule pas, et la note 06 dit ce qu'on en fait.
+    [[nodiscard]] virtual std::int64_t storedBilanCount() const = 0;
+
+    virtual void storeBilanCount( std::int64_t p_count ) = 0;
+
+    [[nodiscard]] virtual std::int64_t storedPerfectBilanCount() const = 0;
+
+    virtual void storePerfectBilanCount( std::int64_t p_count ) = 0;
+
+    [[nodiscard]] virtual std::int64_t storedBilanSuccessStreak() const = 0;
+
+    virtual void storeBilanSuccessStreak( std::int64_t p_streak ) = 0;
+
+    [[nodiscard]] virtual std::int64_t storedLongestBilanSuccessStreak() const = 0;
+
+    virtual void storeLongestBilanSuccessStreak( std::int64_t p_streak ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -333,6 +368,26 @@ public:
 
     void storeModeVampQuestionShare( std::int32_t p_share ) override { m_modeVampQuestionShare = p_share; }
 
+    [[nodiscard]] std::int32_t storedArcadeLives() const override { return m_arcadeLives; }
+
+    void storeArcadeLives( std::int32_t p_lives ) override { m_arcadeLives = p_lives; }
+
+    [[nodiscard]] std::int64_t storedBilanCount() const override { return m_bilanCount; }
+
+    void storeBilanCount( std::int64_t p_count ) override { m_bilanCount = p_count; }
+
+    [[nodiscard]] std::int64_t storedPerfectBilanCount() const override { return m_perfectBilanCount; }
+
+    void storePerfectBilanCount( std::int64_t p_count ) override { m_perfectBilanCount = p_count; }
+
+    [[nodiscard]] std::int64_t storedBilanSuccessStreak() const override { return m_bilanSuccessStreak; }
+
+    void storeBilanSuccessStreak( std::int64_t p_streak ) override { m_bilanSuccessStreak = p_streak; }
+
+    [[nodiscard]] std::int64_t storedLongestBilanSuccessStreak() const override { return m_longestBilanSuccessStreak; }
+
+    void storeLongestBilanSuccessStreak( std::int64_t p_streak ) override { m_longestBilanSuccessStreak = p_streak; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
@@ -385,6 +440,13 @@ private:
     std::int32_t m_modeColourQuestionShare{ 0 };
     std::int32_t m_modeNameQuestionShare{ 0 };
     std::int32_t m_modeVampQuestionShare{ 0 };
+
+    // Les coeurs de l'Arcade, et les compteurs du Bilan.
+    std::int32_t m_arcadeLives{ 10 };
+    std::int64_t m_bilanCount{ 0 };
+    std::int64_t m_perfectBilanCount{ 0 };
+    std::int64_t m_bilanSuccessStreak{ 0 };
+    std::int64_t m_longestBilanSuccessStreak{ 0 };
 };
 
 }    // namespace musichien::domain

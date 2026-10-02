@@ -134,7 +134,7 @@ TEST( GameModeTest, the_arcade_plan_only_decides_the_kind )
 // Les reglages d'une Arcade : vingt-cinq questions, dix coeurs, et le plan.
 TEST( GameModeTest, the_arcade_settings_carry_the_dose_and_the_hearts )
 {
-    const SessionSettings settings = arcadeSettingsFor( PlayerLevel::Fluent, 3 );
+    const SessionSettings settings = arcadeSettingsFor( PlayerLevel::Fluent, 3, 10 );
 
     EXPECT_EQ( ARCADE_QUESTION_COUNT, settings.questionCount );
     ASSERT_TRUE( settings.lives.has_value() );
@@ -227,7 +227,7 @@ TEST( GameModeTest, an_unfinished_arcade_barely_pays )
 // rien.
 TEST( GameModeTest, the_arcade_and_the_training_cap_the_palette_at_the_next_level )
 {
-    const SessionSettings beginnerArcade = arcadeSettingsFor( PlayerLevel::Beginner, 1 );
+    const SessionSettings beginnerArcade = arcadeSettingsFor( PlayerLevel::Beginner, 1, 10 );
     const SessionSettings fluentLevel = sessionSettingsFor( PlayerLevel::Fluent );
 
     // Un DEBUTANT part de deux intervalles, et peut monter jusqu'aux cinq du niveau au-dessus.
@@ -237,7 +237,7 @@ TEST( GameModeTest, the_arcade_and_the_training_cap_the_palette_at_the_next_leve
     EXPECT_EQ( fluentLevel.startingModeCount, beginnerArcade.maximumModeCount );
 
     // Le DERNIER palier n'a pas de suivant : sa partie ne plafonne rien.
-    const SessionSettings masterArcade = arcadeSettingsFor( PlayerLevel::Master, 1 );
+    const SessionSettings masterArcade = arcadeSettingsFor( PlayerLevel::Master, 1, 10 );
     EXPECT_EQ( 0U, masterArcade.maximumPaletteSize );
     EXPECT_EQ( 0U, masterArcade.maximumModeCount );
 
