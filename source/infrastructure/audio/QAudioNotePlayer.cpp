@@ -3,13 +3,13 @@
 #include "domain/music/Note.h"
 
 #include <QAudioDevice>
+#include <QDebug>
 #include <QMediaDevices>
 #include <QTimer>
 
 #include <algorithm>
 #include <array>
 #include <format>
-#include <iostream>
 #include <iterator>
 #include <utility>
 
@@ -25,9 +25,12 @@ constexpr std::chrono::milliseconds DEFAULT_NOTE_DURATION{ 700 };
 // The synthesizer already normalises its own output, so the sink must not attenuate it further.
 constexpr double SINK_VOLUME = 1.0;
 
-// The sink buffer, in bytes. Its size IS the latency: the mixer is pulled ahead by that much, so a metronome click
-// triggered now would be heard one buffer later. Sixteen kilobytes is roughly forty milliseconds at 48 kHz in stereo
-// float - small enough that the click stays in time, large enough that the stream does not starve.
+// LE TAMPON DE SORTIE, EN OCTETS, ET CE N'EST PLUS QU'UN REPLI.
+//
+// Il a longtemps ete la valeur IMPOSEE - seize kilooctets, une quarantaine de millisecondes - parce que sa taille est la
+// latence entre un clic demande et un clic entendu. Ce raisonnement etait juste pour le haut-parleur du telephone, et
+// FAUX ailleurs : la bonne taille depend de la ROUTE, et Android la connait (voir ensureAudioOutputIsOpen). Il ne sert
+// donc plus que le jour ou la plateforme ne repond rien, ce qui n'arrive pas sur les appareils connus.
 constexpr int SINK_BUFFER_BYTES = 16384;
 
 // A drum hit is a SHORT sound, where a note lasts: at equal peak it sounds quieter. The samples are already normalised
@@ -82,7 +85,8 @@ void QAudioNotePlayer::reopenAudioOutput()
 
     if( !isAudioOutputAvailable() )
     {
-        std::cerr << "Musichien: the audio device changed and no output could be opened. Playback stays silent until one appears.\n";
+        qWarning().noquote() << "Musichien: the audio device changed and no output could be opened. Playback stays silent "
+                                "until one appears.";
     }
 }
 
@@ -129,7 +133,7 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
     if( outputDevice.isNull() )
     {
         m_outputDescription = "no audio output device";
-        std::cerr << "Musichien: no audio output device: the notes will stay silent.\n";
+        qWarning().noquote() << "Musichien: no audio output device: the notes will stay silent.";
         return;
     }
 
@@ -162,8 +166,8 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
 
     if( m_audioFormat.sampleFormat() != QAudioFormat::Float )
     {
-        std::cerr << "Musichien: the audio device does not accept 32 bit float samples (it wants "
-                  << static_cast<int>( m_audioFormat.sampleFormat() ) << "). Playback stays silent.\n";
+        qWarning().noquote() << "Musichien: the audio device does not accept 32 bit float samples (it wants"
+                             << static_cast<int>( m_audioFormat.sampleFormat() ) << "). Playback stays silent.";
 
         // Assigned rather than reset(): QAudioSink has a reset() method of its own, so a call to
         // "m_audioSink.reset()" would read as if it acted on the sound stream.
@@ -182,16 +186,42 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
     // two sounds be heard at once.
     m_mixer = std::make_unique<AudioMixer>( m_audioFormat.sampleRate(), m_audioFormat.channelCount() );
 
-    // A bounded sink buffer, because its size is the delay between a click being asked for and being heard.
-    m_audioSink->setBufferSize( SINK_BUFFER_BYTES );
+    // LE TAMPON DE SORTIE N'EST PLUS IMPOSE, ET C'EST UNE REPARATION.
+    //
+    // Roger : « quand je branche mes ecouteurs bluetooth, ca saccade, ca gresille ». Nous demandions seize kilooctets,
+    // soit une quarantaine de millisecondes : un nombre juste pour le haut-parleur du telephone, et FAUX pour un
+    // casque Bluetooth.
+    //
+    // Une liaison Bluetooth a son propre tampon, et Android le sait - c'est meme pour cela que
+    // 'AudioTrack.getMinBufferSize' depend de la ROUTE. Mais Qt n'applique ce minimum que sur un appareil SANS faible
+    // latence (voir QAndroidAudioSink::start) : sur un Pixel, il garde notre chiffre tel quel. Un flux trop maigre
+    // pour la liaison meurt de faim entre deux remplissages, et cela s'entend exactement comme Roger le decrit.
+    //
+    // On ne demande donc plus RIEN : la plateforme choisit son minimum pour la route du moment, et c'est elle qui
+    // sait. Le tampon REEL est relu dans la foulee, parce que c'est LUI qui dit la latence de sortie.
+    const qsizetype requestedBufferBytes = m_audioSink->bufferSize();
 
-    m_outputDescription = std::format( "{} ({} Hz, {} channel(s), sample format {})",
+    m_outputBufferBytes = ( requestedBufferBytes > 0 ) ? requestedBufferBytes : SINK_BUFFER_BYTES;
+
+    const auto bytesPerFrame =
+      static_cast<qsizetype>( sizeof( float ) ) * std::max( 1, m_audioFormat.channelCount() );
+
+    const auto bufferMilliseconds =
+      ( bytesPerFrame > 0 )
+        ? static_cast<int>( ( m_outputBufferBytes / bytesPerFrame ) * 1000 / std::max( 1, m_audioFormat.sampleRate() ) )
+        : 0;
+
+    m_outputDescription = std::format( "{} ({} Hz, {} channel(s), sample format {}, buffer {} ms)",
                                        outputDevice.description().toStdString(),
                                        m_audioFormat.sampleRate(),
                                        m_audioFormat.channelCount(),
-                                       static_cast<int>( m_audioFormat.sampleFormat() ) );
+                                       static_cast<int>( m_audioFormat.sampleFormat() ),
+                                       bufferMilliseconds );
 
-    std::cerr << "Musichien: audio output opened on " << m_outputDescription << "\n";
+    // qInfo et NON std::cerr : sur Android, la sortie d'erreur n'arrive PAS dans logcat - c'est verifie sur l'appareil,
+    // et c'est ecrit dans le Vault. Or c'est precisement LA ligne qu'on veut pouvoir lire depuis le telephone le jour
+    // ou un son se comporte mal : quelle sortie, quel taux, et surtout quel tampon.
+    qInfo().noquote() << QString::fromStdString( "Musichien: audio output opened on " + m_outputDescription );
 }
 
 void QAudioNotePlayer::startSinkIfNeeded()
@@ -939,7 +969,7 @@ void QAudioNotePlayer::startMetronome( double p_bpm, int p_beatsPerBar )
     const auto channelCount = static_cast<std::int64_t>( std::max( 1, m_audioFormat.channelCount() ) );
     const auto bytesPerFrame = static_cast<std::int64_t>( sizeof( float ) ) * channelCount;
 
-    m_mixer->setOutputLatencyFrames( static_cast<std::int64_t>( SINK_BUFFER_BYTES ) / std::max<std::int64_t>( 1, bytesPerFrame ) );
+    m_mixer->setOutputLatencyFrames( m_outputBufferBytes / std::max<std::int64_t>( 1, bytesPerFrame ) );
 
     m_mixer->startMetronome( p_bpm, p_beatsPerBar );
 

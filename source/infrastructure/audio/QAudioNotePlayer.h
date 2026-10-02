@@ -266,6 +266,15 @@ private:
     // restarts it, which would cut the sound being played.
     bool m_isSinkRunning{ false };
 
+    // LE TAMPON DE SORTIE REELLEMENT OBTENU, en octets, tel que la plateforme le donne pour la route du moment.
+    //
+    // C'est lui qui dit la LATENCE de sortie - le decalage entre ce qui est ecrit et ce qui est entendu - et cette
+    // latence sert a juger une frappe. Une valeur inventee ici ferait juger une frappe juste en avance ou en retard.
+    //
+    // Voir ensureAudioOutputIsOpen : il n'est plus IMPOSE, precisement parce qu'une valeur unique ne peut pas
+    // convenir a toutes les routes - un casque Bluetooth n'a pas les memes besoins que le haut-parleur.
+    qsizetype m_outputBufferBytes{ 0 };
+
     // The timbre the next listening will use. Drawn at random among the samples AND the sine (when it is enabled),
     // but STABLE as long as the question does not change: being played back on a different instrument would turn
     // "listen again" into a different question, and the verdict into a trap. Returns an index into m_instruments, or
