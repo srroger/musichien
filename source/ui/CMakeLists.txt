@@ -44,6 +44,16 @@ musichienFunction_AddLibrary(ui
     IntervalDescription.cpp
     IntervalPlaybackController.h
     IntervalPlaybackController.cpp
+
+    # Le banc d'essai des modes : sept boutons ranges par clarte, pour entendre une couleur sur un bourdon
+    ModeDescription.h
+    ModeDescription.cpp
+    ModePreviewController.h
+    ModePreviewController.cpp
+
+    # L'ecran du cercle des quintes : une page de reference, ou l'on ne repond a rien
+    KeyCircleController.h
+    KeyCircleController.cpp
     MicrophoneController.h
     MicrophoneController.cpp
     RhythmController.h
@@ -81,6 +91,7 @@ if(MUSICHIEN_BUILD_TESTING)
         ExerciseSessionController_test.cpp
         RhythmController_test.cpp
         IntervalPlaybackController_test.cpp
+        ModePreviewController_test.cpp
         ExerciseScreen_test.cpp
         MainScreen_test.cpp
         MicrophoneController_test.cpp

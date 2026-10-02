@@ -3,13 +3,13 @@
 #include "domain/music/Note.h"
 
 #include <QAudioDevice>
+#include <QDebug>
 #include <QMediaDevices>
 #include <QTimer>
 
 #include <algorithm>
 #include <array>
 #include <format>
-#include <iostream>
 #include <iterator>
 #include <utility>
 
@@ -25,9 +25,12 @@ constexpr std::chrono::milliseconds DEFAULT_NOTE_DURATION{ 700 };
 // The synthesizer already normalises its own output, so the sink must not attenuate it further.
 constexpr double SINK_VOLUME = 1.0;
 
-// The sink buffer, in bytes. Its size IS the latency: the mixer is pulled ahead by that much, so a metronome click
-// triggered now would be heard one buffer later. Sixteen kilobytes is roughly forty milliseconds at 48 kHz in stereo
-// float - small enough that the click stays in time, large enough that the stream does not starve.
+// LE TAMPON DE SORTIE, EN OCTETS, ET CE N'EST PLUS QU'UN REPLI.
+//
+// Il a longtemps ete la valeur IMPOSEE - seize kilooctets, une quarantaine de millisecondes - parce que sa taille est la
+// latence entre un clic demande et un clic entendu. Ce raisonnement etait juste pour le haut-parleur du telephone, et
+// FAUX ailleurs : la bonne taille depend de la ROUTE, et Android la connait (voir ensureAudioOutputIsOpen). Il ne sert
+// donc plus que le jour ou la plateforme ne repond rien, ce qui n'arrive pas sur les appareils connus.
 constexpr int SINK_BUFFER_BYTES = 16384;
 
 // A drum hit is a SHORT sound, where a note lasts: at equal peak it sounds quieter. The samples are already normalised
@@ -43,6 +46,16 @@ constexpr float PLAIN_CLICK_GAIN = 0.7F;
 // Le repli synthetise, quand les clics echantillonnes manquent.
 constexpr float FALLBACK_ACCENTED_CLICK_GAIN = 0.30F;
 constexpr float FALLBACK_PLAIN_CLICK_GAIN = 0.18F;
+
+// Le silence entre la gamme et l'accord d'un APERCU d'instrument. Assez long pour que l'oreille quitte la gamme, assez
+// court pour que l'ecoute reste UNE ecoute : on choisit un timbre, on ne compare pas deux morceaux.
+constexpr std::chrono::milliseconds PREVIEW_SILENCE{ 400 };
+
+// L'accord d'un apercu est tenu cinq fois la duree d'une note de gamme : la duree d'une petite phrase. C'est une couleur
+// qu'on ecoute - il faut le temps de l'entendre battre - et non un pas qu'on enchaine. Le corps par defaut du port tient
+// le meme temps, et il doit le tenir : un adaptateur qui n'a qu'un timbre fait entendre la meme chose que celui qui en a
+// onze, simplement sans la difference.
+constexpr std::int32_t PREVIEW_CHORD_DURATION_MULTIPLIER = 5;
 
 }    // namespace
 
@@ -66,23 +79,36 @@ void QAudioNotePlayer::prepareAudioOutput()
 
 void QAudioNotePlayer::reopenAudioOutput()
 {
-    stopAll();
-
-    // The sink and the two synthesisers were built for the OLD device's sample rate: they are discarded, and the
-    // next ensure opens whatever is now the default device and rebuilds them at its own rate.
-    m_audioSink.reset();
-    m_synthesizer.reset();
-    m_drumSynthesizer.reset();
-    m_mixer.reset();
-    m_isSinkRunning = false;
-    m_outputDescription = "not opened yet";
+    closeAudioOutput();
 
     ensureAudioOutputIsOpen();
 
     if( !isAudioOutputAvailable() )
     {
-        std::cerr << "Musichien: the audio device changed and no output could be opened. Playback stays silent until one appears.\n";
+        qWarning().noquote() << "Musichien: the audio device changed and no output could be opened. Playback stays silent "
+                                "until one appears.";
     }
+}
+
+void QAudioNotePlayer::closeAudioOutput()
+{
+    // TOUT ce qui sonnait s'arrete ici : le mix est vide, donc rien ne sera repris a la reouverture. Une note coupee
+    // par la mise en veille ne doit pas ressortir plus tard, hors de son exercice.
+    stopAll();
+
+    // The sink and the two synthesisers were built for the OLD device's sample rate: they are discarded, and the
+    // next ensure opens whatever is now the default device and rebuilds them at its own rate.
+    //
+    // ASSIGNED rather than reset() for the sink and the mixer, exactly as lower down in this file: QAudioSink and
+    // QIODevice both have a reset() method of their own, so "m_audioSink.reset()" would read as if it acted on the
+    // sound stream rather than on the pointer. clang-tidy says the same thing
+    // (readability-ambiguous-smartptr-reset-call), which is how the two lines below were found.
+    m_audioSink = nullptr;
+    m_synthesizer.reset();
+    m_drumSynthesizer.reset();
+    m_mixer = nullptr;
+    m_isSinkRunning = false;
+    m_outputDescription = "not opened yet";
 }
 
 bool QAudioNotePlayer::isAudioOutputAvailable() const noexcept
@@ -107,7 +133,7 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
     if( outputDevice.isNull() )
     {
         m_outputDescription = "no audio output device";
-        std::cerr << "Musichien: no audio output device: the notes will stay silent.\n";
+        qWarning().noquote() << "Musichien: no audio output device: the notes will stay silent.";
         return;
     }
 
@@ -140,8 +166,8 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
 
     if( m_audioFormat.sampleFormat() != QAudioFormat::Float )
     {
-        std::cerr << "Musichien: the audio device does not accept 32 bit float samples (it wants "
-                  << static_cast<int>( m_audioFormat.sampleFormat() ) << "). Playback stays silent.\n";
+        qWarning().noquote() << "Musichien: the audio device does not accept 32 bit float samples (it wants"
+                             << static_cast<int>( m_audioFormat.sampleFormat() ) << "). Playback stays silent.";
 
         // Assigned rather than reset(): QAudioSink has a reset() method of its own, so a call to
         // "m_audioSink.reset()" would read as if it acted on the sound stream.
@@ -160,16 +186,75 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
     // two sounds be heard at once.
     m_mixer = std::make_unique<AudioMixer>( m_audioFormat.sampleRate(), m_audioFormat.channelCount() );
 
-    // A bounded sink buffer, because its size is the delay between a click being asked for and being heard.
-    m_audioSink->setBufferSize( SINK_BUFFER_BYTES );
+    // LE FILET SOUS LA CORDE, et il manquait.
+    //
+    // Une sortie qui s'arrete TOUTE SEULE alors qu'il restait quelque chose a jouer a ECHOUE : Android a refuse
+    // l'ouverture, le plafond de huit flux est atteint, la liaison a lache. Le QAudioSink reste alors en place, muet, et
+    // TOUT ce qui suit reste muet - c'est le « d'un coup j'ai perdu le son » de Roger. Un silence DEFINITIF pour une
+    // panne PASSAGERE est le pire des deux mondes.
+    //
+    // On la jette donc, et la note suivante en reconstruit une neuve : la panne coute UN son au lieu de tous ceux qui
+    // suivent.
+    //
+    // ICI, et pas plus haut : ce branchement a d'abord ete pose juste apres la creation du FLUX, ou il ne pouvait pas
+    // fonctionner - le CONTEXTE de la connexion est le mixeur, et le mixeur n'existait pas encore. Qt l'a dit tout seul,
+    // sur l'appareil : « QObject::connect(QAudioSink, Unknown): invalid nullptr parameter ». Un filet qui ne se branche
+    // pas est pire qu'aucun filet : il rassure.
+    //
+    // Le contexte est le mixeur, et non `this` : cet adaptateur n'est pas un QObject, et le mixeur lui appartient - il
+    // vit donc exactement aussi longtemps. La reparation est DIFFEREE d'un tour de boucle, parce qu'elle DETRUIT l'objet
+    // meme qui est en train d'emettre ce signal.
+    QObject::connect( m_audioSink.get(),
+                      &QAudioSink::stateChanged,
+                      m_mixer.get(),
+                      [this]( QtAudio::State p_state ) {
+                          if( ( p_state != QtAudio::StoppedState ) || ( m_mixer == nullptr ) || !m_mixer->isPlaying() )
+                          {
+                              return;
+                          }
 
-    m_outputDescription = std::format( "{} ({} Hz, {} channel(s), sample format {})",
+                          qWarning() << "Musichien: the audio output stopped on its own while sound was pending; "
+                                        "rebuilding it for the next note.";
+
+                          QTimer::singleShot( 0, m_mixer.get(), [this]() { closeAudioOutput(); } );
+                      } );
+
+    // LE TAMPON DE SORTIE N'EST PLUS IMPOSE, ET C'EST UNE REPARATION.
+    //
+    // Roger : « quand je branche mes ecouteurs bluetooth, ca saccade, ca gresille ». Nous demandions seize kilooctets,
+    // soit une quarantaine de millisecondes : un nombre juste pour le haut-parleur du telephone, et FAUX pour un
+    // casque Bluetooth.
+    //
+    // Une liaison Bluetooth a son propre tampon, et Android le sait - c'est meme pour cela que
+    // 'AudioTrack.getMinBufferSize' depend de la ROUTE. Mais Qt n'applique ce minimum que sur un appareil SANS faible
+    // latence (voir QAndroidAudioSink::start) : sur un Pixel, il garde notre chiffre tel quel. Un flux trop maigre
+    // pour la liaison meurt de faim entre deux remplissages, et cela s'entend exactement comme Roger le decrit.
+    //
+    // On ne demande donc plus RIEN : la plateforme choisit son minimum pour la route du moment, et c'est elle qui
+    // sait. Le tampon REEL est relu dans la foulee, parce que c'est LUI qui dit la latence de sortie.
+    const qsizetype requestedBufferBytes = m_audioSink->bufferSize();
+
+    m_outputBufferBytes = ( requestedBufferBytes > 0 ) ? requestedBufferBytes : SINK_BUFFER_BYTES;
+
+    const auto bytesPerFrame =
+      static_cast<qsizetype>( sizeof( float ) ) * std::max( 1, m_audioFormat.channelCount() );
+
+    const auto bufferMilliseconds =
+      ( bytesPerFrame > 0 )
+        ? static_cast<int>( ( m_outputBufferBytes / bytesPerFrame ) * 1000 / std::max( 1, m_audioFormat.sampleRate() ) )
+        : 0;
+
+    m_outputDescription = std::format( "{} ({} Hz, {} channel(s), sample format {}, buffer {} ms)",
                                        outputDevice.description().toStdString(),
                                        m_audioFormat.sampleRate(),
                                        m_audioFormat.channelCount(),
-                                       static_cast<int>( m_audioFormat.sampleFormat() ) );
+                                       static_cast<int>( m_audioFormat.sampleFormat() ),
+                                       bufferMilliseconds );
 
-    std::cerr << "Musichien: audio output opened on " << m_outputDescription << "\n";
+    // qInfo et NON std::cerr : sur Android, la sortie d'erreur n'arrive PAS dans logcat - c'est verifie sur l'appareil,
+    // et c'est ecrit dans le Vault. Or c'est precisement LA ligne qu'on veut pouvoir lire depuis le telephone le jour
+    // ou un son se comporte mal : quelle sortie, quel taux, et surtout quel tampon.
+    qInfo().noquote() << QString::fromStdString( "Musichien: audio output opened on " + m_outputDescription );
 }
 
 void QAudioNotePlayer::startSinkIfNeeded()
@@ -199,7 +284,26 @@ void QAudioNotePlayer::stopSinkWhenSilent()
     //
     // The mixer is the CONTEXT of the single shot, and that is deliberate: it is owned by this object, so if the
     // player is destroyed the pending call goes with it instead of touching a dangling pointer.
-    QTimer::singleShot( 250, m_mixer.get(), [this]() {
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // UNE MINUTE, ET NON UN QUART DE SECONDE, et c'est un SON PERDU qui l'a appris.
+    //
+    // Roger : « tout allait bien puis d'un coup j'ai perdu le son ». La cause est mesuree, et elle est sans appel :
+    //
+    //     E AAudioService: openStream(): exceeded max streams per process 8 >= 8
+    //     AAudioStreamBuilder_openStream() returns -896 = AAUDIO_ERROR_INTERNAL
+    //
+    // ANDROID NE LAISSE PAS OUVRIR PLUS DE HUIT FLUX AUDIO PAR PROCESSUS. Or chaque `start()` d'un QAudioSink ouvre un
+    // flux AAudio, et chaque `stop()` le ferme - mais la FERMETURE EST ASYNCHRONE. Avec un quart de seconde de patience,
+    // chaque note rendait l'appareil puis le reprenait : 93 flux ouverts en cinq minutes, une poignee encore en train de
+    // se fermer a chaque instant, et au neuvieme tout echoue. Une fois le plafond atteint, plus rien ne passe : le son
+    // ne revient jamais, et c'est exactement ce que Roger a vecu.
+    //
+    // Le remede est de ne plus JOUER AU YO-YO. Une minute de patience laisse le flux ouvert pendant toute une seance -
+    // les questions s'enchainent bien plus vite que cela - donc un seul flux est ouvert, et le plafond n'est jamais
+    // approche. L'appareil est rendu tout de meme : apres une vraie minute de silence, et immediatement a la mise en
+    // arriere-plan (voir closeAudioOutput), qui est le vrai cas de la batterie.
+    QTimer::singleShot( 60000, m_mixer.get(), [this]() {
         if( ( m_audioSink == nullptr ) || ( m_mixer == nullptr ) )
         {
             return;
@@ -322,6 +426,36 @@ void QAudioNotePlayer::playChordFor( std::span<const domain::Note> p_notes,
     playSamples( renderChordFor( p_notes, p_duration ) );
 }
 
+void QAudioNotePlayer::playInstrumentPreview( std::span<const domain::Note> p_scale,
+                                              std::span<const domain::Note> p_chord,
+                                              std::size_t p_instrumentIndex,
+                                              std::chrono::milliseconds p_noteDuration,
+                                              std::chrono::milliseconds p_gap )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // Le timbre est IMPOSE, et rien d'autre n'est touche : ni le tirage, ni le timbre retenu pour la session. Ecouter ce
+    // qu'un instrument donnerait ne doit pas decider a la place du joueur de ce qu'il entendra ensuite.
+    const auto sampleRate = static_cast<std::size_t>( std::max( 1, m_audioFormat.sampleRate() ) );
+    const auto silenceSampleCount = static_cast<std::size_t>( sampleRate * PREVIEW_SILENCE.count() / 1000 );
+
+    std::vector<float> preview = renderMelodyWithIndex( p_scale, p_noteDuration, p_gap, p_instrumentIndex );
+
+    preview.insert( preview.end(), silenceSampleCount, 0.0F );
+
+    const std::vector<float> chord =
+      renderChordWithIndex( p_chord, p_noteDuration * PREVIEW_CHORD_DURATION_MULTIPLIER, p_instrumentIndex );
+
+    preview.insert( preview.end(), chord.begin(), chord.end() );
+
+    playSamples( preview );
+}
+
 void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_instruments,
                                        std::vector<domain::Waveform> p_waveforms )
 {
@@ -334,23 +468,132 @@ void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_
     m_lastPlayedNotes.clear();
 }
 
+void QAudioNotePlayer::useDroneInstruments( std::vector<domain::SampledInstrument> p_drones )
+{
+    m_drones = std::move( p_drones );
+
+    m_droneIndex = 0;
+
+    m_lastDroneNotes.clear();
+}
+
+void QAudioNotePlayer::useEnabledInstruments( std::vector<bool> p_enabled )
+{
+    m_enabledTimbre = std::move( p_enabled );
+
+    // Le timbre retenu pour la session peut tres bien avoir ete decoche entre-temps : le tirage suivant en choisira un
+    // autre, et c'est tout ce qu'il y a a faire. Rien n'est reinitialise ici - c'est le TIRAGE qui verifie.
+}
+
+bool QAudioNotePlayer::isTimbreEnabled( std::size_t p_timbreIndex ) const
+{
+    if( p_timbreIndex >= m_enabledTimbre.size() )
+    {
+        return true;
+    }
+
+    return m_enabledTimbre.at( p_timbreIndex );
+}
+
+const domain::SampledInstrument * QAudioNotePlayer::instrumentAt( std::size_t p_timbreIndex ) const
+{
+    if( p_timbreIndex >= m_instruments.size() )
+    {
+        return nullptr;
+    }
+
+    const domain::SampledInstrument & instrument = m_instruments.at( p_timbreIndex );
+
+    // Vide : la ressource n'a pas pu etre lue. Le rang reste le sien - c'est ce qui garde les index du domaine justes -
+    // mais il n'y a rien a jouer, et la synthese s'en charge.
+    return instrument.isEmpty() ? nullptr : &instrument;
+}
+
 std::size_t QAudioNotePlayer::timbreIndexFor( std::span<const domain::Note> p_notes )
 {
-    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
+    // Le joueur a pu DEMANDER de garder le timbre pour la lecture qui suit : c'est ce que fait une comparaison de deux
+    // modes, dont les deux passages n'ont pas les memes notes - et un vamp deplace meme le bourdon. La demande vaut pour
+    // UNE lecture, et elle est consommee ici, comme un jeton.
+    //
+    // CE BLOC A MANQUE, et c'est le bug du clair-obscur. holdTimbre() posait son drapeau pour le BOURDON seul, et
+    // timbreIndexFor ne le lisait pas : l'adaptateur re-tirait donc un timbre, et les deux modes d'une meme question
+    // sonnaient sur deux instruments differents - exactement ce que la comparaison ne doit pas faire entendre.
+    if( m_holdTimbre )
+    {
+        m_holdTimbre = false;
+
+        if( isTimbreEnabled( m_instrumentIndex ) )
+        {
+            return m_instrumentIndex;
+        }
+    }
 
     // The same question is the same NOTES, whatever order the melody played them in: a falling fifth and its
     // feedback chord share the same two notes. Comparing them as an ORDERED sequence would re-draw the instrument
     // between the melody and the chord - the guitar turning into a saxophone in front of the player.
-    const bool sameQuestion = ( p_notes.size() == m_lastPlayedNotes.size() )
-                              && std::is_permutation( p_notes.begin(), p_notes.end(), m_lastPlayedNotes.begin() );
+    const bool sameQuestion =
+      !m_lastPlayedNotes.empty() && ( p_notes.size() == m_lastPlayedNotes.size() )
+      && std::is_permutation( p_notes.begin(), p_notes.end(), m_lastPlayedNotes.begin() );
 
-    if( !sameQuestion )
+    // Les notes entendues sont retenues dans TOUS les cas : c'est ce qui permet a la question suivante de savoir si elle a
+    // change, y compris quand le timbre, lui, ne change plus.
+    m_lastPlayedNotes.assign( p_notes.begin(), p_notes.end() );
+
+    // ET LE TIMBRE DE LA SESSION NE BOUGE PLUS : voir beginTimbreForSession. Une nouvelle question ne retire donc plus de
+    // timbre, et l'oreille ne compare plus que ce qu'on lui demande - l'intervalle, jamais l'instrument.
+    //
+    // Sauf s'il vient d'etre DECOCHE : garder un son que le joueur vient de refuser serait la seule facon d'entendre
+    // encore ce qu'il ne veut plus. Le tirage, plus bas, en choisira un autre - et c'est la seule chose a faire ici.
+    if( ( sameQuestion || m_timbreIsHeldForSession ) && isTimbreEnabled( m_instrumentIndex ) )
     {
-        m_lastPlayedNotes.assign( p_notes.begin(), p_notes.end() );
+        return m_instrumentIndex;
+    }
 
-        std::uniform_int_distribution<std::size_t> distribution{ 0, timbreCount - 1 };
+    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
 
-        m_instrumentIndex = distribution( m_instrumentRandomEngine );
+    if( timbreCount == 0 )
+    {
+        return m_instrumentIndex;
+    }
+
+    // Le tirage porte sur les timbres ACCEPTES, et il tire un RANG parmi eux plutot que de batir une liste : une
+    // allocation a chaque question serait payee a chaque question, pour un resultat identique.
+    std::size_t allowedCount = 0;
+
+    for( std::size_t index = 0; index < timbreCount; ++index )
+    {
+        if( isTimbreEnabled( index ) )
+        {
+            ++allowedCount;
+        }
+    }
+
+    // Aucun timbre accepte : l'interface l'interdit - la derniere case ne peut pas s'eteindre - mais un fichier de
+    // reglages peut encore le dire. Plutot que de tirer parmi ce que le joueur a refuse, on continue ce qu'on jouait.
+    if( allowedCount == 0 )
+    {
+        return m_instrumentIndex;
+    }
+
+    std::uniform_int_distribution<std::size_t> distribution{ 0, allowedCount - 1 };
+
+    std::size_t wantedRank = distribution( m_instrumentRandomEngine );
+
+    for( std::size_t index = 0; index < timbreCount; ++index )
+    {
+        if( !isTimbreEnabled( index ) )
+        {
+            continue;
+        }
+
+        if( wantedRank == 0 )
+        {
+            m_instrumentIndex = index;
+
+            break;
+        }
+
+        --wantedRank;
     }
 
     return m_instrumentIndex;
@@ -369,9 +612,14 @@ std::vector<float> QAudioNotePlayer::renderNoteFor( std::span<const domain::Note
 
     const std::size_t index = timbreIndexFor( p_sequence );
 
-    if( index < m_instruments.size() )
+    if( const domain::SampledInstrument * instrument = instrumentAt( index ) )
     {
-        return m_instruments.at( index ).renderNote( p_note, p_duration, m_audioFormat.sampleRate(), m_tuning );
+        return instrument->renderNote( p_note, p_duration, m_audioFormat.sampleRate(), m_tuning );
+    }
+
+    if( index >= m_instruments.size() + m_waveforms.size() )
+    {
+        return m_synthesizer->renderNote( p_note, p_duration, m_tuning );
     }
 
     return m_synthesizer->renderWaveNote( p_note, m_waveforms.at( index - m_instruments.size() ), p_duration, m_tuning );
@@ -380,22 +628,32 @@ std::vector<float> QAudioNotePlayer::renderNoteFor( std::span<const domain::Note
 std::vector<float> QAudioNotePlayer::renderChordFor( std::span<const domain::Note> p_notes,
                                                      std::chrono::milliseconds p_duration )
 {
-    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
-
-    if( timbreCount == 0 )
+    if( m_instruments.empty() && m_waveforms.empty() )
     {
         return m_synthesizer->renderChord( p_notes, p_duration, m_tuning );
     }
 
-    const std::size_t index = timbreIndexFor( p_notes );
+    return renderChordWithIndex( p_notes, p_duration, timbreIndexFor( p_notes ) );
+}
 
-    if( index < m_instruments.size() )
+std::vector<float> QAudioNotePlayer::renderChordWithIndex( std::span<const domain::Note> p_notes,
+                                                           std::chrono::milliseconds p_duration,
+                                                           std::size_t p_timbreIndex )
+{
+    if( const domain::SampledInstrument * instrument = instrumentAt( p_timbreIndex ) )
     {
-        return m_instruments.at( index ).renderChord( p_notes, p_duration, m_audioFormat.sampleRate(), m_tuning );
+        return instrument->renderChord( p_notes, p_duration, m_audioFormat.sampleRate(), m_tuning );
+    }
+
+    // Un index au-dela des deux listes retombe sur la synthese, comme un appareil sans echantillons : mieux vaut un
+    // accord synthetise qu'un apercu muet.
+    if( p_timbreIndex >= m_instruments.size() + m_waveforms.size() )
+    {
+        return m_synthesizer->renderChord( p_notes, p_duration, m_tuning );
     }
 
     return m_synthesizer->renderWaveChord( p_notes,
-                                           m_waveforms.at( index - m_instruments.size() ),
+                                           m_waveforms.at( p_timbreIndex - m_instruments.size() ),
                                            p_duration,
                                            m_tuning );
 }
@@ -404,29 +662,220 @@ std::vector<float> QAudioNotePlayer::renderMelodyFor( std::span<const domain::No
                                                       std::chrono::milliseconds p_noteDuration,
                                                       std::chrono::milliseconds p_gap )
 {
-    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
-
-    if( timbreCount == 0 )
+    if( m_instruments.empty() && m_waveforms.empty() )
     {
         return m_synthesizer->renderMelody( p_notes, p_noteDuration, p_gap, m_tuning );
     }
 
-    const std::size_t index = timbreIndexFor( p_notes );
+    return renderMelodyWithIndex( p_notes, p_noteDuration, p_gap, timbreIndexFor( p_notes ) );
+}
 
-    if( index < m_instruments.size() )
+std::vector<float> QAudioNotePlayer::renderMelodyWithIndex( std::span<const domain::Note> p_notes,
+                                                            std::chrono::milliseconds p_noteDuration,
+                                                            std::chrono::milliseconds p_gap,
+                                                            std::size_t p_timbreIndex )
+{
+    if( const domain::SampledInstrument * instrument = instrumentAt( p_timbreIndex ) )
     {
-        return m_instruments.at( index ).renderMelody( p_notes,
-                                                       p_noteDuration,
-                                                       p_gap,
-                                                       m_audioFormat.sampleRate(),
-                                                       m_tuning );
+        return instrument->renderMelody( p_notes, p_noteDuration, p_gap, m_audioFormat.sampleRate(), m_tuning );
+    }
+
+    // Un index au-dela des deux listes retombe sur la synthese : mieux vaut une gamme synthetisee qu'un apercu muet.
+    if( p_timbreIndex >= m_instruments.size() + m_waveforms.size() )
+    {
+        return m_synthesizer->renderMelody( p_notes, p_noteDuration, p_gap, m_tuning );
     }
 
     return m_synthesizer->renderWaveMelody( p_notes,
-                                            m_waveforms.at( index - m_instruments.size() ),
+                                            m_waveforms.at( p_timbreIndex - m_instruments.size() ),
                                             p_noteDuration,
                                             p_gap,
                                             m_tuning );
+}
+
+void QAudioNotePlayer::playMelodyOverDrone( std::span<const domain::Note> p_melody,
+                                            std::span<const domain::Note> p_drone,
+                                            std::chrono::milliseconds p_noteDuration,
+                                            std::chrono::milliseconds p_gap,
+                                            domain::DroneFraming p_framing )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // Un bourdon ENREGISTRE, quand il y en a un.
+    //
+    // Le domaine a deja dit QUELLE quinte doit sonner : p_drone est fait des notes du bourdon, pas d'un numero de
+    // timbre. L'echantillonneur les joue donc telles quelles, avec la transposition, la normalisation et le fondu de
+    // queue de toutes les notes du jeu - le bourdon n'est pas un cas particulier.
+    if( !m_drones.empty() )
+    {
+        // Le timbre est TIRE, et il reste le meme tant que le bourdon ne change pas : entendre le meme mode sur un
+        // autre bourdon serait une autre question. C'est exactement la regle des instruments de melodie.
+        //
+        // Et le domaine peut DEMANDER de le garder malgre un changement de bourdon : c'est ce que fait une comparaison
+        // de deux modes, ou le bourdon d'un vamp se deplace par nature. Roger l'a entendu : « il faudrait que ca utilise
+        // les meme instruments, ca evite le bruit de la difference d'instrument ».
+        const bool sameDrone = m_holdTimbre
+                               || ( ( p_drone.size() == m_lastDroneNotes.size() )
+                                    && std::is_permutation( p_drone.begin(), p_drone.end(), m_lastDroneNotes.begin() ) );
+
+        // Consomme : la demande vaut pour UNE lecture, et la suivante retrouve sa liberte.
+        m_holdTimbre = false;
+
+        if( !sameDrone )
+        {
+            m_lastDroneNotes.assign( p_drone.begin(), p_drone.end() );
+
+            std::uniform_int_distribution<std::size_t> distribution{ 0, m_drones.size() - 1 };
+
+            m_droneIndex = distribution( m_instrumentRandomEngine );
+        }
+
+        const domain::SampledInstrument & drone = m_drones.at( m_droneIndex );
+
+        // La duree du bourdon vient du DOMAINE, et non d'un calcul ecrit ici : c'est la seule facon de garantir que le
+        // bourdon enregistre et celui de la synthese tiennent exactement le meme temps.
+        const std::vector<float> droneSamples =
+          drone.renderChord( p_drone,
+                             domain::droneDurationFor( p_melody.size(), p_noteDuration, p_gap, p_framing ),
+                             m_audioFormat.sampleRate(),
+                             m_tuning );
+
+        // LA MELODIE PAR UN INSTRUMENT, quand il y en a un.
+        //
+        // C'est la correction du 01/10/2026 : le bourdon etait deja ENREGISTRE - un chœur, des cordes - pendant que la
+        // melodie restait synthetisee. Deux matieres qui ne s'accordent pas, et Roger l'a entendu tout de suite : « les voix
+        // pour les modes, je trouve ca un peu bizarre ».
+        //
+        // Le REPLI reste la synthese, et il n'est pas decoratif : un appareil dont les echantillons manquent doit quand
+        // meme entendre la question.
+        const std::size_t timbreIndex = timbreIndexFor( p_melody );
+
+        if( const domain::SampledInstrument * instrument = instrumentAt( timbreIndex ) )
+        {
+            const std::vector<float> melodySamples =
+              instrument->renderMelody( p_melody, p_noteDuration, p_gap, m_audioFormat.sampleRate(), m_tuning );
+
+            playSamples( m_synthesizer->mixRenderedMelodyOverDrone( melodySamples, droneSamples, p_framing ) );
+
+            return;
+        }
+
+        playSamples(
+          m_synthesizer->mixMelodyOverDrone( p_melody, droneSamples, p_noteDuration, p_gap, m_tuning, p_framing ) );
+
+        return;
+    }
+
+    // Le REPLI, et il n'est pas decoratif : un appareil dont les echantillons n'ont pas pu etre lus doit quand meme
+    // entendre la question. La synthese fabrique alors son propre bourdon (Waveform::Organ).
+    playSamples( m_synthesizer->renderMelodyOverDrone( p_melody, p_drone, p_noteDuration, p_gap, m_tuning, p_framing ) );
+}
+
+void QAudioNotePlayer::playPhraseOverDrone( std::span<const domain::Note> p_melody,
+                                            std::span<const std::chrono::milliseconds> p_durations,
+                                            std::span<const domain::Note> p_drone,
+                                            std::chrono::milliseconds p_gap,
+                                            domain::DroneFraming p_framing )
+{
+    // Exactement le meme chemin que playMelodyOverDrone, a une chose pres : les durees. Recopier la mecanique plutot que
+    // d'en inventer une seconde est delibere - une phrase et une gamme doivent sonner du meme bourdon, au meme niveau,
+    // decalees de la meme facon, sinon comparer l'une a l'autre serait comparer deux choses differentes.
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    if( !m_drones.empty() )
+    {
+        const bool sameDrone = ( p_drone.size() == m_lastDroneNotes.size() )
+                               && std::is_permutation( p_drone.begin(), p_drone.end(), m_lastDroneNotes.begin() );
+
+        if( !sameDrone )
+        {
+            m_lastDroneNotes.assign( p_drone.begin(), p_drone.end() );
+
+            std::uniform_int_distribution<std::size_t> distribution{ 0, m_drones.size() - 1 };
+
+            m_droneIndex = distribution( m_instrumentRandomEngine );
+        }
+
+        const domain::SampledInstrument & drone = m_drones.at( m_droneIndex );
+
+        // La duree du bourdon est la SOMME des pas, silences compris : c'est la meme regle que pour une melodie
+        // reguliere, et elle vit dans le domaine pour que les deux bourdons - celui de la synthese et celui des
+        // echantillons - ne puissent pas diverger.
+        const std::vector<float> droneSamples =
+          drone.renderChord( p_drone,
+                             domain::droneDurationFor( p_durations, p_gap, p_framing ),
+                             m_audioFormat.sampleRate(),
+                             m_tuning );
+
+        // LA PHRASE PAR UN INSTRUMENT, comme la gamme : voir playMelodyOverDrone. C'est ce qui fait qu'un mode s'entend
+        // d'une seule matiere, que la question joue une phrase ou une gamme.
+        const std::size_t timbreIndex = timbreIndexFor( p_melody );
+
+        if( const domain::SampledInstrument * instrument = instrumentAt( timbreIndex ) )
+        {
+            const std::vector<float> melodySamples =
+              instrument->renderMelody( p_melody, p_durations, p_gap, m_audioFormat.sampleRate(), m_tuning );
+
+            playSamples( m_synthesizer->mixRenderedMelodyOverDrone( melodySamples, droneSamples, p_framing ) );
+
+            return;
+        }
+
+        playSamples(
+          m_synthesizer->mixMelodyOverDrone( p_melody, droneSamples, p_durations, p_gap, m_tuning, p_framing ) );
+
+        return;
+    }
+
+    playSamples( m_synthesizer->renderMelodyOverDrone( p_melody, p_drone, p_durations, p_gap, m_tuning, p_framing ) );
+}
+
+void QAudioNotePlayer::holdTimbre()
+{
+    // Le timbre de la lecture QUI SUIT sera celui-ci, et la demande est consommee par elle.
+    //
+    // Le drapeau de SESSION n'est PLUS touche, et c'est le fond du bug du clair-obscur : il l'etait, donc le second mode
+    // d'une comparaison rendait la session au tirage - et les deux modes sonnaient sur deux instruments, precisement la
+    // ou le meme timbre est ce qui rend la comparaison possible.
+    m_holdTimbre = true;
+}
+
+void QAudioNotePlayer::beginTimbreForSession()
+{
+    // UN timbre pour toute la session, et un nouveau a chaque session : le tirage a lieu ICI, une fois, puis
+    // timbreIndexFor ne le touche plus.
+    //
+    // Roger a entendu le probleme avant de le nommer : « les instruments parfois ca rend bizarre dans certains
+    // intervalles ». Le timbre changeait a chaque question, donc une seconde mineure et une quinte n'etaient pas jouees
+    // par le meme instrument - et l'oreille comparait deux choses au lieu d'une.
+    m_holdTimbre = false;
+    m_timbreIsHeldForSession = false;
+    m_lastPlayedNotes.clear();
+
+    const std::size_t timbreCount = m_instruments.size() + m_waveforms.size();
+
+    if( timbreCount == 0 )
+    {
+        // Rien a choisir : la synthese jouera, comme partout ou un echantillon manque.
+        return;
+    }
+
+    std::uniform_int_distribution<std::size_t> distribution{ 0, timbreCount - 1 };
+
+    m_instrumentIndex = distribution( m_instrumentRandomEngine );
+
+    // Et le timbre est TENU : c'est la seule chose qui distingue ce tirage des autres.
+    m_timbreIsHeldForSession = true;
 }
 
 void QAudioNotePlayer::playMistakeCue()
@@ -572,7 +1021,7 @@ void QAudioNotePlayer::startMetronome( double p_bpm, int p_beatsPerBar )
     const auto channelCount = static_cast<std::int64_t>( std::max( 1, m_audioFormat.channelCount() ) );
     const auto bytesPerFrame = static_cast<std::int64_t>( sizeof( float ) ) * channelCount;
 
-    m_mixer->setOutputLatencyFrames( static_cast<std::int64_t>( SINK_BUFFER_BYTES ) / std::max<std::int64_t>( 1, bytesPerFrame ) );
+    m_mixer->setOutputLatencyFrames( m_outputBufferBytes / std::max<std::int64_t>( 1, bytesPerFrame ) );
 
     m_mixer->startMetronome( p_bpm, p_beatsPerBar );
 
@@ -661,6 +1110,42 @@ void QAudioNotePlayer::playDrum( domain::Drum p_drum )
     {
         mixSamples( m_drumSynthesizer->renderDrum( p_drum ), DRUM_GAIN );
     }
+}
+
+void QAudioNotePlayer::useDogBarks( std::vector<std::vector<float>> p_samples )
+{
+    m_dogBarks = std::move( p_samples );
+}
+
+void QAudioNotePlayer::playDogBark()
+{
+    ensureAudioOutputIsOpen();
+
+    // Un aboiement s'entend, et il doit s'entendre : c'est le chien qui annonce qu'il a quelque chose a dire. Il reste
+    // pourtant SOUS le niveau d'une note, parce qu'il ne fait pas partie de la musique.
+    constexpr float DOG_BARK_GAIN = 0.45F;
+
+    // Les variantes TOURNENT : l'index avance a chaque aboiement, et repart au debut quand il a fait le tour. Roger
+    // voulait « trois autres qui tourneraient » - et une rotation vaut mieux qu'un tirage au hasard, qui peut tomber
+    // deux fois de suite sur le meme wouf et donner l'impression qu'il n'y en a qu'un.
+    for( std::size_t attempt = 0; attempt < m_dogBarks.size(); ++attempt )
+    {
+        const std::size_t index = m_nextDogBark % m_dogBarks.size();
+        ++m_nextDogBark;
+
+        // Un fichier qui n'a pas ete lu ne compte pas comme une phrase : on passe au suivant.
+        if( !m_dogBarks[index].empty() )
+        {
+            mixSamples( m_dogBarks[index], DOG_BARK_GAIN );
+
+            return;
+        }
+    }
+
+    // Pas un seul aboiement charge : le clic de menu prend sa place. Roger avait donne les deux solutions dans la MEME
+    // phrase - « un son doux et tres court de chien... ou sinon, juste le meme petit son que tu avais sur les boutons »
+    // - donc tomber sur l'une quand l'autre manque est exactement ce qu'il a demande.
+    playTapCue();
 }
 
 void QAudioNotePlayer::playGreeting()

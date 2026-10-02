@@ -77,7 +77,7 @@ struct StatisticsFilter
 {
     // Depuis quand. Un SEUL point dans le temps : les filtres de l'ecran (sept jours, trente jours, tout) s'y ramenent
     // tous, et « tout » se dit avec le point le plus ancien possible.
-    std::chrono::system_clock::time_point since{};
+    std::chrono::system_clock::time_point since;
 
     // Aucun genre par defaut, donc tous : c'est ce qu'un joueur veut voir en ouvrant la page.
     std::optional<QuestionKind> kind;

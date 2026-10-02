@@ -1,52 +1,37 @@
 # =====================================================================================================================
 # Musichien - identifier of the build
 #
-# Writes a header holding the identifier of the build being compiled.
+# Writes a header holding the DATE AND TIME at which this binary is being built.
 #
 # ---------------------------------------------------------------------------------------------------------------------
 # What the identifier says, and what it does not
 #
-# It says WHICH COMMIT the binary was compiled from, and that is all. It deliberately does NOT say whether the
-# working tree had uncommitted changes: that cannot be kept exact without regenerating - and therefore
-# recompiling - on every single edit, and a flag that is right only sometimes is worse than no flag at all.
-# "Does this binary match a commit?" is a question for `git status`, which answers it perfectly.
+# It says WHEN the binary was made, and that is all. Roger l'a demande explicitement : « au lieu de mettre l'id du
+# commit, me mettre la date et heure plutot ».
 #
-# Nor is it 'git describe': that prefixes the identifier with the last TAG, and this repository still carries
-# a tag from an older numbering ("v0.2.1-25-g12c9c48"). Displayed next to the application's own version, that
-# reads as a contradiction - two numbers, one of them wrong.
+# The reason is the one a player actually has. An application installed on a phone can be weeks old, and comparing
+# two APKs means asking « which one is the newer? ». A date answers that in one look; a commit identifier answers
+# « which code is this? », which is a question for the repository, not for the phone.
+#
+# The version number is NOT repeated here: it already has a single home - the project() line - and a number written
+# twice is a number that lies once.
 #
 # ---------------------------------------------------------------------------------------------------------------------
-# Why it is generated at BUILD time and not at configure time
+# Why it is regenerated on EVERY build
 #
-# A version computed when CMake configures the project is as old as the last configuration: commit three
-# times, build, and the application would still claim to be the code of last Tuesday. The whole point of this
-# identifier is to answer "what is on my phone right now", so it has to be read at the moment of the build.
+# Because the date changes with the build, not with the commit. A value computed only when git moves would claim
+# the time of last Tuesday for a binary built today, after three hours of work.
 #
-# The command that calls this script depends on the files git rewrites when the repository moves - HEAD, and
-# the branch it points at. The identifier is therefore regenerated exactly when it can have changed, and
-# nothing is recompiled when it has not.
+# The file is rewritten only when its CONTENT changes - so the minute, not the second. Two builds in the same
+# minute therefore recompile nothing, and an unchanged file costs nothing at all.
 # =====================================================================================================================
 
-execute_process(
-    COMMAND git rev-parse --short HEAD
-    WORKING_DIRECTORY "${MUSICHIEN_SOURCE_DIR}"
-    OUTPUT_VARIABLE musichienBuildId
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET
-    RESULT_VARIABLE musichienGitResult
-)
-
-if(NOT musichienGitResult EQUAL 0)
-    # Not a checkout: a source archive, or a machine without git. "unknown" is the honest answer, and a build
-    # must never fail over an identifier.
-    set(musichienBuildId "unknown")
-endif()
+string(TIMESTAMP musichienBuildId "%Y-%m-%d %H:%M")
 
 set(musichienHeaderContent "// Written by cmake/musichienWriteBuildId.cmake - do not edit.
 #pragma once
 
-// Identifier of the build: the commit it was compiled from, plus '-dirty' when the working tree was not clean
-// at that moment.
+// When this build was made: local date and time, to the minute. It is what a player compares between two APKs.
 #define MUSICHIEN_BUILD_ID \"${musichienBuildId}\"
 ")
 

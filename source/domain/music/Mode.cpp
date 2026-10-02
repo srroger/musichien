@@ -1,0 +1,189 @@
+#include "domain/music/Mode.h"
+
+#include "domain/music/Chord.h"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <string_view>
+#include <vector>
+
+namespace musichien::domain
+{
+
+namespace
+{
+
+// La quinte juste : le pas du cercle des quintes, et il ne depend d'aucun mode. Douze quintes font sept octaves, donc
+// la marche fait le tour des DOUZE classes de hauteur sans jamais repasser deux fois sur la meme.
+constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
+
+// Les identifiants, dans l'ORDRE DE L'ENUMERATION.
+//
+// Une seule liste, lue dans les deux sens (le nom d'un mode, et le mode d'un nom) : c'est ce qui garantit qu'un nom
+// et son mode ne peuvent pas se desynchroniser. La table s'ecrit une fois, et les deux fonctions y puisent.
+constexpr std::array<std::string_view, MODE_COUNT> MODE_IDENTIFIERS{ "lydian", "ionian", "mixolydian", "dorian", "aeolian", "phrygian", "locrian" };
+
+}    // namespace
+
+std::vector<Note> notesOfMode( Note p_tonic, Mode p_mode )
+{
+    std::vector<Note> notes;
+    notes.reserve( DEGREE_COUNT );
+
+    const std::int32_t tonicMidiNumber = p_tonic.midiNumber();
+
+    for( const std::int32_t offset : modeDegreeOffsets( p_mode ) )
+    {
+        notes.emplace_back( tonicMidiNumber + offset );
+    }
+
+    return notes;
+}
+
+std::vector<Note> notesOfModeClosingOnTonic( Note p_tonic, Mode p_mode )
+{
+    std::vector<Note> melody = notesOfMode( p_tonic, p_mode );
+
+    // LA TONIQUE A L'OCTAVE, et non une huitieme note quelconque : c'est elle qui referme, et c'est pour cela que cette
+    // fonction porte ce nom.
+    melody.push_back( p_tonic.transposedBy( SEMITONES_PER_OCTAVE ) );
+
+    return melody;
+}
+
+std::vector<Note> modeScaleUpAndDown( Note p_tonic, Mode p_mode )
+{
+    const std::vector<Note> ascending = notesOfMode( p_tonic, p_mode );
+
+    std::vector<Note> melody = ascending;
+    melody.reserve( ( ascending.size() * 2 ) - 1 );
+
+    // Le sommet n'est joue QU'UNE FOIS : le repeter ferait une hesitation, pas un demi-tour. C'est aussi ce que fait le
+    // banc d'essai des modes, et les deux doivent sonner pareil.
+    for( auto note = ascending.rbegin() + 1; note != ascending.rend(); ++note )
+    {
+        melody.push_back( *note );
+    }
+
+    return melody;
+}
+
+std::vector<Note> phrygianSignatureChord( Note p_tonic )
+{
+    // Le deuxieme degre du phrygien : un demi-ton au-dessus de la tonique, toujours.
+    constexpr std::int32_t SECOND_DEGREE_IN_SEMITONES = 1;
+
+    const Note root = p_tonic.transposedBy( SECOND_DEGREE_IN_SEMITONES );
+
+    // Un MAJEUR, et la qualite dit tout : le reste (trois notes, une tierce majeure, une quinte juste) appartient a la
+    // regle de l'accord, pas a cette fonction. Une autre couleur phrygienne se contenterait de changer ce nom.
+    const std::span<const std::int32_t> intervals = chordIntervals( ChordQuality::Major );
+
+    std::vector<Note> notes;
+    notes.reserve( intervals.size() );
+
+    for( const std::int32_t interval : intervals )
+    {
+        notes.push_back( root.transposedBy( interval ) );
+    }
+
+    return notes;
+}
+
+std::string_view modeIdentifier( Mode p_mode ) noexcept
+{
+    return MODE_IDENTIFIERS.at( modeIndex( p_mode ) );
+}
+
+std::span<const Mode> modeLearningOrder()
+{
+    // L'ordre est ecrit UNE fois, et il est STATIQUE : un span sur une variable locale serait un pointeur vers un
+    // cadavre. L'ordre de la liste est explique en detail dans l'en-tete, parce qu'il se discute.
+    // IONIEN ET EOLIEN, PUIS LES DEUX PLUS CONTRASTES, PUIS LES DEUX PLUS SUBTILS, PUIS LE LOCRIEN.
+    //
+    // Les niveaux prennent les N premiers de cette liste : elle EST la progression des modes.
+    //
+    // Le PHRYGIEN monte de la sixieme a la quatrieme place le 01/10/2026, a la demande de Roger et pour la raison qui
+    // gouverne deja l'ordre des intervalles - « les plus contrastes d'abord ». Sa seconde mineure sur la tonique donne la
+    // couleur hispanique ou orientale qu'une oreille reconnait en une seconde, la ou le dorien et le lydien ne bougent
+    // qu'une seule note, et doucement.
+    static const std::array<Mode, MODE_COUNT> ORDER{ Mode::Ionian,
+                                                     Mode::Aeolian,
+                                                     Mode::Mixolydian,
+                                                     Mode::Phrygian,
+                                                     Mode::Dorian,
+                                                     Mode::Lydian,
+                                                     Mode::Locrian };
+
+    return ORDER;
+}
+
+std::vector<Mode> beginnerModePalette( std::size_t p_modeCount )
+{
+    const std::span<const Mode> order = modeLearningOrder();
+
+    // JAMAIS MOINS DE DEUX MODES.
+    //
+    // Une question de couleur compare deux modes, et une palette d'un seul ne pourrait pas la poser : le domaine
+    // refuse donc cet etat tout de suite, plutot que de laisser la session le decouvrir au moment de tirer une
+    // question - c'est-a-dire au pire moment.
+    const std::size_t count = std::clamp( p_modeCount, std::size_t{ 2 }, order.size() );
+
+    return std::vector<Mode>{ order.begin(), order.begin() + static_cast<std::ptrdiff_t>( count ) };
+}
+
+std::array<CircleNote, SEMITONES_PER_OCTAVE> modeCircleNotes( Mode p_mode, std::int32_t p_tonicPitchClass ) noexcept
+{
+    // Une classe de hauteur est ramenee dans [0, 12) une fois pour toutes : une tonique donnee par un numero MIDI peut
+    // etre negative ou depasser l'octave, et la suite du calcul n'a plus a s'en soucier.
+    const auto wrapPitchClass = []( std::int32_t p_pitchClass ) noexcept {
+        return ( ( p_pitchClass % SEMITONES_PER_OCTAVE ) + SEMITONES_PER_OCTAVE ) % SEMITONES_PER_OCTAVE;
+    };
+
+    const std::int32_t tonicPitchClass = wrapPitchClass( p_tonicPitchClass );
+
+    // Les sept notes du mode, ramenees a des classes de hauteur : c'est tout ce dont le cercle a besoin.
+    std::array<bool, SEMITONES_PER_OCTAVE> belongsToMode{};
+
+    for( const std::int32_t offset : modeDegreeOffsets( p_mode ) )
+    {
+        belongsToMode.at( static_cast<std::size_t>( wrapPitchClass( tonicPitchClass + offset ) ) ) = true;
+    }
+
+    std::array<CircleNote, SEMITONES_PER_OCTAVE> circle{};
+
+    std::int32_t pitchClass = tonicPitchClass;
+
+    for( std::size_t index = 0; index < circle.size(); ++index )
+    {
+        const auto position = static_cast<std::size_t>( pitchClass );
+
+        circle.at( index ) = CircleNote{ .pitchClassIndex = pitchClass,
+                                         .belongsToMode = belongsToMode.at( position ),
+                                         .isTonic = ( index == 0 ) };
+
+        // La quinte juste, et le retour dans [0, 12) : c'est ce qui fait le tour du cercle une fois et une seule.
+        pitchClass = wrapPitchClass( pitchClass + FIFTH_IN_SEMITONES );
+    }
+
+    return circle;
+}
+
+std::optional<Mode> modeFromIdentifier( std::string_view p_identifier ) noexcept
+{
+    for( std::size_t index = 0; index < MODE_COUNT; ++index )
+    {
+        if( MODE_IDENTIFIERS.at( index ) == p_identifier )
+        {
+            return static_cast<Mode>( index );
+        }
+    }
+
+    return std::nullopt;
+}
+
+}    // namespace musichien::domain

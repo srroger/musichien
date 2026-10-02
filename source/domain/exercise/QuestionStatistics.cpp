@@ -19,7 +19,11 @@ namespace
 
     // Un genre demande : tout le reste passe a la trappe. C'est ce qui permet de dire « je veux voir le chant » ou
     // « seulement les accords », sans que l'ecran ait a filtrer quoi que ce soit lui-meme.
-    return !p_filter.kind.has_value() || ( p_record.kind == p_filter.kind.value() );
+    //
+    // L'ACCES SE FAIT PAR L'OPERATEUR, et non par value() : ce fichier marque ses fonctions noexcept, et value() peut
+    // lever - donc la fonction entiere devenait une fonction qui peut quitter par une exception, ce qu'un noexcept
+    // interdit. L'ecriture ci-dessous dit la meme chose sans en avoir l'air.
+    return !p_filter.kind.has_value() || ( p_record.kind == *p_filter.kind );
 }
 
 void accumulate( QuestionStatistics & p_statistics, const QuestionRecord & p_record ) noexcept

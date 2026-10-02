@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.26)
 
 cmake_policy(VERSION 3.26)
 
-project(Musichien VERSION 1.3.3 LANGUAGES C CXX)
+project(Musichien VERSION 1.6.25 LANGUAGES C CXX)
 
 
 # Organise the targets into folders in Qt Creator, Visual Studio and Xcode.
@@ -52,3 +52,9 @@ if(MUSICHIEN_BUILD_TESTING)
 endif()
 
 add_subdirectory(source)
+
+# Les outils de developpement : ils ne dependent que du domaine, donc ils n'ont rien a faire dans un paquet Android.
+# La meme regle que pour les tests : ce qui ne sert qu'a la machine de developpement n'entre pas dans le telephone.
+if(NOT ANDROID)
+    add_subdirectory(tools)
+endif()

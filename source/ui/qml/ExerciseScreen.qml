@@ -35,6 +35,11 @@ Item {
     // La couleur d'une COULEUR D'ACCORD, comme la couleur d'un intervalle : un code qui se lit avant le nom.
     // La couleur d'une couleur d'accord vient du CONTROLEUR (chordColourName) : elle est la meme sur tous les ecrans, et
     // elle le restera. Deux fichiers QML qui recalculeraient chacun leur teinte finiraient par en montrer deux differentes.
+    // LA FAMILLE OU LE JOUEUR EST LE PLUS FORT, et celle ou il resiste - pendant CETTE partie.
+    // =================================================================================================================
+    // LE BOSS
+    // La derniere question d'une Arcade est la NOTE ETRANGERE, et Roger l'a voulue comme un combat de fin : « le chien
+    // levite lentement en plein milieu de la page, et tout le fond devient en fondu doux rouge feu ».
 
     id: exerciseScreen
 
@@ -45,6 +50,11 @@ Item {
     // Elle vient du CONTROLEUR, donc du domaine et de son tempo : une mesure a 90 bpm dure deux secondes et demie, et
     // aucune constante ecrite ici ne saurait le dire sans mentir le jour ou le tempo change.
     readonly property int rhythmPause: ExerciseController.rhythmCellDurationMs + 600
+    // Les modes ont BEAUCOUP plus de son que les autres questions : une gamme entiere, encadree par son bourdon, et deux
+    // fois quand deux modes se comparent. La pause doit donc couvrir la LECTURE ENTIERE plus le temps de lire le verdict -
+    // sinon elle avance au milieu du son, ce que Roger a vu tout de suite : « pour les modes, ca va beaucoup trop vite,
+    // le son se coupe en plein milieu, t'as pas le temps de lire ».
+    readonly property int modePause: ExerciseController.modeSoundDurationMs + 3000
     // Horizontal offset of the whole screen during the shake. Zero is the resting state, and it is both
     // where the animation starts and where it ends.
     property real shakeOffset: 0
@@ -56,6 +66,42 @@ Item {
     // La meme chose pour un accord : ce que le joueur vient de repondre, et s'il y a quelque chose a montrer.
     readonly property var answeredChordData: ExerciseController.answeredChord
     readonly property bool hasAnsweredChord: answeredChordData !== undefined && answeredChordData.name !== undefined
+
+    // LE CHRONO, en minutes:secondes. Une fonction plutot qu'une expression : elle sert une fois aujourd'hui et servira
+    // partout ou l'on voudra dire un temps.
+    function durationLabel(p_seconds) {
+        var minutes = Math.floor(p_seconds / 60);
+        var seconds = p_seconds % 60;
+        return minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+    }
+
+    // Calcule sur les resultats de la session, jamais sur le journal : c'est ce que la partie vient de montrer, et c'est ce
+    // qui rend le mot vrai au moment ou on le lit. La famille la plus faible n'est proposee que s'il y en a PLUSIEURS : sur
+    // une partie d'un seul genre, la meilleure ET la pire seraient la meme ligne, dite deux fois.
+    function strongestFamily() {
+        var results = ExerciseController.familyResults();
+        var best = null;
+        for (var index = 0; index < results.length; ++index) {
+            if (best === null || results[index].percent > best.percent)
+                best = results[index];
+
+        }
+        return best;
+    }
+
+    function weakestFamily() {
+        var results = ExerciseController.familyResults();
+        if (results.length < 2)
+            return null;
+
+        var worst = null;
+        for (var index = 0; index < results.length; ++index) {
+            if (worst === null || results[index].percent < worst.percent)
+                worst = results[index];
+
+        }
+        return worst;
+    }
 
     // Deliberately NOT an indication of the answer: a colour says "this button is a fifth", never "this
     // button is the one you are looking for".
@@ -105,7 +151,6 @@ Item {
             sungVerdict += qsTr(" — écart %1 cents").arg((sungCents > 0 ? "+" : "") + sungCents);
             return sungVerdict;
         }
-
         var verdict = qsTr("%1 (%2)").arg(heard.name).arg(heard.identifier);
         if (exerciseScreen.hasAnswered && !ExerciseController.wasLastAnswerCorrect)
             verdict += qsTr(" — tu as répondu %1").arg(exerciseScreen.answeredInterval.identifier);
@@ -121,7 +166,7 @@ Item {
 
         // Une question de rythme a la sienne, et elle est plus longue : le feedback y est la CELLULE elle-meme, qui
         // dure une mesure entiere. Couper avant la fin couperait le son qui vient d'etre donne en reponse.
-        interval: ExerciseController.questionKind === 3 ? exerciseScreen.rhythmPause : (ExerciseController.wasLastAnswerCorrect ? exerciseScreen.successPause : exerciseScreen.mistakePause)
+        interval: ExerciseController.isHarmonyQuestion ? exerciseScreen.modePause : (ExerciseController.questionKind === 3 ? exerciseScreen.rhythmPause : (ExerciseController.wasLastAnswerCorrect ? exerciseScreen.successPause : exerciseScreen.mistakePause))
         onTriggered: ExerciseController.continueToNextQuestion()
     }
 
@@ -200,6 +245,81 @@ Item {
         onClicked: ExerciseController.continueToNextQuestion()
     }
 
+    // IL SE POSE DERRIERE TOUT : c'est un DECOR, pas une couche. Le laisser devant cacherait la question, et le joueur ne
+    // pourrait plus repondre a ce qu'on lui demande. Un Item sans gestionnaire de souris ne consomme aucun clic, donc le
+    // « touche pour passer » continue de marcher a travers lui.
+    // =================================================================================================================
+    Rectangle {
+        id: bossBackdrop
+
+        anchors.fill: parent
+        // Il ne s'allume que pour la question du boss, et jamais une fois la partie finie : le rouge doit s'eteindre.
+        visible: opacity > 0
+        opacity: (ExerciseController.isForeignNoteQuestion && !ExerciseController.isFinished) ? 1 : 0
+
+        Image {
+            id: bossImage
+
+            // Position de repos : au MILIEU de la page, comme Roger l'a imagine.
+            readonly property real restingY: (parent.height - height) / 2
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(parent.width * 0.58, 260)
+            height: width
+            fillMode: Image.PreserveAspectFit
+            source: "qrc:/assets/images/shibaBoss.png"
+            opacity: 0.9
+            y: bossImage.restingY
+
+            // ET IL LEVITE : un va-et-vient lent, de bas en haut, sans fin. Deux animations enchainees, parce qu'une
+            // seule ne saurait pas revenir.
+            SequentialAnimation on y {
+                loops: Animation.Infinite
+                running: bossBackdrop.visible
+
+                NumberAnimation {
+                    from: bossImage.restingY - 16
+                    to: bossImage.restingY + 16
+                    duration: 2800
+                    easing.type: Easing.InOutSine
+                }
+
+                NumberAnimation {
+                    from: bossImage.restingY + 16
+                    to: bossImage.restingY - 16
+                    duration: 2800
+                    easing.type: Easing.InOutSine
+                }
+
+            }
+
+        }
+
+        gradient: Gradient {
+            GradientStop {
+                position: 0
+                color: "#3a0c11"
+            }
+
+            GradientStop {
+                position: 1
+                color: "#7c1a1c"
+            }
+
+        }
+
+        // LE FONDU, dans les deux sens : « un fondu doux » a l'arrivee, et le retour a la nuit violette quand le boss
+        // tombe. Sans ce retour, la page resterait rouge pour la suite du jeu.
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 900
+                easing.type: Easing.InOutQuad
+            }
+
+        }
+
+    }
+
     // An explicit width and height rather than anchors: an item cannot both be anchored and have its x
     // set, and being able to set x is the entire point of this one.
     Item {
@@ -265,6 +385,13 @@ Item {
             // -------------------------------------------------------------------------------------------------
             // L'ANECDOTE DE LA QUESTION, juste au-dessus des actions : assez haute pour se lire entre deux questions,
             // assez basse pour ne pas voler la place de la reponse - qui reste au centre, et c'est elle qui compte.
+            // -------------------------------------------------------------------------------------------------
+            // LA QUESTION D'HARMONIE
+            // Deux formes, et deux seulement, parce que ce sont DEUX questions :
+            //   * la COULEUR : deux boutons, « plus clair » et « plus sombre ». Rien a nommer, rien a savoir d'avance :
+            //     comparer deux choses entendues dans la foulee est un travail d'oreille, et c'est la premiere marche ;
+            //   * le NOM : un bouton par mode de la palette, peints par leur CLARTE - l'ecran montre alors exactement ce
+            //     que l'oreille vient d'entendre, et l'oeil apprend l'axe en meme temps que l'oreille.
 
             anchors.fill: parent
             anchors.margins: 16
@@ -320,6 +447,11 @@ Item {
             }
 
             RowLayout {
+                // LES COEURS. Un par vie, et ils passent a la ligne quand la partie en accorde beaucoup : avec le reglage
+                // qui monte jusqu'a vingt-cinq, une seule ligne de coeurs deborderait de l'ecran.
+                // Les coeurs sont poses sur la MEME ligne que « Quitter », a droite - et leur largeur est CALCULEE, jamais
+                // prise a celle du dessin.
+
                 Layout.fillWidth: true
 
                 Button {
@@ -357,12 +489,44 @@ Item {
                     Layout.fillWidth: true
                 }
 
-                Text {
-                    // An empty lives property shows a heart count; an unlimited session shows the symbol
-                    // rather than a number that would have to lie.
-                    text: ExerciseController.hasUnlimitedLives ? "∞" : "♥".repeat(ExerciseController.lives)
-                    color: "#ff8fa3"
-                    font.pixelSize: 20
+                // C'etait le bug : la largeur venait de `implicitWidth`, qui vaut ZERO tant que le Repeater n'a rien
+                // construit. La rangee recevait donc une largeur nulle au premier passage, les coeurs se posaient UN PAR
+                // LIGNE - une colonne - et cette colonne poussait la zone de jeu vers le haut. Roger l'a vu tout de suite.
+                Flow {
+                    id: heartsFlow
+
+                    // La taille d'un coeur, et la largeur d'une ligne : au-dela de dix, ils retrecissent et se replient
+                    // sur DEUX lignes.
+                    readonly property int heartCount: ExerciseController.hasUnlimitedLives ? 1 : Math.max(1, ExerciseController.lives)
+                    readonly property int heartSize: heartCount > 10 ? 13 : 21
+                    readonly property real heartsWidth: (heartCount > 10 ? Math.ceil(heartCount / 2) : heartCount) * heartSize
+
+                    Layout.alignment: Qt.AlignRight
+                    Layout.preferredWidth: heartsWidth
+                    // ET LA LARGEUR EST TENUE : sans un minimum, QtQuick.Layouts peut reduire la rangee a la largeur d'un
+                    // seul coeur, et le repli se fait alors une note par ligne.
+                    Layout.minimumWidth: heartsWidth
+                    Layout.maximumWidth: heartsWidth
+                    spacing: 1
+
+                    Text {
+                        visible: ExerciseController.hasUnlimitedLives
+                        text: "∞"
+                        color: "#ff8fa3"
+                        font.pixelSize: 20
+                    }
+
+                    Repeater {
+                        model: ExerciseController.hasUnlimitedLives ? 0 : ExerciseController.lives
+
+                        delegate: Text {
+                            text: "♥"
+                            color: "#ff8fa3"
+                            font.pixelSize: heartsFlow.heartSize
+                        }
+
+                    }
+
                 }
 
             }
@@ -420,13 +584,38 @@ Item {
                     }
 
                     Text {
+                        // Le "Écoute bien…" est le prompt des questions d'OREILLE. Sur une question de rythme, c'est la
+                        // zone rythmique qui dit ou en est la boucle, et le meme mot y serait faux la moitie du temps.
+                        // LE MODE EST ANNONCE, et c'est une correction de Roger : « il faut afficher le mode qui est en
+                        // train d'etre joue des le debut, car sans rien c'est beaucoup trop difficile - il doit a la fois
+                        // trouver le mode ainsi que la note qui ne va pas ». La gamme jouee EST le mode, donc le nommer
+                        // n'enleve rien a l'exercice : il enleve une devinette.
+
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.WordWrap
-                        // Le "Écoute bien…" est le prompt des questions d'OREILLE. Sur une question de rythme, c'est la
-                        // zone rythmique qui dit ou en est la boucle, et le meme mot y serait faux la moitie du temps.
+                        // Sur une question d'HARMONIE, il faut dire QUOI ecouter : deux modes a comparer, ou un seul a
+                        // nommer. Un prompt generique laisserait le joueur chercher ce qu'on lui demande, et c'est
+                        // exactement ce qu'une consigne ne doit pas faire.
                         visible: !ExerciseController.isFeedbackVisible && ExerciseController.questionKind !== 3 && ExerciseController.questionKind !== 4
-                        text: qsTr("Écoute bien…")
+                        text: {
+                            // Le VAMP : deux fois la meme gamme, sur deux centres differents. La consigne doit le dire,
+                            // parce que c'est justement ce que le joueur ne peut pas deviner - il entend deux fois les
+                            // memes notes, et c'est pourtant deux modes.
+                            if (ExerciseController.isModeVampQuestion)
+                                return qsTr("Deux fois la même gamme, sur deux centres différents : le second passage est-il plus clair, ou plus obscur ?");
+
+                            if (ExerciseController.isForeignNoteQuestion)
+                                return qsTr("Sept notes montent en %1 sur le bourdon : l'une n'appartient pas à la gamme. Laquelle ?").arg(ExerciseController.heardMode.name);
+
+                            if (ExerciseController.isModeColourQuestion)
+                                return qsTr("Écoute les deux modes : le second est-il plus clair, plus obscur, ou pareil ?");
+
+                            if (ExerciseController.isModeQuestion)
+                                return qsTr("Écoute ce mode sur son bourdon : lequel est-ce ?");
+
+                            return qsTr("Écoute bien…");
+                        }
                         color: "#cbb8e8"
                         font.pixelSize: 17
                     }
@@ -487,7 +676,6 @@ Item {
                 Layout.fillWidth: true
                 visible: ExerciseController.questionKind === 2
                 spacing: 10
-
                 // Le micro suit l'ecran qui s'en sert : il s'ouvre quand la question se chante, et se referme quand
                 // elle se tait. Un exercice passe la plupart de son temps sans chant, et un micro ouvert pour rien
                 // vide la batterie.
@@ -844,6 +1032,235 @@ Item {
 
             }
 
+            // Le mode qui vient de sonner est affiche au-dessus, en vert : c'est le lien entre ce que l'oreille entend et
+            // ce que la theorie en dit, au moment ou elle l'entend.
+            // -------------------------------------------------------------------------------------------------
+            ColumnLayout {
+                // La ROUE du mode : ses sept notes allumées sur le cercle des quintes, la tonique en haut.
+                // LA NOTE ETRANGERE : les sept notes de la gamme, dans l'ordre entendu, et l'intrus se designe par sa PLACE.
+                // Les boutons de la note etrangere ont DISPARU : c'est la roue du dessus qui repond, depuis qu'elle est
+                // cliquable. Une rangee de sept boutons plats disait la meme chose en plus petit, et son texte etait elide
+                // jusqu'au « ... » - Roger l'a vu jouer : « on voit ... au lieu de la note a l'interieur ».
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.alignment: Qt.AlignVCenter
+                visible: ExerciseController.isHarmonyQuestion
+                spacing: 10
+
+                Text {
+                    // Le VERDICT, et il est en GRAS parce que le temps de lecture est court.
+                    // Deux noms poses cote a cote ne disent rien : ce qu'on a entendu, c'est UNE NOTE qui a bouge, et
+                    // c'est donc cela qu'il faut ecrire - « de dorien a ionien, la tierce a monte ».
+
+                    id: modeVerdict
+
+                    // Et quand RIEN n'a bouge - deux fois la meme couleur - il faut le dire aussi : c'est la seule
+                    // reponse possible, et un verdict muet laisserait croire a un bug.
+                    readonly property bool sameness: ExerciseController.previousMode.name !== undefined && ExerciseController.heardMode.name !== undefined && (ExerciseController.previousMode.name === ExerciseController.heardMode.name)
+
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#ffd479"
+                    font.pixelSize: 19
+                    font.bold: true
+                    visible: !ExerciseController.isAsking && ExerciseController.heardMode.name !== undefined
+                    text: {
+                        if (!visible)
+                            return "";
+
+                        // Un SEUL mode a sonne - une question de nom : il n'y a rien a comparer, et « undefined -> Dorien »
+                        // n'aurait aucun sens. C'est ce que Roger voyait a la victoire, sur une question de nom.
+                        if (ExerciseController.previousMode.name === undefined)
+                            return ExerciseController.heardMode.name + " — " + ExerciseController.heardMode.characteristic;
+
+                        if (sameness)
+                            return qsTr("Les deux passages : %1 — pareils").arg(ExerciseController.heardMode.name);
+
+                        return ExerciseController.previousMode.name + " → " + ExerciseController.heardMode.name + "  ·  " + ExerciseController.modeDifference.label;
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8ef2b0"
+                    font.pixelSize: 14
+                    // Trois cas ou il n'y a rien a dire ici : la question est encore posee, les deux passages etaient
+                    // pareils, ou un seul mode a sonne - et sa caracteristique est deja ecrite dans le verdict.
+                    visible: modeVerdict.visible && !modeVerdict.sameness && ExerciseController.previousMode.name !== undefined
+                    text: modeVerdict.visible && !modeVerdict.sameness && ExerciseController.previousMode.name !== undefined ? ExerciseController.modeDifference.sentence : ""
+                }
+
+                // Elle est là PENDANT la question, et c'est un choix de Roger : « je mettrais quand même la roue dans la
+                // question, l'utilisateur pourra ne pas trop la regarder ». Elle donne le mode à qui sait la lire - et
+                // c'est justement ce qu'on veut apprendre. La tonique reste en haut, toujours : c'est ce qui rend l'arc
+                // lisible d'un coup d'œil.
+                // La ROUE, et c'est elle qui REPOND sur une question de note etrangere : ses sept notes allumees sont
+                // exactement les sept pas de la gamme, donc appuyer sur l'une d'elles designe l'intrus. Roger l'a demande -
+                // « il suffit d'appuyer sur un de ces boutons non ? » - et il a raison : les pastilles sont plus grandes que
+                // les petits boutons de note qu'elles remplacent, et elles sont deja la pour montrer la gamme.
+                ModeCircle {
+                    // LA ROUE S'ANIME : sa tete part de la tonique et parcourt la gamme, de note en note, pendant que la
+                    // musique joue. Roger l'a voulue ici - « dans les exercices, quand on affiche les modes dans leur
+                    // cercle » - parce qu'elle dit QUELLE note sonne, et qu'a la fin le chemin laisse une forme.
+
+                    id: modeCircle
+
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 6
+                    // LA ROUE S'OXYGENE : Roger l'a vue jouer - « les points sont pas assez espaces pour que ca rende
+                    // vraiment bien ». Une case fait trente degres, donc l'ecart entre deux pastilles vaut environ la
+                    // moitie du rayon : la seule facon d'ouvrir cet ecart est de faire GRANDIR le cercle ou de reduire les
+                    // pastilles. Les deux ont ete poussees d'un cran, et d'un seul : un rayon plus grand demande de la
+                    // hauteur, et l'ecran n'en a pas beaucoup.
+                    //
+                    // Les pastilles restent grandes : elles sont CLIQUEES sur une question de note etrangere, et une cible
+                    // qui retrecit trop fait rater la note qu'on visait.
+                    span: 304
+                    dotSize: 46
+                    visible: ExerciseController.isHarmonyQuestion
+                    selectable: ExerciseController.isForeignNoteQuestion
+                    notes: ExerciseController.modeCircle
+                    onNoteChosen: (p_stepIndex) => {
+                        ExerciseController.answerForeignNote(p_stepIndex);
+                    }
+
+                    // La gamme de l'exercice MONTE, puis se REFERME sur sa tonique : le chemin fait donc le tour du
+                    // cercle et revient a son point de depart, ce qui referme la figure - et c'est la figure qui reste a
+                    // l'ecran une fois la musique finie.
+                    //
+                    // Le DERNIER degre est 0, et non 7 : le septieme degre du domaine EST le premier degre du cercle,
+                    // une octave plus haut. Le cercle ne porte que sept notes, donc la note qui ferme la gamme est
+                    // celle par laquelle elle a commence.
+                    Connections {
+                        function onModePlaybackStarted() {
+                            modeCircle.startPlayback(ExerciseController.modeSoundLeadInMs, ExerciseController.modeSoundNoteStepMs, [0, 1, 2, 3, 4, 5, 6, 0]);
+                        }
+
+                        // Et la trainee S'EFFACE quand la question change : un chemin qui survivrait a sa musique montrerait
+                        // un trajet que personne n'a entendu.
+                        function onQuestionChanged() {
+                            modeCircle.playing = false;
+                        }
+
+                        target: ExerciseController
+                    }
+
+                }
+
+                // Le verdict de l'intrus : quel pas, et quelle note il portait au lieu de celle de la gamme.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#ffd479"
+                    font.pixelSize: 18
+                    font.bold: true
+                    visible: ExerciseController.foreignNoteVerdict.stepNumber !== undefined
+                    text: ExerciseController.foreignNoteVerdict.stepNumber !== undefined ? qsTr("L'intrus : le pas %1 — %2 au lieu de %3").arg(ExerciseController.foreignNoteVerdict.stepNumber).arg(ExerciseController.foreignNoteVerdict.heardName).arg(ExerciseController.foreignNoteVerdict.expectedName) : ""
+                }
+
+                // Et DE QUOI elle parle : sur une question de couleur, deux modes ont sonne, et la roue est celle du
+                // second. Sans cette ligne, Roger l'a dit en jouant : « on ne sait pas a qui correspond le cercle ».
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    visible: ExerciseController.modeCircleLabel !== ""
+                    text: ExerciseController.modeCircleLabel
+                }
+
+                // Le geste pour passer existe depuis toujours - un tap n'importe ou - mais personne ne peut le deviner,
+                // et Roger ne l'a pas vu : « est-ce que c'est complique de rajouter du temps pour la reponse ? skipable
+                // quand on appuie dessus ». La reponse est donc oui, et on le dit.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#6f5b93"
+                    font.pixelSize: 11
+                    visible: ExerciseController.isFeedbackVisible
+                    text: qsTr("touche l'écran pour passer")
+                }
+
+                RowLayout {
+                    // Le « neutre » au MILIEU, comme Roger le demandait : plus clair d'un cote, plus obscur de l'autre, et
+                    // « pareil » entre les deux. Une reponse qui ne prend pas parti se lit mieux la ou elle est.
+
+                    Layout.fillWidth: true
+                    spacing: 10
+                    visible: ExerciseController.isModeColourQuestion
+
+                    // SAUF SUR UN VAMP, ou « pareil » n'existe pas : les deux passages y portent deux centres differents,
+                    // donc deux modes, donc la reponse est TOUJOURS clair ou obscur. Un bouton qu'on ne peut pas gagner
+                    // n'est pas un choix, c'est un piege - et c'est aussi ce qui permet de reconnaitre un vamp au premier
+                    // coup d'oeil, ce que Roger ne pouvait pas faire : les deux questions se ressemblaient trop.
+                    Button {
+                        Layout.fillWidth: true
+                        height: 56
+                        text: qsTr("Plus clair")
+                        enabled: ExerciseController.isAsking
+                        onClicked: ExerciseController.answerModeColour(true)
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        height: 56
+                        visible: !ExerciseController.isModeVampQuestion
+                        text: qsTr("Pareil")
+                        enabled: ExerciseController.isAsking
+                        onClicked: ExerciseController.answerSameColour()
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        height: 56
+                        text: qsTr("Plus obscur")
+                        enabled: ExerciseController.isAsking
+                        onClicked: ExerciseController.answerModeColour(false)
+                    }
+
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    visible: !ExerciseController.isModeColourQuestion
+
+                    Repeater {
+                        model: ExerciseController.modeChoices
+
+                        delegate: Button {
+                            required property var modelData
+                            readonly property bool isBright: modelData.brightness > 0.5
+                            readonly property bool wasHeard: ExerciseController.heardMode.index !== undefined && modelData.index === ExerciseController.heardMode.index
+
+                            width: 104
+                            height: 48
+                            text: modelData.name
+                            font.pixelSize: 14
+                            enabled: ExerciseController.isAsking
+                            highlighted: wasHeard
+                            Material.background: Qt.rgba(0.18 + (0.62 * modelData.brightness), 0.14 + (0.56 * modelData.brightness), 0.3 + (0.48 * modelData.brightness), 1)
+                            Material.foreground: isBright ? "#1d1033" : "#ffffff"
+                            onClicked: ExerciseController.answerModeName(modelData.index)
+                        }
+
+                    }
+
+                }
+
+            }
+
             // Le dessin vient de ChordTreeView.qml, partage avec la carte du profil : une seule definition du layout,
             // donc aucun risque de voir deux arbres differents selon l'ecran qui les montre.
             ChordTreeView {
@@ -867,12 +1284,16 @@ Item {
                 Layout.minimumWidth: 0
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
+                // L'anecdote : de la DECORATION, et elle doit se lire comme telle. L'italique entre guillemets, comme le
+                // bout de lore en italique des cartes Magic que Roger a en tete - on sait d'un coup d'oeil que ce n'est
+                // pas une consigne, et qu'on peut la sauter sans rien perdre.
                 maximumLineCount: 3
                 elide: Text.ElideRight
                 visible: ExerciseController.questionAnecdoteText !== ""
-                text: ExerciseController.questionAnecdoteText
+                text: ExerciseController.questionAnecdoteText !== "" ? qsTr("« %1 »").arg(ExerciseController.questionAnecdoteText) : ""
                 color: "#8a77ad"
                 font.pixelSize: 12
+                font.italic: true
             }
 
             RowLayout {
@@ -934,6 +1355,8 @@ Item {
         // The end of the session
         // -----------------------------------------------------------------------------------------------------
         ColumnLayout {
+            // CE QUE LE BILAN VIENT DE RAPPORTER : les trophees tout neufs, et le titre s'il a monte.
+
             anchors.fill: parent
             anchors.margins: 24
             visible: ExerciseController.isFinished
@@ -962,23 +1385,196 @@ Item {
                 }
 
             }
+            // Le chien de la fin : content quand la partie est gagnee, triste quand elle est perdue.
 
-            Text {
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                text: qsTr("Session terminée")
-                color: "#ffffff"
-                font.pixelSize: 24
-                font.bold: true
+            // Il vient APRES l'etoile et AVANT les chiffres : l'etoile est la recompense du domaine, le chien est le mot
+            // qu'on y ajoute, et un dessin dit « bravo » ou « pas cette fois » plus vite qu'une ligne de score.
+            Image {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredHeight: 150
+                fillMode: Image.PreserveAspectFit
+                source: ExerciseController.wasSessionWon ? "qrc:/assets/images/chibaWin.png" : "qrc:/assets/images/chibaLose.png"
             }
 
             Text {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
+                text: ExerciseController.sessionGrantsExperience ? qsTr("Arcade terminée") : qsTr("Session terminée")
+                color: "#ffffff"
+                font.pixelSize: 24
+                font.bold: true
+            }
+
+            // LE BILAN DE L'ARCADE : ce qu'aucun autre mode ne montre, parce qu'aucun autre mode ne le gagne.
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: ExerciseController.sessionGrantsExperience
+                spacing: 6
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Text {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        color: "#cbb8e8"
+                        font.pixelSize: 16
+                        text: qsTr("⏱ %1").arg(exerciseScreen.durationLabel(ExerciseController.sessionDurationSeconds))
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        color: "#cbb8e8"
+                        font.pixelSize: 16
+                        text: qsTr("🔥 série %1").arg(ExerciseController.sessionLongestStreak)
+                    }
+
+                }
+
+                // L'EXPERIENCE, et son merite : le multiplicateur ne s'affiche QUE s'il a majore, sinon la ligne dirait
+                // « x1 », ce qui n'est pas une recompense mais un constat.
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#ffd479"
+                    font.pixelSize: 22
+                    font.bold: true
+                    text: ExerciseController.arcadeMultiplierPercent > 100 ? qsTr("+%1 XP  ·  x%2").arg(ExerciseController.arcadeXpEarned).arg(ExerciseController.arcadeMultiplierPercent / 100) : qsTr("+%1 XP").arg(ExerciseController.arcadeXpEarned)
+                }
+
+                // LES TROIS FAMILLES : demandees, reussies, et le taux. C'est la ou le joueur voit ce que la partie a
+                // vraiment mesure.
+                Repeater {
+                    model: ExerciseController.sessionGrantsExperience ? ExerciseController.familyResults() : []
+
+                    delegate: RowLayout {
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Text {
+                            Layout.fillWidth: true
+                            color: "#e8dcff"
+                            font.pixelSize: 14
+                            text: modelData.name
+                        }
+
+                        Text {
+                            color: "#8a77ad"
+                            font.pixelSize: 13
+                            text: qsTr("%1 / %2").arg(modelData.correct).arg(modelData.asked)
+                        }
+
+                        Text {
+                            Layout.preferredWidth: 46
+                            horizontalAlignment: Text.AlignRight
+                            color: modelData.percent < 50 ? "#ff8fb0" : "#8ef2b0"
+                            font.pixelSize: 14
+                            font.bold: true
+                            text: qsTr("%1 %").arg(modelData.percent)
+                        }
+
+                    }
+
+                }
+
+                // LE MOT, sous les chiffres : un point fort et un point a travailler, tires de la partie qu'on vient de
+                // jouer. Le second n'apparait que s'il y a PLUSIEURS familles - sinon la meilleure et la pire seraient la
+                // meme ligne, dite deux fois.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.topMargin: 2
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8ef2b0"
+                    font.pixelSize: 13
+                    visible: ExerciseController.isFinished && (exerciseScreen.strongestFamily() !== null)
+                    text: (exerciseScreen.strongestFamily() !== null) ? qsTr("Fort en %1.").arg(exerciseScreen.strongestFamily().name) : ""
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#ff8fb0"
+                    font.pixelSize: 13
+                    visible: ExerciseController.isFinished && (exerciseScreen.weakestFamily() !== null)
+                    text: (exerciseScreen.weakestFamily() !== null) ? qsTr("À travailler : %1.").arg(exerciseScreen.weakestFamily().name) : ""
+                }
+
+            }
+
+            // LES AUTRES MODES ne paient pas, et l'ecran le DIT plutot que d'afficher un gain qui n'a pas eu lieu.
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                Layout.minimumWidth: 0
+                horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
-                color: "#cbb8e8"
-                font.pixelSize: 16
-                text: ExerciseController.starEarned ? qsTr("%1 XP · tout reconnu à l'oreille").arg(ExerciseController.experience) : qsTr("%1 XP · la prochaine fois sera meilleure").arg(ExerciseController.experience)
+                color: "#8a77ad"
+                font.pixelSize: 14
+                visible: !ExerciseController.sessionGrantsExperience
+                text: qsTr("Ici, pas d'expérience : l'Arcade seule en donne. Mais tout compte pour tes statistiques.")
+            }
+
+            // Roger : « a la fin du bilan, si il a gagne un trophee ou une recompense, il faut lui dire (et lui dire qu'ils
+            // sont dans "profil") - du coup il va y aller et se rendre compte qu'il y en a d'autres a gagner ». C'est
+            // exactement le but : le renvoyer voir la liste, ou les suivants attendent.
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                // ELLES SONT LUES COMME DES PROPRIETES, et c'est une CORRECTION : ecrire `titleJustIncreased` sans
+                // parentheses n'appelait PAS la methode - c'etait un objet fonction, donc toujours vrai, et le badge
+                // s'affichait a chaque fin de partie avec « Toutou ». Et une propriete notifiable est ce qui permet a
+                // cette liaison de se rafraichir quand ce que le bilan a rapporte change.
+                visible: (ExerciseController.newlyEarnedTrophies.length > 0) || ExerciseController.titleJustIncreased
+                spacing: 4
+
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#ffd479"
+                    font.pixelSize: 17
+                    font.bold: true
+                    text: ExerciseController.titleJustIncreased ? qsTr("🏆 Nouveau titre : %1").arg(ExerciseController.playerTitle.name) : qsTr("🏆 Récompense !")
+                }
+
+                Repeater {
+                    model: ExerciseController.newlyEarnedTrophies
+
+                    delegate: Text {
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        color: "#e8dcff"
+                        font.pixelSize: 13
+                        text: "★ " + modelData.name + " · " + modelData.description
+                    }
+
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    text: qsTr("Tout est dans ton profil.")
+                }
+
             }
 
             // L'anecdote de sortie : on quitte sur quelque chose a apprendre, comme on est entre. Bornee en largeur
@@ -992,7 +1588,7 @@ Item {
                 font.pixelSize: 13
                 font.italic: true
                 visible: ExerciseController.anecdoteText !== ""
-                text: ExerciseController.anecdoteText
+                text: ExerciseController.anecdoteText !== "" ? qsTr("« %1 »").arg(ExerciseController.anecdoteText) : ""
             }
 
             Item {
@@ -1004,7 +1600,7 @@ Item {
                 height: 54
                 highlighted: true
                 text: qsTr("▶ Rejouer")
-                onClicked: ExerciseController.startSession()
+                onClicked: ExerciseController.restartSession()
             }
 
             Button {

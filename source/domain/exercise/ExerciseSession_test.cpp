@@ -7,10 +7,12 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <span>
 
 namespace musichien::domain
 {
@@ -28,7 +30,33 @@ namespace
 
 constexpr std::uint32_t TEST_SEED = 20260926;
 
-// Des questions d'INTERVALLE, et rien d'autre.
+// AUCUNE part laissee a sa valeur par defaut.
+//
+// Les parts sont maintenant des POIDS, lus les uns par rapport aux autres : le tirage se fait sur leur SOMME, et non sur
+// cent. Une seule part oubliee a vingt suffit donc a voler un cinquieme des questions - et le piege grandit a chaque
+// genre nouveau.
+//
+// Il a mordu une fois : « rythme seulement » laissait les accords a vingt, la somme faisait cent vingt, et sept tests de
+// rythme ne tombaient justes que par l'ordre des comparaisons de l'ancien tirage. Ce helper existe pour que cela ne
+// puisse plus arriver : tous les reglages d'un genre l'appellent, puis remontent la seule part qui les interesse.
+void pinEveryQuestionShare( SessionSettings & p_settings )
+{
+    p_settings.namedIntervalQuestionShare = 0;
+    p_settings.sameColourQuestionShare = 0;
+    p_settings.foreignNoteQuestionShare = 0;
+    p_settings.singQuestionShare = 0;
+    p_settings.directionQuestionShare = 0;
+    p_settings.chordQuestionShare = 0;
+    p_settings.modeColourQuestionShare = 0;
+    p_settings.modeNameQuestionShare = 0;
+    p_settings.modeVampQuestionShare = 0;
+}
+
+// Des questions d'INTERVALLE A NOMMER, et rien d'autre.
+//
+// Aucune part n'est remontee, et c'est tout l'interet : une session sans aucune part pose la question par defaut du
+// jeu, qui est justement celle que ces tests parlent. C'est la garde de drawKind qui le garantit, et non un reglage -
+// donc un genre ajoute plus tard ne pourra pas se glisser ici sans qu'on l'ait voulu.
 //
 // Une session reelle melange les genres - chant, rythme, accords - et c'est ce qu'on veut en jouant. Un test qui parle
 // d'une GRILLE, d'une PALETTE ou des VIES doit donc savoir de quoi il parle : sans cet epeinglage, il tombe une fois
@@ -37,9 +65,7 @@ constexpr std::uint32_t TEST_SEED = 20260926;
 [[nodiscard]] SessionSettings intervalOnlySettings()
 {
     SessionSettings settings;
-    settings.singQuestionShare = 0;
-    settings.rhythmQuestionShare = 0;
-    settings.chordQuestionShare = 0;
+    pinEveryQuestionShare( settings );
     return settings;
 }
 
@@ -97,9 +123,7 @@ void playCorrectly( ExerciseSession & p_session, std::size_t p_questionCount )
 [[nodiscard]] SessionSettings rhythmOnlySettings()
 {
     SessionSettings settings;
-    settings.singQuestionShare = 0;
-    settings.directionQuestionShare = 0;
-    settings.rhythmQuestionShare = 100;
+    pinEveryQuestionShare( settings );
     return settings;
 }
 
@@ -155,9 +179,7 @@ void playTheCellCorrectly( ExerciseSession & p_session )
 [[nodiscard]] SessionSettings chordOnlySettings()
 {
     SessionSettings settings;
-    settings.singQuestionShare = 0;
-    settings.directionQuestionShare = 0;
-    settings.rhythmQuestionShare = 0;
+    pinEveryQuestionShare( settings );
     settings.chordQuestionShare = 100;
     return settings;
 }
@@ -406,7 +428,17 @@ TEST( ExerciseSessionTest, five_wrong_answers_end_a_session_that_has_five_lives 
 
     answerWrongly( session );
 
-    // The session is over the moment the last life goes, without a feedback to read.
+    // La derniere vie s'en va, mais la question merite encore sa REPONSE : savoir ce qu'on a rate est la seule chose
+    // qui reste a apprendre quand la partie est perdue.
+    //
+    // Ce n'etait pas le comportement d'origine, et Roger l'a renverse : « quand on perds, on arrive direct a la page
+    // des scores, mais on n'a pas la reponse a la question sur laquelle on a fail ». La session passe donc en Feedback
+    // comme n'importe quelle question conclue, et c'est advance() - qui sait deja le faire - qui la termine.
+    EXPECT_FALSE( session.isFinished() );
+    EXPECT_EQ( SessionState::Feedback, session.state() );
+
+    session.advance();
+
     EXPECT_TRUE( session.isFinished() );
 }
 
@@ -718,6 +750,7 @@ TEST( ExerciseSessionTest, two_mistakes_turn_the_question_in_progress_guided )
 TEST( ExerciseSessionTest, a_session_can_ask_to_sing_instead_of_naming )
 {
     SessionSettings settings;
+    pinEveryQuestionShare( settings );
     settings.singQuestionShare = 100;    // toute la session est chantee
 
     ExerciseSession session{ 7, settings };
@@ -732,6 +765,7 @@ TEST( ExerciseSessionTest, a_session_can_ask_to_sing_instead_of_naming )
 TEST( ExerciseSessionTest, a_sung_question_can_be_passed_at_once )
 {
     SessionSettings settings;
+    pinEveryQuestionShare( settings );
     settings.singQuestionShare = 100;    // toute la session est chantee
 
     ExerciseSession session{ 7, settings };
@@ -760,189 +794,92 @@ TEST( ExerciseSessionTest, a_sung_question_can_be_passed_at_once )
 // que le domaine ne mesure pas le temps : il RECOIT la position des frappes, et il les juge.
 // ---------------------------------------------------------------------------------------------------------------------
 
-TEST( ExerciseSessionTest, a_rhythm_question_asks_for_a_cell_and_a_tempo )
+TEST( ExerciseSessionTest, a_share_of_zero_is_a_closed_door )
 {
-    const ExerciseSession session{ TEST_SEED, rhythmOnlySettings() };
+    // Le bug que Roger a signale, et il est critique : « j'ai beau mettre plus clair et plus sombre a 0, je l'obtiens
+    // toujours dans mes parties ». Un poids a zero doit etre une porte FERMEE - pour chaque genre, et sur toutes les
+    // graines.
+    //
+    // Le test suit exactement ce qu'un joueur fait : nommer soixante, chanter vingt, accords vingt, et RIEN d'autre.
+    SessionSettings settings;
+    pinEveryQuestionShare( settings );
 
-    const Question & question = session.currentQuestion();
+    settings.namedIntervalQuestionShare = 60;
+    settings.singQuestionShare = 20;
+    settings.chordQuestionShare = 20;
 
-    EXPECT_EQ( QuestionKind::Rhythm, question.kind );
-
-    // La cellule vient du domaine, et l'ardoise de la tentative a une case par frappe a couvrir.
-    ASSERT_LT( question.patternIndex, allRhythmPatterns().size() );
-    EXPECT_EQ( allRhythmPatterns().at( question.patternIndex ).hits().size(), question.coveredOnsets.size() );
-    EXPECT_EQ( 90, question.bpm );
-
-    // Rien a choisir : la reponse n'est pas un bouton, c'est le geste.
-    EXPECT_TRUE( question.choices.empty() );
-}
-
-TEST( ExerciseSessionTest, reproducing_every_hit_of_the_cell_wins_the_question )
-{
-    ExerciseSession session{ TEST_SEED, rhythmOnlySettings() };
-
-    playTheCellCorrectly( session );
-
-    EXPECT_TRUE( session.endRhythmLoop() );
-    EXPECT_EQ( SessionState::Feedback, session.state() );
-
-    // Une question juste est une question juste, quel que soit son genre : elle compte dans le score et allonge la
-    // serie. C'est ce que "le rythme est une question comme une autre" veut dire, et c'est tout l'interet du travail.
-    EXPECT_EQ( 1, session.score().streak() );
-    EXPECT_EQ( 1U, session.score().completedQuestionCount() );
-}
-
-TEST( ExerciseSessionTest, forgetting_a_hit_loses_the_attempt_and_keeps_the_question )
-{
-    SessionSettings settings = rhythmOnlySettings();
-    settings.lives = std::nullopt;
-
-    ExerciseSession session{ TEST_SEED, settings };
-
-    const RhythmPattern & pattern = patternOf( session );
-
-    // Toutes les frappes SAUF la derniere : l'oubli typique, celui du joueur qui suit la cellule et s'arrete une
-    // frappe trop tot.
-    ASSERT_GT( pattern.hits().size(), 1U );
-
-    for( std::size_t index = 0; index + 1 < pattern.hits().size(); ++index )
+    for( std::uint32_t seed = 1; seed <= 200; ++seed )
     {
-        session.registerRhythmTap( pattern.hits().at( index ).beat );
+        const ExerciseSession session{ seed, settings };
+
+        const QuestionKind kind = session.currentQuestion().kind;
+
+        EXPECT_TRUE( ( kind == QuestionKind::NamedInterval ) || ( kind == QuestionKind::Sing )
+                     || ( kind == QuestionKind::Chord ) )
+          << "genre inattendu alors que sa part vaut zero, graine " << seed;
+    }
+}
+
+TEST( ExerciseSessionTest, a_vamp_is_never_pareil )
+{
+    // Le diagnostic de Roger : « je pense que les modes "deux centre" et "plus clair, plus sombre" se confondent ».
+    // Il avait raison, et ce test tient la moitie de la reponse qui appartient au domaine.
+    //
+    // Un vamp porte DEUX modes - les deux passages ont la meme gamme et deux centres differents, par construction - donc
+    // « pareil » ne peut jamais etre la bonne reponse. L'ecran, lui, offrait quand meme le bouton : un bouton qu'aucun
+    // joueur ne peut gagner n'est pas un choix, c'est un piege.
+    SessionSettings settings;
+    pinEveryQuestionShare( settings );
+
+    settings.modeVampQuestionShare = 100;
+
+    for( std::uint32_t seed = 1; seed <= 200; ++seed )
+    {
+        ExerciseSession session{ seed, settings };
+
+        ASSERT_EQ( QuestionKind::ModeVamp, session.currentQuestion().kind ) << "graine " << seed;
+
+        EXPECT_FALSE( session.answerModeColour( ModeColourAnswer::Same ) ) << "graine " << seed;
+    }
+}
+
+TEST( ExerciseSessionTest, every_genre_comes_out_when_every_part_is_equal )
+{
+    // Le defaut que Roger a trouve, et il etait invisible : six parts a vingt font une somme de CENT VINGT, et l'ancien
+    // tirage - borne par cent - faisait disparaitre les deux derniers genres de la liste. On demandait du vamp dans les
+    // reglages, et il n'en venait jamais.
+    //
+    // Six parts egales doivent donc donner SEPT genres. Le test prend une centaine de graines differentes et ne lit que
+    // la PREMIERE question de chacune : avancer demanderait de savoir repondre a tous les genres, ce qui n'est pas le
+    // sujet ici - le tirage l'est.
+    // Six parts egales doivent donc donner SIX genres : le rythme en a ete retire, et c'est le VAMP qui reste en dernier
+    // dans l'ordre du tirage - c'est lui qui manquait avant la correction.
+    //
+    // Le test prend deux cents graines differentes et ne lit que la PREMIERE question de chacune : avancer demanderait de
+    // savoir repondre a tous les genres, ce qui n'est pas le sujet ici - le tirage l'est.
+    SessionSettings settings;
+    pinEveryQuestionShare( settings );
+
+    settings.namedIntervalQuestionShare = 20;
+    settings.singQuestionShare = 20;
+    settings.chordQuestionShare = 20;
+    settings.modeColourQuestionShare = 20;
+    settings.modeNameQuestionShare = 20;
+    settings.modeVampQuestionShare = 20;
+
+    std::set<QuestionKind> seenKinds;
+
+    constexpr std::uint32_t SEED_COUNT = 200;
+
+    for( std::uint32_t seed = 1; seed <= SEED_COUNT; ++seed )
+    {
+        const ExerciseSession session{ seed, settings };
+
+        seenKinds.insert( session.currentQuestion().kind );
     }
 
-    EXPECT_FALSE( session.endRhythmLoop() );
-    EXPECT_EQ( SessionState::Asking, session.state() );
-
-    // Et l'ardoise est VIERGE pour la boucle suivante : la frappe oubliee une fois ne le reste pas pour toujours.
-    playTheCellCorrectly( session );
-
-    EXPECT_TRUE( session.endRhythmLoop() );
-}
-
-TEST( ExerciseSessionTest, a_tap_between_the_hits_costs_the_whole_attempt )
-{
-    SessionSettings settings = rhythmOnlySettings();
-    settings.lives = std::nullopt;
-
-    ExerciseSession session{ TEST_SEED, settings };
-
-    const RhythmPattern & pattern = patternOf( session );
-
-    const double offBeat = furthestPositionFromAnyHitInBeats( pattern );
-
-    // Le prealable du test, verifie plutot que suppose : cette position est bien un rate, au tempo de la question.
-    ASSERT_GT( distanceToNearestOnsetInBeats( pattern, offBeat ) * beatDurationMs( 90.0 ), GOOD_WINDOW_MS );
-
-    playTheCellCorrectly( session );
-
-    // La frappe de trop : toutes les frappes sont la, mais une est tombee entre deux. Sans cette regle, "reproduire
-    // une cellule" deviendrait "taper en continu jusqu'a avoir touche les bons endroits".
-    session.registerRhythmTap( offBeat );
-
-    EXPECT_FALSE( session.endRhythmLoop() );
-}
-
-TEST( ExerciseSessionTest, tapping_twice_on_the_same_hit_is_not_a_mistake )
-{
-    ExerciseSession session{ TEST_SEED, rhythmOnlySettings() };
-
-    playTheCellCorrectly( session );
-
-    // Le doigt qui rebondit sur l'ecran, ou le doute d'un joueur qui reaffirme : ce qui est juge, c'est la PLACE des
-    // frappes, et une frappe de la cellule est touchee ou elle ne l'est pas.
-    session.registerRhythmTap( patternOf( session ).hits().front().beat );
-
-    EXPECT_TRUE( session.endRhythmLoop() );
-}
-
-TEST( ExerciseSessionTest, a_rhythm_question_is_never_turned_into_a_guided_one )
-{
-    SessionSettings settings = rhythmOnlySettings();
-    settings.lives = std::nullopt;
-
-    // Un intervalle qui monte, pour que le basculement guide soit possible s'il devait arriver.
-    settings.ascendingShare = 100;
-    settings.descendingShare = 0;
-    settings.harmonicShare = 0;
-
-    ExerciseSession session{ TEST_SEED, settings };
-
-    for( int attempt = 0; attempt < 3; ++attempt )
-    {
-        // Rien tape : la boucle se termine sans une seule frappe.
-        EXPECT_FALSE( session.endRhythmLoop() );
-    }
-
-    // Une cellule n'a ni montee ni descente : la question reste une question de rythme, et le joueur qui vient d'en
-    // rater une attend de la REPOSER.
-    EXPECT_EQ( QuestionKind::Rhythm, session.currentQuestion().kind );
-}
-
-TEST( ExerciseSessionTest, a_rhythm_question_can_be_passed_after_one_lost_attempt )
-{
-    SessionSettings settings = rhythmOnlySettings();
-    settings.lives = std::nullopt;
-
-    ExerciseSession session{ TEST_SEED, settings };
-
-    EXPECT_FALSE( session.isHelpAvailable() );
-
-    session.endRhythmLoop();    // rien tape : une tentative perdue
-
-    // Un intervalle se reecoute autant de fois qu'on veut ; une cellule ne s'entend que pendant sa boucle d'ecoute.
-    // Un seul essai perdu, et le joueur peut passer - sinon une question incomprehensible couterait toutes ses vies.
-    EXPECT_TRUE( session.isHelpAvailable() );
-}
-
-TEST( ExerciseSessionTest, tapping_on_a_question_that_is_not_rhythmic_judges_nothing )
-{
-    ExerciseSession session{ TEST_SEED, unlimitedLivesSettings() };
-
-    EXPECT_EQ( QuestionKind::NamedInterval, session.currentQuestion().kind );
-
-    // Deux langues ne se repondent pas l'une l'autre : une frappe sur une question d'intervalle ne juge rien, et ne
-    // ferme pas la question.
-    EXPECT_EQ( HitQuality::Miss, session.registerRhythmTap( 0.0 ) );
-    EXPECT_FALSE( session.endRhythmLoop() );
-    EXPECT_EQ( SessionState::Asking, session.state() );
-}
-
-TEST( ExerciseSessionTest, the_rhythm_share_decides_whether_a_cell_is_asked )
-{
-    // Zero : jamais de rythme, meme sur trente questions.
-    SessionSettings withoutRhythm = unlimitedLivesSettings();
-    withoutRhythm.questionCount = 30;
-
-    ExerciseSession intervalSession{ TEST_SEED, withoutRhythm };
-
-    for( std::size_t index = 0; index < 30; ++index )
-    {
-        EXPECT_NE( QuestionKind::Rhythm, intervalSession.currentQuestion().kind );
-
-        answerCorrectly( intervalSession );
-        intervalSession.advance();
-    }
-
-    // Cent : toutes les questions en sont, et c'est ce qui rend le reste de ces tests possible.
-    SessionSettings onlyRhythm = rhythmOnlySettings();
-    onlyRhythm.questionCount = 30;
-
-    ExerciseSession rhythmSession{ TEST_SEED, onlyRhythm };
-
-    for( std::size_t index = 0; index < 30; ++index )
-    {
-        EXPECT_EQ( QuestionKind::Rhythm, rhythmSession.currentQuestion().kind );
-
-        playTheCellCorrectly( rhythmSession );
-
-        EXPECT_TRUE( rhythmSession.endRhythmLoop() );
-
-        rhythmSession.advance();
-    }
-
-    // La session va jusqu'au bout sans rater une question : la fin est la meme que pour des intervalles.
-    EXPECT_TRUE( rhythmSession.isFinished() );
-    EXPECT_TRUE( rhythmSession.hasEarnedStar() );
+    // Les six, et pas cinq : c'est le VAMP qui manquait, et c'est lui qui tombe en dernier dans l'ordre du tirage.
+    EXPECT_EQ( 6U, seenKinds.size() );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1067,7 +1004,10 @@ TEST( ExerciseSessionTest, the_chord_palette_widens_with_successes )
 
     // Et la couleur arrivee est la SUIVANTE de l'ordre d'apprentissage, jamais une tiree au hasard : c'est ce qui rend
     // la progression previsible pour le joueur.
-    EXPECT_EQ( ChordQuality::Sus4, session.chordPalette().at( 2 ) );
+    //
+    // La troisieme couleur est le 7 DE DOMINANTE depuis le 01/10/2026, et non plus le sus4 : c'est l'accord qu'on rencontre
+    // partout - la tension qui demande a resoudre - la ou un sus est une couleur flottante qu'on croise bien plus tard.
+    EXPECT_EQ( ChordQuality::DominantSeventh, session.chordPalette().at( 2 ) );
 
     // Elle est desormais proposee, et elle peut tomber : le tirage peut la demander.
     EXPECT_EQ( 3U, session.currentQuestion().chordChoices.size() );
@@ -1271,6 +1211,517 @@ TEST( ExerciseSessionTest, the_chord_hint_stops_when_only_a_hint_would_be_left )
     // Mais l'ARPEGE reste disponible, et c'est la nuance qui compte : un debutant n'a rien a eliminer, et c'est
     // precisement lui que l'accord note a note aide le plus.
     EXPECT_TRUE( session.canHearChordAsArpeggio() );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Le pilier harmonie : le degrade
+//
+// Ces tests ne verifient pas un son, mais la seule chose qui puisse etre FAUSSE dans une question de mode : le SENS.
+// « Plus clair ou plus sombre ? » n'a de reponse que si le domaine sait lui-meme comparer deux couleurs, et si la
+// tonique qu'il donne au bourdon tombe dans la fenetre des enregistrements.
+// ---------------------------------------------------------------------------------------------------------------------
+
+namespace
+{
+
+// Une session qui ne pose QUE des questions de modes, et de couleur : sans cet epeinglage, la session melange les
+// genres et les tests echoueraient au hasard - exactement comme pour les accords et le rythme.
+[[nodiscard]] SessionSettings modeColourOnlySettings()
+{
+    SessionSettings settings = intervalOnlySettings();
+    settings.modeColourQuestionShare = 100;
+    return settings;
+}
+
+[[nodiscard]] SessionSettings modeNameOnlySettings()
+{
+    SessionSettings settings = intervalOnlySettings();
+    settings.modeNameQuestionShare = 100;
+    return settings;
+}
+
+// La reponse juste a une question de couleur, telle que le DOMAINE la calcule.
+TEST( ExerciseSessionTest, only_the_three_first_kinds_are_about_an_interval )
+{
+    // La question que se posent l'ecran (« ai-je un indice a montrer ? ») et la session (« une aide doit-elle reculer la
+    // palette ? »), posee une seule fois pour les deux. Elle etait ecrite trois fois, et la troisieme - les modes -
+    // manquait : Roger a vu un souvenir de film apparaitre sous une question de bourdon.
+    EXPECT_TRUE( isIntervalQuestion( QuestionKind::NamedInterval ) );
+    EXPECT_TRUE( isIntervalQuestion( QuestionKind::Direction ) );
+    EXPECT_TRUE( isIntervalQuestion( QuestionKind::Sing ) );
+
+    EXPECT_FALSE( isIntervalQuestion( QuestionKind::Rhythm ) );
+    EXPECT_FALSE( isIntervalQuestion( QuestionKind::Chord ) );
+    EXPECT_FALSE( isIntervalQuestion( QuestionKind::ModeColour ) );
+    EXPECT_FALSE( isIntervalQuestion( QuestionKind::ModeName ) );
+    EXPECT_FALSE( isIntervalQuestion( QuestionKind::ModeVamp ) );
+}
+
+[[nodiscard]] bool expectedColourAnswer( const Question & p_question )
+{
+    return p_question.previousMode.has_value() && isBrighterThan( p_question.mode, *p_question.previousMode );
+}
+
+// Un livre qui porte UNE phrase par mode : le tirage tombe alors toujours juste, et c'est ce qui permet de verifier
+// qu'une question de nom entend bien une melodie - sans dependre du hasard du tirage.
+[[nodiscard]] PhraseBook bookWithOnePhrasePerMode()
+{
+    PhraseBook book;
+
+    for( std::size_t index = 0; index < MODE_COUNT; ++index )
+    {
+        Phrase phrase;
+        phrase.mode = static_cast<Mode>( index );
+        phrase.tonic = Note{ 50 };
+        phrase.bpm = 72;
+        phrase.steps = { PhraseStep{ .degree = 1, .beats = 1 },
+                         PhraseStep{ .degree = 3, .beats = 2 },
+                         PhraseStep{ .degree = 1, .beats = 2 } };
+
+        book.add( std::move( phrase ) );
+    }
+
+    return book;
+}
+
+// Les classes de hauteur d'une suite de notes : c'est ce qui permet de dire « ce sont les MEMES notes » sans se soucier
+// des octaves. Un vamp ne se verifie pas autrement.
+[[nodiscard]] std::set<std::int32_t> pitchClassesOf( std::span<const Note> p_notes )
+{
+    std::set<std::int32_t> classes;
+
+    for( const Note & note : p_notes )
+    {
+        classes.insert( note.pitchClassIndex() );
+    }
+
+    return classes;
+}
+
+}    // namespace
+
+TEST( ExerciseSessionTest, a_colour_question_poses_two_different_modes_on_one_drone )
+{
+    ExerciseSession session{ TEST_SEED, modeColourOnlySettings() };
+
+    // La boucle suit la LONGUEUR d'une session, et non un nombre ecrit a la main : repondre au-dela de la derniere
+    // question est refuse par le domaine - la session est finie - et un test qui l'ignorerait echouerait sur sa propre
+    // borne plutot que sur la regle qu'il verifie.
+    for( std::size_t questionIndex = 0; questionIndex < session.settings().questionCount; ++questionIndex )
+    {
+        const Question & question = session.currentQuestion();
+
+        ASSERT_EQ( QuestionKind::ModeColour, question.kind );
+
+        // Deux modes, et deux modes DIFFERENTS : comparer un mode avec lui-meme n'aurait pas de reponse, donc la
+        // question serait impossible plutot que difficile.
+        ASSERT_TRUE( question.previousMode.has_value() );
+        EXPECT_NE( *question.previousMode, question.mode );
+
+        // UNE seule tonique, tenue par le bourdon sous les deux : c'est elle qui donne un centre, et sans elle deux
+        // modes ne seraient que deux gammes.
+        EXPECT_TRUE( question.modeTonic.isValid() );
+
+        // Et elle tombe dans la fenetre des enregistrements - 35 a 41. Ce n'est pas un gout : la tonique ET sa quinte
+        // doivent rester a moins de trois demi-tons d'un echantillon de bourdon, sinon un enregistrement serait
+        // transpose au-dela de ce qui s'entend.
+        EXPECT_GE( question.modeTonic.midiNumber(), 35 );
+        EXPECT_LE( question.modeTonic.midiNumber(), 41 );
+
+        // Les choix sont ceux de la palette, ni plus ni moins.
+        EXPECT_EQ( session.modePalette().size(), question.modeChoices.size() );
+
+        EXPECT_TRUE( session.answerModeColour( expectedColourAnswer( question ) ) );
+        EXPECT_EQ( SessionState::Feedback, session.state() );
+
+        session.advance();
+    }
+}
+
+TEST( ExerciseSessionTest, a_wrong_colour_answer_leaves_the_question_posed )
+{
+    ExerciseSession session{ TEST_SEED, modeColourOnlySettings() };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_EQ( QuestionKind::ModeColour, question.kind );
+
+    const bool wrongAnswer = !expectedColourAnswer( question );
+
+    EXPECT_FALSE( session.answerModeColour( wrongAnswer ) );
+
+    // La question reste posee et le joueur peut repondre encore : exactement le comportement d'une question
+    // d'intervalle ratee, donc rien de particulier a faire dans l'ecran.
+    EXPECT_EQ( SessionState::Asking, session.state() );
+    EXPECT_TRUE( session.answerModeColour( !wrongAnswer ) );
+    EXPECT_EQ( SessionState::Feedback, session.state() );
+}
+
+TEST( ExerciseSessionTest, a_mode_question_refuses_an_answer_of_another_kind )
+{
+    // Trois langues, trois questions : dire « plus clair » la ou un nom est demande ne repond a rien, et nommer un mode
+    // la ou deux couleurs venaient de sonner non plus. C'est le meme refus que la direction oppose a une question qui
+    // demandait un nom.
+    ExerciseSession colourSession{ TEST_SEED, modeColourOnlySettings() };
+    ExerciseSession nameSession{ TEST_SEED, modeNameOnlySettings() };
+    ExerciseSession intervalSession{ TEST_SEED, intervalOnlySettings() };
+
+    EXPECT_FALSE( colourSession.answerModeName( Mode::Ionian ) );
+    EXPECT_FALSE( nameSession.answerModeColour( true ) );
+
+    EXPECT_FALSE( intervalSession.answerModeColour( true ) );
+    EXPECT_FALSE( intervalSession.answerModeName( Mode::Ionian ) );
+}
+
+TEST( ExerciseSessionTest, a_name_question_poses_one_mode_and_remembers_the_answer )
+{
+    ExerciseSession session{ TEST_SEED, modeNameOnlySettings() };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_EQ( QuestionKind::ModeName, question.kind );
+
+    // Rien a comparer sur une question de NOM : c'est pour cela que le mode precedent est un optional, et non un mode
+    // « vide » qu'un lecteur finirait par lire.
+    EXPECT_FALSE( question.previousMode.has_value() );
+
+    EXPECT_EQ( session.modePalette().size(), question.modeChoices.size() );
+
+    EXPECT_TRUE( session.answerModeName( question.mode ) );
+
+    // Ce que le joueur a repondu est garde, pour que le verdict puisse le montrer : meme role que la derniere reponse
+    // d'accord.
+    EXPECT_EQ( std::optional<Mode>{ question.mode }, session.lastModeAnswer() );
+}
+
+TEST( ExerciseSessionTest, a_name_question_hears_a_melody_when_the_book_has_one )
+{
+    // Les trois cents phrases de l'atelier attendaient leur question. Le banc d'essai l'avait annonce : « la phrase fait
+    // aussi connaitre son MODE, puisque c'est justement la question que l'exercice posera un jour ».
+    const PhraseBook book = bookWithOnePhrasePerMode();
+
+    ExerciseSession session{ TEST_SEED, modeNameOnlySettings(), &book };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_EQ( QuestionKind::ModeName, question.kind );
+    ASSERT_TRUE( question.modePhrase.has_value() );
+
+    // Et c'est la phrase du mode DEMANDE : une melodie d'un autre mode serait une question sans reponse juste.
+    EXPECT_EQ( question.mode, question.modePhrase->mode );
+}
+
+TEST( ExerciseSessionTest, a_name_question_stays_a_question_without_a_book )
+{
+    // Un contenu absent coute une MELODIE, jamais une question : la seance se joue, en gamme. C'est la regle du projet,
+    // et elle vaut aussi pour un livre vide, garde par une autre page.
+    ExerciseSession session{ TEST_SEED, modeNameOnlySettings() };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_EQ( QuestionKind::ModeName, question.kind );
+    EXPECT_FALSE( question.modePhrase.has_value() );
+
+    // Et elle a une reponse : c'est la seule chose qui compte pour qu'une question soit une question.
+    EXPECT_TRUE( session.answerModeName( question.mode ) );
+}
+
+TEST( ExerciseSessionTest, a_same_colour_question_is_answered_by_saying_so )
+{
+    // Le bouton que Roger a demande - « rajouter un bouton egal » - et la regle qui le rend utile : pour que « pareil »
+    // soit une BONNE reponse de temps en temps, le jeu doit parfois poser deux fois la meme couleur.
+    SessionSettings settings = modeColourOnlySettings();
+    settings.sameColourQuestionShare = 100;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_TRUE( question.previousMode.has_value() );
+    EXPECT_EQ( *question.previousMode, question.mode );
+
+    // Les deux autres reponses sont FAUSSES : un bouton juste tout le temps n'apprendrait rien a personne.
+    EXPECT_FALSE( session.answerModeColour( ModeColourAnswer::Brighter ) );
+    EXPECT_TRUE( session.answerModeColour( ModeColourAnswer::Same ) );
+}
+
+TEST( ExerciseSessionTest, a_question_of_two_different_colours_refuses_sameness )
+{
+    SessionSettings settings = modeColourOnlySettings();
+    settings.sameColourQuestionShare = 0;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    ASSERT_TRUE( session.currentQuestion().previousMode.has_value() );
+    ASSERT_NE( *session.currentQuestion().previousMode, session.currentQuestion().mode );
+
+    EXPECT_FALSE( session.answerModeColour( ModeColourAnswer::Same ) );
+    EXPECT_TRUE( session.answerModeColour( expectedColourAnswer( session.currentQuestion() ) ) );
+}
+
+TEST( ExerciseSessionTest, the_same_colour_share_poses_both_kinds_of_question )
+{
+    // La part par defaut (vingt) doit donner les DEUX cas sur une centaine de questions : sans cela, le bouton « pareil »
+    // serait un piege permanent, et un piege ne s'apprend pas.
+    SessionSettings settings = modeColourOnlySettings();
+    settings.sameColourQuestionShare = 50;
+
+    bool sawSameness = false;
+    bool sawDifference = false;
+
+    // Une session par graine, et la premiere question de chacune : c'est le TIRAGE qu'on veut voir, et avancer
+    // demanderait de savoir repondre - ce qui n'est pas le sujet ici.
+    for( std::uint32_t seed = 1; seed <= 100; ++seed )
+    {
+        const ExerciseSession session{ seed, settings };
+
+        const Question & question = session.currentQuestion();
+
+        ASSERT_TRUE( question.previousMode.has_value() );
+
+        if( *question.previousMode == question.mode )
+        {
+            sawSameness = true;
+        }
+        else
+        {
+            sawDifference = true;
+        }
+    }
+
+    EXPECT_TRUE( sawSameness );
+    EXPECT_TRUE( sawDifference );
+}
+
+TEST( ExerciseSessionTest, the_mode_palette_starts_with_the_known_ones_and_grows_on_successes )
+{
+    SessionSettings settings = modeColourOnlySettings();
+    settings.startingModeCount = 2;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    // Le majeur et le mineur : le seul ecart que toute oreille connait deja, et la seule premiere question possible.
+    EXPECT_EQ( 2, session.modePalette().size() );
+    EXPECT_EQ( Mode::Ionian, session.modePalette().front() );
+    EXPECT_EQ( Mode::Aeolian, session.modePalette().at( 1 ) );
+
+    // Trois reussites de suite ouvrent le mode SUIVANT de l'ordre d'apprentissage, et non un mode tire au hasard :
+    // c'est ce qui rend la progression previsible, du connu vers les extremes.
+    for( int successIndex = 0; successIndex < 3; ++successIndex )
+    {
+        EXPECT_TRUE( session.answerModeColour( expectedColourAnswer( session.currentQuestion() ) ) );
+
+        session.advance();
+    }
+
+    EXPECT_EQ( 3, session.modePalette().size() );
+    EXPECT_EQ( Mode::Mixolydian, session.modePalette().at( 2 ) );
+}
+
+// Une session qui ne pose QUE des questions de NOTE ETRANGERE.
+[[nodiscard]] SessionSettings foreignNoteOnlySettings()
+{
+    SessionSettings settings;
+    pinEveryQuestionShare( settings );
+
+    settings.foreignNoteQuestionShare = 100;
+
+    return settings;
+}
+
+TEST( ExerciseSessionTest, a_foreign_note_question_poses_a_scale_with_exactly_one_note_out_of_it )
+{
+    // La question que Roger a demandee des le debut - « quelle note n'est pas dans la gamme ? » - et la seule chose qui
+    // compte : la gamme doit rester RECONNAISSABLE, donc six de ses sept notes y sont, et une seule est etrangere.
+    ExerciseSession session{ TEST_SEED, foreignNoteOnlySettings() };
+
+    const Question & question = session.currentQuestion();
+
+    ASSERT_EQ( QuestionKind::ForeignNote, question.kind );
+
+    // Sept notes, une par degre : c'est une gamme montee.
+    ASSERT_EQ( 7U, question.foreignMelody.size() );
+
+    const std::vector<Note> scale = notesOfMode( question.modeTonic, question.mode );
+
+    std::set<std::int32_t> scaleClasses;
+
+    for( const Note & note : scale )
+    {
+        scaleClasses.insert( note.pitchClassIndex() );
+    }
+
+    std::size_t foreignCount = 0;
+    std::size_t foreignStep = 0;
+
+    for( std::size_t index = 0; index < question.foreignMelody.size(); ++index )
+    {
+        if( scaleClasses.count( question.foreignMelody.at( index ).pitchClassIndex() ) == 0 )
+        {
+            ++foreignCount;
+            foreignStep = index;
+        }
+    }
+
+    // UNE seule note etrangere, et c'est celle que le domaine ANNONCE : la question et sa reponse ne peuvent pas
+    // diverger, sinon l'exercice serait insoluble.
+    EXPECT_EQ( 1U, foreignCount );
+    EXPECT_EQ( static_cast<std::int32_t>( foreignStep ), question.foreignStepIndex );
+
+    // A un DEMI-TON de la note de la gamme, jamais plus : la faute doit s'entendre, pas crier.
+    EXPECT_EQ( 1,
+               std::abs( question.foreignMelody.at( foreignStep ).midiNumber() - scale.at( foreignStep ).midiNumber() ) );
+
+    // Et les six autres pas sont EXACTEMENT la gamme : c'est ce qui permet d'entendre l'intrus.
+    for( std::size_t index = 0; index < question.foreignMelody.size(); ++index )
+    {
+        if( index != foreignStep )
+        {
+            EXPECT_EQ( scale.at( index ).midiNumber(), question.foreignMelody.at( index ).midiNumber() );
+        }
+    }
+}
+
+TEST( ExerciseSessionTest, answering_the_foreign_note_means_designing_its_step )
+{
+    ExerciseSession session{ TEST_SEED, foreignNoteOnlySettings() };
+
+    const std::int32_t foreignStep = session.currentQuestion().foreignStepIndex;
+
+    // Un AUTRE pas est faux : l'exercice ne se reussit pas en designant n'importe quoi.
+    EXPECT_FALSE( session.answerForeignNote( ( foreignStep + 1 ) % 7 ) );
+
+    // Et le bon pas est juste.
+    EXPECT_TRUE( session.answerForeignNote( foreignStep ) );
+
+    // Une question d'intervalle n'accepte pas une reponse de gamme : deux langues differentes ne se repondent pas l'une
+    // l'autre, et c'est le meme refus que partout ailleurs dans ce domaine.
+    ExerciseSession intervalSession{ TEST_SEED, intervalOnlySettings() };
+
+    EXPECT_FALSE( intervalSession.answerForeignNote( 0 ) );
+}
+
+TEST( ExerciseSessionTest, a_vamp_plays_the_same_notes_on_two_different_centres )
+{
+    SessionSettings settings = intervalOnlySettings();
+    settings.modeVampQuestionShare = 100;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    for( std::size_t questionIndex = 0; questionIndex < session.settings().questionCount; ++questionIndex )
+    {
+        const Question & question = session.currentQuestion();
+
+        ASSERT_EQ( QuestionKind::ModeVamp, question.kind );
+        ASSERT_TRUE( question.previousMode.has_value() );
+
+        // Deux modes DIFFERENTS...
+        EXPECT_NE( *question.previousMode, question.mode );
+
+        // ...et deux passages qui ont EXACTEMENT les memes notes.
+        //
+        // C'est tout le vamp, et c'est ce qui en fait une lecon sur le CONTEXTE plutot qu'une seconde question de
+        // couleur : le joueur entend le meme materiau deux fois, et pourtant deux modes. Do dorien et si bemol majeur,
+        // en une phrase.
+        const std::set<std::int32_t> first =
+          pitchClassesOf( notesOfMode( question.previousModeTonic, *question.previousMode ) );
+
+        const std::set<std::int32_t> second = pitchClassesOf( notesOfMode( question.modeTonic, question.mode ) );
+
+        // Le message d'echec porte les VALEURS : sans elles, un test de tirage dit seulement « ca ne va pas ».
+        ASSERT_EQ( first, second ) << "premier mode " << static_cast<int>( *question.previousMode ) << " sur "
+                                   << question.previousModeTonic.midiNumber() << ", second mode "
+                                   << static_cast<int>( question.mode ) << " sur " << question.modeTonic.midiNumber();
+
+        // Et les DEUX toniques restent a portee des enregistrements de bourdon.
+        //
+        // La fenetre est PLUS LARGE que celle d'une question simple - 35 a 48 au lieu de 35 a 41 - parce qu'un vamp
+        // tient deux centres a la fois, et qu'ils sont a une quinte l'un de l'autre : c'est le prix du meme jeu de notes
+        // sur deux hauteurs, et les deux echantillons (re 2 et la 2) le couvrent a trois demi-tons pres.
+        EXPECT_GE( question.previousModeTonic.midiNumber(), 35 );
+        EXPECT_LE( question.previousModeTonic.midiNumber(), 48 );
+
+        EXPECT_GE( question.modeTonic.midiNumber(), 35 );
+        EXPECT_LE( question.modeTonic.midiNumber(), 48 );
+
+        // La reponse se donne comme celle d'une comparaison : c'est la meme question, posee sur un autre materiau.
+        EXPECT_TRUE( session.answerModeColour( expectedColourAnswer( question ) ) );
+        EXPECT_EQ( SessionState::Feedback, session.state() );
+
+        session.advance();
+    }
+}
+
+TEST( ExerciseSessionTest, the_harmony_is_open_out_of_the_box )
+{
+    // Roger, le 01/10/2026 : « pour les reglages par defaut (et a l'installation), il n'y a pas les modes, mets un poids de
+    // 10 a tous les jeux de modes ». Un pilier entier qu'on n'ouvre JAMAIS est un pilier invisible : personne ne peut
+    // decouvrir un reglage dont il ignore l'existence.
+    const SessionSettings defaults;
+
+    EXPECT_EQ( 10, defaults.foreignNoteQuestionShare );
+    EXPECT_EQ( 10, defaults.modeColourQuestionShare );
+    EXPECT_EQ( 10, defaults.modeNameQuestionShare );
+    EXPECT_EQ( 10, defaults.modeVampQuestionShare );
+
+    // Et l'harmonie s'OUVRE sans prendre la place du jeu : elle reste loin derriere l'intervalle a nommer, qui est la
+    // question de fond de l'application.
+    EXPECT_GT( defaults.namedIntervalQuestionShare, defaults.modeNameQuestionShare );
+
+    // Et « Par defaut » dit la MEME chose que l'installation : c'est la lecon du rappel, qui etait le seul reglage ou les
+    // deux se contredisaient. Ce test tient les DEFAUTS ; resetPreferences les recopie, donc la coherence est ici aussi.
+    EXPECT_EQ( 20, defaults.singQuestionShare );
+}
+
+// LE PLAFOND : une session qui en porte un ne grandit plus au-dela. C'est ce qui rend a l'Arcade la difficulte de son
+// niveau - vingt-cinq questions elargissaient deux fois plus qu'une partie de dix, et Roger l'a senti en debutant.
+TEST( ExerciseSessionTest, a_capped_session_never_widens_past_its_ceiling )
+{
+    SessionSettings settings;
+    settings.questionCount = 20;
+    settings.startingPaletteSize = 2;
+    settings.choiceCount = 4;
+    settings.successesBeforeWidening = 1;    // Sans plafond, CHAQUE reussite ajouterait un intervalle.
+    settings.maximumPaletteSize = 2;         // LE PLAFOND, au niveau du depart.
+    settings.lives = std::nullopt;
+
+    ExerciseSession session{ 1, settings };
+
+    const std::size_t startingSize = session.palette().size();
+
+    // Dix reussites d'affilee : sans plafond, la palette aurait largement double.
+    for( int question = 0; question < 10; ++question )
+    {
+        answerCorrectly( session );
+        session.advance();
+    }
+
+    EXPECT_EQ( startingSize, session.palette().size() );
+    EXPECT_EQ( 2U, session.palette().size() );
+}
+
+// Et le JEU LIBRE, lui, garde le droit de grandir : sans plafond, dix reussites elargissent bel et bien la palette.
+TEST( ExerciseSessionTest, an_uncapped_session_still_widens )
+{
+    SessionSettings settings;
+    settings.questionCount = 20;
+    settings.startingPaletteSize = 2;
+    settings.choiceCount = 4;
+    settings.successesBeforeWidening = 1;
+    settings.lives = std::nullopt;
+    // Aucun plafond : maximumPaletteSize reste zero, le defaut.
+
+    ExerciseSession session{ 1, settings };
+
+    const std::size_t startingSize = session.palette().size();
+
+    for( int question = 0; question < 10; ++question )
+    {
+        answerCorrectly( session );
+        session.advance();
+    }
+
+    EXPECT_GT( session.palette().size(), startingSize ) << "sans plafond, la palette doit grandir";
 }
 
 }    // namespace musichien::domain

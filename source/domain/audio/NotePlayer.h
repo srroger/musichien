@@ -14,6 +14,7 @@
 // =====================================================================================================================
 
 #include "domain/audio/DrumSynthesizer.h"
+#include "domain/audio/ToneSynthesizer.h"
 #include "domain/music/Note.h"
 #include "domain/music/Temperament.h"
 
@@ -52,7 +53,97 @@ public:
     // A default body, like playTapCue: an adapter that has no use for a sustained chord keeps the natural duration.
     virtual void playChordFor( std::span<const Note> p_notes, std::chrono::milliseconds p_duration )
     {
+        (void)p_duration;
+
         playChord( p_notes );
+    }
+
+    // Fait ENTENDRE un instrument, pour qu'on puisse le CHOISIR : la gamme demandee, puis l'accord demande, avec CE
+    // timbre et aucun autre.
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // Pourquoi cette methode est dans le port, et pas dans l'adaptateur
+    //
+    // Choisir un timbre se fait a l'oreille, et l'oreille ne peut pas choisir ce qu'elle n'a pas entendu : la page des
+    // reglages offre onze instruments, et un nom ne dit rien de ce qu'on entendra. C'est Roger qui a demande ce bouton -
+    // « pour l'utilisateur, c'est un peu complique de choisir son instrument car c'est complique de l'entendre ».
+    //
+    // La demande passe par le PORT parce que c'est la seule facon de rester testable : un NotePlayerFake enregistre la
+    // gamme ET l'accord, donc un test verifie la musique entendue sans carte son. L'ADAPTATEUR, lui, garde ce qui n'est
+    // pas a nous : rendre les deux dans UN SEUL tampon, car deux appels successifs se superposeraient et l'accord
+    // sonnerait PAR-DESSUS la gamme.
+    //
+    // p_instrumentIndex est un index du domaine (INSTRUMENT_NAMES), jamais un rang interne a l'adaptateur.
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // Un corps par defaut, comme playChordFor : un adaptateur qui n'a qu'un timbre joue quand meme la gamme et l'accord
+    // - il ne montre simplement pas de difference, ce qui est exactement ce qu'il a a montrer.
+    virtual void playInstrumentPreview( std::span<const Note> p_scale,
+                                        std::span<const Note> p_chord,
+                                        std::size_t p_instrumentIndex,
+                                        std::chrono::milliseconds p_noteDuration,
+                                        std::chrono::milliseconds p_gap )
+    {
+        (void)p_instrumentIndex;
+
+        playMelody( p_scale, p_gap );
+
+        // L'accord est TENU bien plus longtemps qu'une note - cinq fois, comme dans l'adaptateur : c'est une couleur qu'on
+        // ecoute, pas un pas qu'on enchaine, et il faut le temps de l'entendre battre.
+        playChordFor( p_chord, p_noteDuration * 5 );
+    }
+
+    // Plays a melody heard OVER a drone held under it: the two sound TOGETHER, from the first note to the last.
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // Pourquoi le domaine demande cela, et pourquoi c'est une question de MUSIQUE avant d'etre d'audio
+    //
+    // Un mode n'est pas un jeu de notes, c'est un jeu de notes PLUS UN CENTRE : les sept memes notes sur re sont du
+    // re dorien, sur si bemol elles sont du si bemol majeur. Sans centre, l'oreille entend une gamme et aucun mode -
+    // donc « ecoute cette gamme et nomme le mode » n'est pas une question difficile, c'est une question sans reponse.
+    //
+    // Le bourdon EST ce centre. C'est pour cela que le domaine le demande ici, plutot que de laisser chaque
+    // adaptateur decider d'en jouer un : le bourdon n'est pas un ornement de restitution, c'est la moitie de la
+    // question posee au joueur.
+    //
+    // Ce qui reste a l'adaptateur : le TIMBRE et le niveau relatif des deux voix, exactement comme pour un clic de
+    // metronome. Ce que le domaine decide : que les deux s'entendent ENSEMBLE - deux appels successifs, un accord
+    // puis une melodie, donneraient deux questions au lieu d'une.
+    //
+    // A default body, like playChordFor: an adapter with no use for a drone falls back on playing the melody, which
+    // is what it would have done alone. A test that only checks the MELODY still gets it.
+    virtual void playMelodyOverDrone( std::span<const Note> p_melody,
+                                      std::span<const Note> p_drone,
+                                      std::chrono::milliseconds p_noteDuration,
+                                      std::chrono::milliseconds p_gap,
+                                      DroneFraming p_framing = {} )
+    {
+        (void)p_drone;
+        (void)p_noteDuration;
+        (void)p_framing;
+
+        playMelody( p_melody, p_gap );
+    }
+
+    // Une PHRASE sur un bourdon : les memes notes que ci-dessus, mais CHACUNE avec sa duree.
+    //
+    // C'est la difference entre une gamme et une phrase, et elle n'est pas cosmetique : les degres disent la couleur, et
+    // les DUREES disent la musique. Jouer une phrase en notes uniformes ferait entendre autre chose que la phrase que
+    // l'oreille avait choisie - et ce serait pourtant celle-la qu'on lui aurait fait ecouter.
+    //
+    // Un corps par defaut, comme playChordFor : un adaptateur qui ignore les phrases joue la melodie avec la premiere
+    // duree pour toutes. La phrase perd son rythme, mais elle reste audible, et rien ne casse.
+    virtual void playPhraseOverDrone( std::span<const Note> p_melody,
+                                      std::span<const std::chrono::milliseconds> p_durations,
+                                      std::span<const Note> p_drone,
+                                      std::chrono::milliseconds p_gap,
+                                      DroneFraming p_framing = {} )
+    {
+        // Le nom de la variable ne peut pas etre celui de la methode qu'elle appelle : le masquage ferait du repli un
+        // appel a la variable elle-meme.
+        const std::chrono::milliseconds fallbackDuration = p_durations.empty() ? noteDuration() : p_durations.front();
+
+        playMelodyOverDrone( p_melody, p_drone, fallbackDuration, p_gap, p_framing );
     }
 
     // Plays the short cue that marks a mistake.
@@ -69,6 +160,22 @@ public:
     // test qui ne s'intéresse pas au clic n'a rien à écrire non plus. Le feedback d'un bouton ne mérite pas
     // d'obliger tous les adaptateurs du projet à répondre.
     virtual void playTapCue() {}
+
+    // Le petit wouf du chien qui raconte une anecdote.
+    //
+    // Un corps par defaut, comme le clic de menu, et il TOMBE DESSUS a dessein : Roger a donne les deux solutions dans la
+    // meme phrase - un son de chien « doux et tres court », « ou sinon, juste le meme petit son que tu avais sur les
+    // boutons de la difficulte ». Un adaptateur qui n'a pas d'aboiement continuera donc de repondre quelque chose.
+    virtual void playDogBark() { playTapCue(); }
+
+    // LE TIMBRE D'UNE SESSION, choisi une fois et garde jusqu'au bout.
+    //
+    // Roger a mis le doigt sur une incoherence en ecoutant : le timbre changeait a CHAQUE question, donc un joueur qui
+    // entendait un saxo sur une seconde et un piano sur une quinte comparait deux choses differentes - alors que la
+    // question porte sur l'intervalle. Un timbre par session, et l'oreille ne juge plus que ce qu'on lui demande.
+    //
+    // Un corps par defaut, comme playChordFor : un adaptateur qui n'a pas de timbre a choisir n'a rien a faire ici.
+    virtual void beginTimbreForSession() {}
 
     // Le clic du métronome : un temps simple, ou le PREMIER temps d'une mesure (accentué). Un corps par défaut, comme
     // le clic de menu : un adaptateur sans métronome se contente du clic ordinaire.
@@ -139,6 +246,16 @@ public:
     // A default body, like playTapCue: a test that only counts the notes played has no tuning to care about, and
     // must not be forced to write one.
     virtual void setTuning( TuningContext p_tuning ) { (void)p_tuning; }
+
+    // Garde le MEME TIMBRE pour la lecture suivante, meme si les notes changent.
+    //
+    // C'est ce qu'une comparaison demande, et l'adaptateur ne peut pas le deviner : deux modes n'ont pas les memes notes,
+    // donc la regle « memes notes, meme timbre » ne s'applique pas, et le bourdon d'un vamp change de centre par nature.
+    // Sans cela, la guitare devenait un saxophone ENTRE LES DEUX PASSAGES - et Roger l'a entendu : « il faudrait que ca
+    // utilise les memes instruments, ca evite le bruit de la difference d'instrument, l'exercice est deja difficile ».
+    //
+    // Un corps par defaut, comme playTapCue : un adaptateur qui n'a qu'un timbre n'a rien a garder.
+    virtual void holdTimbre() {}
 
     // Stops everything immediately. Called when the screen is left or the application goes to the
     // background: an audio stream left open on a phone is a battery drain and a bug.

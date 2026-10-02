@@ -2,6 +2,7 @@
 
 #include <QSettings>
 
+#include <algorithm>
 #include <cstddef>
 
 namespace musichien::infrastructure
@@ -44,16 +45,51 @@ constexpr const char * REFERENCE_PITCH_KEY = "player/reference-pitch";
 
 // How many questions in a hundred ask the player to SING, the rest asking him to name the interval.
 constexpr const char * SING_QUESTION_SHARE_KEY = "player/sing-question-share";
+// La part de la question historique du jeu : nommer l'intervalle. Soixante par defaut, comme le domaine, donc un
+// profil neuf sonne exactement comme le jeu d'avant que cette part existe.
+constexpr const char * NAMED_INTERVAL_QUESTION_SHARE_KEY = "player/named-interval-question-share";
+
+// La part de la note etrangere : la troisieme marche de l'harmonie, eteinte par defaut comme les deux autres.
+constexpr const char * FOREIGN_NOTE_QUESTION_SHARE_KEY = "player/foreign-note-question-share";
+
+// Le tempo des phrases de mode, et son amplitude de variation. Soixante-douze par defaut, comme le contenu de l'atelier.
+constexpr const char * PHRASE_TEMPO_BPM_KEY = "player/phrase-tempo-bpm";
+constexpr const char * PHRASE_TEMPO_VARIATION_KEY = "player/phrase-tempo-variation";
 
 // Les deux autres parts de question, gardees avec les memes bornes et la meme valeur de repli que celle du chant :
 // trois reglages du meme genre se lisent de la meme facon, sinon l'un des trois finira par mentir.
-constexpr const char * RHYTHM_QUESTION_SHARE_KEY = "player/rhythm-question-share";
 constexpr const char * CHORD_QUESTION_SHARE_KEY = "player/chord-question-share";
+
+// L'harmonie : deux parts, et deux cles distinctes. « Entendre une couleur » et « savoir la nommer » sont deux
+// competences, donc deux reglages - un joueur peut vouloir l'une sans l'autre.
+constexpr const char * MODE_COLOUR_QUESTION_SHARE_KEY = "player/mode-colour-question-share";
+constexpr const char * MODE_NAME_QUESTION_SHARE_KEY = "player/mode-name-question-share";
+constexpr const char * MODE_VAMP_QUESTION_SHARE_KEY = "player/mode-vamp-question-share";
+
+// LES COEURS DE L'ARCADE, et les compteurs du Bilan (les trophees et les titres s'y lisent).
+constexpr const char * ARCADE_LIVES_KEY = "player/arcade-lives";
+constexpr const char * BILAN_COUNT_KEY = "player/bilan-count";
+constexpr const char * PERFECT_BILAN_COUNT_KEY = "player/perfect-bilan-count";
+constexpr const char * BILAN_SUCCESS_STREAK_KEY = "player/bilan-success-streak";
+constexpr const char * LONGEST_BILAN_SUCCESS_STREAK_KEY = "player/longest-bilan-success-streak";
 
 // L'heure du rappel, en deux nombres separes : une heure et une minute se lisent dans un fichier de reglages plus
 // facilement qu'un instant encode, et un joueur curieux doit pouvoir comprendre ce qu'il lit.
 constexpr const char * REMINDER_HOUR_KEY = "player/reminder-hour";
 constexpr const char * REMINDER_MINUTE_KEY = "player/reminder-minute";
+
+// LE GODMODE : trois listes de NOMBRES, et non de drapeaux.
+//
+// Elles disent CE QUE le joueur a choisi, dans les identites du domaine : les DEMI-TONS d'un intervalle, l'index d'une
+// qualite d'accord, l'index d'un mode. Aucune ne depend de l'ordre d'une liste qui pourrait changer un jour, et un
+// fichier de reglages reste lisible - « 0, 7, 12 » se comprend a l'oeil.
+constexpr const char * GOD_MODE_INTERVALS_KEY = "player/god-mode-intervals";
+constexpr const char * GOD_MODE_CHORDS_KEY = "player/god-mode-chords";
+constexpr const char * GOD_MODE_MODES_KEY = "player/god-mode-modes";
+constexpr const char * GOD_MODE_CHOSEN_KEY = "player/god-mode-chosen";
+
+// Le dernier palier pour lequel le jeu a FELICITE le joueur : une seule felicitation par palier, jamais deux.
+constexpr const char * ANNOUNCED_LEVEL_KEY = "player/announced-level";
 
 }    // namespace
 
@@ -77,6 +113,100 @@ void QSettingsPlayerPreferences::storeLevel( domain::PlayerLevel p_level )
     QSettings settings;
 
     settings.setValue( LEVEL_KEY, static_cast<int>( p_level ) );
+}
+
+bool QSettingsPlayerPreferences::storedGodModeIsChosen() const
+{
+    const QSettings settings;
+
+    return settings.value( GOD_MODE_CHOSEN_KEY, false ).toBool();
+}
+
+void QSettingsPlayerPreferences::storeGodModeIsChosen( bool p_isChosen )
+{
+    QSettings settings;
+
+    settings.setValue( GOD_MODE_CHOSEN_KEY, p_isChosen );
+}
+
+std::optional<domain::GodModePalette> QSettingsPlayerPreferences::storedGodModePalette() const
+{
+    const QSettings settings;
+
+    if( !settings.contains( GOD_MODE_INTERVALS_KEY ) )
+    {
+        // Rien stocke n'est PAS une palette vide : c'est une palette qui n'a jamais ete sauvegardee, et la page du
+        // GodMode a besoin de la difference pour savoir si elle a quelque chose a montrer ou une page a remplir.
+        return std::nullopt;
+    }
+
+    domain::GodModePalette palette;
+
+    for( const QVariant & semitones : settings.value( GOD_MODE_INTERVALS_KEY ).toList() )
+    {
+        palette.intervals.emplace_back( semitones.toInt() );
+    }
+
+    for( const QVariant & quality : settings.value( GOD_MODE_CHORDS_KEY ).toList() )
+    {
+        palette.chords.push_back( static_cast<domain::ChordQuality>( quality.toInt() ) );
+    }
+
+    for( const QVariant & mode : settings.value( GOD_MODE_MODES_KEY ).toList() )
+    {
+        palette.modes.push_back( static_cast<domain::Mode>( mode.toInt() ) );
+    }
+
+    return palette;
+}
+
+void QSettingsPlayerPreferences::storeGodModePalette( const domain::GodModePalette & p_palette )
+{
+    QVariantList intervals;
+    QVariantList chords;
+    QVariantList modes;
+
+    for( const domain::Interval & interval : p_palette.intervals )
+    {
+        intervals.append( interval.semitones() );
+    }
+
+    for( const domain::ChordQuality quality : p_palette.chords )
+    {
+        chords.append( static_cast<int>( quality ) );
+    }
+
+    for( const domain::Mode mode : p_palette.modes )
+    {
+        modes.append( static_cast<int>( mode ) );
+    }
+
+    QSettings settings;
+
+    settings.setValue( GOD_MODE_INTERVALS_KEY, intervals );
+    settings.setValue( GOD_MODE_CHORDS_KEY, chords );
+    settings.setValue( GOD_MODE_MODES_KEY, modes );
+}
+
+std::optional<domain::PlayerLevel> QSettingsPlayerPreferences::storedAnnouncedLevel() const
+{
+    const QSettings settings;
+
+    if( !settings.contains( ANNOUNCED_LEVEL_KEY ) )
+    {
+        // Rien annonce : le jeu n'a jamais felicite ce joueur, et la premiere felicitation lui appartient.
+        return std::nullopt;
+    }
+
+    return domain::playerLevelFromIndex(
+      static_cast<std::size_t>( settings.value( ANNOUNCED_LEVEL_KEY ).toInt() ) );
+}
+
+void QSettingsPlayerPreferences::storeAnnouncedLevel( domain::PlayerLevel p_level )
+{
+    QSettings settings;
+
+    settings.setValue( ANNOUNCED_LEVEL_KEY, static_cast<int>( p_level ) );
 }
 
 std::vector<bool> QSettingsPlayerPreferences::storedEnabledInstruments() const
@@ -258,6 +388,92 @@ void QSettingsPlayerPreferences::storeReferencePitch( double p_hertz )
     settings.setValue( REFERENCE_PITCH_KEY, p_hertz );
 }
 
+std::int32_t QSettingsPlayerPreferences::storedForeignNoteQuestionShare() const
+{
+    // DIX par defaut, comme le domaine : « Par defaut » et « a l'installation » doivent dire la MEME chose, sinon le bouton
+    // ment - et Roger l'a vu sur le rappel avant de le voir ici.
+    //
+    // Une valeur hors bornes retombe sur ce meme defaut, jamais sur autre chose.
+    const std::int32_t stored = QSettings{}.value( FOREIGN_NOTE_QUESTION_SHARE_KEY, 10 ).toInt();
+
+    if( stored < 0 || stored > 100 )
+    {
+        return 10;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeForeignNoteQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( FOREIGN_NOTE_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedPhraseTempoBpm() const
+{
+    // Soixante-douze par defaut, comme l'atelier : un profil neuf entend ce que Roger a valide a l'oreille. Les bornes
+    // tiennent la phrase jouable - a quarante, elle traine ; a cent soixante, elle n'est plus une phrase.
+    const std::int32_t stored = QSettings{}.value( PHRASE_TEMPO_BPM_KEY, 72 ).toInt();
+
+    if( stored < 40 || stored > 160 )
+    {
+        return 72;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storePhraseTempoBpm( std::int32_t p_bpm )
+{
+    QSettings settings;
+
+    settings.setValue( PHRASE_TEMPO_BPM_KEY, p_bpm );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedPhraseTempoVariation() const
+{
+    // Vingt par defaut : Roger demandait « varier autour de 20-30 bpm », et vingt suffit a casser la monotonie sans
+    // rendre un mode plus dur qu'un autre - toutes les phrases du jeu varient de la meme facon.
+    const std::int32_t stored = QSettings{}.value( PHRASE_TEMPO_VARIATION_KEY, 20 ).toInt();
+
+    if( stored < 0 || stored > 40 )
+    {
+        return 20;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storePhraseTempoVariation( std::int32_t p_variation )
+{
+    QSettings settings;
+
+    settings.setValue( PHRASE_TEMPO_VARIATION_KEY, p_variation );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedNamedIntervalQuestionShare() const
+{
+    // Soixante, comme le domaine : le defaut d'un profil neuf est le jeu tel qu'il etait avant que cette part existe.
+    const std::int32_t stored = QSettings{}.value( NAMED_INTERVAL_QUESTION_SHARE_KEY, 60 ).toInt();
+
+    // Une part hors bornes est une faute de frappe dans un fichier qu'un joueur peut ouvrir, et retombe sur le defaut.
+    if( stored < 0 || stored > 100 )
+    {
+        return 60;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeNamedIntervalQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( NAMED_INTERVAL_QUESTION_SHARE_KEY, p_share );
+}
+
 std::int32_t QSettingsPlayerPreferences::storedSingQuestionShare() const
 {
     const std::int32_t stored = QSettings{}.value( SING_QUESTION_SHARE_KEY, 20 ).toInt();
@@ -278,28 +494,6 @@ void QSettingsPlayerPreferences::storeSingQuestionShare( std::int32_t p_share )
     settings.setValue( SING_QUESTION_SHARE_KEY, p_share );
 }
 
-std::int32_t QSettingsPlayerPreferences::storedRhythmQuestionShare() const
-{
-    // ZERO, et c'est le defaut du DOMAINE aussi (SessionSettings) : la question de rythme existe, elle se regle, et
-    // elle est eteinte tant qu'on ne l'allume pas. Une valeur hors bornes retombe sur ce meme zero, pas sur autre
-    // chose : un fichier abime doit rendre le silence, jamais imposer du rythme.
-    const std::int32_t stored = QSettings{}.value( RHYTHM_QUESTION_SHARE_KEY, 0 ).toInt();
-
-    if( stored < 0 || stored > 100 )
-    {
-        return 0;
-    }
-
-    return stored;
-}
-
-void QSettingsPlayerPreferences::storeRhythmQuestionShare( std::int32_t p_share )
-{
-    QSettings settings;
-
-    settings.setValue( RHYTHM_QUESTION_SHARE_KEY, p_share );
-}
-
 std::int32_t QSettingsPlayerPreferences::storedChordQuestionShare() const
 {
     const std::int32_t stored = QSettings{}.value( CHORD_QUESTION_SHARE_KEY, 20 ).toInt();
@@ -317,6 +511,135 @@ void QSettingsPlayerPreferences::storeChordQuestionShare( std::int32_t p_share )
     QSettings settings;
 
     settings.setValue( CHORD_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedModeColourQuestionShare() const
+{
+    // ZERO par defaut, comme le rythme : un reglage qui n'a jamais ete touche ne doit pas changer la nature du jeu.
+    const std::int32_t stored = QSettings{}.value( MODE_COLOUR_QUESTION_SHARE_KEY, 10 ).toInt();
+
+    if( stored < 0 || stored > 100 )
+    {
+        // Un fichier de reglages est un fichier qu'un humain peut editer : une valeur absurde doit couter le reglage,
+        // jamais le lancement.
+        return 0;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeModeColourQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( MODE_COLOUR_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedModeNameQuestionShare() const
+{
+    const std::int32_t stored = QSettings{}.value( MODE_NAME_QUESTION_SHARE_KEY, 10 ).toInt();
+
+    if( stored < 0 || stored > 100 )
+    {
+        return 10;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeModeNameQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( MODE_NAME_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedModeVampQuestionShare() const
+{
+    const std::int32_t stored = QSettings{}.value( MODE_VAMP_QUESTION_SHARE_KEY, 10 ).toInt();
+
+    if( stored < 0 || stored > 100 )
+    {
+        return 10;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeModeVampQuestionShare( std::int32_t p_share )
+{
+    QSettings settings;
+
+    settings.setValue( MODE_VAMP_QUESTION_SHARE_KEY, p_share );
+}
+
+std::int32_t QSettingsPlayerPreferences::storedArcadeLives() const
+{
+    // Le domaine decide des bornes (dix par defaut, vingt-cinq au plus) ; ceci n'en garde qu'une valeur lisible, et une
+    // valeur hors bornes retombe sur le defaut plutot que de casser une partie.
+    const std::int32_t stored = QSettings{}.value( ARCADE_LIVES_KEY, 10 ).toInt();
+
+    if( stored < 0 || stored > 25 )
+    {
+        return 10;
+    }
+
+    return stored;
+}
+
+void QSettingsPlayerPreferences::storeArcadeLives( std::int32_t p_lives )
+{
+    QSettings settings;
+
+    settings.setValue( ARCADE_LIVES_KEY, p_lives );
+}
+
+std::int64_t QSettingsPlayerPreferences::storedBilanCount() const
+{
+    return std::max<std::int64_t>( 0, QSettings{}.value( BILAN_COUNT_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeBilanCount( std::int64_t p_count )
+{
+    QSettings settings;
+
+    settings.setValue( BILAN_COUNT_KEY, static_cast<qlonglong>( p_count ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::storedPerfectBilanCount() const
+{
+    return std::max<std::int64_t>( 0, QSettings{}.value( PERFECT_BILAN_COUNT_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storePerfectBilanCount( std::int64_t p_count )
+{
+    QSettings settings;
+
+    settings.setValue( PERFECT_BILAN_COUNT_KEY, static_cast<qlonglong>( p_count ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::storedBilanSuccessStreak() const
+{
+    return std::max<std::int64_t>( 0, QSettings{}.value( BILAN_SUCCESS_STREAK_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeBilanSuccessStreak( std::int64_t p_streak )
+{
+    QSettings settings;
+
+    settings.setValue( BILAN_SUCCESS_STREAK_KEY, static_cast<qlonglong>( p_streak ) );
+}
+
+std::int64_t QSettingsPlayerPreferences::storedLongestBilanSuccessStreak() const
+{
+    return std::max<std::int64_t>( 0, QSettings{}.value( LONGEST_BILAN_SUCCESS_STREAK_KEY, 0 ).toLongLong() );
+}
+
+void QSettingsPlayerPreferences::storeLongestBilanSuccessStreak( std::int64_t p_streak )
+{
+    QSettings settings;
+
+    settings.setValue( LONGEST_BILAN_SUCCESS_STREAK_KEY, static_cast<qlonglong>( p_streak ) );
 }
 
 }    // namespace musichien::infrastructure

@@ -24,6 +24,10 @@ musichienFunction_AddLibrary(infrastructure
     content/JsonAnecdoteBook.cpp
     content/JsonTunerGuide.h
     content/JsonTunerGuide.cpp
+
+    # Le livre des phrases modales : le meme contrat que les indices - du TEXTE en entree, un livre du domaine en sortie.
+    content/JsonPhraseBook.h
+    content/JsonPhraseBook.cpp
     haptics/DeviceHaptics.h
     haptics/DeviceHaptics.cpp
     notifications/NotificationScheduler.h
@@ -72,6 +76,7 @@ if(MUSICHIEN_BUILD_TESTING)
         audio/AudioMixer_test.cpp
         content/JsonHintBook_test.cpp
         content/JsonTunerGuide_test.cpp
+        content/JsonPhraseBook_test.cpp
         statistics/JsonLinesQuestionLog_test.cpp
     )
 

@@ -45,9 +45,6 @@ ApplicationWindow {
     // L'accordeur vivait dans les reglages, ce qui est la meilleure facon de ne jamais le trouver : c'est un OUTIL, et un
     // outil se prend quand on en a besoin. La page porte les trois choses qui vont ensemble - le micro, les reglages
     // d'accordage, et de quoi comprendre ce qu'on regle.
-
-    id: mainWindow
-
     // Hides the explanatory text after a few seconds: enough time to read a name and a number, short
     // enough that the screen does not stay cluttered.
     // -------------------------------------------------------------------------------------------------
@@ -61,11 +58,59 @@ ApplicationWindow {
     // faut aussi remplacer `popup`, ce que Qt Quick Controls 2 attend explicitement.
     // Un champ numerique aux couleurs du jeu.
     // Les couleurs des parts du camembert : un vert pour l'oreille, un bleu pour le sens, un dore pour le chant, un rose
-    // pour le rythme et un violet pour les accords. Elles sont choisies pour rester distinctes sur une nuit violette -
-    // un camembert ou deux parts se ressemblent ne dit rien.
-    readonly property var kindColours: ["#8ef2b0", "#7bb0ff", "#ffd479", "#ff8fb0", "#c9a0ff"]
+    // pour le rythme, un violet pour les accords, un turquoise pour la couleur des modes et un orange pour leur nom.
+    // =================================================================================================================
+    // LE CERCLE DES QUINTES
+    // =================================================================================================================
+    // LE MUSICHIEN QUI S'INVITE
+    // Il vit ICI, au niveau de la fenetre et non d'une page : c'est ce qui lui permet de se poser par-dessus n'importe
+    // quoi - l'accueil, les reglages, le cercle - sans que chaque page ait a le connaitre. Roger l'a demande comme ca :
+    // « ce serait le Musichien qui s'invite pour raconter des trucs ».
+    // =================================================================================================================
+    // LA COULEUR DIT LA FAMILLE
+    // =================================================================================================================
+    // Roger a demande que la couleur range les boutons par famille plutot que de les decorer : on JOUE en rouge, les
+    // variantes du jeu dans un rouge eteint, les deux OUTILS dans une couleur a eux, et tout le reste en gris. Une
+    // famille, une couleur, un endroit ou la changer.
+    // LA FELICITATION DE PALIER.
+    // LA CONFIRMATION DE LA REMISE A ZERO DU PROFIL.
+    // LE GODMODE, EN ENTIER.
+    // UNE FAMILLE DE CASES A COCHER : un titre, « tout » et « rien », puis les cases.
+    // =================================================================================================================
+    // UN BOUTON QUI PARLE LA LANGUE DE LA PAGE
+    // =================================================================================================================
+    // Tous les boutons de l'accueil portent le mot de la meme facon : en capitales, dans la police ronde, et avec un
+    // peu plus de poids qu'un texte courant. C'est une decision d'ECRAN, pas une propriete de chaque bouton - et c'est
+    // ici qu'elle se change.
+    // LA MESURE D'UN LIBELLE, pour les listes deroulantes.
+
+    id: mainWindow
+
+    // Le NOMBRE compte : une part prend sa couleur par son RANG, donc une palette plus courte que la liste des genres
+    // ferait reapparaitre les premieres couleurs sur les derniers genres - et deux parts de la meme teinte dans un
+    // camembert ne disent plus rien.
+    readonly property var kindColours: ["#8ef2b0", "#7bb0ff", "#ffd479", "#ff8fb0", "#c9a0ff", "#6fe3d2", "#ffb066"]
     // Width shared by the standalone controls, so that they line up without each repeating the rule.
     readonly property real buttonWidth: Math.min(width * 0.82, 340)
+    // Le rouge du bouton « Jouer » n'est PAS ici : c'est celui du style Material, et Roger l'a trouve bon du premier
+    // coup - le reecrire serait le seul moyen de le perdre.
+    readonly property color questColour: "#8c3a48"
+    // le rouge du jeu, eteint : ce sont des variantes, elles s'annoncent sans crier
+    readonly property color questLabelColour: "#ffe3e6"
+    // L'ENTRAINEMENT a sa propre couleur, et c'est un choix de Roger : « une couleur néon toujours mais qui évoquerait
+    // l'entrainement ou le chill, genre un bleu clair ». Le rouge dit « le jeu » ; le bleu clair dit « je travaille » -
+    // et les deux se lisent d'un coup d'oeil sur la page de garde, sans une phrase de plus.
+    readonly property color trainingColour: "#1c4a66"
+    readonly property color trainingLabelColour: "#a6e7ff"
+    // Et le duo des outils. Le metronome est FROID et le diapason CHAUD, et c'est ce qui les distingue : l'un donne le
+    // temps, l'autre la justesse. Ce qui les relie, ce n'est pas la teinte mais le TRAITEMENT - le meme fond profond,
+    // la meme icone en neon, la meme intensite. Un cyan et un magenta qui se repondent, sur la nuit violette : c'est
+    // le duo que porte deja tout le reste de l'ecran, et c'est pour ca qu'ils ont l'air d'aller ensemble.
+    readonly property color rhythmColour: "#123f47"
+    // le metronome : le temps, froid
+    readonly property color rhythmNeon: "#5fe3e8"
+    readonly property color pitchColour: "#3f1c4e" // le diapason : la justesse, chaud
+    readonly property color pitchNeon: "#d98cff"
     // What the domain said about the interval heard last, and whether there is anything to say at
     // all. An empty map is what a single note produces, because a single note is not an interval.
     readonly property var heardInterval: IntervalController.lastPlayedInterval
@@ -173,6 +218,339 @@ ApplicationWindow {
     // and a bug. The view model was given a method for exactly this call.
     onClosing: IntervalController.stopPlayback()
 
+    // Elle vit ICI, a la racine, et non dans le composant DarkComboBox : un composant inline n'accepte pas d'objet
+    // enfant - seule une definition d'objet en accepte - et le declarer la empechait l'ecran entier de s'instancier.
+    // Le texte est pose juste avant chaque mesure, et la largeur lue aussitot.
+    TextMetrics {
+        id: comboTextMetrics
+
+        font: mainWindow.font
+    }
+
+    // Roger : « apres une partie, si il atteint un certain niveau d'experience, on pourra lui dire : bravo, tu passes au
+    // niveau “Jusqu'a l'octave”, regarde derriere toi tu as fait enormement de progres ». C'est exactement ce qu'elle dit -
+    // et elle ne dit RIEN d'autre, parce qu'un ecran qui felicite et qui vend en meme temps ne felicite plus.
+    Dialog {
+        id: levelUpDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 460)
+        modal: true
+        padding: 16
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#ffd479"
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 12
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                color: "#ffd479"
+                font.pixelSize: 21
+                font.bold: true
+                text: qsTr("Bravo !")
+            }
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                wrapMode: Text.WordWrap
+                color: "#ffffff"
+                font.pixelSize: 15
+                text: qsTr("Tu as joué assez pour la suite : le palier « %1 » t'attend. Regarde derrière toi, tu as fait du chemin.").arg(ExerciseController.invitedLevelName)
+            }
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                wrapMode: Text.WordWrap
+                color: "#cbb8e8"
+                font.pixelSize: 13
+                text: qsTr("Tu peux y passer maintenant, ou continuer encore un peu : la flèche de la liste des difficultés garde ce choix ouvert.")
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                spacing: 10
+
+                MenuButton {
+                    Layout.fillWidth: true
+                    text: qsTr("Plus tard")
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        levelUpDialog.close();
+                    }
+                }
+
+                TintedMenuButton {
+                    Layout.fillWidth: true
+                    tintColour: mainWindow.questColour
+                    labelColour: mainWindow.questLabelColour
+                    text: qsTr("Passer")
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        ExerciseController.acceptLevelInvitation();
+                        levelUpDialog.close();
+                    }
+                }
+
+            }
+
+        }
+
+    }
+
+    // Roger l'a demandee le jour ou l'on a parle du GodMode, et pour la bonne raison : c'est le SEUL chemin de retour en
+    // arriere - effacer le score, c'est repartir - donc le seul geste que personne ne veut faire par accident.
+    Dialog {
+        id: resetProfileDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.9, 420)
+        modal: true
+        padding: 16
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 12
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                wrapMode: Text.WordWrap
+                color: "#ffffff"
+                font.pixelSize: 18
+                font.bold: true
+                text: qsTr("Tout remettre à zéro ?")
+            }
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                wrapMode: Text.WordWrap
+                color: "#cbb8e8"
+                font.pixelSize: 14
+                text: qsTr("L'expérience, les sessions, les étoiles et tout l'historique seront effacés. Ton nom et ton niveau restent. On ne pourra pas revenir en arrière.")
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                spacing: 10
+
+                MenuButton {
+                    Layout.fillWidth: true
+                    text: qsTr("Annuler")
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        resetProfileDialog.close();
+                    }
+                }
+
+                TintedMenuButton {
+                    Layout.fillWidth: true
+                    tintColour: mainWindow.questColour
+                    labelColour: mainWindow.questLabelColour
+                    text: qsTr("Tout effacer")
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        ExerciseController.resetProfile();
+                        resetProfileDialog.close();
+                    }
+                }
+
+            }
+
+        }
+
+    }
+
+    // Roger : « ca ouvrirait une grosse page avec plein de checkbox ». La promesse de cette page est que ses clics ne
+    // changent RIEN tant qu'on n'a pas appuye sur Sauvegarder : c'est ce qui donne son sens au mot sauvegarde, et c'est ce
+    // que dit le libelle « non sauvegarde ».
+    Dialog {
+        id: godModeDialog
+
+        anchors.centerIn: parent
+        width: Math.min(mainWindow.width * 0.96, 560)
+        height: mainWindow.height * 0.94
+        modal: true
+        padding: 12
+
+        background: Rectangle {
+            color: "#241442"
+            radius: 14
+            border.width: 1
+            border.color: "#5c4a80"
+        }
+
+        contentItem: ScrollView {
+            id: godModeScroll
+
+            clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            // Meme correction que partout ailleurs : rien ne depasse en largeur, donc rien ne doit glisser de cote.
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            contentWidth: availableWidth
+
+            ColumnLayout {
+                width: godModeScroll.availableWidth
+                spacing: 10
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    wrapMode: Text.WordWrap
+                    color: "#ffffff"
+                    font.pixelSize: 22
+                    font.bold: true
+                    text: ExerciseController.godModeHasUnsavedChanges ? qsTr("GodMode · non sauvegardé") : qsTr("GodMode")
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    wrapMode: Text.WordWrap
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    text: qsTr("Choisis toi-même ce que tu travailles. Les cinq niveaux restent là : ils pré-remplissent ces cases, et c'est tout.")
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    color: "#8a77ad"
+                    font.pixelSize: 14
+                    text: qsTr("Partir d'un niveau")
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Repeater {
+                        model: ExerciseController.playerLevels
+
+                        delegate: MenuButton {
+                            required property var modelData
+
+                            // Les cinq niveaux seulement : le GodMode n'est pas un modele de lui-meme.
+                            visible: !modelData.isGodMode
+                            text: modelData.name
+                            onClicked: {
+                                ExerciseController.playTapCue();
+                                ExerciseController.prefillGodModeFromLevel(modelData.index);
+                            }
+                        }
+
+                    }
+
+                }
+
+                // CE QUI EMPECHE DE JOUER, dit en une phrase et au bon endroit : « coche au moins deux intervalles » se
+                // corrige, « configuration invalide » ne se corrige pas.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.topMargin: 6
+                    wrapMode: Text.WordWrap
+                    visible: text !== ""
+                    color: "#ff8fb0"
+                    font.pixelSize: 14
+                    text: ExerciseController.godModeProblem
+                }
+
+                GodModeFamilySection {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Intervalles")
+                    entries: ExerciseController.godModeIntervals
+                    indexKey: "semitones"
+                    onToggled: (index) => {
+                        return ExerciseController.toggleGodModeInterval(index);
+                    }
+                    onAllChecked: (checked) => {
+                        return ExerciseController.setEveryGodModeIntervalChecked(checked);
+                    }
+                }
+
+                GodModeFamilySection {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Accords")
+                    entries: ExerciseController.godModeChords
+                    indexKey: "index"
+                    onToggled: (index) => {
+                        return ExerciseController.toggleGodModeChord(index);
+                    }
+                    onAllChecked: (checked) => {
+                        return ExerciseController.setEveryGodModeChordChecked(checked);
+                    }
+                }
+
+                GodModeFamilySection {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Modes")
+                    entries: ExerciseController.godModeModes
+                    indexKey: "index"
+                    onToggled: (index) => {
+                        return ExerciseController.toggleGodModeMode(index);
+                    }
+                    onAllChecked: (checked) => {
+                        return ExerciseController.setEveryGodModeModeChecked(checked);
+                    }
+                }
+
+                Item {
+                    Layout.preferredHeight: 16
+                }
+
+            }
+
+        }
+
+        footer: RowLayout {
+            spacing: 8
+
+            TintedMenuButton {
+                Layout.fillWidth: true
+                tintColour: mainWindow.questColour
+                labelColour: mainWindow.questLabelColour
+                text: qsTr("Sauvegarder")
+                enabled: ExerciseController.godModeCanStart
+                onClicked: {
+                    ExerciseController.playTapCue();
+                    ExerciseController.saveGodMode();
+                }
+            }
+
+            MenuButton {
+                Layout.fillWidth: true
+                text: qsTr("Fermer")
+                onClicked: {
+                    ExerciseController.playTapCue();
+                    godModeDialog.close();
+                }
+            }
+
+        }
+
+    }
+
     // La demande d'autorisation part un peu APRES le premier affichage : le joueur voit d'abord la page, et la boite
     // d'Android arrive ensuite, sur quelque chose qui existe. Posee pendant la construction de l'ecran, elle
     // apparaitrait sur une fenetre encore vide, ce qui ressemble a un plantage plutot qu'a une question.
@@ -224,6 +602,25 @@ ApplicationWindow {
                 // Asked right here, and right before "Jouer", because it is the only thing the landing screen
                 // needs to know before a session starts - and it decides where the sessions begin. It is NOT a
                 // setting: the answer is remembered, and it is the first piece of the profile.
+                // -------------------------------------------------------------------------------------------------
+                // Les sept modes, du plus clair au plus sombre
+                // La PHRASE du mode : une vraie phrase du contenu, avec les durees que l'oreille de Roger a retenues.
+                // Elle vient APRES avoir entendu le mode, et sur le mode allume : c'est le meme geste que la gamme, un
+                // cran plus loin. Un bouton par mode en ferait quatorze a l'ecran d'un telephone, pour un choix qui n'a
+                // aucune raison d'etre simultane.
+                // La ROUE du mode entendu : ses sept notes allumées sur le cercle des quintes, la tonique marquée.
+                // -----------------------------------------------------------------------------------------
+                // Le niveau, en LISTE DEROULANTE.
+                // La grille de boutons qu'elle remplace mangeait la moitie de la page : quatre options - cinq
+                // aujourd'hui - sur deux lignes, chacune de la largeur d'un bouton. Roger l'a demande tel quel :
+                // « il faudrait faire la combobox pour les niveaux, ca allegerait pas mal ».
+                // Les DEUX GRANDS OUTILS, en icones.
+                // LE GODMODE N'EST PAS UN NIVEAU, ET SES CLICS NE SONT PAS ENCORE ACTIFS.
+                // Le composant est celui des reglages, et il est ANCRE dans un Item de la largeur des boutons : ses
+                // propres Layout.* visent un parent qui est un Layout, et ici le parent n'en est pas un - la largeur
+                // vient donc du bouton qui la porte, ce qui est exactement ce qu'on veut.
+                // LA DIFFICULTE, ET LA FLECHE QUI DIT QU'ON PEUT MONTER.
+                // L'ENTRAINEMENT : trois familles, dix questions chacune, et aucune experience.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -244,6 +641,15 @@ ApplicationWindow {
                     source: "qrc:/assets/images/shiba-guitar.png"
                     fillMode: Image.PreserveAspectFit
                     smooth: true
+
+                    // Le chien de l'accueil REPOND : appuyer sur lui ouvre la popup avec une AUTRE anecdote. Roger l'a
+                    // demande, et c'est ce qui fait du chien un personnage plutot qu'une illustration - il a toujours
+                    // quelque chose a raconter, et c'est lui qu'on vient voir.
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: ExerciseController.tellAnotherAnecdote()
+                    }
+
                 }
 
                 Text {
@@ -304,31 +710,99 @@ ApplicationWindow {
                     text: ExerciseController.hasChosenLevel ? qsTr("Ton niveau") : qsTr("Pour commencer : tu en es où ?")
                 }
 
-                GridLayout {
+                // Roger l'a voulue ici : « je mettrais bien dans la combobox de difficulte, si il est invite a augmenter de
+                // palier, un bouton d'icone de fleche doree vers le haut ». C'est la que se change un palier, donc c'est la
+                // qu'un rappel a un sens - et nulle part ailleurs.
+                RowLayout {
+                    // LA FLECHE DOREE, et elle dure tant que le palier n'a pas ete pris : c'est un RAPPEL, pas une
+                    // obligation. Un joueur qui a dit « plus tard » la retrouve la, et reste libre de son rythme.
+
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
-                    columns: 2
-                    columnSpacing: 8
-                    rowSpacing: 8
+                    spacing: 8
 
-                    Repeater {
-                        model: ExerciseController.playerLevels
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: levelCombo.implicitHeight
 
-                        delegate: Button {
-                            required property var modelData
+                        DarkComboBox {
+                            id: levelCombo
 
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 44
-                            text: modelData.name
-                            font.pixelSize: 14
-                            // The chosen one stays marked, so that the screen never leaves any doubt about the
-                            // level the next session will use.
-                            highlighted: ExerciseController.playerLevel === modelData.index
-                            onClicked: ExerciseController.choosePlayerLevel(modelData.index)
+                            anchors.fill: parent
+                            model: ExerciseController.playerLevels
+                            textRole: "name"
+                            valueRole: "index"
+                            // La liste deroulée s'ouvre assez large pour montrer TOUT ce qu'elle propose : voir
+                            // widestEntryWidth. C'est ici que Roger l'a demande - « le mode "je débute" ne s'affiche pas si
+                            // on n'est pas débutant ». L'affectation est IMPERATIVE, jamais une liaison : une liaison ici
+                            // rejouerait la mesure a chaque frame.
+                            popup.onOpened: popup.width = widestEntryWidth()
+                            // Le niveau choisi reste marque dans la liste : l'ecran ne laisse jamais de doute sur la
+                            // difficulte de la prochaine partie.
+                            currentIndex: ExerciseController.playerLevel
+                            onActivated: {
+                                ExerciseController.choosePlayerLevel(currentValue);
+                            }
                         }
 
                     }
 
+                    // SUR UN FOND SOMBRE, et c'est une correction de Roger : « la fleche doree dans un bouton gris ne se voit
+                    // pas bien. Mais elle est nickel ». Le gris du style est la couleur des portes grises, pas celle d'un
+                    // signal : le violet profond la fait ressortir, et c'est le seul bouton de la page a crier quelque chose.
+                    MenuButton {
+                        Layout.preferredWidth: 52
+                        Layout.preferredHeight: levelCombo.implicitHeight
+                        visible: ExerciseController.levelInvitationIsAvailable
+                        Material.background: "#2a1a46"
+                        Material.foreground: "#ffd479"
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            levelUpDialog.open();
+                        }
+
+                        // Dessinee comme l'engrenage du GodMode : une hampe et une pointe, vers le haut.
+                        Canvas {
+                            anchors.centerIn: parent
+                            width: 22
+                            height: 22
+                            antialiasing: true
+                            onPaint: {
+                                const ctx = getContext("2d");
+                                ctx.reset();
+                                ctx.strokeStyle = "#ffd479";
+                                ctx.lineWidth = 3;
+                                ctx.lineCap = "round";
+                                ctx.lineJoin = "round";
+                                // La hampe.
+                                ctx.beginPath();
+                                ctx.moveTo(11, 19);
+                                ctx.lineTo(11, 6);
+                                ctx.stroke();
+                                // Et la pointe.
+                                ctx.beginPath();
+                                ctx.moveTo(5, 11);
+                                ctx.lineTo(11, 4);
+                                ctx.lineTo(17, 11);
+                                ctx.stroke();
+                            }
+                        }
+
+                    }
+
+                }
+
+                // Roger a demande ce mot exactement - « ca repasse en mode Custom (not saved) » - et sans lui, le joueur
+                // croirait que ses clics ont deja change la partie : ils ne la changent qu'apres Sauvegarder.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: ExerciseController.godModeIsChosen && ExerciseController.godModeHasUnsavedChanges
+                    color: "#ffd479"
+                    font.pixelSize: 12
+                    text: qsTr("GodMode non sauvegardé : tu joues encore l'ancienne configuration.")
                 }
 
                 Item {
@@ -352,13 +826,74 @@ ApplicationWindow {
 
                 // The way into the loop. It sits above the bench on purpose: the bench is a tool for
                 // building the project, and playing is what the application is FOR.
-                Button {
+                // LA PORTE PRINCIPALE, et c'est l'ARCADE depuis que le jeu a quatre modes. Elle garde le rouge du style, et
+                // c'est le seul bouton dont le mot est plus grand que les autres : c'est celui que l'oeil doit trouver en
+                // premier, et une taille plus grande le dit mieux qu'une phrase.
+                MenuButton {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 58
+                    font.pixelSize: 23
                     highlighted: true
-                    text: qsTr("▶ Jouer")
+                    text: qsTr("▶ ARCADE")
                     onClicked: ExerciseController.startSession()
+                }
+
+                // Ce que l'Arcade est, en une phrase : le seul mode qui fait progresser, et il impose son dosage. Roger a
+                // voulu que l'experience ne se gagne QU'ICI - « si il veut progresser en experience, il doit imperativement
+                // faire le B » - et l'ecran doit le dire, sinon le joueur s'entraine sans jamais comprendre pourquoi son
+                // niveau ne monte pas.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    text: qsTr("25 questions · le seul mode qui fait gagner de l'expérience.")
+                }
+
+                // Roger les a voulues JUSTE SOUS l'Arcade - « les 3 familles, ce seront les 3 modes qu'on mettrait en ligne
+                // juste en dessous du bouton ARCADE » - et dans un BLEU CLAIR : le rouge dit « le jeu », le bleu dit « je
+                // travaille ». Pas de phrase d'introduction : le bouton se comprend seul, et une legende qui explique
+                // l'evidence prend la place de ce qu'elle commente.
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    Layout.topMargin: 8
+                    spacing: 8
+
+                    TintedMenuButton {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        tintColour: mainWindow.trainingColour
+                        labelColour: mainWindow.trainingLabelColour
+                        text: qsTr("Intervalles")
+                        onClicked: ExerciseController.startTrainingSession(0)
+                    }
+
+                    TintedMenuButton {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        tintColour: mainWindow.trainingColour
+                        labelColour: mainWindow.trainingLabelColour
+                        text: qsTr("Accords")
+                        onClicked: ExerciseController.startTrainingSession(1)
+                    }
+
+                    TintedMenuButton {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        tintColour: mainWindow.trainingColour
+                        labelColour: mainWindow.trainingLabelColour
+                        text: qsTr("Modes")
+                        onClicked: ExerciseController.startTrainingSession(2)
+                    }
+
                 }
 
                 // Le BILAN : une session dont les questions sont DECIDEES, du plus facile au plus difficile. Il reste
@@ -377,10 +912,14 @@ ApplicationWindow {
                     text: qsTr("C'est le week-end : l'heure du bilan.")
                 }
 
-                Button {
+                TintedMenuButton {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 46
+                    // Le meme rouge que les variantes du jeu, mais eteint : c'est une porte du jeu, pas le jeu.
+                    tintColour: mainWindow.questColour
+                    labelColour: mainWindow.questLabelColour
+                    labelSize: 20
                     // Dore le week-end : la couleur suffit a dire « c'est le moment », et le bouton garde sa place
                     // sous « Jouer » : c'est jouer qui doit rester la porte d'entree.
                     highlighted: ExerciseController.isWeekEnd
@@ -406,16 +945,20 @@ ApplicationWindow {
                     Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
 
-                    Button {
+                    TintedMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
+                        tintColour: mainWindow.questColour
+                        labelColour: mainWindow.questLabelColour
                         text: qsTr("Mode infini")
                         onClicked: ExerciseController.startInfiniteSession()
                     }
 
-                    Button {
+                    TintedMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
+                        tintColour: mainWindow.questColour
+                        labelColour: mainWindow.questLabelColour
                         text: qsTr("Chanter")
                         onClicked: {
                             MicrophoneController.startSingingSession();
@@ -423,35 +966,169 @@ ApplicationWindow {
                         }
                     }
 
-                    Button {
+                    TintedMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
+                        tintColour: mainWindow.questColour
+                        labelColour: mainWindow.questLabelColour
                         text: qsTr("Survie")
                         onClicked: ExerciseController.startSurvivalSession()
                     }
 
                 }
 
-                // Les OUTILS et les portes vers des PAGES, sous les modes de jeu. Deux rangees de deux plutot qu'une
-                // rangee de quatre : « Metronome » et « Accordeur » ne tiennent pas cote a cote sur la largeur d'un
-                // telephone, et un libelle coupe en deux n'est plus un libelle.
+                // Et un peu d'air SOUS cette rangee-la, avant les outils : Roger l'a demande - « je rajouterai bien un
+                // petit espace en bas de la ligne qui a : infini, chanter et survie ».
+                Item {
+                    Layout.preferredHeight: 10
+                }
+
+                // Un metronome et un diapason se reconnaissent d'un coup d'oeil, et ce sont les deux seuls outils qu'on
+                // ouvre pour TRAVAILLER - l'un donne le temps, l'autre la justesse. Un bouton qui ne porte qu'un mot
+                // demande a etre lu ; une forme se voit. Roger : « je mettrais plutot une icone avec un gros diapason,
+                // ca devrait se comprendre tout seul ».
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
 
-                    Button {
+                    // Le metronome, en cyan : c'est le TEMPS, et le temps est froid. Le fond profond et l'icone en
+                    // neon disent que c'est un outil, pas une decoration - et l'icone se dessine dans la couleur du
+                    // bouton, donc les deux ne peuvent pas se desaccorder.
+                    TintedMenuButton {
+                        id: metroButton
+
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 46
-                        text: qsTr("Métronome")
-                        onClicked: rhythmDialog.open()
+                        Layout.preferredHeight: 116
+                        tintColour: mainWindow.rhythmColour
+                        iconColour: mainWindow.rhythmNeon
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            rhythmDialog.open();
+                        }
+
+                        // Le MOT reste, sous l'icone. Une forme se reconnait, mais un outil qui n'est plus nomme
+                        // n'est plus une promesse : l'ecran ne dit plus ce qu'il ouvre, et c'est un test qui l'a
+                        // fait remarquer avant qu'un joueur ne s'en apercoive.
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 9
+                            text: qsTr("Métronome")
+                            color: "#cbb8e8"
+                            font.capitalization: Font.AllUppercase
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                        }
+
+                        // Le metronome : le boitier en trapeze, la tige inclinee et son contrepoids. C'est la
+                        // silhouette du vieil appareil a balancier, celle que tout le monde a vue sur un piano.
+                        Canvas {
+                            anchors.centerIn: parent
+                            // L'icone remonte de 10 points : le mot est en bas du bouton, et les deux doivent tenir
+                            // ensemble plutot que se chevaucher.
+                            anchors.verticalCenterOffset: -10
+                            width: 62
+                            height: 62
+                            antialiasing: true
+                            onPaint: {
+                                const ctx = getContext("2d");
+                                ctx.reset();
+                                ctx.strokeStyle = metroButton.iconColour;
+                                ctx.lineWidth = 5;
+                                ctx.lineJoin = "round";
+                                ctx.lineCap = "round";
+                                // Le boitier, plus large en bas.
+                                ctx.beginPath();
+                                ctx.moveTo(17, 54);
+                                ctx.lineTo(45, 54);
+                                ctx.lineTo(36, 14);
+                                ctx.lineTo(26, 14);
+                                ctx.closePath();
+                                ctx.stroke();
+                                // La tige qui bat, et son contrepoids.
+                                ctx.beginPath();
+                                ctx.moveTo(31, 51);
+                                ctx.lineTo(41, 12);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.arc(38, 22, 4, 0, Math.PI * 2);
+                                ctx.stroke();
+                                // La graduation : trois crans, qui disent que ca bat.
+                                ctx.beginPath();
+                                ctx.moveTo(21, 44);
+                                ctx.lineTo(25, 44);
+                                ctx.moveTo(24, 34);
+                                ctx.lineTo(28, 34);
+                                ctx.stroke();
+                            }
+                        }
+
                     }
 
-                    Button {
+                    // Et le diapason, en magenta : c'est la JUSTESSE, et elle est chaude. Le meme traitement que le
+                    // metronome - fond profond, icone en neon - avec une teinte opposee sur la roue : le cyan et le
+                    // magenta se repondent, et c'est ce qui fait tenir les deux boutons ensemble sans les confondre.
+                    TintedMenuButton {
+                        id: tunerButton
+
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 46
-                        text: qsTr("Accordeur")
-                        onClicked: tunerDialog.open()
+                        Layout.preferredHeight: 116
+                        tintColour: mainWindow.pitchColour
+                        iconColour: mainWindow.pitchNeon
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            tunerDialog.open();
+                        }
+
+                        // Et son mot, comme le metronome : l'accordeur nomme l'outil qu'il ouvre.
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 9
+                            text: qsTr("Accordeur")
+                            color: "#cbb8e8"
+                            font.capitalization: Font.AllUppercase
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                        }
+
+                        // Le diapason : la fourche et son manche. Deux traits epais qui montent, et l'oeil ne s'y
+                        // trompe pas - c'est l'objet qui donne la justesse, et le seul que l'accordeur peut montrer.
+                        Canvas {
+                            anchors.centerIn: parent
+                            anchors.verticalCenterOffset: -10
+                            width: 62
+                            height: 62
+                            antialiasing: true
+                            onPaint: {
+                                const ctx = getContext("2d");
+                                ctx.reset();
+                                ctx.strokeStyle = tunerButton.iconColour;
+                                ctx.lineWidth = 6;
+                                ctx.lineJoin = "round";
+                                ctx.lineCap = "round";
+                                // La fourche : deux branches qui montent et s'ecartent.
+                                ctx.beginPath();
+                                ctx.moveTo(21, 12);
+                                ctx.lineTo(21, 26);
+                                ctx.quadraticCurveTo(21, 40, 31, 40);
+                                ctx.quadraticCurveTo(41, 40, 41, 26);
+                                ctx.lineTo(41, 12);
+                                ctx.stroke();
+                                // Le manche, qui descend du creux de la fourche.
+                                ctx.beginPath();
+                                ctx.moveTo(31, 40);
+                                ctx.lineTo(31, 52);
+                                ctx.stroke();
+                                // Et son pied, un peu evase.
+                                ctx.beginPath();
+                                ctx.moveTo(26, 54);
+                                ctx.lineTo(36, 54);
+                                ctx.stroke();
+                            }
+                        }
+
                     }
 
                 }
@@ -461,25 +1138,44 @@ ApplicationWindow {
                     Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
 
-                    Button {
+                    // Le cercle des quintes : la CARTE du pilier harmonie, et la seule page qui ne demande rien au
+                    // joueur - on y lit, on n'y repond pas. Il descend ici, avec les deux portes, parce que les deux
+                    // grands outils au-dessus avaient besoin de toute la largeur.
+                    MenuButton {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Cercle")
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            keyCircleDialog.open();
+                        }
+                    }
+
+                    MenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
                         text: qsTr("Options")
-                        onClicked: settingsDialog.open()
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            settingsDialog.open();
+                        }
                     }
 
-                    Button {
+                    MenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
                         text: qsTr("Profil")
-                        onClicked: profileDialog.open()
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            profileDialog.open();
+                        }
                     }
 
                 }
 
                 // L'ARBRE DES ACCORDS, sur sa propre ligne : c'est une CARTE qu'on consulte, pas un reglage, et elle se
                 // trouve sans chercher. Elle merite mieux qu'une quatrieme case dans une rangee de trois.
-                Button {
+                MenuButton {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     Layout.preferredHeight: 46
@@ -661,6 +1357,140 @@ ApplicationWindow {
                     text: qsTr("Écoute bien, puis nomme ce que tu entends.")
                 }
 
+                // Un mode ne s'entend PAS tout seul : il lui faut un CENTRE. Chaque bouton fait donc entendre la gamme
+                // montee puis descendue SUR UN BOURDON tenu, et c'est le domaine qui decide quelle quinte tenir et
+                // combien de temps. C'est le meme chemin que l'exercice du degrade, donc le meme son.
+                // -------------------------------------------------------------------------------------------------
+                Rectangle {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 1
+                    color: "#4a3170"
+                }
+
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 8
+                    text: qsTr("Les sept modes, du plus clair au plus obscur")
+                    color: "#ffffff"
+                    font.pixelSize: 17
+                    font.bold: true
+                }
+
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    text: qsTr("Touche un mode : la gamme monte et descend sur un bourdon, pour entendre sa couleur. Les plus clairs sont en haut.")
+                    color: "#cbb8e8"
+                    font.pixelSize: 14
+                    wrapMode: Text.WordWrap
+                }
+
+                Flow {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: Math.min(scrollView.availableWidth - 24, 360)
+                    Layout.topMargin: 8
+                    spacing: 6
+
+                    Repeater {
+                        // La liste vient du domaine, exactement comme celle des intervalles : ajouter un mode au
+                        // domaine est ce qui fait apparaitre un bouton ici.
+                        model: ModeController.modes
+
+                        delegate: Button {
+                            required property var modelData
+                            // Le bouton allume est celui qui a vraiment ete ENTENDU, et non celui qui a ete touche.
+                            readonly property bool wasHeard: ModeController.lastPlayedMode.index !== undefined && modelData.index === ModeController.lastPlayedMode.index
+                            // La CLARTE peint le bouton : plus le mode est clair, plus il est lumineux. C'est l'axe du
+                            // cercle des quintes, et il prepare l'exercice du degrade - ou les cases s'assombrissent a
+                            // mesure qu'on eteint des notes.
+                            readonly property bool isBright: modelData.brightness > 0.5
+
+                            width: 104
+                            height: 46
+                            leftPadding: 6
+                            rightPadding: 6
+                            text: modelData.name
+                            font.pixelSize: 14
+                            highlighted: wasHeard
+                            Material.background: Qt.rgba(0.18 + (0.62 * modelData.brightness), 0.14 + (0.56 * modelData.brightness), 0.3 + (0.48 * modelData.brightness), 1)
+                            Material.foreground: isBright ? "#1d1033" : "#ffffff"
+                            onClicked: {
+                                ModeController.playMode(modelData.index);
+                                // ET LA ROUE S'ANIME : sa tete part de la tonique et parcourt la gamme, de note en
+                                // note. La duree vient du CONTROLEUR - c'est le temps que la gamme met vraiment a sonner.
+                                modeBenchCircle.startPlayback(ModeController.playbackLeadInMs, ModeController.playbackNoteStepMs);
+                            }
+                        }
+
+                    }
+
+                }
+
+                // Ce qui vient de sonner, et la note qui colore ce mode : c'est le lien entre ce que l'oreille entend et
+                // ce que la theorie en dit, au moment ou elle l'entend.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#8ef2b0"
+                    font.pixelSize: 14
+                    wrapMode: Text.WordWrap
+                    visible: ModeController.lastPlayedMode.index !== undefined
+                    text: ModeController.lastPlayedMode.index !== undefined ? qsTr("%1 — %2").arg(ModeController.lastPlayedMode.name).arg(ModeController.lastPlayedMode.characteristic) : ""
+                }
+
+                // Le bouton disparait quand le contenu n'a pas de phrase pour ce mode, et c'est voulu : offrir un bouton
+                // qui ne sonne pas apprendrait au joueur a ne plus appuyer.
+                Button {
+                    readonly property int playedModeIndex: ModeController.lastPlayedMode.index !== undefined ? ModeController.lastPlayedMode.index : -1
+
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 10
+                    visible: playedModeIndex >= 0 && ModeController.phraseCountForMode(playedModeIndex) > 0
+                    text: qsTr("♪ Phrase")
+                    onClicked: ModeController.playPhraseOfMode(playedModeIndex)
+                }
+
+                // Ce qui vient de sonner, en degres : « 1 4(2) 5 1 ». C'est la meme ecriture que celle de l'atelier, ou
+                // ces phrases ont ete gardees - donc ce que l'oreille a juge peut se relire ici.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    Layout.topMargin: 6
+                    Layout.leftMargin: 24
+                    Layout.rightMargin: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#cbb8e8"
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                    visible: ModeController.lastPlayedPhrase.degrees !== undefined
+                    text: ModeController.lastPlayedPhrase.degrees !== undefined ? qsTr("la phrase : %1 (%2 bpm)").arg(ModeController.lastPlayedPhrase.degrees).arg(ModeController.lastPlayedPhrase.bpm) : ""
+                }
+
+                // Ici elle ne cache rien - le banc d'essai fait écouter à loisir - et c'est justement à quoi elle sert :
+                // voir la fenêtre de notes pendant qu'on l'entend, jusqu'à ce que l'oreille la reconnaisse seule.
+                ModeCircle {
+                    id: modeBenchCircle
+
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 12
+                    visible: ModeController.playedModeCircle.length > 0
+                    notes: ModeController.playedModeCircle
+                }
+
                 Item {
                     Layout.preferredHeight: 16
                 }
@@ -721,17 +1551,13 @@ ApplicationWindow {
         id: settingsDialog
 
         anchors.centerIn: parent
-        width: Math.min(mainWindow.width * 0.9, 420)
-        // La popup s'adapte a son contenu, et se borne seulement quand il ne tient pas : plus d'espace vide en bas,
-        // et le defilement prend le relais quand il y a trop a montrer.
-        height: Math.min(mainWindow.height * 0.9, settingsColumn.implicitHeight + 32)
+        // PLEIN ECRAN, et ce n'est pas un caprice : la page des reglages a grandi jusqu'a ne plus tenir dans une popup -
+        // instruments, rappel, poids des jeux, tempo - et Roger a demande « un ecran pour avoir un peu plus de place ».
+        // Un dialogue qui prend tout l'ecran est cet ecran, sans toucher a la navigation.
+        width: mainWindow.width
+        height: mainWindow.height
         modal: true
-        padding: 16
-
-        // Les reglages contiennent la page du micro : l'ouvrir ouvre l'ecoute, le fermer la referme. C'est le meme
-        // reglage que dans l'accordeur, avec la meme regle - pas de microphone ouvert pour rien.
-        onOpened: MicrophoneController.ensureListening()
-        onClosed: MicrophoneController.stopTest()
+        padding: 12
 
         // Un fond sombre, et pas la feuille blanche du systeme : cette page fait partie du jeu, et le
         // blanc de l’application systeme jurait au milieu du bleu nuit.
@@ -750,10 +1576,27 @@ ApplicationWindow {
             // La colonne ne doit jamais defiler de cote : rien ne depasse en largeur, et un leger mouvement horizontal
             // quand on fait defiler vers le bas est un defaut, pas une liberte.
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            // Et le contenu est BORNE a la largeur disponible, ce qui est la seule facon d'empecher vraiment le
+            // deplacement lateral : la barre cachee n'empechait pas le glissement, et Roger l'a senti - « on peut toujours
+            // bouger la page de gauche a droite, ce qui est derangeant avec les sliders ». Un curseur qu'on tire ne doit
+            // jamais deplacer la page.
+            contentWidth: availableWidth
 
             ColumnLayout {
-                // Les trois parts de question : combien de questions de chaque genre sur cent. Un reglage par genre,
-                // la meme mise en page pour les trois, et une seule definition - voir QuestionShareSetting.
+                // Le TEMPO des phrases de mode, et son amplitude. Roger : « on pourrait choisir de l'augmenter, d'en choisir
+                // un central et de varier autour de 20-30 bpm. Histoire de rendre moins monotone. »
+                // Et celle-ci est en TETE parce que c'est d'elle que les autres se detachent : on commence par demander
+                // moins de « nommer », et les parts qui suivent prennent ce qu'on lui retire. C'est la question que le
+                // jeu posait a ses debuts, et la seule qui n'avait pas de part a elle - elle prenait ce qui restait, et
+                // un total qui depassait cent la faisait disparaitre en silence.
+                // LES POIDS DES JEUX, et dans CET ordre : d'abord les trois questions d'ecoute, puis les modes, puis la
+                // note etrangere. Roger l'a demande tel quel, et l'ordre de l'ecran est aussi celui du tirage - une
+                // part ne deplace donc que les questions qui la suivent.
+                // Le micro, le tempere et le diapason ne sont PAS ici : ils vivent dans la page Accordeur, ou ils servent
+                // vraiment. Roger l'a demande - « enlever le micro et la configuration du temperament, le diapason, et le
+                // laisser seulement au niveau de l'accordeur » - et il a raison : un reglage se range la ou il s'emploie.
+                // Le panneau du micro, lui, est le MEME composant que celui de l'accordeur : une seule definition.
+                // LES DEUX BOUTONS DU BAS, dans l'ordre demande : « Par defaut » puis « Fermer ».
 
                 id: settingsColumn
 
@@ -764,28 +1607,119 @@ ApplicationWindow {
                     Layout.preferredWidth: 0
                     Layout.minimumWidth: 0
                     Layout.fillWidth: true
+                    Layout.topMargin: 8
+                    color: "#e8dcff"
+                    font.pixelSize: 16
+                    font.bold: true
+                    text: qsTr("Sons des instruments")
+                }
+
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.fillWidth: true
                     color: "#cbb8e8"
                     font.pixelSize: 14
                     wrapMode: Text.WordWrap
-                    text: qsTr("Le tirage se fait au hasard parmi les instruments coches.")
+                    text: qsTr("Le tirage se fait au hasard parmi les instruments cochés.")
                 }
 
-                Repeater {
-                    model: ExerciseController.instruments
+                // Les instruments sur DEUX colonnes : une seule colonne obligeait a faire defiler pour voir la liste
+                // entiere, et Roger a demande ce regroupement - « les ecrire propre au lieu de mot sans majuscule, et
+                // sur plusieurs colonnes plutot que sur une seule comme maintenant ».
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 4
 
-                    delegate: CheckBox {
-                        required property var modelData
+                    Repeater {
+                        // Un bouton d'ECOUTE, a cote de chaque instrument.
 
-                        Layout.fillWidth: true
-                        // Material reserve une cible tactile de 48 dp : dans une LIGNE de liste, c'est deux fois trop.
-                        // Un Layout n'obéit qu'a Layout.preferredHeight, jamais a `height`.
+                        model: ExerciseController.instruments
+
+                        delegate: Row {
+                            required property var modelData
+
+                            width: (settingsColumn.width / 2) - 6
+                            height: 34
+
+                            CheckBox {
+                                id: instrumentCheckBox
+
+                                // Le bouton d'ecoute prend sa place, et le nom garde le reste : c'est le nom qu'on
+                                // lit, c'est le bouton qu'on pousse.
+                                width: parent.width - instrumentPreviewButton.width
+                                height: parent.height
+                                text: modelData.name
+                                checked: modelData.enabled
+                                onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+
+                                // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre. Le
+                                // leftPadding remet le texte a droite de la case, sinon il se pose par-dessus
+                                // l'indicateur.
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: "#e8dcff"
+                                    verticalAlignment: Text.AlignVCenter
+                                    leftPadding: parent.indicator.width + parent.spacing
+                                    font.pixelSize: 13
+                                }
+
+                            }
+
+                            // Roger : « ce serait pas mal d'avoir un bouton play a cote du choix des instruments, qui
+                            // joue une gamme phrygienne montante et descendante puis un accord caracteristique du
+                            // phrygien ». Un nom sur une case ne dit rien de ce qu'on entendra - et onze timbres, c'est
+                            // onze fois le meme probleme.
+                            Button {
+                                id: instrumentPreviewButton
+
+                                // Roger l'a trouve « un peu petit » : 36, c'est juste ce qu'il faut pour un pouce, sans
+                                // voler la place du nom de l'instrument a cote.
+                                width: 36
+                                height: parent.height
+                                text: "\u25B6"
+                                onClicked: ExerciseController.previewInstrument(modelData.index)
+
+                                // Le bouton ne pose pas de fond tant qu'on ne le touche pas : la ligne doit rester une
+                                // liste d'instruments, pas une rangee de boutons.
+                                background: Rectangle {
+                                    color: instrumentPreviewButton.down ? "#3a2a5c" : "transparent"
+                                    radius: 4
+                                }
+
+                                contentItem: Text {
+                                    text: instrumentPreviewButton.text
+                                    color: "#ffd479"
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    font.pixelSize: 13
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                // L'HEURE du rappel est sur la MEME ligne que la case qui l'active : celui qui vient de l'activer cherche
+                // aussitot QUAND il sonnera, et Roger a demande exactement ce regroupement - « et enlever le texte inutile
+                // "L'heure du rappel" ».
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    spacing: 6
+
+                    CheckBox {
                         Layout.preferredHeight: 34
-                        text: modelData.name
-                        checked: modelData.enabled
-                        onClicked: ExerciseController.setInstrumentEnabled(modelData.index, checked)
+                        text: qsTr("Un rappel chaque jour")
+                        checked: ExerciseController.dailyReminderEnabled
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            ExerciseController.setDailyReminderEnabled(checked);
+                        }
 
-                        // Meme defaut que le nom du profil : le style Material ecrit noir sur fond sombre. Le leftPadding
-                        // remet le texte a droite de la case, sinon il se pose par-dessus l'indicateur.
                         contentItem: Text {
                             text: parent.text
                             color: "#e8dcff"
@@ -794,40 +1728,6 @@ ApplicationWindow {
                             font.pixelSize: 13
                         }
 
-                    }
-
-                }
-
-                CheckBox {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 34
-                    text: qsTr("Un rappel chaque jour")
-                    checked: ExerciseController.dailyReminderEnabled
-                    onClicked: ExerciseController.setDailyReminderEnabled(checked)
-
-                    contentItem: Text {
-                        text: parent.text
-                        color: "#e8dcff"
-                        verticalAlignment: Text.AlignVCenter
-                        leftPadding: parent.indicator.width + parent.spacing
-                        font.pixelSize: 13
-                    }
-
-                }
-
-                // L'HEURE du rappel, juste sous la case qui l'active : celui qui vient de l'activer cherche aussitot
-                // QUAND il sonnera. Deux nombres plutot qu'un selecteur d'heure : c'est plus court a regler, et cela
-                // tient sur une ligne de telephone.
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.topMargin: 2
-                    visible: ExerciseController.dailyReminderEnabled
-                    spacing: 6
-
-                    Text {
-                        color: "#8a77ad"
-                        font.pixelSize: 13
-                        text: qsTr("L'heure du rappel :")
                     }
 
                     DarkSpinBox {
@@ -885,108 +1785,38 @@ ApplicationWindow {
                     text: qsTr("Prochaine oreille : %1").arg(mainWindow.reminderCountdown())
                 }
 
-                // L'accordage. Le tempere egal est la reference, et il reste le defaut : c'est ce sur quoi la musique
-                // autour de nous est construite. Les anciens ne prennent leur sens qu'autour d'une tonique, et le
-                // texte le dit plutot que de laisser croire a un simple bouton de plus.
-                ColumnLayout {
+                // Les parts sont des POIDS, lus les uns par rapport aux autres : leur somme est l'echelle, et le total
+                // n'a donc pas besoin de faire cent. Vingt partout vaut un sixieme pour chacun.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.fillWidth: true
+                    Layout.topMargin: 16
+                    color: "#e8dcff"
+                    font.pixelSize: 16
+                    font.bold: true
+                    text: qsTr("Poids des jeux")
+                }
+
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.fillWidth: true
+                    color: "#cbb8e8"
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Chaque curseur est un poids, pas un pourcentage : c'est le rapport entre les poids qui décide. Le pourcentage affiché est la chance réelle de tomber sur cette question.")
+                }
+
+                QuestionShareSetting {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
-                    spacing: 6
-
-                    Text {
-                        Layout.fillWidth: true
-                        color: "#e8dcff"
-                        font.pixelSize: 14
-                        font.bold: true
-                        text: qsTr("Accordage (tempérament et diapason)")
+                    title: qsTr("Nommer")
+                    hint: qsTr("Poids des questions où l'on nomme l'intervalle entendu. Les parts se lisent entre elles : 20 partout vaut un sixième chacune.")
+                    share: ExerciseController.namedIntervalQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setNamedIntervalQuestionShare(p_share);
                     }
-
-                    DarkComboBox {
-                        model: ExerciseController.temperaments
-                        currentIndex: ExerciseController.temperament
-                        onActivated: ExerciseController.setTemperament(index)
-                    }
-
-                    Text {
-                        Layout.preferredWidth: 0
-                        Layout.minimumWidth: 0
-                        Layout.fillWidth: true
-                        color: "#8a77ad"
-                        font.pixelSize: 12
-                        wrapMode: Text.WordWrap
-                        text: qsTr("Le tempéré est la référence. Les autres sonnent plus juste par endroits, et faux ailleurs. La page Accordeur explique chacun d'eux.")
-                    }
-
-                    // La note de reference : sans elle, un accordage non egal ne veut rien dire. Elle n'apparait
-                    // donc que quand l'accordage en a besoin.
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 4
-                        spacing: 6
-                        visible: ExerciseController.temperament !== 0
-
-                        Text {
-                            Layout.fillWidth: true
-                            color: "#e8dcff"
-                            font.pixelSize: 13
-                            text: qsTr("Note de référence")
-                        }
-
-                        DarkComboBox {
-                            model: ExerciseController.tuningRoots
-                            currentIndex: ExerciseController.tuningRoot
-                            onActivated: ExerciseController.setTuningRoot(index)
-                        }
-
-                    }
-
-                    // Le diapason. 440 par defaut, mais beaucoup d'instruments a vent sont construits un peu plus
-                    // haut pour sonner plus brillant : le regler, c'est accorder l'accordeur sur eux.
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 4
-                        spacing: 6
-
-                        Text {
-                            Layout.fillWidth: true
-                            color: "#e8dcff"
-                            font.pixelSize: 13
-                            text: qsTr("Diapason (le la de référence)")
-                        }
-
-                        SpinBox {
-                            Layout.preferredWidth: 150
-                            Layout.preferredHeight: 32
-                            Layout.alignment: Qt.AlignLeft
-                            from: 400
-                            to: 480
-                            stepSize: 1
-                            editable: true
-                            value: ExerciseController.referencePitch
-                            onValueModified: ExerciseController.setReferencePitch(value)
-
-                            contentItem: TextInput {
-                                text: parent.textFromValue(parent.value, parent.locale)
-                                color: "#ffffff"
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pixelSize: 15
-                                validator: parent.validator
-                                inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                readOnly: !parent.editable
-                            }
-
-                            background: Rectangle {
-                                color: "#1b1035"
-                                radius: 4
-                                border.width: 1
-                                border.color: "#5c4a80"
-                            }
-
-                        }
-
-                    }
-
                 }
 
                 // Le rythme et les accords sont arrives apres le chant, et ils se sont fait brancher sans une ligne
@@ -995,7 +1825,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
                     title: qsTr("Chant")
-                    hint: qsTr("Part des questions chantées, en pour cent. 0 = jamais, 100 = tout chanter.")
+                    hint: qsTr("Poids des questions chantées. Un poids, lu par rapport aux autres parts.")
                     share: ExerciseController.singQuestionShare
                     onShareEdited: (p_share) => {
                         return ExerciseController.setSingQuestionShare(p_share);
@@ -1005,35 +1835,209 @@ ApplicationWindow {
                 QuestionShareSetting {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
-                    title: qsTr("Rythme")
-                    hint: qsTr("Part des questions de rythme, en pour cent. 0 = jamais, 100 = que du rythme.")
-                    share: ExerciseController.rhythmQuestionShare
-                    onShareEdited: (p_share) => {
-                        return ExerciseController.setRhythmQuestionShare(p_share);
-                    }
-                }
-
-                QuestionShareSetting {
-                    Layout.fillWidth: true
-                    Layout.topMargin: 10
                     title: qsTr("Accords")
-                    hint: qsTr("Part des questions d'accords, en pour cent. 0 = jamais, 100 = que des accords.")
+                    hint: qsTr("Poids des questions d'accords. Un poids, lu par rapport aux autres parts.")
                     share: ExerciseController.chordQuestionShare
                     onShareEdited: (p_share) => {
                         return ExerciseController.setChordQuestionShare(p_share);
                     }
                 }
 
-                // Le micro : choisir le peripherique et le tester. Le MEME panneau sert ici et sur la page
-                // Accordeur - deux copies finiraient par montrer deux accordeurs differents.
-                MicrophonePanel {
+                // Les deux marches de l'harmonie, et elles sont bien DEUX : comparer deux couleurs est un travail
+                // d'oreille, nommer un mode un travail de vocabulaire. Un joueur peut vouloir la premiere sans la
+                // seconde, et l'application doit pouvoir dire laquelle resiste.
+                QuestionShareSetting {
+                    Layout.fillWidth: true
                     Layout.topMargin: 10
+                    title: qsTr("Modes : plus clair, plus obscur")
+                    hint: qsTr("Part des questions qui font comparer deux modes sur un bourdon. 0 = jamais. C'est la première marche de l'harmonie : de l'oreille, aucun vocabulaire.")
+                    share: ExerciseController.modeColourQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setModeColourQuestionShare(p_share);
+                    }
                 }
 
-                Button {
-                    Layout.alignment: Qt.AlignRight
-                    text: qsTr("Fermer")
-                    onClicked: settingsDialog.close()
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Modes : leur nom")
+                    hint: qsTr("Part des questions qui font nommer un mode entendu sur un bourdon. 0 = jamais. La même couleur, mais dite avec un mot.")
+                    share: ExerciseController.modeNameQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setModeNameQuestionShare(p_share);
+                    }
+                }
+
+                // La plus avancee des trois : la MEME gamme sur deux centres differents. C'est la seule question dont la
+                // reponse soit dans le contexte - les notes ne bougent pas, le mode si.
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Modes : deux centres")
+                    hint: qsTr("Part des questions qui font entendre la même gamme sur deux centres différents. 0 = jamais. Les notes sont identiques, le mode change.")
+                    share: ExerciseController.modeVampQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setModeVampQuestionShare(p_share);
+                    }
+                }
+
+                // La troisieme marche de l'harmonie : la plus fine des trois, et c'est pour cela qu'elle vient en dernier.
+                QuestionShareSetting {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    title: qsTr("Note étrangère")
+                    hint: qsTr("Poids des questions où une note étrangère se cache dans une gamme. 0 = jamais. Il faut tenir toute la gamme dans sa tête pour la repérer.")
+                    share: ExerciseController.foreignNoteQuestionShare
+                    onShareEdited: (p_share) => {
+                        return ExerciseController.setForeignNoteQuestionShare(p_share);
+                    }
+                }
+
+                // Le premier est le CENTRE, le second l'amplitude du tirage : chaque phrase est jouée à centre ± tirage,
+                // donc aucune ne sonne exactement comme la précédente. Le tempo écrit dans le contenu ne décide plus.
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 16
+                    spacing: 6
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        text: qsTr("Tempo des phrases :")
+                    }
+
+                    DarkSpinBox {
+                        Layout.preferredWidth: 86
+                        from: 40
+                        to: 160
+                        stepSize: 2
+                        value: ExerciseController.phraseTempoBpm
+                        onValueModified: ExerciseController.setPhraseTempoBpm(value)
+                    }
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        text: qsTr("bpm")
+                    }
+
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    spacing: 6
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        text: qsTr("Variation :")
+                    }
+
+                    DarkSpinBox {
+                        Layout.preferredWidth: 86
+                        from: 0
+                        to: 40
+                        stepSize: 5
+                        value: ExerciseController.phraseTempoVariation
+                        onValueModified: ExerciseController.setPhraseTempoVariation(value)
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 0
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        text: qsTr("± bpm, tiré à chaque phrase")
+                    }
+
+                }
+
+                // LES COEURS DE L'ARCADE. Dix par defaut, vingt-cinq au plus, et c'est un RACCOURCI assume : Roger l'a
+                // demande tel quel - « juste un cheatcode pour rendre l'arcade plus facile » - pour pouvoir enfin tenir
+                // une partie jusqu'au boss. Il ne change ni le bareme du multiplicateur ni la longueur de l'Arcade.
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 16
+                    spacing: 6
+
+                    Text {
+                        Layout.fillWidth: true
+                        color: "#e8dcff"
+                        font.pixelSize: 14
+                        font.bold: true
+                        text: qsTr("Cœurs d'Arcade")
+                    }
+
+                    Text {
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
+                        Layout.fillWidth: true
+                        color: "#8a77ad"
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Combien de fois tu peux te tromper dans une Arcade. Monte à 25 pour voir le boss tranquillement.")
+                    }
+
+                    RowLayout {
+                        spacing: 10
+
+                        Slider {
+                            Layout.fillWidth: true
+                            from: 1
+                            to: 25
+                            stepSize: 1
+                            value: ExerciseController.arcadeLives
+                            onMoved: ExerciseController.setArcadeLives(value)
+                        }
+
+                        DarkSpinBox {
+                            Layout.preferredWidth: 86
+                            from: 1
+                            to: 25
+                            stepSize: 1
+                            value: ExerciseController.arcadeLives
+                            onValueModified: ExerciseController.setArcadeLives(value)
+                        }
+
+                    }
+
+                }
+
+                // « Par defaut » est a gauche et discret : c'est un geste rare, et il ne touche JAMAIS au score - voir
+                // resetPreferences. Un bouton qui efface les etoiles sans le dire serait un piege.
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 16
+                    spacing: 10
+
+                    Button {
+                        Layout.fillWidth: true
+                        text: qsTr("Par défaut")
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            ExerciseController.resetPreferences();
+                        }
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        highlighted: true
+                        text: qsTr("Fermer")
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            settingsDialog.close();
+                        }
+                    }
+
+                }
+
+                // Et un peu de VIDE en bas : les derniers boutons tombaient sous la barre de navigation du telephone, et
+                // Roger ne pouvait plus les atteindre - « la page de settings ne descend pas assez, les derniers boutons
+                // sont caches par les boutons du telephone ».
+                Item {
+                    Layout.preferredHeight: 128
                 }
 
             }
@@ -1177,7 +2181,10 @@ ApplicationWindow {
                 Button {
                     Layout.alignment: Qt.AlignRight
                     text: qsTr("Fermer")
-                    onClicked: singingDialog.close()
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        singingDialog.close();
+                    }
                 }
 
             }
@@ -1218,13 +2225,22 @@ ApplicationWindow {
             id: profileScroll
 
             clip: true
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            // Meme correction que dans les reglages : rien ne depasse en largeur, donc rien ne doit pouvoir glisser de
+            // cote. La barre cachee ne suffisait pas, et Roger l'a senti sur les deux pages.
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            contentWidth: availableWidth
 
             ColumnLayout {
                 // -----------------------------------------------------------------------------------------------------
                 // LES STATISTIQUES
                 // Ce que le joueur travaille vraiment, ce qu'il delaisse sans le savoir, et combien de temps il joue.
                 // LE CAMEMBERT : la part de chaque genre de question, pour voir d'un coup d'oeil ce qui est travaille.
+                // LA PORTE DU GODMODE, ici et pas dans les reglages : c'est une facon de JOUER, et non un reglage de
+                // confort - et Roger l'a voulue dans le profil.
+                // Remet l'experience, les sessions, les etoiles ET les statistiques a zero : un score efface qui garderait
+                // son journal continuerait de raconter une histoire que le joueur vient d'effacer. Le nom et le niveau
+                // restent : ce sont des choix, pas un score.
 
                 width: profileScroll.availableWidth
                 spacing: 10
@@ -1279,6 +2295,107 @@ ApplicationWindow {
                     font.pixelSize: 14
                     font.bold: true
                     text: StatisticsController.playingDayStreak > 1 ? qsTr("🔥 %1 jours d'affilée !").arg(StatisticsController.playingDayStreak) : qsTr("🔥 C'est parti pour une série")
+                }
+
+                // LE TITRE, et les TROPHEES : ce que le BILAN laisse derriere lui. Roger a voulu les deux reserves au bilan -
+                // « des trophées et/ou des certificats, accessibles seulement via le Bilan ». Le titre dit ou le joueur en
+                // est ; les trophees disent ce qu'il a fait.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 8
+                    color: "#ffd479"
+                    font.pixelSize: 20
+                    font.bold: true
+                    text: ExerciseController.playerTitle.name
+                }
+
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.fillWidth: true
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    font.italic: true
+                    wrapMode: Text.WordWrap
+                    text: ExerciseController.playerTitle.motto
+                }
+
+                // TOUTE L'ECHELLE DES TITRES, et pas seulement celui du moment. Roger : « on peut voir la liste dans la page
+                // de profil (mais en grise). Histoire de donner des "objectifs" au joueur. » Le titre porte est dore et
+                // gras ; ceux d'au-dessus sont un objectif, ceux d'en dessous une etape deja passee.
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    spacing: 2
+
+                    Repeater {
+                        model: ExerciseController.allTitles
+
+                        delegate: RowLayout {
+                            required property var modelData
+
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                Layout.preferredWidth: 18
+                                color: modelData.earned ? "#ffd479" : "#5c4a80"
+                                font.pixelSize: 13
+                                text: modelData.earned ? "★" : "☆"
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 0
+                                Layout.minimumWidth: 0
+                                color: modelData.earned ? "#e8dcff" : "#6f5b93"
+                                font.pixelSize: 12
+                                text: modelData.name + " · " + modelData.motto
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 6
+                    spacing: 3
+
+                    Repeater {
+                        model: ExerciseController.trophies
+
+                        delegate: RowLayout {
+                            required property var modelData
+
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            // Une etoile PLEINE pour ce qui est acquis, creuse pour le reste : le joueur voit d'un coup
+                            // d'oeil ce qu'il a fait, et ce qu'il lui reste a faire.
+                            Text {
+                                Layout.preferredWidth: 20
+                                color: modelData.earned ? "#ffd479" : "#5c4a80"
+                                font.pixelSize: 15
+                                text: modelData.earned ? "★" : "☆"
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 0
+                                Layout.minimumWidth: 0
+                                color: modelData.earned ? "#e8dcff" : "#6f5b93"
+                                font.pixelSize: 12
+                                wrapMode: Text.WordWrap
+                                text: modelData.name + " · " + modelData.description
+                            }
+
+                        }
+
+                    }
+
                 }
 
                 // Tout vient du JOURNAL, et de lui seul : chaque question conclue y laisse une ligne, et cette page est ce
@@ -1592,20 +2709,41 @@ ApplicationWindow {
                     onClicked: ExerciseController.testReminder()
                 }
 
-                // Remet l'experience, les sessions, les etoiles ET les statistiques a zero : un score efface qui garderait
-                // son journal continuerait de raconter une histoire que le joueur vient d'effacer. Le nom et le niveau
-                // restent : ce sont des choix, pas un score. Aucune confirmation pour l'instant - l'application est en
-                // developpement.
+                // Le libelle dit l'etat, et c'est la seule chose qui distingue « j'ai sauvegarde » de « j'ai touche a
+                // quelque chose » : le nom du mode, et rien de plus.
+                Button {
+                    Layout.alignment: Qt.AlignRight
+                    text: ExerciseController.godModeHasUnsavedChanges ? qsTr("GodMode · non sauvegardé") : qsTr("GodMode")
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        godModeDialog.open();
+                    }
+                }
+
+                // Et il DEMANDE CONFIRMATION, maintenant : Roger l'a demande le jour ou ce bouton est devenu le seul chemin
+                // de retour en arriere du GodMode.
                 Button {
                     Layout.alignment: Qt.AlignRight
                     text: qsTr("Remise à zéro complète")
-                    onClicked: ExerciseController.resetProfile()
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        resetProfileDialog.open();
+                    }
                 }
 
                 Button {
                     Layout.alignment: Qt.AlignRight
                     text: qsTr("Fermer")
-                    onClicked: profileDialog.close()
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        profileDialog.close();
+                    }
+                }
+
+                // De l'air sous le dernier bouton : la barre de navigation du telephone recouvrait le bas de la page, et
+                // c'est le meme reproche que Roger a fait aux reglages - « je rajouterai bien un petit espace en bas ».
+                Item {
+                    Layout.preferredHeight: 128
                 }
 
             }
@@ -1727,11 +2865,32 @@ ApplicationWindow {
                     Layout.alignment: Qt.AlignRight
                     Layout.topMargin: 8
                     text: qsTr("Fermer")
-                    onClicked: chordTreeDialog.close()
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        chordTreeDialog.close();
+                    }
                 }
 
             }
 
+        }
+
+    }
+
+    // Plein ecran, comme l'accordeur, et pour la meme raison : c'est une page qu'on LIT, pas un message qu'on acquitte.
+    // La roue a besoin de la place pour que ses douze cases respirent, chacune portant trois informations.
+    // =================================================================================================================
+    Dialog {
+        id: keyCircleDialog
+
+        anchors.centerIn: parent
+        width: mainWindow.width
+        height: mainWindow.height
+        modal: true
+        padding: 0
+
+        KeyCircleScreen {
+            anchors.fill: parent
         }
 
     }
@@ -1865,6 +3024,7 @@ ApplicationWindow {
                             model: ExerciseController.temperaments
                             currentIndex: ExerciseController.temperament
                             onActivated: ExerciseController.setTemperament(index)
+                            popup.onOpened: popup.width = widestEntryWidth()
                         }
 
                         // L'EXPLICATION du temperament choisi : d'ou il vient, et comment il fonctionne. Elle vient du
@@ -1927,6 +3087,7 @@ ApplicationWindow {
                             model: ExerciseController.tuningRoots
                             currentIndex: ExerciseController.tuningRoot
                             onActivated: ExerciseController.setTuningRoot(index)
+                            popup.onOpened: popup.width = widestEntryWidth()
                         }
 
                         Text {
@@ -2116,7 +3277,10 @@ ApplicationWindow {
                     Button {
                         Layout.fillWidth: true
                         text: qsTr("Fermer")
-                        onClicked: tunerDialog.close()
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            tunerDialog.close();
+                        }
                     }
 
                 }
@@ -2273,6 +3437,7 @@ ApplicationWindow {
                         model: RhythmController.patterns
                         currentIndex: RhythmController.currentPattern
                         onActivated: RhythmController.setCurrentPattern(index)
+                        popup.onOpened: popup.width = widestEntryWidth()
                     }
 
                     Text {
@@ -2316,7 +3481,10 @@ ApplicationWindow {
                     Button {
                         Layout.fillWidth: true
                         text: qsTr("Fermer")
-                        onClicked: rhythmDialog.close()
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            rhythmDialog.close();
+                        }
                     }
 
                 }
@@ -2372,6 +3540,279 @@ ApplicationWindow {
 
     }
 
+    // Il arrive quand on revient d'une partie FINIE (voir stopSession, cote controleur), avec l'anecdote du moment, et il
+    // ne part que sur un clic : un texte qu'on n'a pas fini de lire est un texte qu'on n'aurait pas du montrer.
+    // =================================================================================================================
+    Item {
+        // Le chien parle : sa bulle est au-dessus de lui, et elle porte l'anecdote.
+        // ET LA FELICITATION ARRIVE ICI, UNE SEULE FOIS.
+
+        id: chibaPopup
+
+        anchors.fill: parent
+        z: 1000
+        visible: ExerciseController.isChibaTalking
+        // Le chien parle a la fin d'une partie : c'est donc le meme moment, et Roger l'a decrit exactement comme ca -
+        // « apres une partie, on pourra lui dire : bravo ». On la marque en l'ouvrant, sinon elle reviendrait apres chaque
+        // partie ; la fleche de la liste des difficultes, elle, reste tant que le palier n'est pas pris.
+        onVisibleChanged: {
+            if (visible) {
+                // Le chien ARRIVE, et la felicitation de palier l'accompagne.
+                chibaContent.beginArrival();
+                if (ExerciseController.levelInvitationIsAvailable && !ExerciseController.levelInvitationAnnounced) {
+                    ExerciseController.markLevelInvitationAnnounced();
+                    levelUpDialog.open();
+                }
+            }
+        }
+
+        // Un voile : il dit que la page est en pause, et il est cliquable EN ENTIER - y compris a cote du chien, parce
+        // qu'un bouton qu'il faut viser est un bouton qu'on rate.
+        Rectangle {
+            anchors.fill: parent
+            color: "#990b0620"
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: ExerciseController.dismissChiba()
+            }
+
+        }
+
+        // La bulle et le chien ont la MEME largeur, et c'est une correction : Roger a vu le contraire - « le chien est
+        // legerement mal centre, legerement trop a droite, du coup la bulle de texte depasse un peu a droite ». Le chien
+        // n'etait pas decentre (mesure : son contour occupe toute la largeur de l'image) ; c'etait la bulle qui etait plus
+        // large que lui.
+        ColumnLayout {
+            // L'ARRIVEE DU CHIEN, jouee chaque fois qu'il ouvre la bouche.
+            // Roger : « le chien qui apparait en anecdote en fin de partie a une apparition un peu brutale. On pourrait pas le
+            // faire arriver en animation de gauche ou de droite jusqu'au centre (animation tres en mode dodelinage), puis le
+            // texte apparait ». Le texte attend donc la fin du balancement - c'est la transition qui manquait.
+
+            id: chibaContent
+
+            // Le cote est TIRE AU HASARD : il n'entre pas toujours par le meme bord, ce qui donne a chaque fin de partie un
+            // petit air de « tiens, le revoila » plutot qu'un mecanisme qu'on connait par coeur.
+            property real arrivalShift: 0
+
+            function beginArrival() {
+                const fromLeft = Math.random() < 0.5;
+                const distance = chibaPopup.width * 0.75;
+                chibaContent.arrivalShift = fromLeft ? -distance : distance;
+                chibaBubble.opacity = 0;
+                chibaHint.opacity = 0;
+                arrival.restart();
+            }
+
+            width: Math.min(chibaPopup.width - 96, 300)
+            spacing: 0
+            x: (chibaPopup.width - width) / 2 + chibaContent.arrivalShift
+            y: (chibaPopup.height - height) / 2
+
+            // Le DEPLACEMENT, et le DODELINAGE par-dessus : le chien tangue en arrivant, de moins en moins fort, puis se pose.
+            // C'est le balancement de l'IMAGE seule - la bulle, elle, ne tourne pas, sinon le texte tremblerait.
+            SequentialAnimation {
+                id: arrival
+
+                ParallelAnimation {
+                    NumberAnimation {
+                        target: chibaContent
+                        property: "arrivalShift"
+                        to: 0
+                        duration: 700
+                        easing.type: Easing.OutCubic
+                    }
+
+                    SequentialAnimation {
+                        NumberAnimation {
+                            target: chibaDog
+                            property: "wobble"
+                            from: -9
+                            to: 9
+                            duration: 120
+                        }
+
+                        NumberAnimation {
+                            target: chibaDog
+                            property: "wobble"
+                            from: 9
+                            to: -7
+                            duration: 120
+                        }
+
+                        NumberAnimation {
+                            target: chibaDog
+                            property: "wobble"
+                            from: -7
+                            to: 5
+                            duration: 120
+                        }
+
+                        NumberAnimation {
+                            target: chibaDog
+                            property: "wobble"
+                            from: 5
+                            to: 0
+                            duration: 160
+                        }
+
+                    }
+
+                }
+
+                // Et SEULEMENT LA, le texte : « puis le texte apparait ».
+                ParallelAnimation {
+                    NumberAnimation {
+                        target: chibaBubble
+                        property: "opacity"
+                        to: 1
+                        duration: 260
+                    }
+
+                    NumberAnimation {
+                        target: chibaHint
+                        property: "opacity"
+                        to: 1
+                        duration: 260
+                    }
+
+                }
+
+            }
+
+            Rectangle {
+                id: chibaBubble
+
+                Layout.fillWidth: true
+                Layout.preferredHeight: musichienLabel.implicitHeight + 36
+                color: "#fdf8ff"
+                radius: 18
+                border.width: 2
+                border.color: "#3a1f5c"
+
+                Text {
+                    id: musichienLabel
+
+                    anchors.centerIn: parent
+                    width: parent.width - 32
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#2a1548"
+                    font.pixelSize: 16
+                    text: ExerciseController.anecdoteText
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: ExerciseController.dismissChiba()
+                }
+
+            }
+
+            Image {
+                id: chibaDog
+
+                // Le DODELINAGE, anime par l'arrivee : c'est le chien qui tangue, pas la bulle de texte - un texte qui
+                // tremble se lit mal.
+                property real wobble: 0
+
+                Layout.fillWidth: true
+                // La hauteur est bornee par l'ecran, pour que le chien ne mange pas la page en paysage ; la largeur, elle,
+                // est celle de la bulle. Les deux blocs se superposent donc exactement, et plus rien ne depasse.
+                Layout.preferredHeight: Math.min(chibaPopup.height * 0.34, 190)
+                fillMode: Image.PreserveAspectFit
+                // Une des QUATRE humeurs, tiree au hasard a chaque fois qu'il ouvre la bouche.
+                source: ExerciseController.chibaImageSource
+                rotation: chibaDog.wobble
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: ExerciseController.dismissChiba()
+                }
+
+            }
+
+            Text {
+                id: chibaHint
+
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 8
+                color: "#cbb8e8"
+                font.pixelSize: 12
+                text: qsTr("touche l'écran pour continuer")
+            }
+
+        }
+
+    }
+
+    // Trois familles, et un seul composant : trois copies auraient fini par diverger, et la quatrieme famille - le jour ou
+    // une question de plus existera - se branchera en trois lignes.
+    component GodModeFamilySection: ColumnLayout {
+        id: godModeSection
+
+        property string title: ""
+        property var entries: []
+        // Le nom de la cle qui identifie un element : des DEMI-TONS pour un intervalle, un index pour un accord ou un mode.
+        property string indexKey: "semitones"
+
+        signal toggled(int index)
+        signal allChecked(bool checked)
+
+        spacing: 2
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Text {
+                Layout.fillWidth: true
+                color: "#ffffff"
+                font.pixelSize: 17
+                font.bold: true
+                text: godModeSection.title
+            }
+
+            MenuButton {
+                text: qsTr("Tout")
+                onClicked: godModeSection.allChecked(true)
+            }
+
+            MenuButton {
+                text: qsTr("Rien")
+                onClicked: godModeSection.allChecked(false)
+            }
+
+        }
+
+        // Les cases, en vrac dans la largeur : c'est une grosse liste, et Roger l'a acceptee telle quelle - « pour l'instant
+        // l'interface peut etre moche, juste une grosse liste ».
+        Flow {
+            Layout.fillWidth: true
+            spacing: 2
+
+            Repeater {
+                model: godModeSection.entries
+
+                delegate: CheckBox {
+                    required property var modelData
+
+                    text: modelData.name
+                    checked: modelData.checked
+                    // LE TEXTE EST BLANC, et il faut le dire : le style Material peint ses cases sur fond CLAIR, avec un
+                    // texte noir - invisible sur notre nuit violette. Roger l'a vu tout de suite : « les textes sont en
+                    // noir, sur fond sombre ca ne se voit pas bien ». Meme correction que partout ailleurs, appliquee ici
+                    // une fois pour les trois familles.
+                    Material.foreground: "#ffffff"
+                    onClicked: godModeSection.toggled(modelData[godModeSection.indexKey])
+                }
+
+            }
+
+        }
+
+    }
+
     component MicrophonePanel: Rectangle {
         Layout.fillWidth: true
         // Un Rectangle qui ne contient qu'un layout ancre n'a AUCUNE hauteur propre : ses enfants se
@@ -2405,6 +3846,8 @@ ApplicationWindow {
                 model: MicrophoneController.inputDeviceNames
                 currentIndex: MicrophoneController.currentDeviceIndex
                 onActivated: MicrophoneController.selectDevice(index)
+                // Les noms de peripheriques sont longs par nature : c'est ici que la liste doit s'elargir le plus.
+                popup.onOpened: popup.width = widestEntryWidth()
             }
 
             // La portee miniature : la boule suit la hauteur chantee. Le composant StaffBall porte le style.
@@ -2446,6 +3889,38 @@ ApplicationWindow {
 
         }
 
+    }
+
+    // Roger : « les textes des boutons devraient avoir une police d'ecriture plus sympa et plus douce et ronde », et
+    // « les autres boutons en gris comme ils sont actuellement, c'est parfait ». Le gris ne bouge donc pas d'un
+    // pixel : seule la maniere de dire le mot change.
+    component MenuButton: Button {
+        font.capitalization: Font.AllUppercase
+        font.pixelSize: 15
+        font.weight: Font.DemiBold
+        // Le style Material garde 24 points de marge de chaque cote, ce qui suffit a elider un mot : « MODE INFINI »
+        // en capitales est plus large que « Mode infini » en minuscules, et trois de ces boutons se partagent la
+        // largeur de l'ecran. Ces mots sont courts, ils n'ont pas besoin de cette marge - ils ont besoin de la place.
+        leftPadding: 6
+        rightPadding: 6
+    }
+
+    // Le meme, quand sa famille a une couleur. La teinte se peint avec NOS couleurs et jamais avec celles du style :
+    // c'est la seule facon qu'un rouge eteint, un cyan et un magenta cohabitent sous le meme bouton sans que le style
+    // ait son mot a dire.
+    component TintedMenuButton: MenuButton {
+        id: tintedButton
+
+        property color tintColour: "transparent"
+        property color labelColour: "#ffffff"
+        property int labelSize: 15
+        // La couleur du trait des icones dessinees au Canvas. La plupart de ces boutons n'en ont pas ; ceux qui en ont
+        // une la lisent ici, pour que le dessin et le fond ne puissent pas se desaccorder.
+        property color iconColour: "#ffffff"
+
+        font.pixelSize: tintedButton.labelSize
+        Material.background: tintedButton.tintColour
+        Material.foreground: tintedButton.labelColour
     }
 
     // Un grand chiffre, avec ce qu'il veut dire. Trois par page suffisent : au-dela, on ne lit plus, on survole.
@@ -2510,11 +3985,19 @@ ApplicationWindow {
     // UNE seule definition pour les trois reglages - chant, rythme, accords - parce que trois copies identiques
     // finissent toujours par diverger, et parce que le prochain genre de question en aura une quatrieme a brancher.
     component QuestionShareSetting: ColumnLayout {
+        // Le pourcentage EFFECTIF de cette part : la part divisee par la SOMME des parts.
+
         id: questionShareSetting
 
         property string title: ""
         property string hint: ""
         property int share: 0
+        // C'est ce que le joueur veut savoir - « quelle chance a cette question de tomber ? » - et le calcul ne doit pas
+        // etre le sien. Roger l'a demande exactement comme ca : « l'utilisateur ne va pas faire le calcul lui-meme pour
+        // obtenir 100% au total ». Il a raison, et c'est meme pire que ca : les parts sont des POIDS, donc leur somme
+        // n'est pas cent - un reglage a 20 partout ne donne pas 20 % mais un septieme, et personne ne peut le deviner.
+        readonly property int total: ExerciseController.namedIntervalQuestionShare + ExerciseController.singQuestionShare + ExerciseController.chordQuestionShare + ExerciseController.modeColourQuestionShare + ExerciseController.modeNameQuestionShare + ExerciseController.modeVampQuestionShare + ExerciseController.foreignNoteQuestionShare
+        readonly property int percent: total > 0 ? Math.round((100 * share) / total) : 0
 
         signal shareEdited(real p_share)
 
@@ -2538,14 +4021,39 @@ ApplicationWindow {
             text: questionShareSetting.hint
         }
 
-        DarkSpinBox {
-            Layout.preferredWidth: 150
-            Layout.alignment: Qt.AlignLeft
-            from: 0
-            to: 100
-            stepSize: 5
-            value: questionShareSetting.share
-            onValueModified: questionShareSetting.shareEdited(value)
+        RowLayout {
+            spacing: 10
+
+            // Un CURSEUR, et un champ a cote. Roger : « au lieu de + et de -, mettre un slider (avec le textfield au bout
+            // pour changer a la main) ». Le curseur pour le geste, le champ pour la valeur exacte - et le pourcentage
+            // effectif juste apres, parce que c'est lui que le joueur veut lire.
+            Slider {
+                Layout.fillWidth: true
+                from: 0
+                to: 100
+                stepSize: 5
+                value: questionShareSetting.share
+                onMoved: questionShareSetting.shareEdited(value)
+            }
+
+            DarkSpinBox {
+                Layout.preferredWidth: 92
+                Layout.alignment: Qt.AlignRight
+                from: 0
+                to: 100
+                stepSize: 5
+                value: questionShareSetting.share
+                onValueModified: questionShareSetting.shareEdited(value)
+            }
+
+            // Le chiffre qui compte vraiment. Il est en vert parce qu'il BOUGE quand on regle : c'est lui qu'on regarde.
+            Text {
+                color: questionShareSetting.percent > 0 ? "#8ef2b0" : "#6f5b93"
+                font.pixelSize: 15
+                font.bold: true
+                text: questionShareSetting.percent + " %"
+            }
+
         }
 
     }
@@ -2554,8 +4062,56 @@ ApplicationWindow {
     // style pour les trois listes de la page.
     component DarkComboBox: ComboBox {
         // Un ComboBox ne doit JAMAIS prendre la largeur de son texte, et ces trois lignes sont la pour ca.
+        // LA DIFFICULTE CHOISIE, quand le modele est une liste de FICHES : c'est ce qui permet de traiter le GodMode a part
+        // - une autre couleur, une autre graisse, une icone - sans que ce composant ait a connaitre le GodMode lui-meme.
+        // LA LISTE DEPLIEE NE SE CONTRAINT PAS A LA LARGEUR DU CONTROLE.
+        // Roger : « la combobox n'est pas assez large pour tout afficher une fois dépliée, du coup le mode "je débute" ne
+        // s'affiche pas si on n'est pas débutant - bête de devoir scroller pour une option ». Le CONTROLE, lui, peut etre
+        // etroit : il vit dans une colonne, et c'est sa place. La liste, non : elle doit montrer tout ce qu'elle propose,
+        // et un choix qu'on ne voit pas est un choix qu'on ne sait pas avoir.
+        // LA MESURE D'UN LIBELLE, pour elargir la liste deroulante a ce qu'elle contient.
+        // La largeur se MESURE, et ne s'invente pas : le plus long libelle du modele, plus la place de l'indicateur de
+        // choix. Un nombre ecrit a la main aurait ete faux au premier libelle qui s'allonge.
+        // C'est une FONCTION, et surtout PAS une propriete liee : la mesure ECRIT dans comboTextMetrics.text avant de
+        // lire son advanceWidth, et une propriete liee qui ecrit dans ce dont elle depend BOUCLE A L'INFINI. C'est
+        // arrive le 01/10/2026 : 1 086 141 lignes de « Binding loop detected » en onze secondes, le thread principal a
+        // 100 %, et l'application gelee au demarrage - dix secondes d'ecran noir, sur le telephone comme sur le bureau.
 
         id: combo
+
+        // Une liste de MOTS (les appareils audio) donne une chaine, et une chaine n'a pas de drapeau : le test retombe donc
+        // simplement a faux, et rien ne change pour elle.
+        readonly property var currentEntry: (combo.model !== null) && (combo.currentIndex >= 0) ? combo.model[combo.currentIndex] : null
+        readonly property bool currentEntryIsSpecial: currentEntry !== null && currentEntry.isGodMode === true
+
+        // Une fonction appelee a l'ouverture du popup ne boucle pas : elle s'execute une fois, hors de tout binding.
+        function widestEntryWidth() {
+            let widest = combo.width;
+            const entries = combo.model;
+            if ((entries === null) || (entries === undefined) || (entries.length === undefined))
+                return widest;
+
+            for (let index = 0; index < entries.length; ++index) {
+                comboTextMetrics.text = combo.itemLabel(entries[index]);
+                widest = Math.max(widest, comboTextMetrics.advanceWidth + 56);
+            }
+            return widest;
+        }
+
+        // LE TEXTE D'UNE LIGNE, et c'est la fonction qui compte : selon que le modele est une liste de mots (les
+        // appareils audio, les temperaments) ou une liste de FICHES (les niveaux de jeu, qui portent un nom, un
+        // nombre de questions et une description), ce que le delegate recoit n'est pas de la meme nature. Lire
+        // « modelData » sans regarder faisait disparaitre les libelles de la liste des niveaux : une fiche n'est pas
+        // un mot, et un mot vide s'affiche tres bien - c'est-a-dire pas du tout.
+        function itemLabel(item) {
+            if (item === undefined || item === null)
+                return "";
+
+            if (typeof item === "object" && combo.textRole !== "")
+                return item[combo.textRole] !== undefined ? item[combo.textRole] : "";
+
+            return item;
+        }
 
         // QtQuick.Layouts respecte l'implicitWidth d'un item comme un MINIMUM : une seule entree longue - « Aucune entree
         // audio detectee, verifie le profil de ta carte son » - elargissait donc tout le dialogue des reglages, bien plus
@@ -2564,22 +4120,111 @@ ApplicationWindow {
         Layout.minimumWidth: 0
         Layout.preferredWidth: 0
         Layout.fillWidth: true
+        // Une liste deroulante qui arrive a la cheville des boutons qui l'entourent ne se lit pas comme une commande :
+        // Roger l'a dit tout de suite - « il est tout fin ». Elle fait maintenant la hauteur d'un bouton, et c'est la
+        // meme pour toutes : la liste des niveaux de la page de garde, celle des appareils audio, celle des
+        // temperaments. C'est l'implicitHeight, et non un Layout.preferredHeight : la liste des niveaux vit dans un
+        // Item qui prend sa hauteur d'elle, donc la regle doit tenir en dehors d'un Layout aussi bien que dedans.
+        implicitHeight: 52
+
+        // L'ENGRENAGE, dessine comme le metronome et le diapason des outils : un mode qui se REGLE merite de le dire d'un
+        // signe, et pas seulement d'un mot. Il n'apparait que pour le GodMode.
+        Canvas {
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            width: 18
+            height: 18
+            antialiasing: true
+            visible: combo.currentEntryIsSpecial
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.reset();
+                ctx.strokeStyle = "#ffd479";
+                ctx.fillStyle = "#ffd479";
+                ctx.lineWidth = 2;
+                // Huit dents, courtes et epaisses : la silhouette d'un engrenage se lit a cette taille, pas ses details.
+                const centre = 9;
+                for (let tooth = 0; tooth < 8; ++tooth) {
+                    const angle = (tooth * Math.PI) / 4;
+                    const inner = 4.6;
+                    const outer = 8.2;
+                    ctx.beginPath();
+                    ctx.moveTo(centre + (inner * Math.cos(angle)), centre + (inner * Math.sin(angle)));
+                    ctx.lineTo(centre + (outer * Math.cos(angle)), centre + (outer * Math.sin(angle)));
+                    ctx.stroke();
+                }
+                ctx.beginPath();
+                ctx.arc(centre, centre, 4.6, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(centre, centre, 1.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
 
         contentItem: Text {
             text: combo.displayText
-            color: "#ffffff"
+            // Le GodMode se reconnait d'un coup d'oeil : une autre couleur, une autre graisse, un engrenage. Roger :
+            // « pour bien signifier que c'est un mode a part ».
+            color: combo.currentEntryIsSpecial ? "#ffd479" : "#ffffff"
             verticalAlignment: Text.AlignVCenter
-            leftPadding: 10
+            leftPadding: 12
+            // La place de l'engrenage, quand il est la : sans elle, un mot long passerait dessous.
+            rightPadding: combo.currentEntryIsSpecial ? 34 : 0
+            font.pixelSize: combo.currentEntryIsSpecial ? 17 : 16
+            font.bold: combo.currentEntryIsSpecial
             elide: Text.ElideRight
         }
 
         delegate: ItemDelegate {
-            width: combo.width
+            id: comboEntry
 
-            contentItem: Text {
-                text: modelData
-                color: "#e8dcff"
-                verticalAlignment: Text.AlignVCenter
+            // La ligne appartient-elle au GodMode, ou a un palier encore FERME ? Les deux se lisent dans la fiche, et une
+            // chaine (les appareils audio) n'a ni l'un ni l'autre - les deux retombent donc a faux pour elle.
+            readonly property bool isGod: (modelData !== null) && (typeof modelData === "object") && modelData.isGodMode === true
+            readonly property bool isLocked: (modelData !== null) && (typeof modelData === "object") && modelData.isLocked === true
+
+            width: combo.width
+            height: 46
+            // Un palier ferme ne se CHOISIT pas : la liste montre ou l'on va, elle ne laisse pas cliquer dans le vide.
+            enabled: !isLocked
+
+            contentItem: RowLayout {
+                spacing: 8
+
+                Text {
+                    Layout.fillWidth: true
+                    text: combo.itemLabel(modelData)
+                    // Et dans la liste OUVERTE, le GodMode garde sa couleur : c'est la qu'on le choisit, et un mode a part qui
+                    // ressemblerait aux autres au moment ou on le choisit ne serait a part nulle part.
+                    color: comboEntry.isGod ? "#ffd479" : (comboEntry.isLocked ? "#6f5b93" : "#e8dcff")
+                    verticalAlignment: Text.AlignVCenter
+                    font.pixelSize: 16
+                    font.bold: comboEntry.isGod
+                }
+
+                // LE CADENAS, dessine comme l'engrenage du GodMode et la fleche doree : une anse et un corps. Un palier ferme
+                // doit le DIRE, sinon « pourquoi je ne peux pas ? » n'a pas de reponse a l'ecran.
+                Canvas {
+                    Layout.preferredWidth: 13
+                    Layout.preferredHeight: 16
+                    visible: comboEntry.isLocked
+                    onPaint: {
+                        let context = getContext("2d");
+                        context.reset();
+                        context.strokeStyle = "#8a77ad";
+                        context.fillStyle = "#8a77ad";
+                        context.lineWidth = 2;
+                        // L'anse.
+                        context.beginPath();
+                        context.arc(width / 2, 6, 4, Math.PI, 0);
+                        context.stroke();
+                        // Le corps.
+                        context.fillRect(1, 7, width - 2, height - 8);
+                    }
+                }
+
             }
 
             // La ligne survolee : sans ca, on ne sait pas ce qu'on est en train de choisir.

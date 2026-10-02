@@ -25,6 +25,22 @@ musichienFunction_AddLibrary(domain
     music/Chord.h
     music/Chord.cpp
 
+    # Clavier musical : la gamme majeure, et les sept modes obtenus par rotation de celle-ci
+    music/Mode.h
+    music/Mode.cpp
+
+    # Le cercle des quintes : les armures, les relatives mineures, et la qualite des degres
+    music/KeySignature.h
+    music/KeySignature.cpp
+
+    # Une phrase modale, et le generateur qui la propose : des degres, jamais des notes
+    music/Phrase.h
+    music/Phrase.cpp
+
+    # Le livre des phrases modales : ou le domaine tient ce qu'un fichier de contenu lui a appris. Voir PhraseBook.h.
+    music/PhraseBook.h
+    music/PhraseBook.cpp
+
     # L'arbre des accords : comment chaque couleur s'obtient d'une autre, en un geste
     music/ChordTree.h
     music/ChordTree.cpp
@@ -64,6 +80,18 @@ musichienFunction_AddLibrary(domain
     exercise/ExerciseSession.h
     exercise/ExerciseSession.cpp
 
+    # LES QUATRE FACONS DE JOUER, et celle qui paie : l'Entrainement ouvre une famille, l'Arcade impose son dosage et
+    # gagne seule l'experience, et Infini / Survie sont le jeu libre. Voir GameMode.h.
+    exercise/GameMode.h
+    exercise/GameMode.cpp
+
+    # LES TITRES ET LES TROPHEES, gagnes au Bilan. Voir Trophy.h.
+    exercise/Trophy.h
+    exercise/Trophy.cpp
+
+    # LE PERIMETRE CHOISI par le joueur : le GodMode. Il ne remplace pas les niveaux, il les prend comme modeles.
+    exercise/GodModePalette.h
+    exercise/GodModePalette.cpp
     # Le journal des questions conclues, et ce qu'il permet de dire : la fondation des statistiques
     exercise/QuestionRecord.h
     exercise/QuestionRecord.cpp
@@ -110,6 +138,10 @@ if(MUSICHIEN_BUILD_TESTING)
         music/TunerGuide_test.cpp
         music/StaffPosition_test.cpp
         music/Chord_test.cpp
+        music/Mode_test.cpp
+        music/KeySignature_test.cpp
+        music/Phrase_test.cpp
+        music/PhraseBook_test.cpp
         music/ChordTree_test.cpp
         audio/ToneSynthesizer_test.cpp
         audio/PitchEstimator_test.cpp
@@ -122,6 +154,9 @@ if(MUSICHIEN_BUILD_TESTING)
         exercise/AnswerGrid_test.cpp
         exercise/AnecdoteBook_test.cpp
         exercise/ExerciseSession_test.cpp
+        exercise/GodModePalette_test.cpp
+        exercise/GameMode_test.cpp
+        exercise/Trophy_test.cpp
         exercise/HintBook_test.cpp
         exercise/LearningOrder_test.cpp
         exercise/PlayerLevel_test.cpp

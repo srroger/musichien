@@ -26,19 +26,112 @@ namespace
     return patterns.at( index );
 }
 
+// Un genre de question et sa PART, dans l'ordre ou l'ecran les presente.
+//
+// Une table plutot qu'une suite de comparaisons : c'est ce qui permet de tirer sur la SOMME des parts (voir drawKind),
+// et d'ajouter un genre plus tard sans avoir a recalculer toutes les bornes des genres qui le suivent - le defaut exact
+// que la chaine de conditions portait.
+struct KindShare
+{
+    std::int32_t share{ 0 };
+    QuestionKind kind{ QuestionKind::NamedInterval };
+};
+
 }    // namespace
 
-ExerciseSession::ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings )
+bool isKindOpen( const SessionSettings & p_settings, QuestionKind p_kind ) noexcept
+{
+    switch( p_kind )
+    {
+        case QuestionKind::NamedInterval:
+            return p_settings.namedIntervalQuestionShare > 0;
+
+        case QuestionKind::Direction:
+            return p_settings.directionQuestionShare > 0;
+
+        case QuestionKind::Sing:
+            return p_settings.singQuestionShare > 0;
+
+        case QuestionKind::Chord:
+            return p_settings.chordQuestionShare > 0;
+
+        case QuestionKind::ModeColour:
+            return p_settings.modeColourQuestionShare > 0;
+
+        case QuestionKind::ModeName:
+            return p_settings.modeNameQuestionShare > 0;
+
+        case QuestionKind::ModeVamp:
+            return p_settings.modeVampQuestionShare > 0;
+
+        case QuestionKind::ForeignNote:
+            return p_settings.foreignNoteQuestionShare > 0;
+
+        case QuestionKind::Rhythm:
+            // Le rythme n'est plus un exercice de ce jeu : il n'est JAMAIS ouvert, et le dire ici evite qu'un plan
+            // l'impose un jour - c'est le genre de question que plus rien ne pose.
+            return false;
+    }
+
+    return false;
+}
+
+namespace
+{
+
+// La palette d'intervalles avec laquelle une seance DEMARRE : celle que le joueur a choisie quand il en a choisi une -
+// c'est le GodMode - et sinon le prefixe de l'ordre d'apprentissage, exactement comme avant.
+//
+// Les trois fonctions qui suivent sont lues par la liste d'initialisation du constructeur, donc elles ne peuvent pas
+// dependre de membres deja construits : elles prennent les reglages, et rien d'autre.
+[[nodiscard]] std::vector<Interval> initialIntervalPalette( const SessionSettings & p_settings )
+{
+    if( !p_settings.intervalPalette.empty() )
+    {
+        return p_settings.intervalPalette;
+    }
+
+    return beginnerPalette( p_settings.startingPaletteSize );
+}
+
+[[nodiscard]] std::vector<ChordQuality> initialChordPalette( const SessionSettings & p_settings )
+{
+    if( !p_settings.chordPalette.empty() )
+    {
+        return p_settings.chordPalette;
+    }
+
+    return beginnerChordPalette( p_settings.startingChordQualityCount );
+}
+
+[[nodiscard]] std::vector<Mode> initialModePalette( const SessionSettings & p_settings )
+{
+    if( !p_settings.modePalette.empty() )
+    {
+        return p_settings.modePalette;
+    }
+
+    return beginnerModePalette( p_settings.startingModeCount );
+}
+
+}    // namespace
+
+ExerciseSession::ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings, const PhraseBook * p_phraseBook )
   : m_randomEngine{ p_seed }
-  , m_settings{ p_settings }
-  , m_palette{ beginnerPalette( m_settings.startingPaletteSize ) }
-  , m_chordPalette{ beginnerChordPalette( m_settings.startingChordQualityCount ) }
+  , m_settings{ std::move( p_settings ) }
+  , m_palette{ initialIntervalPalette( m_settings ) }
+  , m_chordPalette{ initialChordPalette( m_settings ) }
+  , m_modePalette{ initialModePalette( m_settings ) }
+  , m_phraseBook{ p_phraseBook }
   , m_score{ m_settings.lives }
   , m_currentQuestion{ buildQuestion() }
 {
     // The first question is built HERE rather than on a start() call: a session that exists is a
     // session that is asking something, and the screen therefore never has to handle a state where
     // there is nothing to play.
+    //
+    // Et c'est aussi pourquoi le LIVRE DES PHRASES arrive par la liste d'initialisation : la premiere question est deja
+    // construite quand ce corps s'execute, donc un livre donne apres coup ne pourrait plus rien pour elle.
 }
 
 Question ExerciseSession::buildQuestion()
@@ -50,11 +143,21 @@ Question ExerciseSession::buildQuestion()
     // avant tout tirage : ce qui est decide ne se retire pas.
     const std::optional<QuestionTarget> planned = plannedQuestionAt( m_questionNumber - 1 );
 
+    // Le plan a-t-il decide la CIBLE, ou seulement le GENRE ?
+    //
+    // Un Bilan decide la cible elle-meme (« travaille la sixte »). L'Arcade, elle, decide le DOSAGE et laisse le detail
+    // au tirage : elle porte DRAWN_TARGET, et la cible se tire comme dans une partie ordinaire.
+    const bool targetIsDecided = planned.has_value() && ( planned->target != DRAWN_TARGET );
+
     if( planned.has_value() )
     {
         question.kind = planned->kind;
-        question.target = Interval{ planned->target };
         question.direction = planned->direction;
+
+        if( targetIsDecided )
+        {
+            question.target = Interval{ planned->target };
+        }
     }
     else
     {
@@ -64,6 +167,14 @@ Question ExerciseSession::buildQuestion()
         question.target = drawTarget();
 
         question.kind = drawKind();
+    }
+
+    // Le plan qui n'a decide que le GENRE laisse la cible au tirage, exactement comme une partie ordinaire. Seules les
+    // questions d'INTERVALLE tirent ici : un accord tire sa COULEUR, un mode tire son mode, et chacun le fait dans sa
+    // propre construction, plus bas.
+    if( planned.has_value() && !targetIsDecided && isIntervalQuestion( question.kind ) )
+    {
+        question.target = drawTarget();
     }
 
     if( question.kind == QuestionKind::Rhythm )
@@ -77,7 +188,7 @@ Question ExerciseSession::buildQuestion()
 
     if( question.kind == QuestionKind::Chord )
     {
-        if( planned.has_value() )
+        if( targetIsDecided )
         {
             // Le plan a dit la COULEUR ; la tonique reste tiree, parce qu'un bilan ne teste pas la hauteur, et les
             // choix sont ceux de la palette.
@@ -95,7 +206,34 @@ Question ExerciseSession::buildQuestion()
         return question;
     }
 
-    if( !planned.has_value() )
+    if( ( question.kind == QuestionKind::ModeColour ) || ( question.kind == QuestionKind::ModeName ) )
+    {
+        // Une question d'harmonie ne se decide pas par un plan : le Bilan ne la connait pas encore. Elle se construit
+        // donc entierement ici - la tonique du bourdon, le ou les modes, et les choix de la palette du joueur.
+        buildModeQuestion( question, question.kind == QuestionKind::ModeColour );
+
+        return question;
+    }
+
+    if( question.kind == QuestionKind::ModeVamp )
+    {
+        // Le vamp a sa propre construction, parce qu'il a sa propre contrainte : les deux passages doivent avoir
+        // EXACTEMENT les memes notes, et c'est ce qui demande de deplacer la tonique ET le mode ensemble.
+        buildVampQuestion( question );
+
+        return question;
+    }
+
+    if( question.kind == QuestionKind::ForeignNote )
+    {
+        // La note etrangere a la sienne : c'est la seule question dont la melodie soit DECIDEE d'avance - sept notes, une
+        // par degre - et dont l'intrus soit choisi avant d'etre joue.
+        buildForeignNoteQuestion( question );
+
+        return question;
+    }
+
+    if( !targetIsDecided )
     {
         // Le SENS n'est tire que si personne ne l'a decide : un plan le porte deja.
         if( question.kind == QuestionKind::Sing )
@@ -357,39 +495,70 @@ bool ExerciseSession::answerChord( ChordQuality p_quality )
 
 QuestionKind ExerciseSession::drawKind()
 {
-    std::uniform_int_distribution<std::int32_t> distribution{ 0, 99 };
+    // Les parts, et leur SOMME.
+    //
+    // Le tirage se fait sur la somme, et jamais sur cent. C'etait le defaut, et Roger a mis le doigt dessus : « on
+    // commence a avoir beaucoup de spinbox 0-100 en disant que c'est des parts, mais sur dix questions, c'est plus des
+    // probabilites non ? ». Avec six parts a vingt - ce que l'ecran permet de regler - la somme fait 120, et un tirage
+    // sur [0, 100) faisait DISPARAITRE les derniers genres sans que rien ne le dise : on demandait du vamp, et il n'en
+    // venait jamais.
+    //
+    // Des parts se lisent les unes PAR RAPPORT AUX AUTRES. C'est donc leur somme qui est l'echelle, et vingt partout
+    // vaut un sixieme pour chacun, exactement comme on l'attend.
+    //
+    // L'ordre est celui de l'ecran : chaque genre prend la tranche qui suit la precedente, donc augmenter une part ne
+    // deplace que les questions d'apres.
+    const std::array<KindShare, 8> shares{ KindShare{ .share = m_settings.namedIntervalQuestionShare,
+                                                      .kind = QuestionKind::NamedInterval },
+                                           KindShare{ .share = m_settings.singQuestionShare,
+                                                      .kind = QuestionKind::Sing },
+                                           KindShare{ .share = m_settings.directionQuestionShare,
+                                                      .kind = QuestionKind::Direction },
+                                           KindShare{ .share = m_settings.chordQuestionShare,
+                                                      .kind = QuestionKind::Chord },
+                                           KindShare{ .share = m_settings.modeColourQuestionShare,
+                                                      .kind = QuestionKind::ModeColour },
+                                           KindShare{ .share = m_settings.modeNameQuestionShare,
+                                                      .kind = QuestionKind::ModeName },
+                                           KindShare{ .share = m_settings.modeVampQuestionShare,
+                                                      .kind = QuestionKind::ModeVamp },
+                                           KindShare{ .share = m_settings.foreignNoteQuestionShare,
+                                                      .kind = QuestionKind::ForeignNote } };
+
+    std::int32_t total = 0;
+
+    for( const KindShare & entry : shares )
+    {
+        total += std::max( std::int32_t{ 0 }, entry.share );
+    }
+
+    if( total <= 0 )
+    {
+        // Aucune part : l'intervalle a nommer est la question par defaut du jeu, et c'est ce qu'elle a toujours ete.
+        return QuestionKind::NamedInterval;
+    }
+
+    std::uniform_int_distribution<std::int32_t> distribution{ 0, total - 1 };
 
     const std::int32_t draw = distribution( m_randomEngine );
 
-    if( draw < m_settings.singQuestionShare )
+    // Une TABLE, et non une chaine de comparaisons cumulees : les bornes s'additionnent d'elles-memes, chaque genre est
+    // une ligne, et un genre AJOUTE plus tard ne peut pas oublier de mettre a jour les sommes des suivants - le defaut
+    // exact que la version precedente portait.
+    std::int32_t boundary = 0;
+
+    for( const KindShare & entry : shares )
     {
-        return QuestionKind::Sing;
+        boundary += std::max( std::int32_t{ 0 }, entry.share );
+
+        if( draw < boundary )
+        {
+            return entry.kind;
+        }
     }
 
-    if( ( m_settings.directionQuestionShare > 0 )
-        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare ) )
-    {
-        return QuestionKind::Direction;
-    }
-
-    // Le rythme vient APRES les deux autres, et les parts se lisent comme des BORNES CUMULEES : chacune prend la
-    // tranche qui suit la precedente. L'ordre n'est pas une preference, c'est ce qui rend le tirage lisible d'un coup
-    // d'oeil - et ce qui fait qu'augmenter une part ne deplace que les questions qui la suivent.
-    if( ( m_settings.rhythmQuestionShare > 0 )
-        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare
-                      + m_settings.rhythmQuestionShare ) )
-    {
-        return QuestionKind::Rhythm;
-    }
-
-    // Et les accords en dernier : c'est la question la plus exigeante des quatre, donc celle qui ferme la marche.
-    if( ( m_settings.chordQuestionShare > 0 )
-        && ( draw < m_settings.singQuestionShare + m_settings.directionQuestionShare
-                      + m_settings.rhythmQuestionShare + m_settings.chordQuestionShare ) )
-    {
-        return QuestionKind::Chord;
-    }
-
+    // Inatteignable tant que la somme ci-dessus est celle qui borne le tirage : y arriver voudrait dire qu'une part a
+    // ete oubliee en chemin.
     return QuestionKind::NamedInterval;
 }
 
@@ -402,6 +571,292 @@ void ExerciseSession::buildChordQuestion( Question & p_question )
     // Ce que le joueur peut repondre : SA palette, dans l'ordre d'apprentissage, et rien d'autre. Une couleur qu'il
     // n'a jamais rencontree ne lui serait d'aucun secours - elle ne serait pas un choix, seulement un piege.
     p_question.chordChoices.assign( m_chordPalette.begin(), m_chordPalette.end() );
+}
+
+bool ExerciseSession::answerModeColour( ModeColourAnswer p_answer )
+{
+    if( ( m_state != SessionState::Asking )
+        || ( ( m_currentQuestion.kind != QuestionKind::ModeColour )
+             && ( m_currentQuestion.kind != QuestionKind::ModeVamp ) ) )
+    {
+        // Comparer deux couleurs la ou il n'y en a pas eu deux ne repond a rien : c'est le meme refus que le nom
+        // d'intervalle oppose a une question chantee, et la frappe a une question d'intervalle.
+        //
+        // Le VAMP se repond de la meme facon, et c'est deliberé : la question qu'il pose - « le second passage est-il
+        // plus clair ? » - est la meme. Ce qui change est ce qu'il fait entendre, pas ce qu'il demande.
+        return false;
+    }
+
+    // Le sens attendu est calcule par le DOMAINE, a partir des deux modes de la question : l'ecran ne peut donc pas se
+    // tromper de sens en lisant la question, et il n'a rien a recalculer.
+    //
+    // Et il se calcule en TROIS valeurs, pas deux : quand les deux passages portent la meme couleur, la seule bonne
+    // reponse est « pareil ». L'ancien calcul rendait « plus sombre » (la comparaison d'un mode avec lui-meme est fausse),
+    // ce qui aurait donne une bonne reponse a un joueur qui n'avait rien entendu - le bug que Roger a vu de loin.
+    const bool sameness = !m_currentQuestion.previousMode.has_value()
+                          || ( m_currentQuestion.mode == *m_currentQuestion.previousMode );
+
+    // Le ternaire imbrique est remplace par deux comparaisons nommees : clang-tidy a raison de le refuser, et la
+    // lecture y gagne - la couleur attendue se lit maintenant comme une phrase, pas comme une poupee russe.
+    ModeColourAnswer expected = ModeColourAnswer::Same;
+
+    if( !sameness )
+    {
+        expected = isBrighterThan( m_currentQuestion.mode, *m_currentQuestion.previousMode ) ? ModeColourAnswer::Brighter
+                                                                                             : ModeColourAnswer::Darker;
+    }
+
+    return resolveAnswer( p_answer == expected, std::nullopt );
+}
+
+bool ExerciseSession::answerModeColour( bool p_secondIsBrighter )
+{
+    // L'ancienne forme, a deux reponses : la plupart des questions de couleur ne portent qu'une difference a entendre, et
+    // les tests qui parlent du SENS de la comparaison n'ont pas a connaitre la troisieme reponse.
+    return answerModeColour( p_secondIsBrighter ? ModeColourAnswer::Brighter : ModeColourAnswer::Darker );
+}
+
+bool ExerciseSession::answerModeName( Mode p_mode )
+{
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::ModeName ) )
+    {
+        return false;
+    }
+
+    // Comme pour un accord : rien a enregistrer comme « repondu », parce qu'il n'y a pas de distance a montrer dans le
+    // verdict - seulement une couleur, et un nom.
+    m_lastModeAnswer = p_mode;
+
+    return resolveAnswer( p_mode == m_currentQuestion.mode, std::nullopt );
+}
+
+bool ExerciseSession::answerForeignNote( std::int32_t p_stepIndex )
+{
+    if( ( m_state != SessionState::Asking ) || ( m_currentQuestion.kind != QuestionKind::ForeignNote ) )
+    {
+        // Designer un pas la ou il n'y a pas de gamme a juger ne repond a rien : c'est le meme refus que le nom
+        // d'intervalle oppose a une question chantee.
+        return false;
+    }
+
+    return resolveAnswer( p_stepIndex == m_currentQuestion.foreignStepIndex, std::nullopt );
+}
+
+void ExerciseSession::buildModeQuestion( Question & p_question, bool p_compare )
+{
+    p_question.modeTonic = drawModeTonic();
+
+    p_question.mode = drawMode();
+
+    if( p_compare )
+    {
+        // Parfois, la MEME couleur DEUX FOIS, et c'est deliberé : c'est la seule facon pour que « pareil » soit une bonne
+        // reponse de temps en temps. Roger a demande le bouton ; encore fallait-il lui donner quelque chose a entendre.
+        //
+        // Entendre qu'il n'y a PAS de difference est une competence d'oreille, et c'est celle qu'on perd en cherchant
+        // toujours quelque chose a entendre. La part est reglable, et a zero le jeu ne pose que des differences.
+        std::uniform_int_distribution<std::int32_t> shareDraw{ 0, 99 };
+
+        if( shareDraw( m_randomEngine ) < m_settings.sameColourQuestionShare )
+        {
+            p_question.previousMode = p_question.mode;
+        }
+        else
+        {
+            // Sinon, un mode DIFFERENT du premier, et tire dans la meme palette : comparer un mode avec lui-meme n'aurait
+            // pas de reponse, donc la question serait impossible plutot que difficile.
+            //
+            // La boucle se termine, et c'est une garantie du DOMAINE et non un espoir : beginnerModePalette rend toujours
+            // deux modes au moins, donc il existe toujours un mode different a tirer.
+            Mode previousMode = drawMode();
+
+            while( previousMode == p_question.mode )
+            {
+                previousMode = drawMode();
+            }
+
+            p_question.previousMode = previousMode;
+        }
+    }
+
+    // Et une MELODIE, quand le contenu en porte une pour ce mode : la question de NOM devient alors « quel est le mode
+    // de cette phrase ? », au lieu d'une gamme qui monte.
+    //
+    // Le tirage a lieu ICI, dans le domaine, et non dans un ecran : c'est la question qui decide de ce qu'elle fait
+    // entendre, et une phrase tiree par l'affichage serait une question que le domaine ne connait pas. Sans phrase pour
+    // ce mode - un contenu absent, ou trie autrement - la question reste entierement posee, en gamme.
+    if( !p_compare && ( m_phraseBook != nullptr ) )
+    {
+        p_question.modePhrase = m_phraseBook->drawPhraseFor( p_question.mode, m_randomEngine );
+    }
+
+    // Ce que le joueur peut repondre : SA palette, dans l'ordre d'apprentissage, et rien d'autre. Un mode qu'il n'a
+    // jamais rencontre ne serait pas un choix, seulement un piege.
+    p_question.modeChoices.assign( m_modePalette.begin(), m_modePalette.end() );
+}
+
+Mode ExerciseSession::drawMode()
+{
+    // Chaque mode de la palette a la meme chance, y compris le dernier arrive : la meme regle que les intervalles et les
+    // accords, et pour la meme raison - ponderer vers ce que le joueur rate ferait un meilleur exercice et un pire jeu.
+    if( m_modePalette.empty() )
+    {
+        // Ne peut pas arriver (voir beginnerModePalette), et rend tout de meme un mode valide : une question posee sur
+        // une palette vide serait un plantage, et le domaine n'en merite pas.
+        return Mode::Ionian;
+    }
+
+    std::uniform_int_distribution<std::size_t> distribution{ 0, m_modePalette.size() - 1 };
+
+    return m_modePalette.at( distribution( m_randomEngine ) );
+}
+
+Note ExerciseSession::drawModeTonic()
+{
+    // La tonique du BOURDON, donc grave, et dans une fenetre ETROITE.
+    //
+    // Trois demi-tons de chaque cote du re 2, ce qui n'est pas un gout : les echantillons du bourdon sont enregistres en
+    // re 2 et en la 2, et un echantillon transpose de plus de trois demi-tons s'entend comme un ralentissement. Une
+    // tonique entre 35 et 41, et sa quinte a sept demi-tons au-dessus, tiennent donc TOUJOURS a moins de trois
+    // demi-tons de l'un des deux enregistrements.
+    constexpr std::int32_t LOWEST_TONIC_MIDI_NUMBER = 35;
+    constexpr std::int32_t HIGHEST_TONIC_MIDI_NUMBER = 41;
+
+    std::uniform_int_distribution<std::int32_t> distribution{ LOWEST_TONIC_MIDI_NUMBER, HIGHEST_TONIC_MIDI_NUMBER };
+
+    return Note{ distribution( m_randomEngine ) };
+}
+
+void ExerciseSession::buildForeignNoteQuestion( Question & p_question )
+{
+    p_question.modeTonic = drawModeTonic();
+
+    p_question.mode = drawMode();
+
+    const std::vector<Note> scale = notesOfMode( p_question.modeTonic, p_question.mode );
+
+    // L'INTRUS : un pas au hasard, et sa note remplacee par une VOISINE qui n'appartient pas a la gamme.
+    //
+    // Un demi-ton d'ecart, et jamais plus : c'est ce qui rend la faute audible SANS etre caricaturale. Une note prise
+    // trois tons plus loin s'entendrait comme une rupture, et l'exercice deviendrait une question de bon sens plutot
+    // qu'une question d'oreille.
+    std::uniform_int_distribution<std::size_t> stepDraw{ 0, scale.size() - 1 };
+
+    const std::size_t stepIndex = stepDraw( m_randomEngine );
+
+    p_question.foreignStepIndex = static_cast<std::int32_t>( stepIndex );
+
+    p_question.foreignMelody = scale;
+
+    // La gamme, ramenee a ses CLASSES de hauteur : c'est ce qui dit si une note en fait partie, et non sa place dans la
+    // melodie - la meme note peut y revenir une octave plus haut.
+    std::array<bool, SEMITONES_PER_OCTAVE> belongsToScale{};
+
+    for( const Note & note : scale )
+    {
+        belongsToScale.at( static_cast<std::size_t>( note.pitchClassIndex() ) ) = true;
+    }
+
+    // Le demi-ton AU-DESSUS d'abord, puis celui du dessous s'il retombe dans la gamme. L'un des deux en sort toujours :
+    // une gamme occupe sept des douze classes de hauteur, donc une note de la gamme ne peut pas avoir ses DEUX voisines
+    // dedans.
+    const Note original = scale.at( stepIndex );
+
+    for( const std::int32_t shift : { 1, -1 } )
+    {
+        const Note candidate{ original.midiNumber() + shift };
+
+        if( !candidate.isValid() )
+        {
+            continue;
+        }
+
+        if( !belongsToScale.at( static_cast<std::size_t>( candidate.pitchClassIndex() ) ) )
+        {
+            p_question.foreignMelody.at( stepIndex ) = candidate;
+
+            return;
+        }
+    }
+}
+
+void ExerciseSession::buildVampQuestion( Question & p_question )
+{
+    const Mode firstMode = drawMode();
+
+    const auto firstIndex = static_cast<std::int32_t>( modeIndex( firstMode ) );
+
+    // UN cran, et un seul.
+    //
+    // Ce n'est pas une precaution, c'est la musique : monter d'un cran vers le clair demande de deplacer la tonique
+    // d'une QUINTE, et deux crans la deplaceraient de deux quintes - soit sept demi-tons de plus, hors de la fenetre des
+    // enregistrements de bourdon. Un cran donne deja l'ecart le plus riche : « re dorien » et « sol mixolydien » sont la
+    // MEME gamme.
+    constexpr std::int32_t VAMP_OFFSET = 1;
+
+    // Si le mode est deja le plus clair, il n'y a pas de cran a monter : on descend alors d'un cran, et c'est la seule
+    // asymetrie de cette question. La palette commence par le majeur et le mineur, donc elle ne s'y trouve pas au
+    // debut - mais elle s'elargit, et le locrien finit par y arriver.
+    const bool goBrighter = firstIndex >= VAMP_OFFSET;
+
+    const std::int32_t secondIndex = goBrighter ? ( firstIndex - VAMP_OFFSET ) : ( firstIndex + VAMP_OFFSET );
+
+    p_question.previousMode = firstMode;
+
+    // La tonique du PREMIER passage, et sa fenetre depend du SENS.
+    //
+    // Le second passage est a une quinte du premier, et les deux doivent rester a portee des deux enregistrements de
+    // bourdon (re 2 et la 2, soit 35 a 48 a trois demi-tons pres). On tire donc le premier du cote ou il reste de la
+    // place : vers le grave si la seconde monte, vers l'aigu si elle descend.
+    constexpr std::int32_t LOW_RANGE_MIDI_NUMBER = 35;
+    constexpr std::int32_t HIGH_RANGE_MIDI_NUMBER = 48;
+
+    // Le deplacement REEEL de la tonique, calcule par le domaine : deux modes n'ont pas le meme degre dans la gamme, et
+    // c'est ce degre qui decide de combien la tonique bouge. Le lydien est le quatrieme degre, le mixolydien le
+    // cinquieme : la meme gamme posee sur l'un ou sur l'autre ne se deplace donc pas du meme nombre de demi-tons.
+    const std::int32_t tonicShift = modeTonicShift( firstMode, static_cast<Mode>( secondIndex ) );
+
+    const std::int32_t lowest = LOW_RANGE_MIDI_NUMBER + ( ( tonicShift < 0 ) ? -tonicShift : 0 );
+    const std::int32_t highest = HIGH_RANGE_MIDI_NUMBER - ( ( tonicShift > 0 ) ? tonicShift : 0 );
+
+    p_question.previousModeTonic = Note{ std::uniform_int_distribution<std::int32_t>{ lowest, highest }( m_randomEngine ) };
+
+    p_question.mode = static_cast<Mode>( secondIndex );
+
+    // La tonique suit le mode, du deplacement que le domaine vient de calculer - et les deux passages ont donc
+    // EXACTEMENT les memes sept notes.
+    //
+    // C'est le §3.3 de la note 27 mis en musique : les centres montent le cercle des quintes, les notes eteintes le
+    // descendent. Le joueur entend deux fois le meme materiau, et pourtant deux modes - voila ce que « un mode, c'est un
+    // jeu de notes plus un centre » veut dire.
+    p_question.modeTonic = p_question.previousModeTonic.transposedBy( tonicShift );
+
+    p_question.modeChoices.assign( m_modePalette.begin(), m_modePalette.end() );
+}
+
+void ExerciseSession::widenModePalette()
+{
+    // Un perimetre choisi ne grandit pas : voir widenPalette.
+    if( m_settings.paletteIsFixed )
+    {
+        return;
+    }
+
+    // Le plafond, comme pour les intervalles.
+    if( ( m_settings.maximumModeCount > 0 ) && ( m_modePalette.size() >= m_settings.maximumModeCount ) )
+    {
+        return;
+    }
+
+    if( m_modePalette.size() >= modeLearningOrder().size() )
+    {
+        // Tous les modes du jeu sont deja en place : il n'y a plus rien a elargir.
+        return;
+    }
+
+    // Toujours le mode SUIVANT de l'ordre d'apprentissage, jamais un tire au hasard : c'est ce qui rend la progression
+    // previsible, du majeur et du mineur vers les extremes.
+    m_modePalette = beginnerModePalette( m_modePalette.size() + 1 );
 }
 
 ChordQuality ExerciseSession::drawChordQuality()
@@ -476,6 +931,9 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
     {
         m_score.registerSuccess( m_currentQuestion.replayCount, m_currentQuestion.wrongAttemptCount );
 
+        // Le compte par famille : la question est CONCLUE, et elle l'est bien. C'est ce que l'ecran de fin d'Arcade lit.
+        m_familyTally.registerQuestion( familyOf( m_currentQuestion.kind ), true );
+
         // A new interval joins the palette every so many successes in a row. The modulo, rather than a
         // simple comparison, is what makes this happen at every step: without it the condition would
         // stay true for ever after the third success, and the palette would grow on every single
@@ -489,6 +947,10 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
             // Les accords s'elargissent sur les MEMES reussites : une seule progression a tenir, plutot que deux
             // compteurs dont l'un finirait par mentir. Une couleur de plus tous les trois succes, comme un intervalle.
             widenChordPalette();
+
+            // Et les modes aussi, pour la meme raison exactement : le pilier harmonie avance sur les reussites de la
+            // session en cours, sans compteur a lui.
+            widenModePalette();
         }
 
         m_state = SessionState::Feedback;
@@ -517,9 +979,17 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
 
     if( m_score.isOutOfLives() )
     {
-        // The session is over the moment the last life goes, without a feedback to read: there is
-        // nothing left to answer, and pretending otherwise would only delay the summary.
-        m_state = SessionState::Finished;
+        // La derniere vie s'en va, mais la question merite encore sa REPONSE.
+        //
+        // La session passe donc en Feedback comme n'importe quelle question conclue, et c'est advance() qui la termine.
+        // C'etait l'inverse, et le commentaire disait pourquoi : « the session is over the moment the last life goes,
+        // without a feedback to read ». Roger l'a vu jouer et l'a renverse : « quand on perds, on arrive direct a la page
+        // des scores, mais on n'a pas la reponse a la question sur laquelle on a fail ». Savoir ce qu'on a rate est
+        // justement ce qui reste a apprendre quand la partie est perdue.
+        m_state = SessionState::Feedback;
+
+        // La question se CONCLUT sur un echec : elle compte comme demandee et ratee dans sa famille.
+        m_familyTally.registerQuestion( familyOf( m_currentQuestion.kind ), false );
 
         return false;
     }
@@ -545,6 +1015,9 @@ void ExerciseSession::revealAnswer()
 
     m_score.registerHelpedQuestion();
 
+    // Une question revelee est une question CONCLUE, et manquee : elle compte dans sa famille comme telle.
+    m_familyTally.registerQuestion( familyOf( m_currentQuestion.kind ), false );
+
     m_lastAnswerWasCorrect = false;
 
     // The player asked to be told: they were not ready. The newest interval leaves the palette, so
@@ -552,11 +1025,12 @@ void ExerciseSession::revealAnswer()
     // does say something, and this is the only place where saying it does not feel like a punishment.
     //
     // Seulement sur une question qui PARLE d'intervalles, et c'est une precision qui compte : passer une cellule
-    // rythmique ou un accord n'apprend rien sur la palette d'intervalles, et la faire reculer serait une consequence
-    // que le joueur ne pourrait relier a rien de ce qu'il vient de faire.
-    if( ( m_currentQuestion.kind == QuestionKind::NamedInterval )
-        || ( m_currentQuestion.kind == QuestionKind::Direction )
-        || ( m_currentQuestion.kind == QuestionKind::Sing ) )
+    // rythmique, un accord ou un mode n'apprend rien sur la palette d'intervalles, et la faire reculer serait une
+    // consequence que le joueur ne pourrait relier a rien de ce qu'il vient de faire.
+    //
+    // Le test est demande au domaine via isIntervalQuestion, et non reecrit ici : une liste recopiee est une liste
+    // qu'on oublie d'etendre quand un genre apparait.
+    if( isIntervalQuestion( m_currentQuestion.kind ) )
     {
         narrowPalette();
     }
@@ -590,6 +1064,7 @@ void ExerciseSession::advance()
 
     m_lastAnswer.reset();
     m_lastChordAnswer.reset();
+    m_lastModeAnswer.reset();
     m_lastAnswerWasCorrect = false;
 
     m_state = SessionState::Asking;
@@ -697,6 +1172,19 @@ bool ExerciseSession::hasEarnedStar() const noexcept
 
 void ExerciseSession::widenPalette()
 {
+    // Un perimetre CHOISI ne s'elargit pas : c'est le GodMode, et c'est toute sa promesse - le joueur a decide ce qu'il
+    // travaille, le jeu n'y ajoute rien.
+    if( m_settings.paletteIsFixed )
+    {
+        return;
+    }
+
+    // LE PLAFOND : une Arcade ou un Entrainement ne depassent pas la difficulte de leur niveau. Voir SessionSettings.
+    if( ( m_settings.maximumPaletteSize > 0 ) && ( m_palette.size() >= m_settings.maximumPaletteSize ) )
+    {
+        return;
+    }
+
     if( m_palette.size() >= learningOrderIntervals().size() )
     {
         // Everything the application knows is already in play.
@@ -711,6 +1199,13 @@ void ExerciseSession::widenPalette()
 
 void ExerciseSession::narrowPalette()
 {
+    if( m_settings.paletteIsFixed )
+    {
+        // Ni elargissement, ni retrecissement : voir widenPalette. Une erreur ne doit pas retirer au joueur un
+        // intervalle qu'il a explicitement demande a travailler.
+        return;
+    }
+
     if( m_palette.size() <= m_settings.startingPaletteSize )
     {
         // Never below where the player started: someone already at the beginning would be left with
@@ -723,6 +1218,18 @@ void ExerciseSession::narrowPalette()
 
 void ExerciseSession::widenChordPalette()
 {
+    // Un perimetre choisi ne grandit pas : voir widenPalette.
+    if( m_settings.paletteIsFixed )
+    {
+        return;
+    }
+
+    // Le plafond, comme pour les intervalles.
+    if( ( m_settings.maximumChordQualityCount > 0 ) && ( m_chordPalette.size() >= m_settings.maximumChordQualityCount ) )
+    {
+        return;
+    }
+
     if( m_chordPalette.size() >= chordLearningOrder().size() )
     {
         // Toutes les couleurs du jeu sont deja en place : il n'y a plus rien a elargir.
@@ -733,6 +1240,70 @@ void ExerciseSession::widenChordPalette()
     // previsible, et une couleur choisie au hasard ferait sauter le joueur du majeur a la septieme majeure sans
     // aucune raison qu'il puisse sentir.
     m_chordPalette = beginnerChordPalette( m_chordPalette.size() + 1 );
+}
+
+QuestionFamily familyOf( QuestionKind p_kind ) noexcept
+{
+    switch( p_kind )
+    {
+        case QuestionKind::NamedInterval:
+        case QuestionKind::Direction:
+        case QuestionKind::Sing:
+            return QuestionFamily::Interval;
+
+        case QuestionKind::Chord:
+            return QuestionFamily::Chord;
+
+        case QuestionKind::Rhythm:
+        case QuestionKind::ModeColour:
+        case QuestionKind::ModeName:
+        case QuestionKind::ModeVamp:
+        case QuestionKind::ForeignNote:
+            // Le rythme est classe avec les MODES, et ce n'est pas un hasard : c'est la famille « le reste », celle qui
+            // n'est ni un intervalle ni une couleur d'accord. Comme il n'est jamais pose (voir isKindOpen), sa place ici
+            // n'a aucune consequence - mais le commutateur doit couvrir tout l'enum pour qu'un genre ajoute demain fasse
+            // echouer le test qui le parcourt.
+            return QuestionFamily::Mode;
+    }
+
+    // Inatteignable tant que le commutateur couvre tous les genres, et c'est voulu.
+    return QuestionFamily::Interval;
+}
+
+void FamilyTally::registerQuestion( QuestionFamily p_family, bool p_wasCorrect ) noexcept
+{
+    const auto index = static_cast<std::size_t>( p_family );
+
+    ++asked.at( index );
+
+    if( p_wasCorrect )
+    {
+        ++correct.at( index );
+    }
+}
+
+std::size_t FamilyTally::askedIn( QuestionFamily p_family ) const noexcept
+{
+    return asked.at( static_cast<std::size_t>( p_family ) );
+}
+
+std::size_t FamilyTally::correctIn( QuestionFamily p_family ) const noexcept
+{
+    return correct.at( static_cast<std::size_t>( p_family ) );
+}
+
+std::size_t FamilyTally::successPercentIn( QuestionFamily p_family ) const noexcept
+{
+    const std::size_t askedCount = askedIn( p_family );
+
+    if( askedCount == 0 )
+    {
+        // Une famille a laquelle on n'a pas joue n'a pas de taux. Zero, et l'ecran sait qu'un zero sur zero demande n'est
+        // pas « nul » mais « absent » - voir askedIn, qu'il lit avant d'afficher.
+        return 0;
+    }
+
+    return ( correctIn( p_family ) * 100 ) / askedCount;
 }
 
 }    // namespace musichien::domain

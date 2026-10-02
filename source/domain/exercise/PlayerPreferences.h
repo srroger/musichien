@@ -14,6 +14,7 @@
 // reasonable people want different things.
 // =====================================================================================================================
 
+#include "domain/exercise/GodModePalette.h"
 #include "domain/exercise/PlayerLevel.h"
 #include "domain/exercise/ReminderSchedule.h"
 #include "domain/music/Temperament.h"
@@ -42,6 +43,37 @@ public:
     [[nodiscard]] virtual std::optional<PlayerLevel> storedLevel() const = 0;
 
     virtual void storeLevel( PlayerLevel p_level ) = 0;
+
+    // -------------------------------------------------------------------------------------------------------------
+    // LE GODMODE
+    // -------------------------------------------------------------------------------------------------------------
+    // La difficulte choisie est-elle le GodMode ?
+    //
+    // Un DRAPEAU, et non une sixieme valeur de PlayerLevel, parce que les deux ne disent pas la meme chose : un niveau
+    // dit ce que le joueur SAIT, le GodMode dit qu'il a decide de choisir lui-meme. Les melanger dans une enumeration
+    // ferait croire que « Je debute » et « GodMode » sont deux points de la meme echelle, alors que l'un est une marche
+    // et l'autre une porte de sortie.
+    [[nodiscard]] virtual bool storedGodModeIsChosen() const = 0;
+
+    virtual void storeGodModeIsChosen( bool p_isChosen ) = 0;
+
+    // Et la palette qu'il a sauvegardee.
+    //
+    // RIEN veut dire « il n'en a jamais sauvegarde une », et ce n'est pas la meme chose qu'une palette vide : une palette
+    // vide est un choix que le joueur a fait - tout decocher - et il doit s'entendre dire pourquoi la partie ne peut pas
+    // commencer. Sans cette distinction, un GodMode jamais ouvert passerait pour un GodMode tout decoche.
+    [[nodiscard]] virtual std::optional<GodModePalette> storedGodModePalette() const = 0;
+
+    virtual void storeGodModePalette( const GodModePalette & p_palette ) = 0;
+
+    // Le dernier palier pour lequel le jeu a FELICITE le joueur.
+    //
+    // C'est ce qui empeche la meme felicitation de revenir apres chaque partie : une bonne nouvelle repetee devient une
+    // machine a sous, et le joueur finit par ne plus la lire. La fleche doree de la liste des difficultes, elle, RESTE -
+    // c'est un rappel qu'il peut monter quand il veut, et ce n'est pas la meme chose qu'un message qui s'impose.
+    [[nodiscard]] virtual std::optional<PlayerLevel> storedAnnouncedLevel() const = 0;
+
+    virtual void storeAnnouncedLevel( PlayerLevel p_level ) = 0;
 
     // Which instruments the player WANTS to hear, one flag per instrument, in the order the application loads
     // them.
@@ -126,19 +158,43 @@ public:
 
     virtual void storeReferencePitch( double p_hertz ) = 0;
 
+    // Part des questions qui font chercher la NOTE ETRANGERE d'une gamme.
+    //
+    // Zero par defaut, comme les autres parts de l'harmonie : le pilier se decouvre en l'allumant. Roger l'a demandee des
+    // le debut, et c'est le troisieme exercice du pilier.
+    [[nodiscard]] virtual std::int32_t storedForeignNoteQuestionShare() const = 0;
+
+    virtual void storeForeignNoteQuestionShare( std::int32_t p_share ) = 0;
+
+    // Le TEMPO des phrases de mode, et de combien il varie d'une phrase a l'autre.
+    //
+    // Roger l'a demande en jouant : « on pourrait faire varier les bpm des phrases des modes ? Genre dans les reglages,
+    // le 72 bpm est pas mal par defaut, mais on pourrait choisir de l'augmenter, d'en choisir un central et de varier
+    // autour de 20-30 bpm. Histoire de rendre moins monotone. »
+    //
+    // Le premier est le CENTRE, le second l'amplitude du tirage : une phrase est jouee a centre ± tirage. Memorises,
+    // comme tous les reglages.
+    [[nodiscard]] virtual std::int32_t storedPhraseTempoBpm() const = 0;
+
+    virtual void storePhraseTempoBpm( std::int32_t p_bpm ) = 0;
+
+    [[nodiscard]] virtual std::int32_t storedPhraseTempoVariation() const = 0;
+
+    virtual void storePhraseTempoVariation( std::int32_t p_variation ) = 0;
+
     // How many questions in a hundred ask the player to SING the interval, the rest asking him to name it. A rule of
     // the session, remembered so that a player who wants more singing does not ask for it every time.
+    //
+    // « Sur cent » n'est plus tout a fait vrai, et c'est une correction : les parts sont desormais des POIDS, lus les
+    // uns par rapport aux autres. Vingt partout vaut un cinquieme pour chacun, et le total n'a plus besoin de faire
+    // cent. Voir SessionSettings::namedIntervalQuestionShare pour le defaut que cela a corrige.
+    [[nodiscard]] virtual std::int32_t storedNamedIntervalQuestionShare() const = 0;
+
+    virtual void storeNamedIntervalQuestionShare( std::int32_t p_share ) = 0;
+
     [[nodiscard]] virtual std::int32_t storedSingQuestionShare() const = 0;
 
     virtual void storeSingQuestionShare( std::int32_t p_share ) = 0;
-
-    // Combien de questions sur cent portent sur le RYTHME.
-    //
-    // Meme regle, meme raison d'etre reglable : une part a zero, et le rythme disparait de la session sans qu'aucune
-    // ligne de code ne change.
-    [[nodiscard]] virtual std::int32_t storedRhythmQuestionShare() const = 0;
-
-    virtual void storeRhythmQuestionShare( std::int32_t p_share ) = 0;
 
     // Combien de questions sur cent portent sur les ACCORDS.
     //
@@ -147,6 +203,65 @@ public:
     [[nodiscard]] virtual std::int32_t storedChordQuestionShare() const = 0;
 
     virtual void storeChordQuestionShare( std::int32_t p_share ) = 0;
+
+    // Part des questions, en pour cent, qui demandent de COMPARER deux modes sur un bourdon.
+    //
+    // ZERO par defaut, comme le rythme : le pilier harmonie se demande, il ne s'impose pas. Un joueur qui veut entendre
+    // des modes met ce reglage a trente, et sa session change de nature sans qu'aucun ecran n'ait a le decider.
+    [[nodiscard]] virtual std::int32_t storedModeColourQuestionShare() const = 0;
+
+    virtual void storeModeColourQuestionShare( std::int32_t p_share ) = 0;
+
+    // Part des questions, en pour cent, qui demandent de NOMMER un mode entendu sur un bourdon.
+    //
+    // Separee de la precedente parce que ce sont deux competences : comparer est une affaire d'oreille, nommer une
+    // affaire de vocabulaire - et l'application doit pouvoir dire laquelle des deux resiste.
+    [[nodiscard]] virtual std::int32_t storedModeNameQuestionShare() const = 0;
+
+    virtual void storeModeNameQuestionShare( std::int32_t p_share ) = 0;
+
+    // Part des questions, en pour cent, qui font entendre la MEME gamme sur deux CENTRES differents.
+    //
+    // C'est la question la plus avancee des trois, et la seule dont la reponse soit dans le contexte : les notes ne
+    // bougent pas, le mode si.
+    [[nodiscard]] virtual std::int32_t storedModeVampQuestionShare() const = 0;
+
+    virtual void storeModeVampQuestionShare( std::int32_t p_share ) = 0;
+
+    // -------------------------------------------------------------------------------------------------------------
+    // LES COEURS DE L'ARCADE
+    // -------------------------------------------------------------------------------------------------------------
+    // Combien de coeurs une Arcade accorde. DIX par defaut, et reglable jusqu'a vingt-cinq.
+    //
+    // C'est un RACCOURCI assume, et Roger l'a demande comme tel : « juste un cheatcode pour rendre l'arcade plus facile ».
+    // Il ne touche ni au bareme du multiplicateur ni a la longueur de la partie - il donne seulement le droit de se
+    // tromper plus souvent, ce qui est exactement ce qu'il faut pour ENFIN voir le boss.
+    [[nodiscard]] virtual std::int32_t storedArcadeLives() const = 0;
+
+    virtual void storeArcadeLives( std::int32_t p_lives ) = 0;
+
+    // -------------------------------------------------------------------------------------------------------------
+    // LE BILAN : ce qu'il faut retenir pour les TROPHEES et les TITRES
+    // -------------------------------------------------------------------------------------------------------------
+    // Combien de bilans joues, combien PARFAITS (aucune question revelee, tout du premier coup), la suite de bilans
+    // REUSSIS en cours, et la plus longue jamais atteinte.
+    //
+    // Quatre compteurs, et non un journal : ce sont des FAITS qu'on ne recalcule pas, et la note 06 dit ce qu'on en fait.
+    [[nodiscard]] virtual std::int64_t storedBilanCount() const = 0;
+
+    virtual void storeBilanCount( std::int64_t p_count ) = 0;
+
+    [[nodiscard]] virtual std::int64_t storedPerfectBilanCount() const = 0;
+
+    virtual void storePerfectBilanCount( std::int64_t p_count ) = 0;
+
+    [[nodiscard]] virtual std::int64_t storedBilanSuccessStreak() const = 0;
+
+    virtual void storeBilanSuccessStreak( std::int64_t p_streak ) = 0;
+
+    [[nodiscard]] virtual std::int64_t storedLongestBilanSuccessStreak() const = 0;
+
+    virtual void storeLongestBilanSuccessStreak( std::int64_t p_streak ) = 0;
 };
 
 // Remembers a level in a variable, for the tests and for a first run on a machine that has no file yet.
@@ -156,6 +271,18 @@ public:
     [[nodiscard]] std::optional<PlayerLevel> storedLevel() const override { return m_level; }
 
     void storeLevel( PlayerLevel p_level ) override { m_level = p_level; }
+
+    [[nodiscard]] bool storedGodModeIsChosen() const override { return m_godModeIsChosen; }
+
+    void storeGodModeIsChosen( bool p_isChosen ) override { m_godModeIsChosen = p_isChosen; }
+
+    [[nodiscard]] std::optional<GodModePalette> storedGodModePalette() const override { return m_godModePalette; }
+
+    void storeGodModePalette( const GodModePalette & p_palette ) override { m_godModePalette = p_palette; }
+
+    [[nodiscard]] std::optional<PlayerLevel> storedAnnouncedLevel() const override { return m_announcedLevel; }
+
+    void storeAnnouncedLevel( PlayerLevel p_level ) override { m_announcedLevel = p_level; }
 
     [[nodiscard]] std::vector<bool> storedEnabledInstruments() const override
     {
@@ -203,21 +330,72 @@ public:
 
     void storeReferencePitch( double p_hertz ) override { m_referencePitch = p_hertz; }
 
+    [[nodiscard]] std::int32_t storedPhraseTempoBpm() const override { return m_phraseTempoBpm; }
+
+    [[nodiscard]] std::int32_t storedForeignNoteQuestionShare() const override { return m_foreignNoteQuestionShare; }
+
+    void storeForeignNoteQuestionShare( std::int32_t p_share ) override { m_foreignNoteQuestionShare = p_share; }
+    void storePhraseTempoBpm( std::int32_t p_bpm ) override { m_phraseTempoBpm = p_bpm; }
+
+    [[nodiscard]] std::int32_t storedPhraseTempoVariation() const override { return m_phraseTempoVariation; }
+
+    void storePhraseTempoVariation( std::int32_t p_variation ) override { m_phraseTempoVariation = p_variation; }
+
+    [[nodiscard]] std::int32_t storedNamedIntervalQuestionShare() const override
+    {
+        return m_namedIntervalQuestionShare;
+    }
+
+    void storeNamedIntervalQuestionShare( std::int32_t p_share ) override { m_namedIntervalQuestionShare = p_share; }
+
     [[nodiscard]] std::int32_t storedSingQuestionShare() const override { return m_singQuestionShare; }
 
     void storeSingQuestionShare( std::int32_t p_share ) override { m_singQuestionShare = p_share; }
-
-    [[nodiscard]] std::int32_t storedRhythmQuestionShare() const override { return m_rhythmQuestionShare; }
-
-    void storeRhythmQuestionShare( std::int32_t p_share ) override { m_rhythmQuestionShare = p_share; }
 
     [[nodiscard]] std::int32_t storedChordQuestionShare() const override { return m_chordQuestionShare; }
 
     void storeChordQuestionShare( std::int32_t p_share ) override { m_chordQuestionShare = p_share; }
 
+    [[nodiscard]] std::int32_t storedModeColourQuestionShare() const override { return m_modeColourQuestionShare; }
+
+    void storeModeColourQuestionShare( std::int32_t p_share ) override { m_modeColourQuestionShare = p_share; }
+
+    [[nodiscard]] std::int32_t storedModeNameQuestionShare() const override { return m_modeNameQuestionShare; }
+
+    void storeModeNameQuestionShare( std::int32_t p_share ) override { m_modeNameQuestionShare = p_share; }
+
+    [[nodiscard]] std::int32_t storedModeVampQuestionShare() const override { return m_modeVampQuestionShare; }
+
+    void storeModeVampQuestionShare( std::int32_t p_share ) override { m_modeVampQuestionShare = p_share; }
+
+    [[nodiscard]] std::int32_t storedArcadeLives() const override { return m_arcadeLives; }
+
+    void storeArcadeLives( std::int32_t p_lives ) override { m_arcadeLives = p_lives; }
+
+    [[nodiscard]] std::int64_t storedBilanCount() const override { return m_bilanCount; }
+
+    void storeBilanCount( std::int64_t p_count ) override { m_bilanCount = p_count; }
+
+    [[nodiscard]] std::int64_t storedPerfectBilanCount() const override { return m_perfectBilanCount; }
+
+    void storePerfectBilanCount( std::int64_t p_count ) override { m_perfectBilanCount = p_count; }
+
+    [[nodiscard]] std::int64_t storedBilanSuccessStreak() const override { return m_bilanSuccessStreak; }
+
+    void storeBilanSuccessStreak( std::int64_t p_streak ) override { m_bilanSuccessStreak = p_streak; }
+
+    [[nodiscard]] std::int64_t storedLongestBilanSuccessStreak() const override { return m_longestBilanSuccessStreak; }
+
+    void storeLongestBilanSuccessStreak( std::int64_t p_streak ) override { m_longestBilanSuccessStreak = p_streak; }
+
 private:
     std::optional<PlayerLevel> m_level;
 
+    // Le GodMode : s'il a ete choisi, et la palette qu'il a laissee. Un optional, comme le niveau, et pour la meme
+    // raison - « rien » et « vide » ne veulent pas dire la meme chose.
+    bool m_godModeIsChosen{ false };
+    std::optional<GodModePalette> m_godModePalette;
+    std::optional<PlayerLevel> m_announcedLevel;
     std::vector<bool> m_enabledInstruments;
 
     std::string m_playerName;
@@ -233,7 +411,7 @@ private:
     // 19 h par defaut : apres le diner, quand la journee de travail est finie et qu'une partie de dix questions est
     // encore possible. C'est le meme genre de choix que les trois moments d'anecdotes - une heure ou l'on est
     // disponible, pas une heure ou l'on est occupe.
-    ReminderMoment m_reminderMoment{ 19, 0 };
+    ReminderMoment m_reminderMoment{ .hour = 19, .minute = 0 };
 
     Temperament m_temperament{ Temperament::Equal };
 
@@ -241,16 +419,34 @@ private:
 
     double m_referencePitch{ 440.0 };
 
+    std::int32_t m_namedIntervalQuestionShare{ 60 };
+
+    // Le tempo des phrases de mode : 72 par defaut, celui que l'atelier ecrit dans le contenu, donc un profil neuf
+    // entend exactement ce que Roger a valide a l'oreille.
+    std::int32_t m_phraseTempoBpm{ 72 };
+    std::int32_t m_phraseTempoVariation{ 20 };
+
+    // La part de la note etrangere : zero par defaut, comme celle des modes.
+    std::int32_t m_foreignNoteQuestionShare{ 0 };
     std::int32_t m_singQuestionShare{ 20 };
 
     // Vingt pour cent chacune, comme le chant : un premier lancement entend un peu de tout, et c'est au joueur de
     // decider ensuite ce qu'il veut travailler. Les memes valeurs que les reglages par defaut du domaine.
-    //
-    // SAUF le rythme, a zero, et c'est une valeur VOULUE : un reglage qui vaut zero ne veut pas dire « pas encore
-    // fait », il veut dire « disponible, et pas impose ».
-    std::int32_t m_rhythmQuestionShare{ 0 };
 
     std::int32_t m_chordQuestionShare{ 20 };
+
+    // L'harmonie : zero par defaut, donc une session d'intervalles reste une session d'intervalles tant que le joueur
+    // n'a pas demande autre chose. C'est un REGLAGE, et un reglage se demande.
+    std::int32_t m_modeColourQuestionShare{ 0 };
+    std::int32_t m_modeNameQuestionShare{ 0 };
+    std::int32_t m_modeVampQuestionShare{ 0 };
+
+    // Les coeurs de l'Arcade, et les compteurs du Bilan.
+    std::int32_t m_arcadeLives{ 10 };
+    std::int64_t m_bilanCount{ 0 };
+    std::int64_t m_perfectBilanCount{ 0 };
+    std::int64_t m_bilanSuccessStreak{ 0 };
+    std::int64_t m_longestBilanSuccessStreak{ 0 };
 };
 
 }    // namespace musichien::domain

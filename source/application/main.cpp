@@ -9,6 +9,7 @@
 #include "infrastructure/audio/QAudioPitchDetector.h"
 #include "infrastructure/content/JsonAnecdoteBook.h"
 #include "infrastructure/content/JsonHintBook.h"
+#include "infrastructure/content/JsonPhraseBook.h"
 #include "infrastructure/content/JsonTunerGuide.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
 #ifdef Q_OS_ANDROID
@@ -22,19 +23,24 @@
 #include "musichienBuildId.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
+#include "ui/KeyCircleController.h"
 #include "ui/MicrophoneController.h"
+#include "ui/ModePreviewController.h"
 #include "ui/RhythmController.h"
 #include "ui/StatisticsController.h"
 
 #include <QAudioDevice>
 #include <QDir>
 #include <QFile>
+#include <QFont>
+#include <QFontDatabase>
 #include <QGuiApplication>
 #include <QMediaDevices>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QStandardPaths>
 #include <QString>
+#include <QTimer>
 #include <QUrl>
 #include <QtQml>
 
@@ -68,6 +74,10 @@ constexpr const char * INTERVAL_HINTS_RESOURCE = ":/assets/content/interval-hint
 constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
 
 constexpr const char * TUNER_GUIDE_RESOURCE = ":/assets/content/tuner.json";
+
+// Les phrases modales : ce que l'oreille de Roger a garde a l'atelier, et rien de plus. Le fichier porte des DEGRES,
+// une tonique et un tempo - jamais d'audio - et c'est le moteur du jeu qui les rejoue.
+constexpr const char * MODAL_PHRASES_RESOURCE = ":/assets/content/modal-phrases.json";
 
 // Reads the memory hints from the resources.
 //
@@ -118,6 +128,31 @@ constexpr const char * TUNER_GUIDE_RESOURCE = ":/assets/content/tuner.json";
     std::cerr << "Musichien: " << book.count() << " anecdotes read\n";
 
     return book;
+}
+
+// Les phrases modales, du meme contrat que tout le reste : un fichier manquant ou casse coute les phrases, jamais
+// l'application. Le banc d'essai s'en passe alors, simplement.
+[[nodiscard]] musichien::domain::PhraseBook loadPhraseBook()
+{
+    QFile contentFile{ QString::fromUtf8( MODAL_PHRASES_RESOURCE ) };
+
+    if( !contentFile.open( QIODevice::ReadOnly ) )
+    {
+        std::cerr << "Musichien: the modal phrases are missing from the resources.\n";
+
+        return {};
+    }
+
+    const QByteArray content = contentFile.readAll();
+
+    musichien::domain::PhraseBook phraseBook = musichien::infrastructure::readPhraseBook(
+      std::string_view{ content.constData(), static_cast<std::size_t>( content.size() ) } );
+
+    // La ligne qui prouve le plus court chemin entre le fichier et le binaire : elle distingue « le fichier est la »
+    // de « le fichier a ete compris », et c'est la seule verification de l'embarquement qui ne se discute pas.
+    std::cerr << "Musichien: " << phraseBook.phraseCount() << " modal phrases read\n";
+
+    return phraseBook;
 }
 
 // Les textes de la page Accordeur : ce qu'un temperament est, d'ou il vient, ce que sont le diapason et la note de
@@ -202,7 +237,61 @@ constexpr const char * TUNER_GUIDE_RESOURCE = ":/assets/content/tuner.json";
 }
 
 // The instruments the game plays with, in the order they are offered.
-constexpr std::array<const char *, 3> INSTRUMENT_NAMES{ "piano", "guitare", "saxo" };
+//
+// CE SONT DES NOMS, ET RIEN D'AUTRE : l'application charge <nom>_c2.wav a <nom>_c6.wav. Ajouter un timbre, c'est donc une
+// ligne ici, une ligne dans INSTRUMENT_NAMES (le domaine, qui en connait aussi les trois formes d'onde) et cinq fichiers
+// declares dans resources.qrc. En retirer un, c'est les memes lignes et ses fichiers. Voir
+// scripts/render_instrument_samples.py, qui les fabrique.
+//
+// Les cinq derniers sont DOUX, et c'est une demande de Roger : « j'utilise que la guitare et le piano, les autres sont
+// trop agressifs. N'hesite pas a rajouter des timbres doux ». Une seconde mineure deja dissonante devient boueuse avec un
+// timbre riche, et un timbre qui grince fait fermer l'application.
+constexpr std::array<const char *, 8> SAMPLED_INSTRUMENT_NAMES{
+  "piano", "guitare", "saxo", "flute", "cordes", "clarinette", "marimba", "harpe" };
+
+// Les trois bourdons enregistres, et l'ordre dans lequel ils sont offerts.
+//
+// Ce ne sont PAS des instruments de melodie : ce sont les sons qui tiennent SOUS une gamme, et c'est une autre
+// fonction. Ils sont joues en QUINTE (la tonique et sa quinte), ce que Roger a demande deux fois de suite - une note
+// seule dit « ceci est la tonique », une quinte dit « ceci est le CENTRE », et ce n'est pas la meme information.
+//
+// Ils viennent de scripts/render_drone_samples.py, donc de la meme banque libre que le piano, la guitare et la batterie.
+[[nodiscard]] musichien::domain::SampledInstrument loadDroneInstrument( const QString & p_droneName )
+{
+    // DEUX notes, et deux seulement : re 2 et la 2, soit une quinte juste. Le bourdon ne change de tonique qu'a
+    // quelques demi-tons, donc cette paire couvre tout ce dont un exercice modal a besoin.
+    constexpr std::array<std::int32_t, 2> ROOT_MIDI_NUMBERS{ 38, 45 };
+    constexpr std::array<const char *, 2> NOTE_NAMES{ "d2", "a2" };
+
+    musichien::domain::SampledInstrument drone;
+
+    for( std::size_t noteIndex = 0; noteIndex < ROOT_MIDI_NUMBERS.size(); ++noteIndex )
+    {
+        QFile sampleFile{ QStringLiteral( ":/assets/soundfonts/drone_%1_%2.wav" )
+                            .arg( p_droneName, QString::fromLatin1( NOTE_NAMES.at( noteIndex ) ) ) };
+
+        if( !sampleFile.open( QIODevice::ReadOnly ) )
+        {
+            continue;
+        }
+
+        const QByteArray content = sampleFile.readAll();
+
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        const std::span<const std::byte> bytes{ reinterpret_cast<const std::byte *>( content.constData() ),
+                                                static_cast<std::size_t>( content.size() ) };
+
+        const std::optional<musichien::domain::SampledNote> note =
+          musichien::domain::sampledNoteFromWave( bytes, ROOT_MIDI_NUMBERS.at( noteIndex ) );
+
+        if( note.has_value() )
+        {
+            drone.addNote( *note );
+        }
+    }
+
+    return drone;
+}
 
 // Reads one embedded wave file as mono samples.
 //
@@ -265,6 +354,28 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     QGuiApplication::setOrganizationName( "Musichien" );
 
+    // LA POLICE DE L'INTERFACE. Une police ne se devine pas d'apres le systeme : elle voyage avec l'application, comme
+    // la police musicale voyage deja avec elle. Le style Material peint ses controles avec la police de
+    // l'application, donc ce seul appel habille TOUTE l'interface, y compris les boutons que le style dessine
+    // lui-meme - c'est ce qui evite d'ecrire un font.family dans chacun des quelque trois cents Text du projet.
+    //
+    // C'est une RESSOURCE : si elle manque, on garde la police du systeme et l'application s'ouvre quand meme. Une
+    // jolie police ne vaut pas un demarrage rate.
+    const int uiFontIdentifier = QFontDatabase::addApplicationFont( ":/assets/fonts/Quicksand-Variable.ttf" );
+    const QStringList uiFontFamilies = QFontDatabase::applicationFontFamilies( uiFontIdentifier );
+
+    if( !uiFontFamilies.isEmpty() )
+    {
+        QFont uiFont{ uiFontFamilies.constFirst() };
+
+        // Medium, et pas Regular : Quicksand est une police fine, et un texte fin sur la nuit violette se lit mal de
+        // loin. Elle reste ronde - c'est sa forme, pas son epaisseur, qui fait sa douceur.
+        uiFont.setWeight( QFont::Medium );
+        QGuiApplication::setFont( uiFont );
+
+        std::cerr << "Musichien: interface font \"" << uiFontFamilies.constFirst().toStdString() << "\"\n";
+    }
+
     // Material is the style Qt Quick Controls maps onto the Android look and feel. Using it from the
     // first line guarantees that what is developed on the desktop looks like what runs on the phone.
     QQuickStyle::setStyle( "Material" );
@@ -294,18 +405,24 @@ int main( int p_argumentCount, char * p_arguments[] )
     // synthesiser keeps the mistake cue, which must not be beautiful, and stays the fallback if a sample is
     // missing.
     std::vector<musichien::domain::SampledInstrument> instruments;
+    instruments.reserve( SAMPLED_INSTRUMENT_NAMES.size() );
 
-    for( const char * instrumentName : INSTRUMENT_NAMES )
+    for( const char * instrumentName : SAMPLED_INSTRUMENT_NAMES )
     {
-        musichien::domain::SampledInstrument instrument = loadInstrument( QString::fromLatin1( instrumentName ) );
-
-        if( !instrument.isEmpty() )
-        {
-            instruments.push_back( std::move( instrument ) );
-        }
+        // AUCUN INSTRUMENT N'EST RETIRE DE LA LISTE, meme quand sa ressource n'a pas pu etre lue.
+        //
+        // Le RANG d'un instrument est son identite : le domaine dit « joue le 4e », et le cable ne traduit rien. Un
+        // instrument saute ferait glisser tous les suivants d'un cran, et l'apercu comme les cases a cocher joueraient
+        // alors d'autres timbres que les leurs. Une ressource manquante laisse donc un TROU a sa place, et l'adaptateur
+        // retombe sur la synthese pour ce rang.
+        instruments.push_back( loadInstrument( QString::fromLatin1( instrumentName ) ) );
     }
 
-    std::cerr << "Musichien: " << instruments.size() << " sampled instrument(s)\n";
+    const auto loadedInstrumentCount = static_cast<std::size_t>( std::ranges::count_if(
+      instruments, []( const musichien::domain::SampledInstrument & p_instrument ) { return !p_instrument.isEmpty(); } ) );
+
+    std::cerr << "Musichien: " << loadedInstrumentCount << " sampled instrument(s) read, " << instruments.size()
+              << " timbre(s) offered\n";
 
     // La batterie, rendue depuis la meme banque libre que les instruments : une vraie peau vaut mieux qu'une chute de
     // sinus.
@@ -321,7 +438,50 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Les deux clics du metronome : deux blocs de bois, dans la meme banque libre.
     notePlayer.useMetronomeClicks( loadSample( "drum_click_high" ), loadSample( "drum_click_low" ) );
 
-    notePlayer.useInstruments( instruments, {} );
+    // Les quatre woufs du chien, synthetises une fois pour toutes par scripts/render_dog_bark.py et charges comme le
+    // reste. Ils TOURNENT a chaque aboiement : c'est ce qui fait que le chien ne repete pas la meme phrase.
+    // Une ressource manquante coute une variante, jamais le demarrage : le clic de menu prend sa place.
+    constexpr std::array<const char *, 4> DOG_BARK_NAMES{ "dog_bark", "dog_bark_2", "dog_bark_3", "dog_bark_4" };
+
+    std::vector<std::vector<float>> dogBarks;
+    dogBarks.reserve( DOG_BARK_NAMES.size() );
+
+    for( const char * dogBarkName : DOG_BARK_NAMES )
+    {
+        dogBarks.push_back( loadSample( dogBarkName ) );
+    }
+
+    notePlayer.useDogBarks( std::move( dogBarks ) );
+
+    // Les trois bourdons enregistres, charges ICI comme les instruments et pour la meme raison : une ressource
+    // manquante coute un timbre, jamais le demarrage.
+    constexpr std::array<const char *, 3> DRONE_NAMES{ "strings", "choir", "pad" };
+
+    std::vector<musichien::domain::SampledInstrument> drones;
+
+    for( const char * droneName : DRONE_NAMES )
+    {
+        musichien::domain::SampledInstrument drone = loadDroneInstrument( QString::fromLatin1( droneName ) );
+
+        if( !drone.isEmpty() )
+        {
+            drones.push_back( std::move( drone ) );
+        }
+    }
+
+    // Le journal de demarrage dit ce qui a ete LU, comme pour les intervalles et la batterie : c'est la preuve la plus
+    // courte que les fichiers ont suivi jusqu'au binaire.
+    std::cerr << "Musichien: " << drones.size() << " drone timbre(s) read\n";
+
+    notePlayer.useDroneInstruments( std::move( drones ) );
+
+    // Les trois formes d'onde pures FERMENT la liste des timbres, et leur rang suit celui des echantillons - exactement
+    // comme domain::INSTRUMENT_NAMES les nomme. Elles ne coutent rien (un drapeau dans les reglages), donc elles gardent
+    // TOUJOURS leur place, meme decochees : c'est ce qui permet plus bas de parler de « l'instrument 10 ».
+    const std::vector<musichien::domain::Waveform> waveforms{ musichien::domain::WAVEFORM_INSTRUMENTS.begin(),
+                                                              musichien::domain::WAVEFORM_INSTRUMENTS.end() };
+
+    notePlayer.useInstruments( std::move( instruments ), waveforms );
 
     // Opening the output now, rather than at the first note, means a machine without a sound card is
     // reported at start up instead of silently refusing to play in the middle of an exercise.
@@ -334,10 +494,45 @@ int main( int p_argumentCount, char * p_arguments[] )
     // rebranchees toutes seules : on avertit, et les reglages permettent de rechoisir le micro.
     QMediaDevices mediaDevices;
 
-    QObject::connect( &mediaDevices, &QMediaDevices::audioOutputsChanged, &mediaDevices, [&notePlayer]() {
-        std::cerr << "Musichien: audio outputs changed, reopening the output.\n";
-        notePlayer.reopenAudioOutput();
+    QObject::connect( &mediaDevices, &QMediaDevices::audioOutputsChanged, &mediaDevices, [&mediaDevices, &notePlayer]() {
+        // DIFFERE D'UN TOUR DE BOUCLE, et ce n'est pas une precaution de principe : rouvrir DETRUIT la sortie.
+        //
+        // Le signal peut arriver pendant qu'on ECRIT dedans - AudioMixer::playAt emet readyRead de facon SYNCHRONE, et
+        // c'est exactement ce chemin qui figure en tete de deux plantages observes sur l'appareil. Detruire la sortie a
+        // cet instant laisserait le code en cours sur un objet mort. Un tour de boucle plus tard, plus personne n'est
+        // dedans.
+        QTimer::singleShot( 0, &mediaDevices, [&notePlayer]() {
+            qInfo() << "Musichien: audio outputs changed, reopening the output.";
+
+            notePlayer.reopenAudioOutput();
+        } );
     } );
+
+    // LE CYCLE DE VIE DE L'APPLICATION, et c'est un CRASH qu'il repare.
+    //
+    // Roger : « j'ai observe des crash quand je sors de l'application sans la fermer, et que je reviens ». La pile de
+    // l'accident est dans le chemin du son - AudioMixer::playAt -> QAudioSink, sur une adresse LIBEREE - et deux
+    // tombstones de l'appareil, dont un ANTERIEUR a ce lot, portent la meme trace.
+    //
+    // Android REND l'appareil audio quand l'application passe en arriere-plan. Le flux qui le tenait survit a ce
+    // deuil, et la premiere note du retour ecrit dans un objet que la plateforme a deja detruit. La sortie est donc
+    // FERMEE ici, et elle se rouvre toute seule a la premiere note - le meme chemin que 'prepareAudioOutput'.
+    //
+    // ApplicationSuspended, et NON ApplicationInactive : sur un ordinateur de bureau, la seconde se declenche a chaque
+    // fois que la fenetre perd le FOCUS, et fermer le son parce qu'on a clique ailleurs serait absurde.
+    QObject::connect( qApp,
+                      &QGuiApplication::applicationStateChanged,
+                      qApp,
+                      [&notePlayer]( Qt::ApplicationState p_state ) {
+                          if( p_state != Qt::ApplicationSuspended )
+                          {
+                              return;
+                          }
+
+                          qInfo() << "Musichien: going to the background, closing the audio output.";
+
+                          notePlayer.closeAudioOutput();
+                      } );
 
     QObject::connect( &mediaDevices, &QMediaDevices::audioInputsChanged, &mediaDevices, []() {
         std::cerr << "Musichien: audio inputs changed - reopen the settings to pick the new microphone.\n";
@@ -352,6 +547,36 @@ int main( int p_argumentCount, char * p_arguments[] )
                                   QML_MODULE_MINOR_VERSION,
                                   "IntervalController",
                                   &intervalController );
+
+    // Les phrases modales, lues AVANT le banc d'essai qui va les jouer : le livre doit vivre plus longtemps que le
+    // controleur, comme le journal des questions. Un objet detruit se voit tres mal, et se voit toujours trop tard.
+    const musichien::domain::PhraseBook modalPhraseBook = loadPhraseBook();
+
+    // Le banc d'essai des modes : le MEME port, et rien de plus. Sept boutons qui font entendre une couleur sur un
+    // bourdon tenu - c'est exactement ce que l'exercice du degrade demandera, jusqu'au timbre du bourdon, qui est tire
+    // par l'adaptateur. Un banc d'essai qui sonnerait autrement que le jeu serait pire qu'inutile.
+    musichien::ui::ModePreviewController modePreviewController{ notePlayer };
+
+    modePreviewController.setPhraseBook( modalPhraseBook );
+
+    // Le tempo des phrases est un REGLAGE du joueur : le banc d'essai le lit donc la ou il vit, au moment de jouer.
+    modePreviewController.setPreferences( playerLevelStore );
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "ModeController",
+                                  &modePreviewController );
+
+    // L'ecran du cercle des quintes : une page de REFERENCE, qui ne joue rien. Elle n'a donc meme pas besoin du
+    // lecteur de notes - seulement du domaine, qui sait tout ce qu'elle affiche.
+    musichien::ui::KeyCircleController keyCircleController;
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "KeyCircleController",
+                                  &keyCircleController );
 
     // The exercise screen has its own view model. It receives the SAME port, and neither controller
     // knows the other exists: the bench and the loop are two independent uses of the same domain.
@@ -388,6 +613,11 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     // Une question conclue est ecrite ici, une fois pour toutes les genres de question.
     exerciseController.setQuestionLog( &questionLog );
+
+    // Et le MEME livre de phrases que le banc d'essai, pour la meme raison : c'est lui qui fait entendre un mode en
+    // MELODIE quand la question demande de le nommer. Le jeu et le banc d'essai sonnent donc pareil - ce qui a demande de
+    // sortir le calcul du controleeur pour le mettre dans le domaine.
+    exerciseController.setPhraseBook( modalPhraseBook );
 
     // Les explications de la page Accordeur, lues dans leur fichier de contenu comme les indices et les anecdotes.
     exerciseController.setTunerGuide( loadTunerGuide() );
@@ -443,37 +673,16 @@ int main( int p_argumentCount, char * p_arguments[] )
     // La session peut poser des questions CHANTEES : elle a besoin du micro pour les juger.
     exerciseController.setMicrophoneController( &microphoneController );
 
-    // What the player WANTS to hear. The filtering happens HERE, in the wiring layer, which is what keeps the
-    // audio adapter from having to know anything about preferences - and it happens again on every change, so
-    // that unticking the saxophone is heard on the very next question rather than at the next launch.
-    const auto playWantedInstruments = [&exerciseController, &notePlayer, &instruments]() {
-        const std::vector<bool> enabled = exerciseController.enabledInstruments();
-
-        std::vector<musichien::domain::SampledInstrument> wantedInstruments;
-
-        for( std::size_t index = 0; index < instruments.size(); ++index )
-        {
-            if( ( index >= enabled.size() ) || enabled.at( index ) )
-            {
-                wantedInstruments.push_back( instruments.at( index ) );
-            }
-        }
-
-        // The waveforms are the instruments that are NOT samples: the flags after the sampled ones ask the adapter
-        // to render a pure spectrum (sine, sawtooth, square) instead of a recording.
-        std::vector<musichien::domain::Waveform> wantedWaveforms;
-
-        for( std::size_t waveformIndex = 0; waveformIndex < musichien::domain::WAVEFORM_INSTRUMENTS.size(); ++waveformIndex )
-        {
-            const std::size_t flagIndex = instruments.size() + waveformIndex;
-
-            if( ( flagIndex >= enabled.size() ) || enabled.at( flagIndex ) )
-            {
-                wantedWaveforms.push_back( musichien::domain::WAVEFORM_INSTRUMENTS.at( waveformIndex ) );
-            }
-        }
-
-        notePlayer.useInstruments( std::move( wantedInstruments ), std::move( wantedWaveforms ) );
+    // Ce que le joueur VEUT entendre. Le filtrage se fait ICI, dans la couche de cablage, ce qui evite a l'adaptateur
+    // audio de connaitre les preferences - et il se refait a chaque changement, donc decocher le saxo s'entend des la
+    // question suivante.
+    //
+    // IL N'ENVOIE PLUS UNE LISTE D'INSTRUMENTS, mais un drapeau par timbre. C'est le fond du bug que Roger a entendu -
+    // « il ne joue pas forcement l'instrument en face » : en compactant la liste, chaque case decochee faisait GLISSER
+    // les rangs, et l'index d'un instrument cessait de designer le meme son. Le filtre porte desormais sur le TIRAGE,
+    // et les instruments gardent leur place - y compris ceux qu'on vient de decocher, qu'il faut encore pouvoir ecouter.
+    const auto playWantedInstruments = [&exerciseController, &notePlayer]() {
+        notePlayer.useEnabledInstruments( exerciseController.enabledInstruments() );
     };
 
     QObject::connect( &exerciseController,
@@ -485,13 +694,14 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Le réglage descend jusqu'à la couche audio, et il descend à CHAQUE changement : basculer le tempérament ou le
     // diapason s'entend à la note suivante, pas au prochain lancement. La TONIQUE n'en fait pas partie - la couche
     // audio connaît toujours la sienne (la première note qu'elle joue) ; seul l'accordeur a besoin d'une tonique à lui.
-    const auto applyTuning = [&playerLevelStore, &notePlayer, &intervalController]() {
+    const auto applyTuning = [&playerLevelStore, &notePlayer, &intervalController, &modePreviewController]() {
         const musichien::domain::TuningContext tuning{ playerLevelStore.storedTemperament(),
                                                        playerLevelStore.storedReferencePitch() };
 
         notePlayer.setTuning( tuning );
 
         intervalController.setTuning( tuning );
+        modePreviewController.setTuning( tuning );
     };
 
     QObject::connect( &exerciseController,

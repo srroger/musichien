@@ -50,8 +50,59 @@ enum class Waveform
 {
     Sine,        // the fundamental only
     Sawtooth,    // every harmonic, falling as 1/n
-    Square       // the odd harmonics only, falling as 1/n
+    Square,      // the odd harmonics only, falling as 1/n
+
+    // Un son TENU et DOUX : la fondamentale et quelques harmoniques basses, comme les tirettes d'un orgue.
+    //
+    // Pourquoi cette forme existe, et c'est un compte rendu, pas une intuition. Le premier bourdon de Musichien
+    // utilisait une dents de scie, et Roger l'a dit tout de suite : « en mode sustain, il rend tres moche, on dirait
+    // un vieux son NES qui gresille ». La cause est technique et exacte : une dents de scie contient des harmoniques
+    // jusqu'a Nyquist, et celles qui DEPASSENT la frequence d'echantillonnage se replient vers le bas du spectre -
+    // c'est le repliement, et il s'entend comme un gresillement metallique.
+    //
+    // La bonne reponse a un bourdon n'est pas de filtrer la dents de scie : c'est de ne pas en jouer une. Un bourdon
+    // n'a pas besoin d'un timbre riche, il a besoin d'un timbre TENU et NON AGRESSIF - donc d'harmoniques basses,
+    // peu nombreuses, et faibles.
+    Organ
 };
+
+// Comment un bourdon ENCADRE la melodie : un temps ou il sonne SEUL avant, et un temps ou il traine apres.
+//
+// Declare ICI, hors de la classe, parce que le PORT de lecture s'en sert aussi (NotePlayer::playMelodyOverDrone) : un
+// type partage par un port et par son implementation appartient au domaine, pas a l'une de ses classes.
+//
+// Pourquoi cet encadrement n'est pas un ornement, et pourquoi ses valeurs par defaut ne sont pas nulles : une couleur
+// modale ne s'entend que si le CENTRE est deja installe quand la melodie arrive. Un bourdon qui demarrerait en meme
+// temps que la premiere note obligerait l'oreille a deviner ou est le centre pendant qu'elle ecoute deja la couleur ;
+// et un bourdon qui s'arreterait avec la derniere note laisserait la fin de la phrase en l'air.
+//
+// C'est le verdict d'ecoute du 30/09/2026 qui a tranche ce point, mot pour mot : « le bourdon est au bon volume, mais
+// on ne l'entend pas assez longtemps ».
+struct DroneFraming
+{
+    // Le bourdon sonne seul avant que la melodie n'arrive.
+    std::chrono::milliseconds leadIn{ 1500 };
+
+    // Et il continue seul apres la derniere note.
+    std::chrono::milliseconds tail{ 1500 };
+};
+
+// La duree d'un bourdon qui encadre une phrase de p_noteCount notes.
+//
+// EXPOSEE parce que deux endroits en ont besoin, et qu'ils doivent trouver le meme nombre : le domaine, qui fabrique
+// son propre bourdon quand aucun echantillon n'est disponible, et l'ADAPTATEUR, qui rend un bourdon ENREGISTRE quand il
+// en a un. Deux calculs qui doivent coincider finissent toujours par diverger en silence - et ici, la consequence serait
+// un bourdon qui s'arrete avant la fin de la phrase, ou qui traine apres.
+[[nodiscard]] std::chrono::milliseconds droneDurationFor( std::size_t p_noteCount,
+                                                          std::chrono::milliseconds p_noteDuration,
+                                                          std::chrono::milliseconds p_gap,
+                                                          DroneFraming p_framing = {} ) noexcept;
+
+// La meme duree, pour une phrase dont chaque note a la sienne. Le silence est compte UNE fois par note, exactement
+// comme ci-dessus : la formule ne change pas, seule la facon de la parcourir change.
+[[nodiscard]] std::chrono::milliseconds droneDurationFor( std::span<const std::chrono::milliseconds> p_durations,
+                                                          std::chrono::milliseconds p_gap,
+                                                          DroneFraming p_framing = {} ) noexcept;
 
 class ToneSynthesizer
 {
@@ -147,6 +198,118 @@ public:
                                                    std::chrono::milliseconds p_noteDuration,
                                                    std::chrono::milliseconds p_gap,
                                                    TuningContext p_tuning = {} ) const;
+
+    // Les memes notes, dont CHACUNE a sa duree : c'est ce qu'une PHRASE demande.
+    //
+    // Une phrase n'est pas une gamme : les degres disent la couleur, et les durees disent la musique. La jouer en notes
+    // uniformes en ferait une AUTRE phrase - et ce serait pourtant celle-la qu'on ferait entendre a l'oreille qui a
+    // choisi la vraie.
+    //
+    // Une note pour laquelle aucune duree n'est donnee garde la derniere duree CONNUE : un appelant qui compte mal
+    // obtient quelque chose d'audible, plutot qu'un silence qu'il ne comprendrait pas.
+    [[nodiscard]] std::vector<float> renderMelody( std::span<const Note> p_notes,
+                                                   std::span<const std::chrono::milliseconds> p_durations,
+                                                   std::chrono::milliseconds p_gap,
+                                                   TuningContext p_tuning = {} ) const;
+
+    // A melody heard OVER a drone that is held from its first note to its last: the two are heard TOGETHER.
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // Pourquoi cette regle vit dans le domaine, et non dans l'adaptateur audio
+    //
+    // Parce qu'un mode n'est pas un jeu de notes, c'est un jeu de notes PLUS UN CENTRE : les sept memes notes sur
+    // re sont du re dorien, sur si bemol elles sont du si bemol majeur. Sans centre, l'oreille entend une gamme et
+    // aucun mode - ce qui veut dire que « ecoute cette gamme et nomme le mode » n'est pas une question difficile,
+    // c'est une question SANS REPONSE.
+    //
+    // Le bourdon EST ce centre. Le rendre ici plutot que dans l'adaptateur, c'est la meme raison que partout
+    // ailleurs : une balance de deux voix est une regle, donc elle se calcule et elle se teste - et un adaptateur
+    // qui doit inventer le niveau du bourdon inventerait aussi le gout de l'exercice.
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // La duree du bourdon, et pourquoi elle est calculee
+    //
+    // Le bourdon dure EXACTEMENT ce que dure la melodie, silence final compris. Un bourdon plus court laisserait
+    // la derniere note seule, et la fin de la phrase redeviendrait une note isolee - c'est-a-dire, de nouveau, une
+    // question sans reponse.
+    // Comment un bourdon ENCADRE la melodie : un temps ou il sonne SEUL avant, et un temps ou il traine apres.
+    //
+    // Pourquoi cet encadrement n'est pas un ornement, et pourquoi ses valeurs par defaut ne sont pas nulles : une
+    // couleur modale ne s'entend que si le CENTRE est deja installe quand la melodie arrive. Un bourdon qui
+    // demarrerait en meme temps que la premiere note obligerait l'oreille a deviner ou est le centre pendant qu'elle
+    // ecoute deja la couleur ; et un bourdon qui s'arreterait avec la derniere note laisserait la fin de la phrase
+    // en l'air.
+    //
+    // C'est le verdict d'ecoute du 30/09/2026 qui a tranche ce point, mot pour mot : « le bourdon est au bon volume,
+    // mais on ne l'entend pas assez longtemps ».
+    [[nodiscard]] std::vector<float> renderMelodyOverDrone( std::span<const Note> p_melody,
+                                                            std::span<const Note> p_drone,
+                                                            std::chrono::milliseconds p_noteDuration,
+                                                            std::chrono::milliseconds p_gap,
+                                                            TuningContext p_tuning = {},
+                                                            DroneFraming p_framing = {} ) const;
+
+    // La meme chose pour une PHRASE, dont chaque note a sa duree. Le bourdon, lui, tient la somme des pas : il n'a pas
+    // a savoir que la phrase n'est pas reguliere.
+    [[nodiscard]] std::vector<float> renderMelodyOverDrone( std::span<const Note> p_melody,
+                                                            std::span<const Note> p_drone,
+                                                            std::span<const std::chrono::milliseconds> p_durations,
+                                                            std::chrono::milliseconds p_gap,
+                                                            TuningContext p_tuning = {},
+                                                            DroneFraming p_framing = {} ) const;
+
+    // Mixe une melodie et un bourdon DEJA RENDUS : c'est la moitie « assemblage » de renderMelodyOverDrone.
+    //
+    // Pourquoi cette moitie existe separement : le TIMBRE du bourdon n'est pas une regle de musique, c'est une donnee de
+    // restitution. Le domaine sait en fabriquer un (Waveform::Organ, le repli), et l'adaptateur peut en apporter un
+    // autre - un ensemble a cordes enregistre, par exemple. Les deux ont besoin de la MEME regle d'assemblage : le
+    // decalage du leadIn, la ponderation du bourdon, et le garde-fou anti-saturation. La dupliquer serait laisser deux
+    // equilibres diverger en silence.
+    //
+    // p_droneSamples peut etre plus long ou plus court que la melodie encadree : ce qui existe s'entend, le reste est du
+    // silence. Un bourdon plus court qu'une phrase est donc accepte, et c'est deliberé - c'est a l'appelant de savoir ce
+    // qu'il donne.
+    [[nodiscard]] std::vector<float> mixMelodyOverDrone( std::span<const Note> p_melody,
+                                                         std::span<const float> p_droneSamples,
+                                                         std::chrono::milliseconds p_noteDuration,
+                                                         std::chrono::milliseconds p_gap,
+                                                         TuningContext p_tuning = {},
+                                                         DroneFraming p_framing = {} ) const;
+
+    // La meme regle d'assemblage, pour une phrase dont chaque note a sa duree. L'adaptateur audio en a besoin : c'est
+    // par elle qu'un bourdon ENREGISTRE et une phrase se rencontrent.
+    [[nodiscard]] std::vector<float> mixMelodyOverDrone( std::span<const Note> p_melody,
+                                                         std::span<const float> p_droneSamples,
+                                                         std::span<const std::chrono::milliseconds> p_durations,
+                                                         std::chrono::milliseconds p_gap,
+                                                         TuningContext p_tuning = {},
+                                                         DroneFraming p_framing = {} ) const;
+
+    // LA MEME REGLE D'ASSEMBLAGE, quand la melodie vient d'un INSTRUMENT plutot que de la synthese.
+    //
+    // C'est la correction du 01/10/2026. Dans une question de mode, le bourdon etait deja un instrument ENREGISTRE - un
+    // chœur, des cordes, une nappe - pendant que la melodie restait synthetisee. Les deux n'ont ni la meme matiere ni la
+    // meme queue, et Roger l'a entendu tout de suite : « les voix pour les modes, je trouve ca un peu bizarre ».
+    //
+    // L'assemblage reste le travail du DOMAINE, et c'est ce qui compte : la gamme d'un mode et la phrase d'un mode sont
+    // decalees du meme silence et au meme niveau, parce qu'elles passent par la meme regle.
+    //
+    // Une melodie VIDE est rendue telle quelle : il n'y a rien a poser sur le bourdon, et un tampon vide se joue comme un
+    // silence plutot que comme une erreur.
+    [[nodiscard]] std::vector<float> mixRenderedMelodyOverDrone( std::span<const float> p_melodySamples,
+                                                                 std::span<const float> p_droneSamples,
+                                                                 DroneFraming p_framing = {} ) const;
+
+    // Le niveau du bourdon, avant que la somme ne soit normalisee.
+    //
+    // Inferieur a un, et c'est une decision d'ecoute, pas une precaution technique : le bourdon doit etre SENTI
+    // plutot qu'ecoute. Il est ce contre quoi la melodie se dit, pas quelque chose a reconnaitre - et un bourdon au
+    // niveau de la melodie donnerait deux choses a suivre au lieu d'une couleur.
+    //
+    // Monte a 0.45, puis redescendu a 0.30 : une fois le bourdon devenu une onde ENTRETENUE (voir renderMelodyOverDrone),
+    // il ne s'eteint plus, donc il est present tout du long au lieu de n'etre fort qu'a son attaque. Roger, 30/09/2026 :
+    // « maintenant qu'il tient, il est un peu fort ». La baisse est le prix exact de la correction precedente.
+    static constexpr float DRONE_GAIN = 0.30F;
 
     // The SAME three calls, but for a PURE WAVEFORM: a controlled spectrum instead of the struck string. See Waveform.
     // No hammer either: the attack is a short fade rather than a strike.

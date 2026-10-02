@@ -95,11 +95,11 @@ void IntervalPlaybackController::setPlayedFrequencies( std::span<const domain::N
 
     for( const domain::Note & note : p_notes )
     {
-        const double hz = domain::frequencyFor( note, root, m_tuning.temperament, m_tuning.referencePitchHz );
+        const double hertz = domain::frequencyFor( note, root, m_tuning.temperament, m_tuning.referencePitchHz );
 
         parts.append( QStringLiteral( "%1 · %2 Hz" )
                         .arg( QString::fromStdString( note.name() ) )
-                        .arg( hz, 0, 'f', 2 ) );
+                        .arg( hertz, 0, 'f', 2 ) );
     }
 
     m_playedFrequencies = parts.join( QStringLiteral( "  →  " ) );

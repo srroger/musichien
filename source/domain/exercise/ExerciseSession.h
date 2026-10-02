@@ -23,9 +23,12 @@
 #include "domain/exercise/SessionScore.h"
 #include "domain/music/Chord.h"
 #include "domain/music/Interval.h"
+#include "domain/music/Mode.h"
 #include "domain/music/Note.h"
+#include "domain/music/PhraseBook.h"
 #include "domain/rhythm/Rhythm.h"
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -44,6 +47,24 @@ namespace musichien::domain
 //
 // La definition vit ICI, avant les reglages, parce qu'un PLAN de questions (le Bilan) s'exprime avec elle : un plan se
 // pose dans les reglages, et une enumeration utilisee par eux doit venir avant eux.
+// Ce qu'un joueur peut repondre a une question de COULEUR : le second passage est-il plus clair, plus sombre, ou le
+// meme ?
+//
+// La troisieme reponse est une demande de Roger - « bug dans le plus clair plus sombre, si les 2 modes sont identiques,
+// erreur. rajouter un bouton egal » - et elle a amene une regle : pour que « pareil » soit une BONNE reponse de temps en
+// temps, il faut que le jeu pose parfois deux fois la meme couleur. Voir SessionSettings::sameColourQuestionShare.
+//
+// C'est un exercice qui a du sens, et pas seulement une reponse de plus : entendre qu'il n'y a PAS de difference est une
+// competence d'oreille, et c'est celle qu'on perd en cherchant toujours quelque chose a entendre.
+enum class ModeColourAnswer : std::int32_t
+{
+    // Les valeurs sont explicites : l'interface les lit comme un nombre, et une enumeration qui se renumerote toute seule
+    // deplacerait les boutons sans que rien ne casse au build.
+    Brighter = 0,
+    Darker = 1,
+    Same = 2
+};
+
 enum class QuestionKind
 {
     // Les valeurs sont EXPLICITES parce que l'interface les lit comme un nombre : la page compare questionKind a 0, 1,
@@ -63,8 +84,135 @@ enum class QuestionKind
     //
     // La question la plus simple du jeu a poser, et la plus difficile a repondre : un accord, c'est plusieurs notes,
     // et l'oreille doit entendre leur RAPPORT plutot que les notes elles-memes.
-    Chord = 4
+    Chord = 4,
+
+    // Le DEGRADE : deux modes sont joues l'un apres l'autre sur le meme bourdon, et le joueur dit si le second est
+    // plus CLAIR ou plus SOMBRE que le premier.
+    //
+    // C'est la premiere question du pilier harmonie, et elle est volontairement la plus simple des deux : comparer deux
+    // couleurs entendues dans la foulee ne demande aucun nom, donc aucun vocabulaire - seulement une oreille. Roger :
+    // « l'exercice peut etre simple pour le joueur, mais reste un bon exercice pour s'imprégner des modes et des
+    // couleurs ».
+    //
+    // Le BOURDON est ce qui la rend possible : sans centre, deux gammes ne sont pas deux modes, et la question n'aurait
+    // pas de reponse. Voir la note 27 du vault, §4.
+    ModeColour = 5,
+
+    // Et le NOM, ensuite : un seul mode est joue sur le bourdon, et le joueur le nomme parmi ceux de sa palette.
+    //
+    // La meme couleur, mais dite avec un mot. Les deux genres sont SEPARES parce qu'ils ne sont pas difficiles de la
+    // meme facon : comparer est une affaire d'oreille, nommer une affaire de vocabulaire - et un joueur qui reussit la
+    // premiere en ratant la seconde apprend quelque chose de lui-meme. Il faut, pour le voir, que leurs statistiques
+    // soient distinctes.
+    // Et le NOM, ensuite : un seul mode est joue sur le bourdon, et le joueur le nomme parmi ceux de sa palette.
+    //
+    // La meme couleur, mais dite avec un mot. Les deux genres sont SEPARES parce qu'ils ne sont pas difficiles de la
+    // meme facon : comparer est une affaire d'oreille, nommer une affaire de vocabulaire - et un joueur qui reussit la
+    // premiere en ratant la seconde apprend quelque chose de lui-meme. Il faut, pour le voir, que leurs statistiques
+    // soient distinctes.
+    ModeName = 6,
+
+    // Le VAMP : la MEME gamme, posee sur deux centres differents.
+    //
+    // C'est la demonstration la plus directe du §4 de la note 27, et la plus utile : do dorien et si bemol majeur ont
+    // exactement les MEMES sept notes, et ce n'est pas la meme musique. Le joueur entend deux fois la meme suite de
+    // notes, sur deux bourdons differents, et il doit dire si la couleur a bouge.
+    //
+    // C'est aussi la seule question ou la reponse est dans le CONTEXTE et non dans les notes : le meme materiau,
+    // deux modes. Un joueur qui a compris cela a compris ce qu'un mode est.
+    ModeVamp = 7,
+
+    // LA NOTE ETRANGERE : une gamme monte, une note par degre, et l'une d'elles n'appartient pas a la gamme. Le joueur
+    // dit LAQUELLE.
+    //
+    // C'est le troisieme exercice d'harmonie, et il est different des deux premiers : ceux-la demandent de comparer deux
+    // couleurs ou d'en nommer une, celui-ci demande de tenir une gamme ENTIERE dans sa tete et d'y reperer l'intrus.
+    // C'est le plus fin des trois, et c'est pour cela qu'il vient en dernier.
+    //
+    // Roger l'a demande des le debut - « quelle note n'est pas dans la gamme ? » - et il a attendu que la roue des
+    // quintes existe : sans un appui visuel, l'exercice est une devinette a sept choix.
+    ForeignNote = 8
 };
+
+// La question porte-t-elle sur un INTERVALLE qui a ETE JOUE ?
+//
+// La reponse est OUI pour les trois premiers genres, et NON pour tous les autres - et cette fonction existe parce que
+// la question se pose a trois endroits : l'ecran, pour savoir s'il a un indice a montrer ; la session, pour savoir si
+// une aide doit reculer la palette ; et le contenu, qui n'a de souvenirs que d'intervalles.
+//
+// Toute question porte un intervalle - c'est l'ordre des tirages qui veut ca - mais sur une cellule rythmique, une
+// couleur d'accord ou un mode, PERSONNE ne l'a jamais entendu. Trois listes recopiees sont trois listes qu'on oublie
+// d'etendre : c'est exactement ce qui est arrive, et Roger l'a vu avant nous - « pour les bourdons quand je fail, je
+// vois l'indice des intervalles apparaitre » : l'intervalle tire au hasard pour une question de mode tombait sur un
+// souvenir de film.
+[[nodiscard]] constexpr bool isIntervalQuestion( QuestionKind p_kind ) noexcept
+{
+    switch( p_kind )
+    {
+        case QuestionKind::NamedInterval:
+        case QuestionKind::Direction:
+        case QuestionKind::Sing:
+            return true;
+
+        case QuestionKind::Rhythm:
+        case QuestionKind::Chord:
+        case QuestionKind::ModeColour:
+        case QuestionKind::ModeName:
+        case QuestionKind::ModeVamp:
+        case QuestionKind::ForeignNote:
+            return false;
+    }
+
+    // Inatteignable tant que le commutateur ci-dessus couvre tous les genres, et c'est voulu : un genre AJOUTE sans
+    // etre classe ici doit faire echouer le test qui parcourt l'enumeration, pas tomber dans un « oui » silencieux.
+    return false;
+}
+
+// La FAMILLE d'une question : intervalle, accord ou mode.
+//
+// C'est la troisieme lecture de QuestionKind, et elle sert UNE chose : l'Arcade compte ses trois familles separement, et
+// l'Entrainement n'en ouvre qu'une a la fois. Une question appartient exactement a une famille.
+enum class QuestionFamily : std::size_t
+{
+    Interval = 0,
+    Chord = 1,
+    Mode = 2
+};
+
+// Combien de familles, ce qu'un ecran qui les liste a besoin de savoir.
+inline constexpr std::size_t QUESTION_FAMILY_COUNT = 3;
+
+// A quelle famille un genre appartient.
+//
+// Comme isIntervalQuestion, le commutateur couvre TOUS les genres : un genre ajoute sans etre classe ici doit faire
+// echouer le test qui parcourt l'enumeration, pas tomber dans une famille par defaut silencieuse.
+[[nodiscard]] QuestionFamily familyOf( QuestionKind p_kind ) noexcept;
+
+// Ce qu'une session a demande et reussi, famille par famille.
+//
+// C'est le seul endroit d'ou un ecran de fin - celui de l'Arcade - peut dire « tu es plus fort en intervalles qu'en
+// modes » sans recompter quoi que ce soit : la session tient le compte en le vivant.
+struct FamilyTally
+{
+    std::array<std::size_t, QUESTION_FAMILY_COUNT> asked{};
+    std::array<std::size_t, QUESTION_FAMILY_COUNT> correct{};
+
+    void registerQuestion( QuestionFamily p_family, bool p_wasCorrect ) noexcept;
+
+    [[nodiscard]] std::size_t askedIn( QuestionFamily p_family ) const noexcept;
+    [[nodiscard]] std::size_t correctIn( QuestionFamily p_family ) const noexcept;
+
+    // Reussite de cette famille, en pour cent entiers. ZERO quand rien n'a ete demande, et c'est honnete : une famille
+    // a laquelle on n'a pas joue n'a pas de taux, et un ecran qui afficherait « 0 % » mentirait sur un absent.
+    [[nodiscard]] std::size_t successPercentIn( QuestionFamily p_family ) const noexcept;
+};
+
+// Une cible que le PLAN laisse au TIRAGE : la question ne dit que son GENRE.
+//
+// L'Arcade a besoin des deux : elle impose le DOSAGE (dix intervalles, huit accords, sept modes) sans imposer QUELLE
+// seconde ou QUELLE couleur. Un plan decide la repartition, le tirage decide le detail - et c'est ce qui la distingue
+// d'un Bilan, ou la cible ELLE-MEME est decidee.
+inline constexpr std::int32_t DRAWN_TARGET = -1;
 
 // Une question DECIDEE a l'avance : quel genre, quelle cible, dans quel sens.
 //
@@ -77,6 +225,9 @@ struct QuestionTarget
 
     // La cible, dans l'unite de son genre (voir QuestionRecord::target) : des demi-tons pour un intervalle, l'index
     // d'une qualite pour un accord.
+    //
+    // DRAWN_TARGET quand le plan decide le GENRE sans decider la cible : c'est l'Arcade, qui impose son dosage mais
+    // laisse le tirage choisir quelle seconde ou quelle couleur.
     std::int32_t target{ 0 };
 
     IntervalDirection direction{ IntervalDirection::Ascending };
@@ -168,6 +319,21 @@ struct SessionSettings
     // screen flips.
     std::int32_t directionQuestionShare{ 0 };
 
+    // La question historique du jeu : NOMMER l'intervalle entendu.
+    //
+    // Elle a SA part, comme les autres genres, et c'est une correction - pas un champ de plus. Avant, elle etait le
+    // seul genre SANS part : elle prenait « ce qui restait », et un reglage dont la somme depassait cent la faisait
+    // disparaitre en silence, comme il faisait disparaitre les derniers genres de la liste.
+    //
+    // Roger a mis le doigt dessus : « on commence a avoir beaucoup de spinbox 0-100 en disant que c'est des parts, mais
+    // sur dix questions, c'est plus des probabilites non ? ». C'est exactement cela, et la part qui manquait est
+    // celle-ci. Les parts sont maintenant des POIDS, lus les uns par rapport aux autres : leur somme est l'echelle, et
+    // le total n'a plus besoin de faire cent.
+    //
+    // Soixante par defaut, avec le chant et les accords a vingt : la somme fait cent, et le jeu sonne exactement comme
+    // avant que cette part existe.
+    std::int32_t namedIntervalQuestionShare{ 60 };
+
     // Share of questions, in percent, that ask the player to SING the interval instead of naming it.
     //
     // Twenty by default: enough that the voice shows up regularly in a session, small enough that the listening
@@ -175,11 +341,16 @@ struct SessionSettings
     // separate screen.
     std::int32_t singQuestionShare{ 20 };
 
-    // Share of questions, in percent, that ask the player to REPRODUCE a rhythmic cell.
+    // Le rythme n'est PLUS un exercice de ce jeu, et c'est une decision de Roger, prise en jouant : « je pense qu'on peut
+    // enlever les exercices de Rythme de l'app (mais garder le metronome). Ils seront jamais implementes ni utilises. »
     //
-    // ZERO par defaut : la question de rythme fonctionne, mais une question dont on ne peut pas croire le temps n'a
-    // rien a faire dans une session ordinaire. Qui veut du rythme le demande - le reglage est la, entre 0 et 100.
-    std::int32_t rhythmQuestionShare{ 0 };
+    // La part a disparu - c'etait le seul moyen de demander une cellule - et le genre a disparu du TIRAGE avec elle. Ce
+    // qui reste est ce que Roger garde : le pilotage, la frappe, le metronome et les echantillons de batterie. C'est
+    // aussi pourquoi QuestionKind::Rhythm est encore declaree : la demonter vraiment demanderait de demonter la frappe,
+    // et un bouton de moins ne vaut pas un metronome casse.
+    //
+    // Aucune ligne de code ne pose donc plus de cellule : voir drawKind, dont la table des parts ne contient plus le
+    // rythme.
 
     // Le tempo, en battements par minute, auquel la cellule rythmique est posee.
     //
@@ -210,11 +381,84 @@ struct SessionSettings
     // l'ordre de chordLearningOrder() - les triades d'abord, les accords a quatre notes a la fin.
     std::size_t startingChordQualityCount{ 2 };
 
+    // Share of questions, in percent, that ask the player to COMPARE two modes : « le second est-il plus clair ou plus
+    // sombre que le premier ? ».
+    //
+    // ZERO par defaut, comme le rythme et pour la meme raison : une question d'harmonie dans une session d'intervalles
+    // doit se DEMANDER, jamais s'imposer. Le pilier harmonie se dose comme les autres.
+    // Part des questions de couleur ou les DEUX passages ont la meme couleur, en poids comme les autres parts.
+    //
+    // C'est ce qui donne une bonne reponse au bouton « pareil » de Roger : sans cela, le bouton serait un piege
+    // permanent, et un bouton qui n'est jamais juste n'apprend rien. A zero, le jeu ne compare que des modes differents -
+    // le comportement d'avant.
+    std::int32_t sameColourQuestionShare{ 20 };
+
+    // Part des questions qui font chercher la NOTE ETRANGERE d'une gamme.
+    //
+    // DIX par defaut, et c'est une decision de Roger du 01/10/2026 : « pour les reglages par defaut (et a l'installation),
+    // il n'y a pas les modes, mets un poids de 10 a tous les jeux de modes ». Une application qui n'ouvre JAMAIS ses modes
+    // laisse un pilier entier invisible - et personne ne peut decouvrir un reglage dont il ignore l'existence.
+    std::int32_t foreignNoteQuestionShare{ 10 };
+    std::int32_t modeColourQuestionShare{ 10 };
+
+    // Share of questions, in percent, that ask the player to NAME a mode heard on a drone.
+    //
+    // SEPAREE de la part de couleur, et c'est tout l'interet : entendre qu'une couleur a change est une chose, savoir
+    // la nommer en est une autre. Un joueur qui reussit la premiere en ratant la seconde apprend quelque chose de son
+    // oreille - et il faut, pour le voir, que les deux questions soient comptees separement.
+    std::int32_t modeNameQuestionShare{ 10 };
+
+    // Share of questions, in percent, that play the SAME scale on TWO different centres.
+    //
+    // La plus avancee des trois questions d'harmonie, et la seule dont la reponse soit dans le CONTEXTE : les notes ne
+    // bougent pas d'un passage a l'autre, et le mode, si. C'est ce qu'un mode veut dire, et il faut l'entendre une fois
+    // pour le croire.
+    //
+    // DIX par defaut, comme les trois autres - voir foreignNoteQuestionShare. C'est la plus difficile des quatre, et elle
+    // se defend d'etre la : le tirage se fait entre quatre parts egales, donc elle tombe une fois sur quatre, pas plus.
+    std::int32_t modeVampQuestionShare{ 10 };
+
+    // Combien de modes le joueur a rencontres au depart.
+    //
+    // DEUX, et ce sont le majeur et le mineur : le seul ecart que toute oreille connait deja, et la premiere question
+    // possible. La palette s'elargit ensuite d'un mode tous les trois succes, du connu vers les extremes.
+    std::size_t startingModeCount{ 2 };
+
     // Les questions a poser, dans l'ORDRE, quand la session doit suivre un plan.
     //
     // Vide pour une partie ordinaire : le tirage decide. Rempli pour un Bilan, ou l'ordre EST le sujet - du plus facile
     // au plus difficile, et l'on finit par ce qui resiste.
     std::vector<QuestionTarget> plannedQuestions;
+
+    // -------------------------------------------------------------------------------------------------------------
+    // LE PERIMETRE, quand le joueur l'a choisi lui-meme : c'est le GodMode.
+    //
+    // Vides partout ailleurs, et c'est ce vide qui garde aux cinq niveaux leur comportement : une palette vide se lit
+    // « prends le prefixe de l'ordre d'apprentissage », exactement comme avant.
+    // -------------------------------------------------------------------------------------------------------------
+    std::vector<Interval> intervalPalette;
+    std::vector<ChordQuality> chordPalette;
+    std::vector<Mode> modePalette;
+
+    // Un perimetre FIGE ne s'elargit plus sur une reussite, et ne se retrecit plus sur une erreur.
+    //
+    // C'est toute la difference entre un niveau et le GodMode : un niveau fait GRANDIR une palette dont il sait ou il va,
+    // le GodMode travaille celle qu'on lui a donnee et n'y touche plus. Une reussite qui ajouterait un intervalle non
+    // choisi serait exactement la « conduite accompagnee » que ce mode est fait pour casser.
+    bool paletteIsFixed{ false };
+
+    // LE PLAFOND d'une session, quand elle en a un : la palette ne grandit plus au-dela de ces tailles. ZERO veut dire
+    // « aucun plafond », et c'est le comportement d'origine - les modes libres grandissent tant qu'il y a de la place.
+    //
+    // POURQUOI IL EXISTE : une partie d'ARCADE fait vingt-cinq questions, la ou une partie historique en faisait dix. Une
+    // reussite sur `successesBeforeWidening` elargit la palette, donc une Arcade ajoutait DEUX FOIS PLUS d'elements qu'une
+    // partie d'autrefois - et le joueur se retrouvait a entendre une difficulte qu'il n'avait pas choisie. Roger l'a
+    // ressenti en debutant : « j'ai testé le mode arcade en débutant. Et je galère ». Le plafond rend a la session la
+    // difficulte de son niveau, et c'est l'ARCADE et l'ENTRAINEMENT qui l'ont ; le jeu libre, lui, garde le droit d'aller
+    // loin.
+    std::size_t maximumPaletteSize{ 0 };
+    std::size_t maximumChordQualityCount{ 0 };
+    std::size_t maximumModeCount{ 0 };
 
     // Silence left between the two notes of a question, as heard.
     //
@@ -225,6 +469,15 @@ struct SessionSettings
 };
 
 // A question, as the screen needs it.
+// Le genre est-il OUVERT dans ces reglages - c'est-a-dire sa part est-elle non nulle ?
+//
+// La question se pose a DEUX endroits : le tirage, qui la lit deja, et le PLAN d'un bilan, qui l'ignorait. C'est
+// exactement le defaut que Roger a signale : « j'ai beau mettre plus clair et plus sombre a 0, je l'obtiens toujours dans
+// mes parties ». Le bilan ne passe pas par le tirage - il IMPOSE son plan - donc les parts ne s'appliquaient pas a lui.
+//
+// Ecrite une fois, ici, elle ne peut plus etre oubliee a un troisieme endroit.
+[[nodiscard]] bool isKindOpen( const SessionSettings & p_settings, QuestionKind p_kind ) noexcept;
+
 struct Question
 {
     // What the question asks. The screen reads it to know whether to show the circle or the two directions.
@@ -294,6 +547,55 @@ struct Question
     // voisins (une seconde majeure contre une mineure), une qualite d'accord n'en a pas. Cacher une qualite que le
     // joueur connait ne rendrait pas la question plus juste, seulement plus sournoise.
     std::vector<ChordQuality> chordChoices;
+
+    // -------------------------------------------------------------------------------------------------------------
+    // Le mode
+    //
+    // Ces champs ne veulent dire quelque chose que sur une question d'HARMONIE. Le domaine les remplit, l'ecran les lit.
+    // -------------------------------------------------------------------------------------------------------------
+
+    // La tonique, celle que le BOURDON tient. C'est elle qui donne un centre aux modes : sans elle, deux modes ne sont
+    // que deux gammes, et la question n'a pas de reponse.
+    Note modeTonic{ 62 };
+
+    // La tonique du PREMIER passage d'un VAMP. Le jeu en joue deux, et ce sont deux centres differents sous la MEME
+    // gamme : c'est le centre qui change, et rien d'autre.
+    Note previousModeTonic{ 62 };
+
+    // Le mode pose, et celui qui vient d'etre entendu juste avant - sur une question de COULEUR seulement.
+    //
+    // Le precedent est un optional, et pas un mode « vide » : sur une question de NOM il n'y a rien a comparer, et un
+    // champ qui contiendrait une valeur sans signification finirait par etre lu par quelqu'un.
+    Mode mode{ Mode::Ionian };
+    std::optional<Mode> previousMode;
+
+    // LA NOTE ETRANGERE : la gamme jouee, et le pas ou l'intrus se trouve.
+    //
+    // La melodie est gardee ENTIERE, et pas seulement la note fautive : c'est elle qu'on rejoue quand le joueur demande a
+    // reecouter, et la reconstruire a chaque lecture serait deux facons de dire la meme chose. Sept notes, une par degre,
+    // dans l'ordre de la gamme.
+    std::vector<Note> foreignMelody;
+
+    // L'index de l'intrus dans cette melodie : c'est LA reponse. Le joueur a entendu sept notes, il dit laquelle
+    // n'appartenait pas a la gamme.
+    std::int32_t foreignStepIndex{ 0 };
+
+    // Ce que le joueur a le droit de repondre : les modes de sa palette, dans l'ordre d'apprentissage.
+    //
+    // Comme pour les accords, et pour la meme raison : un mode que le joueur n'a jamais rencontre ne serait pas un
+    // choix, seulement un piege.
+    std::vector<Mode> modeChoices;
+
+    // LA MELODIE, quand la question en a une : sur une question de NOM, le mode s'entend dans une PHRASE plutot que
+    // dans une gamme qui monte.
+    //
+    // C'est ce que les trois cents phrases de l'atelier attendaient. Le banc d'essai l'avait ecrit d'avance : « la phrase
+    // fait aussi connaitre son MODE : l'ecran n'a pas a deviner lequel a sonne, puisque c'est justement la question que
+    // l'exercice posera un jour ».
+    //
+    // Un optional, et jamais une phrase vide : une phrase sans pas se jouerait comme un silence, alors qu'un mode sans
+    // phrase doit simplement s'entendre en gamme. Les deux sont des questions valides ; il n'y en a qu'une qui sonne.
+    std::optional<Phrase> modePhrase;
 };
 
 enum class SessionState
@@ -308,11 +610,19 @@ class ExerciseSession
 public:
     // The seed is provided, never drawn here: the domain owns no entropy source, so the same seed
     // always produces the same session, which is what makes every rule above testable.
-    explicit ExerciseSession( std::uint32_t p_seed, SessionSettings p_settings = {} );
+    explicit ExerciseSession( std::uint32_t p_seed,
+                              SessionSettings p_settings = {},
+                              const PhraseBook * p_phraseBook = nullptr );
 
     [[nodiscard]] const Question & currentQuestion() const noexcept { return m_currentQuestion; }
     [[nodiscard]] SessionState state() const noexcept { return m_state; }
     [[nodiscard]] const SessionScore & score() const noexcept { return m_score; }
+
+    // Ce que la session a demande et reussi, famille par famille.
+    //
+    // Tenu pendant la partie, et non recalcule a la fin : l'ecran de fin d'Arcade s'en sert pour dire ou le joueur est
+    // fort et ou il resiste, et il ne peut le dire que de ce que la session a vraiment vu.
+    [[nodiscard]] const FamilyTally & familyTally() const noexcept { return m_familyTally; }
     [[nodiscard]] const SessionSettings & settings() const noexcept { return m_settings; }
 
     // Intervals the player is currently up against, from the learning order.
@@ -420,6 +730,43 @@ public:
     // mauvaise reponse ne ferme pas la question - on retente, et l'accord est rejoue.
     bool answerChord( ChordQuality p_quality );
 
+    // Repond a une question de DEGRADE : le second mode etait-il plus CLAIR que le premier ?
+    //
+    // Un booleen, et non une distance : la reponse n'est pas un ecart, c'est un SENS. Le domaine compare les deux modes
+    // par leur RANG dans l'ordre de couleur, ce qui garantit qu'il ne peut pas se tromper de direction.
+    bool answerModeColour( bool p_secondIsBrighter );
+
+    // La meme question, avec la troisieme reponse : « pareil ».
+    //
+    // C'est ce que le bouton de Roger appelle, et c'est la seule facon de repondre juste quand les deux passages portent
+    // la meme couleur - ce qui arrive quand la part le demande (voir SessionSettings::sameColourQuestionShare).
+    bool answerModeColour( ModeColourAnswer p_answer );
+
+    // Repond a une question de NOM : quel mode a ete joue ?
+    bool answerModeName( Mode p_mode );
+
+    // La reponse a une question de NOTE ETRANGERE : l'index du pas qui n'appartenait pas a la gamme.
+    //
+    // L'index, et non une classe de hauteur : les sept notes sont entendues DANS L'ORDRE, et le joueur designe la place
+    // ou il a entendu l'intrus. Un nom de note marcherait aussi, mais il demanderait au joueur de nommer ce qu'il vient
+    // d'entendre - un autre exercice, et pas celui-ci.
+    bool answerForeignNote( std::int32_t p_stepIndex );
+
+    // Les modes que le joueur a rencontres, dans l'ordre d'apprentissage.
+    [[nodiscard]] std::span<const Mode> modePalette() const noexcept { return m_modePalette; }
+
+    // Le LIVRE DES PHRASES, donne a la CONSTRUCTION et jamais apres.
+    //
+    // Il n'y a pas de setter, et ce n'est pas un oubli : la premiere question est construite par le constructeur lui-meme -
+    // une session qui existe est une session qui demande quelque chose - donc un livre donne ensuite ne pourrait plus rien
+    // pour elle. Un test l'a montre en echouant, et c'est exactement ce qu'un test doit faire.
+    //
+    // Il n'est pas dans SessionSettings non plus : un pointeur dans des reglages qui se copient serait un piege a
+    // proprietaire, alors que sa place est evidemment au cote de ce qui construit les questions.
+
+    // Ce que le joueur a repondu en dernier a une question de mode, pour que le verdict puisse le montrer.
+    [[nodiscard]] std::optional<Mode> lastModeAnswer() const noexcept { return m_lastModeAnswer; }
+
     // Les qualites que le joueur a rencontrees, dans l'ordre d'apprentissage. C'est ce que sa palette d'accords
     // contient, et ce que l'ecran a le droit de proposer.
     [[nodiscard]] std::span<const ChordQuality> chordPalette() const noexcept { return m_chordPalette; }
@@ -447,7 +794,29 @@ private:
     void buildRhythmicCell( Question & p_question );
 
     // Remplit la part "accord" d'une question : quelle couleur, quelle tonique, et ce que le joueur peut repondre.
+    // Construit une question d'accord : sa couleur, sa tonique, et les choix de la palette.
     void buildChordQuestion( Question & p_question );
+
+    // Construit une question d'harmonie : la tonique du bourdon, le ou les modes, et les choix de la palette.
+    //
+    // p_compare dit laquelle des deux : deux modes a comparer, ou un seul a nommer. Une seule fonction, parce que les
+    // deux questions partagent tout - la tonique, le bourdon, la palette, la facon de tirer un mode - et que deux
+    // constructions separees finiraient par tirer differemment.
+    void buildModeQuestion( Question & p_question, bool p_compare );
+
+    [[nodiscard]] Mode drawMode();
+
+    // La tonique du bourdon. Tiree dans la fenetre jouable, et choisie BASSE : c'est le bourdon qui la tient, et un
+    // bourdon aigu n'a plus rien d'un bourdon.
+    [[nodiscard]] Note drawModeTonic();
+
+    // Construit un VAMP : la MEME gamme, posee sur deux centres differents.
+    void buildVampQuestion( Question & p_question );
+
+    // La question de la NOTE ETRANGERE : une gamme montee, une note par degre, et l'une d'elles est etrangere a la gamme.
+    void buildForeignNoteQuestion( Question & p_question );
+
+    void widenModePalette();
 
     // La question decidee pour ce rang, quand la session suit un plan.
     //
@@ -491,7 +860,20 @@ private:
     // Les couleurs d'accord que le joueur a rencontrees. Un PREFIXE de chordLearningOrder(), elargi avec les
     // reussites - exactement comme la palette d'intervalles, et pour la meme raison : une couleur a la fois.
     std::vector<ChordQuality> m_chordPalette;
+
+    // Les modes que le joueur a rencontres : un PREFIXE de modeLearningOrder(), elargi par les MEMES reussites que le
+    // reste. Une seule progression a tenir, plutot que trois compteurs dont l'un finirait par mentir.
+    std::vector<Mode> m_modePalette;
+
+    // Le livre des phrases modales, s'il a ete donne. C'est lui qui fait entendre un mode en MELODIE plutot qu'en gamme.
+    const PhraseBook * m_phraseBook{ nullptr };
+
+    // La derniere reponse de mode, pour que le verdict puisse dire ce qui a ete repondu.
+    std::optional<Mode> m_lastModeAnswer;
     SessionScore m_score;
+
+    // Le compte demande / reussi par famille, tenu au fil des questions. Voir familyTally().
+    FamilyTally m_familyTally;
 
     // Wrong answers in a row. Two of them, and the next question becomes a guided one - a smaller question the
     // player can still answer, which is help that does not announce itself.

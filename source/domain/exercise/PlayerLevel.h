@@ -68,4 +68,21 @@ inline constexpr std::size_t PLAYER_LEVEL_COUNT = 5;
 // settings, never a crash on start up.
 [[nodiscard]] PlayerLevel playerLevelFromIndex( std::size_t p_index ) noexcept;
 
+// L'experience qu'un niveau demande, et celui qu'une experience merite.
+//
+// LE JEU PROPOSE, IL N'IMPOSE PAS : ces fonctions disent ce qu'un joueur a GAGNE par ses parties, et l'ecran s'en sert
+// pour lui proposer la suite. Le niveau reste un choix - c'est ce qui en fait la premiere piece du profil plutot qu'un
+// reglage.
+//
+// Les seuils sont en experience CUMULEE, et ils sont LARGES a dessein : une partie de dix questions rapporte entre cent et
+// deux cents points, donc « Je maitrise » demande une quarantaine de parties. Roger l'a voulu ainsi - « pour aller haut, il
+// faut faire de longues series » - et c'est aussi ce qui empeche une felicitation de tomber des la premiere soiree.
+//
+// Il n'y a AUCUN plafond : celui qui joue beaucoup continue d'ouvrir le jeu, et le mode infini - sans fin et sans vie - est
+// justement l'endroit ou l'on peut aller le plus loin.
+[[nodiscard]] PlayerLevel levelEarnedBy( std::int64_t p_experience ) noexcept;
+
+// L'experience qu'il faut avoir pour meriter ce niveau. Zero pour le premier : il n'y a rien a meriter pour commencer.
+[[nodiscard]] std::int64_t experienceRequiredFor( PlayerLevel p_level ) noexcept;
+
 }    // namespace musichien::domain

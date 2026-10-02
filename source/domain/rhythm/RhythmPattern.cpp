@@ -19,7 +19,7 @@ RhythmPattern::RhythmPattern( std::string_view p_name, int p_beatsPerBar, std::v
 const std::vector<RhythmPattern> & allRhythmPatterns()
 {
     // Built once, and never modified: the list is a fact of the domain, not a state of the game.
-    static const std::vector<RhythmPattern> patterns{
+    static const std::vector<RhythmPattern> PATTERNS{
       // Le binaire : la caisse claire sur les temps 2 et 4, la grosse caisse sur 1 et 3. C'est LA cellule que
       // tout le monde reconnait, et le point de depart logique.
       RhythmPattern{ "Binaire", 4, { { 0.0, Drum::Kick, true }, { 1.0, Drum::Snare }, { 2.0, Drum::Kick }, { 3.0, Drum::Snare } } },
@@ -37,7 +37,7 @@ const std::vector<RhythmPattern> & allRhythmPatterns()
       RhythmPattern{ "Shuffle", 4, { { 0.0, Drum::Kick, true }, { 0.66, Drum::HiHat }, { 1.0, Drum::Snare }, { 1.66, Drum::HiHat }, { 2.0, Drum::Kick }, { 2.66, Drum::HiHat }, { 3.0, Drum::Snare }, { 3.66, Drum::HiHat } } },
     };
 
-    return patterns;
+    return PATTERNS;
 }
 
 namespace
@@ -76,7 +76,7 @@ double distanceToNearestOnsetInBeats( const RhythmPattern & p_pattern, double p_
         return 0.0;
     }
 
-    const double loopLength = static_cast<double>( p_pattern.beatsPerBar() );
+    const auto loopLength = static_cast<double>( p_pattern.beatsPerBar() );
 
     const double position = foldIntoLoop( p_positionInBeats, loopLength );
 
@@ -99,7 +99,7 @@ std::size_t nearestOnsetIndex( const RhythmPattern & p_pattern, double p_positio
         return 0;
     }
 
-    const double loopLength = static_cast<double>( p_pattern.beatsPerBar() );
+    const auto loopLength = static_cast<double>( p_pattern.beatsPerBar() );
 
     const double position = foldIntoLoop( p_positionInBeats, loopLength );
 

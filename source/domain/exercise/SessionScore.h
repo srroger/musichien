@@ -76,6 +76,9 @@ public:
     [[nodiscard]] std::int32_t experience() const noexcept { return m_experience; }
     [[nodiscard]] std::int32_t streak() const noexcept { return m_streak; }
 
+    // La meilleure serie de la session : le plus haut que le compteur soit monte, meme s'il est retombe depuis.
+    [[nodiscard]] std::int32_t longestStreak() const noexcept { return m_longestStreak; }
+
     // Empty when the session has no limit on mistakes.
     [[nodiscard]] std::optional<std::int32_t> remainingLives() const noexcept { return m_remainingLives; }
 
@@ -106,6 +109,7 @@ public:
 private:
     std::int32_t m_experience{ 0 };
     std::int32_t m_streak{ 0 };
+    std::int32_t m_longestStreak{ 0 };
     std::optional<std::int32_t> m_remainingLives;
     std::size_t m_completedQuestionCount{ 0 };
     std::size_t m_firstTrySuccessCount{ 0 };

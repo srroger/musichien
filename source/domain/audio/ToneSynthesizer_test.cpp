@@ -24,6 +24,26 @@ namespace
 // Sample rate used by every test: the one Android devices use natively.
 constexpr std::int32_t TEST_SAMPLE_RATE = 48000;
 
+// L'energie de la difference premiere d'un signal : une mesure de RUGOSITE.
+//
+// C'est exactement ce que le repliement de spectre ajoute a un son, et c'est ce que l'oreille appelle un gresillement.
+// Un son tenu et doux a une difference premiere faible ; une dents de scie, qui saute d'un bord a l'autre a chaque
+// periode, en a une enorme. Comparer deux timbres par ce nombre, c'est donc comparer ce que l'oreille en souffre.
+[[nodiscard]] double roughnessOf( std::span<const float> p_samples )
+{
+    double sum = 0.0;
+
+    for( const std::size_t index : std::views::iota( std::size_t{ 1 }, p_samples.size() ) )
+    {
+        const double difference =
+          static_cast<double>( p_samples.at( index ) ) - static_cast<double>( p_samples.at( index - 1 ) );
+
+        sum += difference * difference;
+    }
+
+    return ( p_samples.empty() ? 0.0 : sum / static_cast<double>( p_samples.size() ) );
+}
+
 // Peak level actually present in a buffer.
 [[nodiscard]] float peakAmplitudeOf( std::span<const float> p_samples )
 {
@@ -677,6 +697,116 @@ TEST( SampledInstrumentTest, the_sampler_follows_the_temperament )
     EXPECT_NEAR( fifthFrequency,
                  measuredFrequency( secondNote, fifthFrequency ),
                  fifthFrequency * 0.0025 );
+}
+
+TEST( ToneSynthesizerTest, the_drone_installs_the_centre_before_the_melody_arrives )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const std::vector<Note> melody{ Note{ 62 }, Note{ 65 }, Note{ 67 } };
+
+    constexpr std::chrono::milliseconds noteDuration{ 300 };
+    constexpr std::chrono::milliseconds gap{ 100 };
+    constexpr std::chrono::milliseconds leadIn{ 1500 };
+    constexpr std::chrono::milliseconds tail{ 1500 };
+
+    const std::vector<Note> drone{ Note{ 38 } };
+
+    const DroneFraming framing{ leadIn, tail };
+
+    const std::vector<float> withDrone =
+      synthesizer.renderMelodyOverDrone( melody, drone, noteDuration, gap, {}, framing );
+
+    const std::vector<float> melodyOnly = synthesizer.renderMelody( melody, noteDuration, gap );
+
+    constexpr std::size_t SAMPLES_PER_MILLISECOND = TEST_SAMPLE_RATE / 1000;
+    constexpr std::size_t WINDOW_SAMPLE_COUNT = 1000;
+
+    ASSERT_FALSE( withDrone.empty() );
+
+    // Le melange est PLUS LONG que la melodie, des deux cotes : c'est le bourdon seul, avant et apres. C'est
+    // exactement ce que l'ecoute du 30/09/2026 a demande - « on ne l'entend pas assez longtemps ».
+    const auto framingSampleCount = ( leadIn + tail ).count() * static_cast<std::int64_t>( SAMPLES_PER_MILLISECOND );
+
+    EXPECT_EQ( melodyOnly.size() + static_cast<std::size_t>( framingSampleCount ), withDrone.size() );
+
+    const std::span<const float> mix = withDrone;
+
+    // 1. AU DEBUT, le bourdon sonne SEUL : l'oreille a le centre avant que la couleur n'arrive.
+    const std::size_t middleOfLeadIn = ( leadIn.count() / 2 ) * static_cast<std::int64_t>( SAMPLES_PER_MILLISECOND );
+
+    EXPECT_GT( peakAmplitudeOf( mix.subspan( middleOfLeadIn, WINDOW_SAMPLE_COUNT ) ), 0.01F );
+
+    // 2. DANS LE SILENCE entre deux notes, la melodie seule est muette et le melange ne l'est pas : c'est la
+    // definition meme de « les deux s'entendent ensemble ».
+    const std::size_t gapMiddle = ( ( leadIn + noteDuration ).count() + 50 ) * static_cast<std::int64_t>( SAMPLES_PER_MILLISECOND );
+
+    // La meme fenetre, mesuree sur la melodie SEULE, se trouve « leadIn » plus tot - le decalage est le temps ou le
+    // bourdon a sonne seul, et non la moitie de ce temps. Se tromper ici ferait mesurer la fin d'une note au lieu du
+    // silence, donc passerait sur un faux positif.
+    const std::size_t leadInSampleCount = static_cast<std::size_t>( leadIn.count() ) * SAMPLES_PER_MILLISECOND;
+
+    const std::span<const float> melodyOnlySpan = melodyOnly;
+
+    EXPECT_LT( peakAmplitudeOf( melodyOnlySpan.subspan( gapMiddle - leadInSampleCount, WINDOW_SAMPLE_COUNT ) ), 0.001F );
+    EXPECT_GT( peakAmplitudeOf( mix.subspan( gapMiddle, WINDOW_SAMPLE_COUNT ) ), 0.01F );
+
+    // 3. LE BOURDON TIENT, et c'est le point que ce test a reellement appris : une corde frappee decroit, donc son
+    // amplitude a la fin serait minuscule. Un bourdon qui s'eteint n'est plus un bourdon, c'est un souvenir de
+    // bourdon - et l'oreille de Roger l'avait dit avant la mesure : « on ne l'entend pas assez longtemps ».
+    const auto droneDuration = leadIn + ( ( noteDuration + gap ) * static_cast<std::int64_t>( melody.size() ) ) + tail;
+
+    // Le MILIEU DE LA QUEUE, donc : a cet instant la melodie est finie, et il ne reste qu'une voix a mesurer. La
+    // formule le dit directement - la fin du tampon moins la moitie de la queue.
+    const std::size_t middleOfTail =
+      static_cast<std::size_t>( ( droneDuration - ( tail / 2 ) ).count() ) * SAMPLES_PER_MILLISECOND;
+
+    const float amplitudeAtStart = peakAmplitudeOf( mix.subspan( middleOfLeadIn, WINDOW_SAMPLE_COUNT ) );
+    const float amplitudeAtEnd = peakAmplitudeOf( mix.subspan( middleOfTail, WINDOW_SAMPLE_COUNT ) );
+
+    EXPECT_GT( amplitudeAtEnd, amplitudeAtStart * 0.5F );
+
+    // Et il est vraiment present, pas un souffle : c'est ce que « le bourdon s'entend » veut dire.
+    EXPECT_GT( amplitudeAtEnd, 0.01F );
+
+    // 4. Et la somme ne sature pas : deux voix qui s'ajoutent doivent rester dans la plage que le materiel accepte.
+    EXPECT_LE( peakAmplitudeOf( withDrone ), 1.0F );
+}
+
+TEST( ToneSynthesizerTest, a_melody_over_an_empty_drone_is_the_melody_alone )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    const std::vector<Note> melody{ Note{ 60 }, Note{ 64 } };
+
+    constexpr std::chrono::milliseconds noteDuration{ 200 };
+    constexpr std::chrono::milliseconds gap{ 50 };
+
+    // Un bourdon vide n'est pas une erreur : c'est une phrase qu'on ecoute sans accompagnement, et elle doit sortir
+    // EXACTEMENT comme la melodie seule - sans quoi les deux chemins divergeraient en silence.
+    EXPECT_EQ( synthesizer.renderMelody( melody, noteDuration, gap ),
+               synthesizer.renderMelodyOverDrone( melody, {}, noteDuration, gap ) );
+}
+
+TEST( ToneSynthesizerTest, the_drone_timbre_is_soft_where_a_sawtooth_grates )
+{
+    const ToneSynthesizer synthesizer{ TEST_SAMPLE_RATE };
+
+    constexpr std::chrono::milliseconds duration{ 1000 };
+
+    // Le meme re grave, aux deux timbres : celui du bourdon, et celui qui a ete rejete a l'ecoute.
+    const std::vector<float> organ = synthesizer.renderWaveNote( Note{ 38 }, Waveform::Organ, duration );
+    const std::vector<float> sawtooth = synthesizer.renderWaveNote( Note{ 38 }, Waveform::Sawtooth, duration );
+
+    ASSERT_FALSE( organ.empty() );
+    ASSERT_EQ( organ.size(), sawtooth.size() );
+
+    // Le bourdon doit etre NETTEMENT moins rugueux : c'est la correction du gresillement, verrouillee par un nombre
+    // plutot que par une impression - et une impression, ici, a eu raison avant la mesure.
+    EXPECT_LT( roughnessOf( organ ), roughnessOf( sawtooth ) / 4.0 );
+
+    // Et il reste un son PLEIN, pas un souffle : son energie est du meme ordre que celle d'une note normale.
+    EXPECT_GT( peakAmplitudeOf( organ ), 0.05F );
 }
 
 }    // namespace musichien::domain

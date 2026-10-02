@@ -30,6 +30,18 @@ public:
 
     void storeLevel( domain::PlayerLevel p_level ) override;
 
+    [[nodiscard]] bool storedGodModeIsChosen() const override;
+
+    void storeGodModeIsChosen( bool p_isChosen ) override;
+
+    [[nodiscard]] std::optional<domain::GodModePalette> storedGodModePalette() const override;
+
+    void storeGodModePalette( const domain::GodModePalette & p_palette ) override;
+
+    [[nodiscard]] std::optional<domain::PlayerLevel> storedAnnouncedLevel() const override;
+
+    void storeAnnouncedLevel( domain::PlayerLevel p_level ) override;
+
     [[nodiscard]] std::vector<bool> storedEnabledInstruments() const override;
 
     void storeEnabledInstruments( std::vector<bool> p_enabledInstruments ) override;
@@ -70,17 +82,60 @@ public:
 
     void storeReferencePitch( double p_hertz ) override;
 
+    [[nodiscard]] std::int32_t storedPhraseTempoBpm() const override;
+
+    void storePhraseTempoBpm( std::int32_t p_bpm ) override;
+
+    [[nodiscard]] std::int32_t storedPhraseTempoVariation() const override;
+
+    void storePhraseTempoVariation( std::int32_t p_variation ) override;
+
+    [[nodiscard]] std::int32_t storedNamedIntervalQuestionShare() const override;
+
+    [[nodiscard]] std::int32_t storedForeignNoteQuestionShare() const override;
+
+    void storeForeignNoteQuestionShare( std::int32_t p_share ) override;
+    void storeNamedIntervalQuestionShare( std::int32_t p_share ) override;
+
     [[nodiscard]] std::int32_t storedSingQuestionShare() const override;
 
     void storeSingQuestionShare( std::int32_t p_share ) override;
 
-    [[nodiscard]] std::int32_t storedRhythmQuestionShare() const override;
-
-    void storeRhythmQuestionShare( std::int32_t p_share ) override;
-
     [[nodiscard]] std::int32_t storedChordQuestionShare() const override;
 
     void storeChordQuestionShare( std::int32_t p_share ) override;
+
+    [[nodiscard]] std::int32_t storedModeColourQuestionShare() const override;
+
+    void storeModeColourQuestionShare( std::int32_t p_share ) override;
+
+    [[nodiscard]] std::int32_t storedModeNameQuestionShare() const override;
+
+    void storeModeNameQuestionShare( std::int32_t p_share ) override;
+
+    [[nodiscard]] std::int32_t storedModeVampQuestionShare() const override;
+
+    void storeModeVampQuestionShare( std::int32_t p_share ) override;
+
+    [[nodiscard]] std::int32_t storedArcadeLives() const override;
+
+    void storeArcadeLives( std::int32_t p_lives ) override;
+
+    [[nodiscard]] std::int64_t storedBilanCount() const override;
+
+    void storeBilanCount( std::int64_t p_count ) override;
+
+    [[nodiscard]] std::int64_t storedPerfectBilanCount() const override;
+
+    void storePerfectBilanCount( std::int64_t p_count ) override;
+
+    [[nodiscard]] std::int64_t storedBilanSuccessStreak() const override;
+
+    void storeBilanSuccessStreak( std::int64_t p_streak ) override;
+
+    [[nodiscard]] std::int64_t storedLongestBilanSuccessStreak() const override;
+
+    void storeLongestBilanSuccessStreak( std::int64_t p_streak ) override;
 };
 
 }    // namespace musichien::infrastructure

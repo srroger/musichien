@@ -25,11 +25,13 @@
 #include "domain/exercise/AnecdoteBook.h"
 #include "domain/exercise/AnswerGrid.h"
 #include "domain/exercise/ExerciseSession.h"
+#include "domain/exercise/GameMode.h"
 #include "domain/exercise/HintBook.h"
 #include "domain/exercise/PlayerPreferences.h"
 #include "domain/exercise/QuestionLog.h"
 #include "domain/exercise/QuestionStatistics.h"
 #include "domain/exercise/Rank.h"
+#include "domain/exercise/Trophy.h"
 #include "domain/music/TunerGuide.h"
 
 #include <QElapsedTimer>
@@ -137,6 +139,105 @@ class ExerciseSessionController final : public QObject
     // ---------------------------------------------------------------------------------------------------------------
     Q_PROPERTY( bool isChordQuestion READ isChordQuestion NOTIFY questionChanged )
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // Le pilier harmonie : le degrade
+    //
+    // Une question de mode se joue comme aucune autre : DEUX modes sur le MEME bourdon, l'un apres l'autre. L'ecran a
+    // donc besoin de savoir laquelle des deux questions il pose, et quels modes il peut proposer.
+    // -----------------------------------------------------------------------------------------------------------------
+
+    // Le mode a comparer ou a nommer, et celui qui vient d'etre entendu avant lui.
+    Q_PROPERTY( bool isModeQuestion READ isModeQuestion NOTIFY questionChanged )
+
+    // Une question d'HARMONIE : celles de mode, et la note etrangere - qui pose la meme oreille devant le meme bourdon.
+    //
+    // Elle existe parce que l'ecran avait recopie « mode » la ou il fallait « harmonie » : le bloc qui porte les sept
+    // boutons de l'intrus etait cache sur une question de note etrangere, et Roger s'est retrouve devant un ecran vide -
+    // « j'entends bien une phrase, mais rien ensuite, aucun bouton, on est bloque ». Un predicat nomme, teste, ne se
+    // recopie pas.
+    Q_PROPERTY( bool isHarmonyQuestion READ isHarmonyQuestion NOTIFY questionChanged )
+
+    // Vrai sur la question de COULEUR : deux modes, et une reponse « plus clair / plus sombre ».
+    Q_PROPERTY( bool isModeColourQuestion READ isModeColourQuestion NOTIFY questionChanged )
+    Q_PROPERTY( bool isModeVampQuestion READ isModeVampQuestion NOTIFY questionChanged )
+
+    // Les modes que le joueur peut repondre : SA palette, dans l'ordre d'apprentissage, du plus clair au plus sombre.
+    // Chaque entree porte un index, un identifiant, un nom, la note qui colore, et une CLARTE entre 0 et 1.
+    Q_PROPERTY( QVariantList modeChoices READ modeChoices NOTIFY questionChanged )
+
+    // Le mode qui vient d'etre joue, decrit comme une entree de la liste ci-dessus - et vide tant que rien n'a sonne.
+    Q_PROPERTY( QVariantMap heardMode READ heardMode NOTIFY sessionChanged )
+
+    // Le mode entendu JUSTE AVANT, sur une question de couleur, et vide sur une question de nom.
+    Q_PROPERTY( QVariantMap previousMode READ previousMode NOTIFY questionChanged )
+
+    // La DIFFERENCE entre les deux modes d'une question de comparaison : le degre qui a bouge, et son accidental.
+    //
+    // C'est ce qui remplace un verdict qui ne disait rien. « De dorien a ionien, la tierce a monte » se lit, s'entend et
+    // s'apprend ; deux noms poses cote a cote ne laissent aucun souvenir - Roger : « on voit ecrit 1 mode, on ne sait
+    // pas lequel, le temps de lecture est trop court ».
+    Q_PROPERTY( QVariantMap modeDifference READ modeDifference NOTIFY questionChanged )
+
+    // Le cercle des quintes du mode de la question : ses sept notes allumees, le reste eteint, la tonique marquee.
+    //
+    // DONNE DES LA QUESTION, et c'est un choix de Roger, assume : « je mettrais quand meme la roue dans la question,
+    // l'utilisateur pourra ne pas trop la regarder ». La fenetre de sept notes plus la tonique donne le mode, donc c'est
+    // une aide forte - mais elle est visible et ignorable, comme l'indice des intervalles, et un joueur qui apprend a
+    // situer les modes a besoin de la voir PENDANT qu'il ecoute, pas apres.
+    //
+    // La tonique reste EN HAUT du cercle : c'est ce qui rend l'arc lisible d'un coup d'oeil, et c'est ce qui ne doit
+    // jamais bouger d'un mode a l'autre.
+    Q_PROPERTY( QVariantList modeCircle READ modeCircle NOTIFY questionChanged )
+    // Ce que la roue montre, et DUQUEL il s'agit : Roger, en jouant - « on ne sait pas a qui correspond le cercle ».
+    //
+    // Sur une question de couleur, DEUX modes ont sonne, et le cercle est celui du SECOND - c'est le seul des deux que la
+    // question nomme. Le nom lui-meme n'arrive qu'avec le verdict : avant, ce serait la reponse de la question de nom.
+    Q_PROPERTY( QString modeCircleLabel READ modeCircleLabel NOTIFY questionChanged )
+
+    // LA NOTE ETRANGERE : sept notes montees, une seule etrangere a la gamme, et le joueur dit laquelle.
+    Q_PROPERTY( bool isForeignNoteQuestion READ isForeignNoteQuestion NOTIFY questionChanged )
+
+    // Les sept notes de la gamme, DANS L'ORDRE ENTENDU : c'est celui de l'ecoute, donc celui des boutons de reponse.
+    Q_PROPERTY( QVariantList foreignNoteChoices READ foreignNoteChoices NOTIFY questionChanged )
+
+    // Le verdict de la note etrangere : quel pas etait l'intrus, quelle note il portait, et quelle note la gamme
+    // attendait. Vide tant que la question est posee.
+    Q_PROPERTY( QVariantMap foreignNoteVerdict READ foreignNoteVerdict NOTIFY questionChanged )
+
+    // Combien de temps DURE le son d'une question de mode, en millisecondes.
+    //
+    // L'ecran s'en sert pour ne pas couper la lecture : Roger a vu le defaut en jouant - « pour les modes, ca va beaucoup
+    // trop vite, le son se coupe en plein milieu ». C'est le minuteur de pause qui avancait, et il ne pouvait pas savoir
+    // qu'un mode dure plus longtemps qu'un intervalle.
+    //
+    // La valeur vient du DOMAINE, par la meme fonction qui decide combien de temps le bourdon tient : deux calculs qui
+    // doivent coincider finissent toujours par diverger.
+    Q_PROPERTY( int modeSoundDurationMs READ modeSoundDurationMs NOTIFY questionChanged )
+
+    // LES DEUX NOMBRES DONT LA ROUE A BESOIN pour arriver sur chaque pastille a l'instant ou la note sonne : le silence
+    // d'entree, et le temps d'un pas.
+    //
+    // Une duree TOTALE ne suffit pas : elle comprend le bourdon seul du debut et de la fin, donc une tete calee dessus
+    // part trop tot et finit dans le silence. Roger : « la boule des lignes dans les modes est un peu lente par rapport au
+    // son ». Voir ModeCircle.startPlayback.
+    //
+    // Zero quand la question n'a pas de mode : la roue n'est alors pas affichee, et une valeur inventee ici ne servirait a
+    // personne.
+    //
+    // La roue ne s'anime QUE sur la gamme. Une phrase ne l'anime pas - voir playPhraseQuestion - donc ces deux nombres
+    // decrivent exactement ce que la roue suit, et rien d'autre.
+    Q_PROPERTY( int modeSoundLeadInMs READ modeSoundLeadInMs NOTIFY questionChanged )
+    Q_PROPERTY( int modeSoundNoteStepMs READ modeSoundNoteStepMs NOTIFY questionChanged )
+
+    // Les deux parts de l'harmonie, en pour cent : comparer deux modes, et nommer un mode. Deux reglages, parce que ce
+    // sont deux competences - un joueur peut vouloir la comparaison sans le vocabulaire, et l'inverse.
+    Q_PROPERTY( int modeColourQuestionShare READ modeColourQuestionShare WRITE setModeColourQuestionShare NOTIFY
+                  modeQuestionShareChanged )
+    Q_PROPERTY( int modeNameQuestionShare READ modeNameQuestionShare WRITE setModeNameQuestionShare NOTIFY
+                  modeQuestionShareChanged )
+    Q_PROPERTY( int modeVampQuestionShare READ modeVampQuestionShare WRITE setModeVampQuestionShare NOTIFY
+                  modeQuestionShareChanged )
+
     // L'accord qui vient d'etre joue, pret a afficher : son nom ("Minor"), son symbole ("Cm") et sa tonique, deja
     // ecrite avec son nom de note - l'ecran n'assemble rien.
     Q_PROPERTY( QVariantMap heardChord READ heardChord NOTIFY sessionChanged )
@@ -178,7 +279,64 @@ class ExerciseSessionController final : public QObject
     //
     // Static because it reads nothing of this object: the list of levels is a fact of the domain, and saying
     // so in the signature is cheaper than a comment. Qt hands it to the screen all the same.
-    Q_PROPERTY( QVariantList playerLevels READ playerLevels CONSTANT )
+    //
+    // ET LE GODMODE EST LA DERNIERE ENTREE, sans etre un niveau du domaine : il ne dit pas ce que le joueur sait, il dit
+    // qu'il a decide de choisir. Il porte donc un drapeau de plus, et c'est ce drapeau que l'ecran lit.
+    // Pas CONSTANT : l'etat « ouvert / ferme » d'un palier change avec l'experience et le code de developpeur, et une liste
+    // figee ne le montrerait jamais. C'est ce defaut qui a fait dire a Roger « j'ai essaye, rien ne s'est passe » : le
+    // deverrouillage AVait bien eu lieu, mais le cadenas ne disparaissait pas.
+    Q_PROPERTY( QVariantList playerLevels READ playerLevels NOTIFY playerLevelChanged )
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // LE GODMODE
+    //
+    // Ce que Roger a demande : une difficulte ou le joueur choisit lui-meme ce qu'il travaille. Il ne REMPLACE pas les
+    // cinq niveaux - ceux-ci gardent leur progression, qui compte dans l'avancement - il les prend comme modeles et
+    // casse la conduite accompagnee. L'XP, les statistiques et les bilans continuent : « c'est un dieu, il a tous les
+    // pouvoirs ».
+    // ---------------------------------------------------------------------------------------------------------------
+
+    // La difficulte choisie est-elle le GodMode ?
+    Q_PROPERTY( bool godModeIsChosen READ godModeIsChosen NOTIFY godModeChanged )
+
+    // Une palette a-t-elle deja ete sauvegardee ? C'est ce qui distingue « il n'a jamais ouvert cette page » de « il a
+    // tout decoche », et les deux ne se reparent pas de la meme facon.
+    Q_PROPERTY( bool godModeIsSaved READ godModeIsSaved NOTIFY godModeChanged )
+
+    // Le brouillon a-t-il ete touche depuis la derniere sauvegarde ? C'est ce qui fait apparaitre « non sauvegarde » a
+    // cote du nom, et rien d'autre.
+    Q_PROPERTY( bool godModeHasUnsavedChanges READ godModeHasUnsavedChanges NOTIFY godModeChanged )
+
+    // La palette en cours peut-elle poser une partie ? Faux, l'ecran doit dire POURQUOI (voir godModeProblem).
+    Q_PROPERTY( bool godModeCanStart READ godModeCanStart NOTIFY godModeChanged )
+
+    // La raison, en une phrase, quand la palette n'est pas jouable. Vide quand tout va bien.
+    Q_PROPERTY( QString godModeProblem READ godModeProblem NOTIFY godModeChanged )
+
+    // Les trois familles, chacune prete a afficher : l'index a renvoyer, le nom, et si la case est cochee.
+    Q_PROPERTY( QVariantList godModeIntervals READ godModeIntervals NOTIFY godModeChanged )
+    Q_PROPERTY( QVariantList godModeChords READ godModeChords NOTIFY godModeChanged )
+    Q_PROPERTY( QVariantList godModeModes READ godModeModes NOTIFY godModeChanged )
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // LA FELICITATION DE PALIER
+    //
+    // Le jeu PROPOSE, il n'impose pas : un joueur qui a joue assez pour la suite s'entend offrir le palier suivant.
+    // Roger : « apres une partie, si il atteint un certain niveau d'experience, on pourra lui dire : bravo, tu passes au
+    // niveau “Jusqu'a l'octave”, regarde derriere toi tu as fait enormement de progres ».
+    // ---------------------------------------------------------------------------------------------------------------
+
+    // Le joueur a-t-il merite mieux que son palier actuel ? C'est ce qui fait apparaitre la fleche doree dans la liste des
+    // difficultes.
+    Q_PROPERTY( bool levelInvitationIsAvailable READ levelInvitationIsAvailable NOTIFY levelInvitationChanged )
+
+    // La felicitation de ce palier a-t-elle deja ete annoncee ? L'ecran de fin de partie ne la montre qu'une fois : une
+    // bonne nouvelle repetee devient une machine a sous.
+    Q_PROPERTY( bool levelInvitationAnnounced READ levelInvitationAnnounced NOTIFY levelInvitationChanged )
+
+    // Le palier propose, et son nom, tout prets pour la popup.
+    Q_PROPERTY( int invitedLevel READ invitedLevel NOTIFY levelInvitationChanged )
+    Q_PROPERTY( QString invitedLevelName READ invitedLevelName NOTIFY levelInvitationChanged )
 
     // The instruments the player wants to hear, each with its index, its name and whether it is enabled.
     //
@@ -195,6 +353,18 @@ class ExerciseSessionController final : public QObject
 
     // A loading-screen anecdote, refreshed on demand. Empty when the content file has nothing to say.
     Q_PROPERTY( QString anecdoteText READ anecdoteText NOTIFY anecdoteChanged )
+
+    // LE MUSICHIEN QUI S'INVITE : il apparait quand le joueur revient de sa partie, avec une anecdote a raconter.
+    //
+    // Il vit au-dessus de TOUTES les pages, et il ne s'efface que sur un clic : un texte qu'on n'a pas fini de lire est un
+    // texte qu'on n'aurait pas du montrer. Le drapeau est arme par la fin d'une partie, jamais par une page.
+    Q_PROPERTY( bool isChibaTalking READ isChibaTalking NOTIFY chibaTalkingChanged )
+
+    // L'humeur du chien qui parle : tiree au hasard parmi les siennes a chaque fois qu'il ouvre la bouche.
+    Q_PROPERTY( QString chibaImageSource READ chibaImageSource NOTIFY chibaTalkingChanged )
+
+    // Vrai quand la partie est finie et gagnee : c'est ce qui decide quel chien vient a la fin.
+    Q_PROPERTY( bool wasSessionWon READ wasSessionWon NOTIFY sessionChanged )
 
     // L'anecdote de la QUESTION en cours. Elle change a chaque question, donc on apprend quelque chose en jouant au lieu
     // d'attendre entre deux parties.
@@ -235,13 +405,51 @@ class ExerciseSessionController final : public QObject
     // player can tune: from zero (no singing) to one hundred (nothing but singing).
     Q_PROPERTY( int singQuestionShare READ singQuestionShare NOTIFY singQuestionShareChanged )
 
-    // Combien de questions sur cent portent sur le RYTHME, et combien sur les ACCORDS. Memes reglages, memes bornes,
-    // memes raisons : au-dela d'une part, on ne choisit plus ce qu'on travaille, on le subit.
-    Q_PROPERTY( int rhythmQuestionShare READ rhythmQuestionShare NOTIFY rhythmQuestionShareChanged )
+    // La part de la question historique du jeu : NOMMER l'intervalle entendu.
+    //
+    // Ce n'est pas un reglage de plus, c'est celui qui manquait : les autres genres avaient chacun leur part, et nommer
+    // - la question que le jeu posait a ses debuts - n'en avait aucune. Elle prenait « ce qui restait », et depuis que
+    // les parts se lisent les unes par rapport aux autres, une part qui se tait n'est plus une part.
+    Q_PROPERTY( int namedIntervalQuestionShare READ namedIntervalQuestionShare NOTIFY namedIntervalQuestionShareChanged )
+
+    // Part des questions qui font chercher la NOTE ETRANGERE d'une gamme. Zero par defaut, comme les deux autres marches
+    // de l'harmonie : le pilier se decouvre en l'allumant.
+    Q_PROPERTY( int foreignNoteQuestionShare READ foreignNoteQuestionShare NOTIFY foreignNoteQuestionShareChanged )
+
+    // Le TEMPO des phrases de mode, et son amplitude de variation. Roger : « on pourrait choisir de l'augmenter, d'en
+    // choisir un central et de varier autour de 20-30 bpm. Histoire de rendre moins monotone. »
+    //
+    // Le premier est le CENTRE, le second l'amplitude : une phrase est jouee a centre ± tirage. Retenus entre deux
+    // seances, comme tous les reglages.
+    Q_PROPERTY( int phraseTempoBpm READ phraseTempoBpm NOTIFY phraseTempoChanged )
+    Q_PROPERTY( int phraseTempoVariation READ phraseTempoVariation NOTIFY phraseTempoChanged )
+
+    // Combien de questions sur cent portent sur les ACCORDS. Meme reglage, memes bornes, meme raison : au-dela d'une
+    // part, on ne choisit plus ce qu'on travaille, on le subit.
     Q_PROPERTY( int chordQuestionShare READ chordQuestionShare NOTIFY chordQuestionShareChanged )
 
     // Only meaningful once the session is over.
     Q_PROPERTY( bool starEarned READ starEarned NOTIFY sessionChanged )
+
+    // L'ECRAN DE FIN D'ARCADE : ce qu'une partie d'Arcade a de plus que les autres, et ce qu'une autre n'a pas.
+    //
+    // Le CHRONO et la PLUS LONGUE SERIE sont figes au moment ou la partie se conclut : un chrono qui court pendant que le
+    // joueur lit son bilan serait un chiffre qui bouge sous ses yeux.
+    Q_PROPERTY( int sessionDurationSeconds READ sessionDurationSeconds NOTIFY sessionChanged )
+    Q_PROPERTY( int sessionLongestStreak READ sessionLongestStreak NOTIFY sessionChanged )
+
+    // L'experience REELLEMENT gagnee, multiplicateur applique. Zero dans tout mode qui ne paie pas.
+    Q_PROPERTY( int arcadeXpEarned READ arcadeXpEarned NOTIFY sessionChanged )
+
+    // Le multiplicateur en pour cent (100, 120, 200), tel que l'ecran l'affiche.
+    Q_PROPERTY( int arcadeMultiplierPercent READ arcadeMultiplierPercent NOTIFY sessionChanged )
+
+    // Le mode de la partie en cours paie-t-il l'experience ? C'est ce qui decide si l'ecran de fin montre le bilan d'Arcade
+    // ou une simple ligne.
+    Q_PROPERTY( bool sessionGrantsExperience READ sessionGrantsExperience NOTIFY sessionChanged )
+
+    // COMBIEN DE COEURS une Arcade accorde : dix par defaut, jusqu'a vingt-cinq. Le raccourci de Roger.
+    Q_PROPERTY( int arcadeLives READ arcadeLives NOTIFY arcadeLivesChanged )
 
 public:
     // Ce que la question en cours demande : nommer un intervalle, ou dire dans quel sens il a ete joue. La valeur
@@ -279,6 +487,52 @@ public:
     [[nodiscard]] QVariantMap heardChord() const;
     [[nodiscard]] QVariantMap answeredChord() const;
     [[nodiscard]] QVariantList chordChoices() const;
+
+    [[nodiscard]] bool isModeQuestion() const noexcept;
+
+    // Vrai pour les questions d'harmonie : un mode a comparer ou a nommer, un vamp, OU une note etrangere a trouver.
+    // L'ecran s'en sert pour montrer la zone qui va avec - la roue, le verdict, et les boutons.
+    [[nodiscard]] bool isHarmonyQuestion() const noexcept;
+
+    [[nodiscard]] bool isModeColourQuestion() const noexcept;
+
+    // Le vamp : la MEME gamme sur deux centres. Il se repond comme une comparaison de couleurs - la reponse est un sens -
+    // mais il n'a PAS de reponse « pareil » : ses deux passages portent deux modes, toujours. L'ecran a donc besoin de le
+    // reconnaitre pour ne pas offrir une reponse qu'on ne peut pas gagner.
+    [[nodiscard]] bool isModeVampQuestion() const noexcept;
+
+    [[nodiscard]] QVariantList modeChoices() const;
+
+    [[nodiscard]] QVariantMap heardMode() const;
+
+    [[nodiscard]] QVariantMap previousMode() const;
+
+    [[nodiscard]] QVariantMap modeDifference() const;
+
+    [[nodiscard]] QVariantList modeCircle() const;
+
+    [[nodiscard]] QString modeCircleLabel() const;
+
+    [[nodiscard]] int modeSoundDurationMs() const;
+
+    // Le silence d'entree de la gamme, en millisecondes : le bourdon seul, avant la premiere note. Voir les Q_PROPERTY.
+    [[nodiscard]] int modeSoundLeadInMs() const;
+
+    // Le temps d'un pas, en millisecondes : une note ET le silence qui la suit. La roue en a besoin separement de la
+    // duree totale, parce que c'est lui qui dit quand la note suivante sonne.
+    [[nodiscard]] int modeSoundNoteStepMs() const;
+
+    [[nodiscard]] bool isForeignNoteQuestion() const noexcept;
+
+    [[nodiscard]] QVariantList foreignNoteChoices() const;
+
+    [[nodiscard]] QVariantMap foreignNoteVerdict() const;
+
+    [[nodiscard]] int modeColourQuestionShare() const;
+
+    [[nodiscard]] int modeNameQuestionShare() const;
+
+    [[nodiscard]] int modeVampQuestionShare() const;
 
     // The name the player gave himself, empty before the first time he writes one.
     [[nodiscard]] QString playerName() const;
@@ -355,12 +609,28 @@ public:
 
     Q_INVOKABLE void setSingQuestionShare( int p_share );
 
-    // Combien de questions sur cent portent sur le rythme, et combien sur les accords. Meme contrat que le chant :
-    // borne a 0-100, memorise, et pris en compte par la session SUIVANTE.
-    [[nodiscard]] int rhythmQuestionShare() const;
+    // La part des questions qui demandent de NOMMER l'intervalle. Meme contrat que les autres : bornee a 0-100,
+    // memorisee, et prise en compte par la session SUIVANTE.
+    [[nodiscard]] int namedIntervalQuestionShare() const;
 
-    Q_INVOKABLE void setRhythmQuestionShare( int p_share );
+    Q_INVOKABLE void setNamedIntervalQuestionShare( int p_share );
 
+    // La part de la note etrangere. Meme contrat que les autres : bornee a 0-100, memorisee, et prise en compte par la
+    // session SUIVANTE.
+    [[nodiscard]] int foreignNoteQuestionShare() const;
+
+    Q_INVOKABLE void setForeignNoteQuestionShare( int p_share );
+
+    // Le tempo des phrases de mode, et son amplitude. Memes contrats que les autres reglages : bornes verifiees, valeur
+    // memorisee, et prise en compte a la prochaine phrase jouee.
+    [[nodiscard]] int phraseTempoBpm() const;
+
+    Q_INVOKABLE void setPhraseTempoBpm( int p_bpm );
+    Q_INVOKABLE void setPhraseTempoVariation( int p_variation );
+    [[nodiscard]] int phraseTempoVariation() const;
+
+    // Combien de questions sur cent portent sur les accords. Meme contrat que le chant : borne a 0-100, memorise, et pris
+    // en compte par la session SUIVANTE.
     [[nodiscard]] int chordQuestionShare() const;
 
     Q_INVOKABLE void setChordQuestionShare( int p_share );
@@ -408,7 +678,39 @@ public:
     [[nodiscard]] QVariantList choices() const;
     [[nodiscard]] QVariantList gridPositions() const;
     [[nodiscard]] bool isAsking() const noexcept;
-    [[nodiscard]] bool isFinished() const noexcept;
+    [[nodiscard]] bool isFinished() const noexcept { return ( m_session != nullptr ) && m_session->isFinished(); }
+
+    // LA PARTIE EST-ELLE GAGNEE ?
+    //
+    // Gagnee veut dire ARRIVEE AU BOUT : c'est le score qui dira comment. Une partie qui finit avec une seule vie est une
+    // partie gagnee, et une partie dont les vies ont saute est une partie perdue - les deux se ressemblent quand on ne
+    // regarde que les questions posees, et c'est ce qui rend la question utile. Elle choisit le dessin de la fin.
+    [[nodiscard]] bool wasSessionWon() const noexcept;
+
+    // Le chien qui s'invite : vrai quand il a quelque chose a raconter. Il ne s'efface que sur un clic du joueur, jamais
+    // tout seul - un texte qu'on n'a pas fini de lire est un texte qu'on n'aurait pas du montrer.
+    [[nodiscard]] bool isChibaTalking() const noexcept { return m_isChibaTalking; }
+
+    // L'humeur du chien : un chemin de ressource, tire au hasard a chaque fois qu'il ouvre la bouche.
+    [[nodiscard]] QString chibaImageSource() const { return m_chibaImageSource; }
+
+    // Remet les REGLAGES au defaut, et seulement eux.
+    //
+    // Roger l'a demande : « je rajouterais bien un "Reset by default" pour remettre tous les parametres par defaut ».
+    // Le score n'est pas un parametre : l'experience, les sessions et les etoiles sont le journal du joueur, et les
+    // effacer au passage ferait de ce bouton un piege.
+    Q_INVOKABLE void resetPreferences();
+
+    // Le joueur a lu : la popup s'efface, et ne revient pas avant la prochaine fin de partie.
+    Q_INVOKABLE void dismissChiba();
+
+    // Le joueur appuie sur le chien : il raconte autre chose.
+    Q_INVOKABLE void tellAnotherAnecdote();
+
+    // Tire une des quatre humeurs du chien. Privee : c'est le deroulement - la fin d'une partie, ou le clic du joueur -
+    // qui la declenche, jamais l'ecran.
+    void pickChibaImage();
+
     [[nodiscard]] bool isFeedbackVisible() const noexcept;
     [[nodiscard]] bool wasLastAnswerCorrect() const noexcept;
     [[nodiscard]] int lastSungCentsOffset() const noexcept { return m_lastSungCentsOffset; }
@@ -418,7 +720,57 @@ public:
     [[nodiscard]] QString hintText() const;
     [[nodiscard]] bool hasChosenLevel() const noexcept;
     [[nodiscard]] int playerLevel() const noexcept;
-    [[nodiscard]] static QVariantList playerLevels();
+    // Les difficultes proposees, avec leur etat : ouvertes ou FERMEES tant que l'experience ne les a pas meritees. Pas
+    // `static` : elle lit l'etat du joueur (son experience, le code de developpeur), donc elle a besoin de l'instance.
+    [[nodiscard]] QVariantList playerLevels();
+
+    [[nodiscard]] bool godModeIsChosen() const noexcept { return m_godModeIsChosen; }
+
+    [[nodiscard]] bool godModeIsSaved() const noexcept { return m_godModeIsSaved; }
+
+    [[nodiscard]] bool godModeHasUnsavedChanges() const;
+
+    [[nodiscard]] bool godModeCanStart() const;
+
+    // La raison, en une phrase, quand la palette ne peut pas poser de partie. Le message vient de l'ecran (tr) et la
+    // regle du domaine : c'est la seule facon de dire « il manque des accords » sans que l'ecran ait a recompter.
+    [[nodiscard]] QString godModeProblem() const;
+
+    [[nodiscard]] QVariantList godModeIntervals() const;
+    [[nodiscard]] QVariantList godModeChords() const;
+    [[nodiscard]] QVariantList godModeModes() const;
+
+    [[nodiscard]] bool levelInvitationIsAvailable() const;
+    [[nodiscard]] bool levelInvitationAnnounced() const;
+    [[nodiscard]] int invitedLevel() const;
+    [[nodiscard]] QString invitedLevelName() const;
+
+    // Accepter la felicitation, c'est choisir ce palier - et par le MEME chemin que si le joueur l'avait pris dans la liste,
+    // donc sans second mecanisme a tenir a jour.
+    Q_INVOKABLE void acceptLevelInvitation();
+
+    // L'ecran a annonce la felicitation : on la marque, pour ne pas la repeter apres chaque partie.
+    Q_INVOKABLE void markLevelInvitationAnnounced();
+
+    // Coche ou decoche un element du brouillon. Rien n'est ecrit sur le disque : c'est le bouton Sauvegarder qui ecrit,
+    // et c'est ce qui rend « non sauvegarde » vrai.
+    Q_INVOKABLE void toggleGodModeInterval( int p_semitones );
+    Q_INVOKABLE void toggleGodModeChord( int p_qualityIndex );
+    Q_INVOKABLE void toggleGodModeMode( int p_modeIndex );
+
+    // Tout cocher ou tout decocher une famille : c'est le geste qu'on veut pour « je veux repartir de zero », et le faire
+    // case par case serait une punition.
+    Q_INVOKABLE void setEveryGodModeIntervalChecked( bool p_checked );
+    Q_INVOKABLE void setEveryGodModeChordChecked( bool p_checked );
+    Q_INVOKABLE void setEveryGodModeModeChecked( bool p_checked );
+
+    // Pré-remplit le brouillon avec le modele d'un niveau. C'est le geste que Roger a decrit : « je debute, ca coche les
+    // deux premiers intervalles », et il sert aussi a repartir d'une base connue.
+    Q_INVOKABLE void prefillGodModeFromLevel( int p_level );
+
+    // Ecrit le brouillon, et RIEN d'autre : c'est la seule ecriture, donc la seule chose qui puisse faire passer
+    // « non sauvegarde » a « sauvegarde ».
+    Q_INVOKABLE void saveGodMode();
     [[nodiscard]] QVariantList instruments() const;
 
     // The flags as the rest of the application needs them: main.cpp filters the loaded instruments with this,
@@ -430,15 +782,148 @@ public:
     [[nodiscard]] bool hasUnlimitedLives() const noexcept;
     [[nodiscard]] bool starEarned() const noexcept;
 
-    // Starts a new session and plays its first question. Called by the "Jouer" button.
+    // L'ARCADE : la porte principale depuis que le jeu a quatre modes.
+    //
+    // Vingt-cinq questions au dosage impose - dix intervalles, huit accords, sept modes - et la note etrangere en final.
+    // C'est le SEUL mode qui paie de l'experience, et c'est tout l'interet : un joueur ne peut pas cultiver son niveau en
+    // ne travaillant que ce qu'il sait deja faire.
     Q_INVOKABLE void startSession();
 
+    // Une partie PILOTEE PAR LES REGLAGES, sans plan ni famille imposee : le MOTEUR du jeu, pour les tests qui verifient
+    // une regle et non une porte.
+    //
+    // Ce n'est PAS un bouton - les quatre facons de jouer sont au-dessus - et c'est deliberate : les tests de regle ont
+    // besoin d'un tirage gouverne par les parts, et les modes de l'ecran en imposent chacun une variante (l'Arcade son
+    // plan, l'Entrainement sa famille). Elle paie l'experience comme l'Arcade, ce qui preserve le comportement des tests
+    // qui la lisaient.
+    void startOrdinarySession();
+
+    // L'ENTRAINEMENT : une famille, dix questions, aucune experience.
+    //
+    // p_family est un QuestionFamily (0 intervalles, 1 accords, 2 modes). La famille ouverte garde ses sous-parts, et
+    // compte dans les statistiques - c'est ce qui nourrit le Bilan - mais ne rapporte rien.
+    Q_INVOKABLE void startTrainingSession( int p_family );
+
+    // REJOUER : relance le MEME mode. Un Entrainement rejoue son Entrainement, un Bilan son Bilan.
+    //
+    // Le bouton « Rejouer » de l'ecran de fin appelait l'Arcade quoi qu'il arrive - ce qui transformait silencieusement un
+    // entrainement en Arcade, et gagnait de l'experience alors qu'on venait de comprendre que non. Le mode est retenu ici,
+    // donc le bouton ne peut plus se tromper.
+    Q_INVOKABLE void restartSession();
+
+    // Le mode de la partie en cours, et s'il paie de l'experience. L'ecran de fin s'en sert pour dire ce qu'il doit dire,
+    // et pour ne PAS afficher d'experience gagnee la ou il n'y en a pas.
+    [[nodiscard]] int gameMode() const noexcept { return static_cast<int>( m_gameMode ); }
+    [[nodiscard]] bool sessionGrantsExperience() const noexcept { return domain::grantsExperience( m_gameMode ); }
+
+    // Le multiplicateur d'experience de l'Arcade, en POUR CENT (100, 120, 200), tel que l'ecran de fin l'affiche.
+    //
+    // Il se lit sur les coeurs PERDUS de la partie qui vient de finir, et il est fige au moment ou la session se conclut :
+    // un ecran qui le recalculerait plus tard lirait un score qui a pu changer.
+    [[nodiscard]] int arcadeMultiplierPercent() const noexcept { return m_lastArcadeMultiplierPercent; }
+
+    // Le chrono de la partie, en secondes, FIGE a la fin. Zero tant que la session n'est pas finie.
+    [[nodiscard]] int sessionDurationSeconds() const noexcept { return m_sessionDurationSeconds; }
+
+    // La plus longue serie de la partie. La derniere serie retombe a chaque erreur et ne raconte rien ; le plus haut que le
+    // compteur soit monte, si.
+    [[nodiscard]] int sessionLongestStreak() const noexcept;
+
+    // L'experience gagnee, multiplicateur applique. Voir persistSessionOutcome, le seul endroit qui l'ecrit.
+    [[nodiscard]] int arcadeXpEarned() const noexcept { return m_arcadeXpEarned; }
+
+    // Les trois familles, avec ce que la partie a demande et reussi : {name, asked, correct, percent}.
+    //
+    // C'est ce que l'ecran de fin d'Arcade lit pour dire ou le joueur est fort et ou il resiste. Les familles sans question
+    // sont EXCLUES : une ligne « 0 sur 0 » n'informe pas, elle remplit.
+    [[nodiscard]] Q_INVOKABLE QVariantList familyResults() const;
+
+    // COMBIEN DE COEURS une Arcade accorde. Le reglage de Roger, et le seul qui rende le boss atteignable quand on
+    // n'arrive a rien.
+    [[nodiscard]] int arcadeLives() const;
+    Q_INVOKABLE void setArcadeLives( int p_lives );
+
+    // LE TITRE du joueur, d'apres ses bilans reussis - et sa devise, en une phrase.
+    //
+    // Q_PROPERTY, ET NON SEULEMENT UNE METHODE, et c'est une CORRECTION. Roger : « a la victoire d'arcade, je vois
+    // constamment que j'ai gagne le nouveau titre : Toutou. »
+    //
+    // L'ecran ecrivait `ExerciseController.titleJustIncreased` SANS parentheses. Une methode non appelee n'est pas un
+    // booleen : c'est un OBJET FONCTION, et un objet fonction est TOUJOURS VRAI. Le badge s'affichait donc a chaque fin
+    // de partie, avec le titre du moment - « Toutou » - comme s'il venait d'etre gagne.
+    //
+    // Et une methode ne suffirait pas, meme appelee : QML ne sait pas QUAND sa reponse change, donc une liaison qui
+    // l'appelle reste figee sur ce qu'elle valait a sa creation. Une propriete notifiable dit les deux choses : quelle
+    // valeur, et quand elle a change. La methode est gardee a cote, pour que les appels explicites restent possibles.
+    Q_PROPERTY( QVariantMap playerTitle READ playerTitle NOTIFY playerProgressChanged )
+    [[nodiscard]] Q_INVOKABLE QVariantMap playerTitle() const;
+
+    // LES TROPHEES, avec leur etat : {identifier, name, description, earned}. Gagnes au Bilan, gardes pour de bon.
+    Q_PROPERTY( QVariantList trophies READ trophies NOTIFY playerProgressChanged )
+    [[nodiscard]] Q_INVOKABLE QVariantList trophies() const;
+
+    // TOUS les titres, du plus modeste au plus haut, avec leur etat. Roger veut les VOIR, meme non acquis : « on peut
+    // voir la liste dans la page de profil (mais en grise). Histoire de donner des "objectifs" au joueur. » L'echelle
+    // entiere est donc un objectif, et pas seulement le titre du moment.
+    Q_PROPERTY( QVariantList allTitles READ allTitles NOTIFY playerProgressChanged )
+    [[nodiscard]] Q_INVOKABLE QVariantList allTitles() const;
+
+    // CE QUE LE DERNIER BILAN VIENT DE RAPPORTER : les trophees tout neufs, et si le titre a monte.
+    //
+    // Roger : « a la fin du bilan, si il a gagne un trophee ou une recompense, il faut lui dire (et lui dire qu'ils sont
+    // dans "profil") ». Vides et faux pour tout autre mode, et remis a zero au debut de chaque partie : une annonce qui
+    // survivrait a sa partie serait une annonce qui ment.
+    Q_PROPERTY( QVariantList newlyEarnedTrophies READ newlyEarnedTrophies NOTIFY playerProgressChanged )
+    [[nodiscard]] Q_INVOKABLE QVariantList newlyEarnedTrophies() const { return m_newlyEarnedTrophies; }
+
+    Q_PROPERTY( bool titleJustIncreased READ titleJustIncreased NOTIFY playerProgressChanged )
+    [[nodiscard]] Q_INVOKABLE bool titleJustIncreased() const noexcept { return m_titleJustIncreased; }
+
+    // Le plus haut palier de difficulte que l'experience du joueur lui ouvre.
+    //
+    // Les paliers superieurs se FERMENT tant qu'on ne les a pas merites : c'est ce qui donne au GodMode son sens - un
+    // passe-droit pour qui veut tester le jeu sans y etre regulier. Voir unlockAllLevels pour le raccourci de developpeur.
+    Q_INVOKABLE bool isLevelUnlocked( int p_index ) const;
+
+    // Le code de developpeur : choisir GodMode SEPT fois d'affilee deverrouille toutes les difficultes.
+    //
+    // Roger : « pour le dev, on va laisser un cheat code aussi pour pouvoir choisir un niveau de difficulte malgre le
+    // manque de point d'experience du style, choisir GodMode 7 fois d'affile, boom ca debloque le choix de toute les
+    // difficulte ». Le compteur est remis a zero des qu'un autre niveau est choisi.
+    Q_INVOKABLE void noteGodModeSelection();
+
+    [[nodiscard]] bool areAllLevelsUnlocked() const noexcept { return m_allLevelsUnlocked; }
+
     // The player says where he is, once. His answer is remembered, and it decides where his sessions start.
+    // Le LIVRE DES PHRASES : donne par la couche de cablage, comme le diapason.
+    //
+    // C'est lui qui fait entendre un mode en MELODIE, et l'ecran n'a rien a en savoir : le domaine tire la phrase au
+    // moment ou il pose la question, et se rabat sur une gamme quand le contenu n'en porte pas pour ce mode.
+    void setPhraseBook( const domain::PhraseBook & p_phraseBook ) { m_phraseBook = &p_phraseBook; }
+
     Q_INVOKABLE void choosePlayerLevel( int p_level );
+
+    // Le clic de menu, a la disposition de l'ecran.
+    //
+    // Il existe deja sur les boutons de difficulte, et Roger veut l'entendre PARTOUT ou l'on ne fait que naviguer :
+    // « ces petits sons de menu, on devrait les etendre, surtout les boutons qui ne produisent pas de musique ou de
+    // bruit ». C'est donc l'ecran qui decide - lui seul sait si un bouton va faire sonner quelque chose.
+    Q_INVOKABLE void playTapCue();
 
     // Turns one instrument on or off. The last enabled one cannot be turned off: an instrument list with nothing
     // in it is a game with no sound.
     Q_INVOKABLE void setInstrumentEnabled( int p_index, bool p_isEnabled );
+
+    // Fait ENTENDRE un instrument, pour que le joueur puisse le choisir a l'oreille.
+    //
+    // Roger : « pour l'utilisateur, c'est un peu complique de choisir son instrument car c'est complique de l'entendre ».
+    // Un nom sur une case ne dit rien de ce qu'on entendra : onze instruments sont offerts, et le seul moyen de choisir
+    // est de les ecouter. C'est une gamme phrygienne qui les presente - montee, descendue, puis l'accord du bII - parce
+    // que c'est le mode qui trahit le mieux un timbre : sa seconde mineure fait entendre tout de suite un son qui
+    // grince ou qui bave, la ou une gamme majeure les laisserait tous paraitre agreables.
+    //
+    // C'est un APERCU, et rien de plus : ni le timbre de la session en cours, ni les reglages ne bougent.
+    Q_INVOKABLE void previewInstrument( int p_index );
 
     // Leaves the loop and goes back to the bench. Stops the sound first: a stream left open on a phone
     // is a battery drain.
@@ -474,6 +959,30 @@ public:
     // Le joueur a nomme la couleur de l'accord, donnee comme l'index du domaine. L'ecran ne compose ni un nom ni un
     // symbole : il renvoie l'index de ce qu'il a affiche.
     Q_INVOKABLE void answerChord( int p_quality );
+
+    // Repond a une question de COULEUR : le second mode etait-il plus clair que le premier ?
+    //
+    // Un booleen, comme le domaine le demande : la reponse n'est pas un ecart, c'est un SENS, et c'est le domaine qui
+    // calcule lequel des deux modes est le plus clair.
+    Q_INVOKABLE void answerModeColour( bool p_secondIsBrighter );
+
+    // Le bouton « pareil » : la troisieme reponse d'une question de couleur, celle qui dit qu'il n'y a rien a entendre.
+    //
+    // Demande par Roger, et c'est une vraie question d'oreille : ne pas inventer une difference quand il n'y en a pas.
+    Q_INVOKABLE void answerSameColour();
+
+    // La reponse a une question de NOTE ETRANGERE : le pas ou l'intrus a ete entendu, de 0 a 6.
+    Q_INVOKABLE void answerForeignNote( int p_stepIndex );
+
+    // Repond a une question de NOM : l'index du mode joue, dans la liste de modeChoices().
+    Q_INVOKABLE void answerModeName( int p_modeIndex );
+
+    // Les deux parts de l'harmonie, reglables comme celles du chant, du rythme et des accords.
+    Q_INVOKABLE void setModeColourQuestionShare( int p_share );
+
+    Q_INVOKABLE void setModeNameQuestionShare( int p_share );
+
+    Q_INVOKABLE void setModeVampQuestionShare( int p_share );
 
     // Vrai quand il y a un indice a proposer : une question d'accord, des aides, un essai deja rate, et de quoi retirer
     // une reponse fausse.
@@ -565,6 +1074,19 @@ signals:
     void runningChanged();
     void questionChanged();
     void sessionChanged();
+
+    // CE QUE LE JOUEUR A ACQUIS a change : son titre, ses trophees, ou ce que le dernier bilan vient de rapporter.
+    //
+    // Sans ce signal, rien de tout cela ne se rafraichit : QML ne sait pas qu'une METHODE a change de reponse, donc une
+    // liaison qui l'appelle reste figee sur ce qu'elle valait a sa creation. C'est la seconde moitie du bug du badge.
+    void playerProgressChanged();
+
+    // Le nombre de coeurs de l'Arcade a change : la page de reglages se redessine, et la prochaine partie en tiendra compte.
+    void arcadeLivesChanged();
+
+    // La gamme d'un mode vient de partir : l'ecran s'en sert pour faire voyager la tete de sa roue, de note en note. Emis
+    // au moment ou le son part, jamais avant - un dessin qui demarre avant la musique montre autre chose qu'elle.
+    void modePlaybackStarted();
     void scoreChanged();
 
     // A wrong answer has just been given, and the question is still being asked.
@@ -576,6 +1098,10 @@ signals:
 
     // The player has just said where he is, or the application has just remembered it.
     void playerLevelChanged();
+
+    void godModeChanged();
+
+    void levelInvitationChanged();
 
     // The player has just turned an instrument on or off.
     void instrumentsChanged();
@@ -608,9 +1134,18 @@ signals:
     // The player has just changed how often questions ask him to sing.
     void singQuestionShareChanged();
 
-    // Le joueur vient de changer la part du rythme, ou celle des accords.
-    void rhythmQuestionShareChanged();
+    void namedIntervalQuestionShareChanged();
+
+    void foreignNoteQuestionShareChanged();
+
+    void phraseTempoChanged();
+
+    // Le joueur vient de changer la part des accords.
     void chordQuestionShareChanged();
+
+    // Un seul signal pour les deux parts de l'harmonie : elles se reglent ensemble, dans le meme ecran, et un signal
+    // par part n'apporterait qu'une occasion d'en oublier un.
+    void modeQuestionShareChanged();
 
     // The player has just pressed the "test the notification" button.
     void testReminderRequested();
@@ -629,6 +1164,9 @@ signals:
 
     // A new anecdote was drawn.
     void anecdoteChanged();
+
+    // Le chien s'invite, ou s'en va.
+    void chibaTalkingChanged();
 
     // L'anecdote de la question a change : une question de plus, donc une anecdote de plus.
     void questionAnecdoteChanged();
@@ -660,8 +1198,32 @@ private:
     // en place, et rien n'est ecrase.
     void applyStoredQuestionShares( domain::SessionSettings & p_settings ) const;
 
+    // Applique la palette du GodMode aux reglages d'une partie, et SEULEMENT quand c'est la difficulte choisie.
+    //
+    // Le Bilan n'y passe pas : il a ses propres questions decidees, du plus facile au plus difficile, et elles n'ont rien
+    // a voir avec un perimetre choisi a la main. C'est ce que Roger a demande - « le bilan va au plus simple ».
+    void applyGodModeIfChosen( domain::SessionSettings & p_settings ) const;
+
+    // Les trois listes du brouillon, chacune rangee dans l'ordre du jeu.
+    [[nodiscard]] domain::GodModePalette orderedDraft() const;
+
+    // Ecrit une famille du brouillon d'un coup : tout, ou rien.
+    [[nodiscard]] static std::vector<domain::Interval> everyIntervalChecked( bool p_checked );
+    [[nodiscard]] static std::vector<domain::ChordQuality> everyChordChecked( bool p_checked );
+    [[nodiscard]] static std::vector<domain::Mode> everyModeChecked( bool p_checked );
+
+    // L'etat de bilan ne doit jamais survivre a un bilan : cette fonction le referme, et c'est le seul endroit qui le fait.
+    void leaveReviewMode() noexcept;
+
     // Adds the session's outcome - its experience, its count, its star - to the profile, once, when it ends.
     void persistSessionOutcome();
+
+    // Ce qu'un BILAN laisse derriere lui : les quatre compteurs qui donnent les titres et les trophees. Appelee UNIQUEMENT
+    // quand la partie qui se conclut etait un bilan - voir persistSessionOutcome.
+    void recordBilanOutcome();
+
+    // Ce qu'un joueur a fait de ses bilans, lu des preferences. Une seule fonction, donc une seule verite.
+    [[nodiscard]] domain::BilanRecord bilanRecord() const;
 
     // Plays the interval of the question being asked, from its own root note.
     void playCurrentQuestion();
@@ -737,6 +1299,18 @@ private:
     // question ou pour la confirmer.
     void playChordNotes( const domain::Chord & p_chord );
 
+    // Joue la question d'harmonie en cours.
+    //
+    // p_secondOnly est ce qui permet les DEUX temps d'une question de couleur : le premier mode est pose tout de suite,
+    // et le second par le minuteur, quand le premier a fini de sonner. Sur une question de nom, un seul appel suffit.
+    void playModeQuestion( bool p_secondOnly );
+
+    // Fait entendre une PHRASE du contenu, avec le bourdon qui la porte : la question de NOM y gagne une melodie la ou
+    // une gamme montante disait la meme chose en moins de musique.
+    void playPhraseQuestion( const domain::Phrase & p_phrase );
+
+    // La note etrangere : la gamme montee sur son bourdon, avec l'intrus a sa place.
+    void playForeignNoteQuestion();
     // Whether the player still gets the answer played for him: a beginner hears the interval first, everyone else
     // has to ask for it (and pays for the asking).
     [[nodiscard]] bool isBeginner() const noexcept;
@@ -764,6 +1338,10 @@ private:
     // May be null: a test, or an application that has nowhere to remember anything, must still run.
     domain::PlayerPreferences * m_levelStore{ nullptr };
 
+    // Le livre des phrases modales, s'il a ete donne. C'est le DOMAINE qui y tire la phrase d'une question ; le controleeur
+    // ne le garde que pour le passer a la session, et il ne le lit jamais lui-meme.
+    const domain::PhraseBook * m_phraseBook{ nullptr };
+
     // May be null too, et pour la meme raison : un journal absent coute des statistiques, jamais une partie.
     domain::QuestionLog * m_questionLog{ nullptr };
 
@@ -775,6 +1353,40 @@ private:
     // en est : l'echauffement est passe, ce qui suit est ce qui lui resiste.
     bool m_isReviewRunning{ false };
 
+    // LE MODE DE LA PARTIE EN COURS, et c'est lui qui decide si elle paie : voir persistSessionOutcome.
+    //
+    // Par defaut l'Arcade, parce que c'est la porte principale - « Jouer » ouvre l'Arcade depuis que le jeu a quatre modes.
+    domain::GameMode m_gameMode{ domain::GameMode::Arcade };
+
+    // La famille du dernier Entrainement, pour que « Rejouer » rejoue le MEME.
+    int m_lastTrainingFamily{ 0 };
+
+    // Le multiplicateur de la derniere Arcade, en pour cent, FIGE au moment ou elle s'est conclue.
+    int m_lastArcadeMultiplierPercent{ 100 };
+
+    // L'experience REELLEMENT gagnee par la derniere partie, multiplicateur applique.
+    int m_arcadeXpEarned{ 0 };
+
+    // Le chrono de la partie EN COURS, et sa valeur FIGEE a la fin. Deux membres, parce qu'un seul ne saurait pas dire
+    // « arrete » : le timer court tant que la partie vit, et l'ecran de fin lit le nombre, pas le timer.
+    QElapsedTimer m_sessionClock;
+    int m_sessionDurationSeconds{ 0 };
+
+    // Ce que le dernier BILAN a rapporte de neuf : les trophees tout frais, et si le titre a monte. Voir
+    // newlyEarnedTrophies : remis a zero au debut de chaque partie.
+    QVariantList m_newlyEarnedTrophies;
+    bool m_titleJustIncreased{ false };
+
+    // Le code de developpeur : sept choix de GodMode d'affilee, et toutes les difficultes s'ouvrent.
+    std::size_t m_godModeSelectionCount{ 0 };
+    bool m_allLevelsUnlocked{ false };
+
+    // Le chien qui s'invite : arme par la fin d'une partie, desarme par le clic du joueur.
+    bool m_isChibaTalking{ false };
+
+    // Son humeur du moment : une des quatre planches, tiree a chaque fois qu'il parle.
+    QString m_chibaImageSource{ QStringLiteral( "qrc:/assets/images/chibaSpeak.png" ) };
+
     // L'ecart mesure du dernier chant juge, mis de cote au moment de la reponse : le micro est resynchronise juste
     // apres, et la mesure serait perdue avec lui.
     int m_lastSungCentsOffset{ 0 };
@@ -784,6 +1396,21 @@ private:
     // has no business being read that often.
     std::optional<domain::PlayerLevel> m_playerLevel;
 
+    // LE BROUILLON DU GODMODE, et l'etat de sa sauvegarde.
+    //
+    // Le brouillon est la palette telle que la page la montre ; la sauvegarde est ce qui est ecrit. Les deux peuvent
+    // differer, et c'est exactement ce que « GodMode (non sauvegarde) » veut dire : tant que le joueur n'a pas appuye,
+    // ses clics ne changent RIEN a ce qu'il jouera - et c'est ce qui rend le bouton utile plutot que decoratif.
+    domain::GodModePalette m_godModeDraft;
+    bool m_godModeIsChosen{ false };
+    bool m_godModeIsSaved{ false };
+
+    // LA PALETTE QUI JOUE : celle qui a ete sauvegardee, ou, au premier lancement, celle du niveau courant.
+    //
+    // Elle est distincte du brouillon, et c'est la decision de Roger : « il peut faire ses changements PUIS appuyer sur
+    // sauvegarder POUR POUVOIR JOUER de cette maniere ». Tant qu'il n'a pas appuye, ses clics ne changent rien a ce qu'il
+    // jouera - et c'est ce qui donne un sens au mot « sauvegarde ».
+    domain::GodModePalette m_godModeSavedPalette;
     // One flag per instrument, in the order of domain::INSTRUMENT_NAMES. Empty means "everything", which is
     // what a first run has and what the screen must show as all enabled.
     std::vector<bool> m_enabledInstruments;
@@ -800,6 +1427,14 @@ private:
     static constexpr int NO_RHYTHM_TAP = -1;
 
     QTimer m_rhythmTimer;
+
+    // Le minuteur qui pose le SECOND mode d'une question de couleur, apres le premier.
+    //
+    // Deux modes ne peuvent pas tenir dans un seul appel au port : chaque appel rend une melodie sur un bourdon, tenu du
+    // debut a la fin. Le second mode est donc joue par ce minuteur, et le bourdon est repose a l'identique - la meme
+    // tonique, donc l'oreille entend une continuite et non deux questions.
+    QTimer m_modeTimer;
+
     QElapsedTimer m_rhythmClock;
 
     // Le temps a jouer dans la mesure, de 0 a beatsPerBar. La valeur beatsPerBar n'est pas un temps : c'est le signal

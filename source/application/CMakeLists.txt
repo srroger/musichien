@@ -85,61 +85,34 @@ target_compile_definitions(musichien_app PRIVATE MUSICHIEN_VERSION="${PROJECT_VE
 # -------------------------------------------------------------------------------------------------------------------
 # Identifier of the build
 #
-# The version says what the code is SUPPOSED to be; this says WHICH commit was actually compiled. Until the
-# first release, the second is what a player needs: an application installed on a phone can be weeks old, and
-# "version 0.5.0" alone cannot tell two builds of it apart.
+# The version says what the code is SUPPOSED to be; this says WHEN the binary was made - local date and time, to the
+# minute. That is what a player compares between two APKs: an application installed on a phone can be weeks old, and
+# « which one is the newer? » is a question a date answers in one look.
 #
-# The header is written by a target that runs on every build and rewrites the file only when the identifier
-# changed, so being exact costs nothing after the first build. See cmake/musichienWriteBuildId.cmake.
+# It is regenerated on EVERY build rather than when git moves, because the date changes with the build. The header is
+# rewritten only when its content changes - the minute, not the second - so two builds in the same minute cost
+# nothing. See cmake/musichienWriteBuildId.cmake.
 # -------------------------------------------------------------------------------------------------------------------
 set(MUSICHIEN_BUILD_ID_HEADER "${CMAKE_BINARY_DIR}/generated/musichienBuildId.h")
 
-# The files git rewrites when the repository moves: HEAD, and the branch it points at - which is the file a
-# commit actually updates. Depending on BOTH is what makes the identifier exact: HEAD alone does not change
-# when a commit is made on a branch.
-#
-# A file that does not exist is left out rather than depended on: a missing dependency would look like a
-# permanent change, and the identifier would be regenerated on every single build.
-set(MUSICHIEN_GIT_STATE_FILES "")
-
-foreach(musichienGitStateFile IN ITEMS
-        "${CMAKE_SOURCE_DIR}/.git/HEAD"
-        "${CMAKE_SOURCE_DIR}/.git/packed-refs"
-        "${CMAKE_SOURCE_DIR}/.git/refs/heads/${MUSICHIEN_GIT_BRANCH}")
-    if(EXISTS "${musichienGitStateFile}")
-        list(APPEND MUSICHIEN_GIT_STATE_FILES "${musichienGitStateFile}")
-    endif()
-endforeach()
-
+# Written ONCE at configure time as well, and that is not a duplicate: at the very first build the file does not
+# exist yet when the compiler looks for its headers, and a rule that has not run cannot provide it.
 execute_process(
-    COMMAND git symbolic-ref --short HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE MUSICHIEN_GIT_BRANCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET
-    RESULT_VARIABLE MUSICHIEN_GIT_BRANCH_RESULT
-)
-
-if(MUSICHIEN_GIT_BRANCH_RESULT EQUAL 0)
-    list(APPEND MUSICHIEN_GIT_STATE_FILES "${CMAKE_SOURCE_DIR}/.git/refs/heads/${MUSICHIEN_GIT_BRANCH}")
-endif()
-
-# A real build artifact, produced by a rule CMake knows about: that is what lets the compiler be ordered after
-# it - main.cpp includes the header, and the dependency the compiler itself records is what makes the ordering
-# exact. A file written by an 'always runs' target would be one build behind, because the build tool decides
-# what to recompile before that target has had a chance to run.
-add_custom_command(
-    OUTPUT ${MUSICHIEN_BUILD_ID_HEADER}
     COMMAND ${CMAKE_COMMAND}
-            -D MUSICHIEN_SOURCE_DIR=${CMAKE_SOURCE_DIR}
             -D MUSICHIEN_OUTPUT_FILE=${MUSICHIEN_BUILD_ID_HEADER}
             -P ${CMAKE_SOURCE_DIR}/cmake/musichienWriteBuildId.cmake
-    DEPENDS ${MUSICHIEN_GIT_STATE_FILES}
+)
+
+# A target that runs on every build. It is ORDERED BEFORE the compiler by the explicit dependency below, which is
+# what makes an always-running target exact here - a file written after the compiler had looked would be one build
+# behind, and would name the wrong minute.
+add_custom_target(musichien_build_id ALL
+    COMMAND ${CMAKE_COMMAND}
+            -D MUSICHIEN_OUTPUT_FILE=${MUSICHIEN_BUILD_ID_HEADER}
+            -P ${CMAKE_SOURCE_DIR}/cmake/musichienWriteBuildId.cmake
     COMMENT "Musichien: identifying the build"
     VERBATIM
 )
-
-add_custom_target(musichien_build_id ALL DEPENDS ${MUSICHIEN_BUILD_ID_HEADER})
 
 # And the application depends on it EXPLICITLY, which 'ALL' does not cover: the Android build asks for a
 # precise target - the package - and a target marked ALL is then never built. Without this line the header is

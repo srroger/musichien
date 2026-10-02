@@ -140,11 +140,17 @@ Workflow détaillé : `docs/GIT_WORKFLOW.md`.
 
 - [x] Conception et décisions d'architecture
 - [x] Socle de build (CMake, superbuild, presets)
-- [x] Domaine : notes et intervalles, **testés**
+- [x] Domaine : notes, intervalles, accords, modes — **testé** (353 tests)
 - [x] Première interface QML (écran de garde)
 - [x] Moteur audio (synthèse pure, testée sans carte son)
-- [ ] Boucle de jeu, progression, gamification
+- [x] **La boucle de jeu** : intervalles nommés, sens, chant jugé en cents, rythme, accords
+- [x] **Gamification** : XP, niveaux, étoiles, série, profil et statistiques
+- [x] **Un accordeur complet** (30 à 4500 Hz, tempéraments et diapason)
+- [x] **Un métronome battu à l'échantillon**, et une batterie **enregistrée**
+- [x] **Le pilier Harmonie a commencé** : les sept modes s'écoutent sur un bourdon **enregistré** (cordes, chœur, nappe), et l'exercice du dégradé fait **comparer** deux modes puis les **nommer**
+- [x] Notifications locales, sans réseau
 - [x] Déploiement Android (APK `arm64-v8a`, **vérifiée sans aucune permission système**)
+- [ ] Les cinq mondes de l'aventure, la révision espacée, les boss
 
 ---
 

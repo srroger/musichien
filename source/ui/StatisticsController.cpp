@@ -3,6 +3,7 @@
 #include "domain/music/Chord.h"
 #include "domain/music/Interval.h"
 #include "domain/rhythm/RhythmPattern.h"
+#include "ui/ModeDescription.h"
 
 #include <QChar>
 #include <QDate>
@@ -93,6 +94,20 @@ constexpr qint64 MINUTES_PER_HOUR = 60;
 
         case domain::QuestionKind::Chord:
             return StatisticsController::tr( "Accords" );
+
+        // Les deux questions d'harmonie, nommees SEPAREMENT : c'est tout l'interet de les avoir separees dans le domaine.
+        // Un joueur qui entend les couleurs et ne sait pas les nommer doit pouvoir le lire sur cette page.
+        case domain::QuestionKind::ModeColour:
+            return StatisticsController::tr( "Modes : couleur" );
+
+        case domain::QuestionKind::ModeName:
+            return StatisticsController::tr( "Modes : nom" );
+
+        case domain::QuestionKind::ModeVamp:
+            return StatisticsController::tr( "Modes : deux centres" );
+
+        case domain::QuestionKind::ForeignNote:
+            return StatisticsController::tr( "Note étrangère" );
     }
 
     return {};
@@ -124,6 +139,34 @@ constexpr qint64 MINUTES_PER_HOUR = 60;
             const std::string_view name = patterns.at( static_cast<std::size_t>( p_target.target ) ).name();
 
             return QString::fromUtf8( name.data(), static_cast<int>( name.size() ) );
+        }
+
+        case domain::QuestionKind::ModeColour:
+        case domain::QuestionKind::ModeName:
+        case domain::QuestionKind::ModeVamp:
+        case domain::QuestionKind::ForeignNote: {
+            // La cible d'une question d'harmonie est l'INDEX du mode pose. Un index hors bornes ne peut venir que d'un
+            // journal edite a la main : il coute un nom, jamais la page.
+            //
+            // Le SIGNE d'abord, la borne ensuite : convertir un index negatif en size_t en ferait un tres grand nombre,
+            // et la borne passerait alors pour la mauvaise raison.
+            constexpr auto MODE_COUNT = static_cast<std::int32_t>( domain::MODE_COUNT );
+
+            if( p_target.target < 0 )
+            {
+                return StatisticsController::tr( "Mode" );
+            }
+
+            if( p_target.target >= MODE_COUNT )
+            {
+                return StatisticsController::tr( "Mode" );
+            }
+
+            // Le nom vient de la MEME description que les boutons de l'ecran d'exercice : la page de statistiques et le
+            // jeu ne peuvent donc pas appeler le meme mode de deux facons.
+            const QVariantMap description = describeMode( static_cast<domain::Mode>( p_target.target ) );
+
+            return description.value( QStringLiteral( "name" ) ).toString();
         }
 
         case domain::QuestionKind::NamedInterval:
@@ -223,11 +266,11 @@ void StatisticsController::refresh()
 
         const auto index = static_cast<std::size_t>( HISTOGRAM_DAY_COUNT - 1 - daysAgo );
 
-        ++questionsPerDay[index];
+        questionsPerDay.at( index ) += 1;
 
         if( record.isCorrect() )
         {
-            ++correctPerDay[index];
+            correctPerDay.at( index ) += 1;
         }
     }
 
@@ -254,13 +297,17 @@ void StatisticsController::refresh()
     }
 
     // LA REPARTITION par genre : ce que le joueur travaille vraiment, et ce qu'il delaisse sans le savoir.
+    //
+    // Le RYTHME n'y figure plus : il n'est plus un exercice, donc une ligne a zero y serait un mensonge poli. Le genre
+    // reste declare dans l'enumeration - la frappe et le metronome s'y accrochent - mais aucune question ne le pose.
     m_kinds.clear();
 
-    const std::array<domain::QuestionKind, 5> kinds{ domain::QuestionKind::NamedInterval,
+    const std::array<domain::QuestionKind, 6> kinds{ domain::QuestionKind::NamedInterval,
                                                      domain::QuestionKind::Direction,
                                                      domain::QuestionKind::Sing,
-                                                     domain::QuestionKind::Rhythm,
-                                                     domain::QuestionKind::Chord };
+                                                     domain::QuestionKind::Chord,
+                                                     domain::QuestionKind::ModeColour,
+                                                     domain::QuestionKind::ModeName };
 
     QVariantList parts;
 

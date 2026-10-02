@@ -11,9 +11,16 @@
 <RCC>
     <qresource prefix="/">
         <file>qml/ExerciseScreen.qml</file>
+        <file>qml/KeyCircleScreen.qml</file>
         <file>qml/Main.qml</file>
         <file>qml/ChordTreeView.qml</file>
         <file>qml/StaffBall.qml</file>
+        <!--
+          La roue des notes d'un mode : les sept notes du mode allumees sur le cercle des quintes, la tonique marquee.
+          Elle sert au banc d'essai des modes ET a l'exercice, apres la reponse seulement - elle donne le mode, donc
+          l'afficher pendant la question serait donner la reponse.
+        -->
+        <file>qml/ModeCircle.qml</file>
         <!--
           The content files live at the root of the project, as docs/ARCHITECTURE.md requires, and the
           alias gives each one the runtime path it has on disk: ':/assets/content/...'. An alias rather
@@ -29,16 +36,46 @@
         -->
         <file alias="assets/content/tuner.json">../../assets/content/tuner.json</file>
         <!--
+          Les phrases modales : des DEGRES, une tonique, un tempo. Jamais d'audio - les 300 phrases de l'atelier pesent
+          323 Mo, et ce fichier en porte tout le contenu musical en quelques dizaines de kilo-octets. C'est le moteur du
+          jeu qui les rejoue, avec le meme bourdon que l'exercice : ce que l'atelier a fait ecouter est donc exactement
+          ce que le jeu fera entendre.
+        -->
+        <file alias="assets/content/modal-phrases.json">../../assets/content/modal-phrases.json</file>
+        <!--
           La police musicale, pour la clef de Sol. Le glyphe U+1D11E n'existe pas dans les polices Android par
           defaut (d'ou le rectangle), alors qu'il est dans Noto Music. Embarquee, elle rend la clef identique sur
           le PC et le telephone.
         -->
         <file alias="assets/fonts/NotoMusic-Regular.ttf">../../assets/fonts/NotoMusic-Regular.ttf</file>
         <!--
+          LA POLICE DE L'INTERFACE. Roger l'a demandee « plus sympa, plus douce et plus ronde », et une police ne se
+          devine pas : elle voyage avec l'application, comme la police musicale voyage deja avec elle. C'est
+          Quicksand (licence SIL Open Font License, libre y compris pour un usage commercial), une police ronde dont
+          les majuscules restent lisibles - ce qui compte, parce que les boutons de la page de garde sont en
+          capitales.
+        -->
+        <file alias="assets/fonts/Quicksand-Variable.ttf">../../assets/fonts/Quicksand-Variable.ttf</file>
+        <!--
           Le chien de l'application, en illustration. Il est lu par le meme chemin que les autres ressources de
           contenu (:/assets/images/...), avec son alias : c'est ce qui garantit qu'il suit jusqu'au telephone.
         -->
         <file alias="assets/images/shiba-guitar.png">../../assets/images/shiba-guitar.png</file>
+        <!--
+          Le chien dans ses trois etats, detoures sur fond transparent. Meme motif que le precedent, alias compris.
+
+          chibaSpeak : il parle, une bulle vide a cote de lui - c'est la popup qui remplit la bulle.
+          chibaWin   : il a gagne, pouce leve et confettis.
+          chibaLose  : il a perdu, nuage et coeur brise.
+        -->
+        <file alias="assets/images/chibaSpeak.png">../../assets/images/chibaSpeak.png</file>
+        <!-- Les trois autres humeurs du chien qui parle : elles tournent au hasard avec la premiere. -->
+        <file alias="assets/images/chibaSpeak2.png">../../assets/images/chibaSpeak2.png</file>
+        <file alias="assets/images/chibaSpeak3.png">../../assets/images/chibaSpeak3.png</file>
+        <file alias="assets/images/chibaSpeak4.png">../../assets/images/chibaSpeak4.png</file>
+        <file alias="assets/images/chibaWin.png">../../assets/images/chibaWin.png</file>
+        <file alias="assets/images/chibaLose.png">../../assets/images/chibaLose.png</file>
+        <file alias="assets/images/shibaBoss.png">../../assets/images/shibaBoss.png</file>
     <!--
       Les echantillons d instruments : meme motif que les fichiers de contenu, alias compris,
       pour que le chemin de ressource soit celui du disque sur le PC comme sur le telephone.
@@ -57,11 +94,56 @@
         <file alias="assets/soundfonts/saxo_c3.wav">../../assets/soundfonts/saxo_c3.wav</file>
         <file alias="assets/soundfonts/saxo_c4.wav">../../assets/soundfonts/saxo_c4.wav</file>
         <file alias="assets/soundfonts/saxo_c5.wav">../../assets/soundfonts/saxo_c5.wav</file>
+        <file alias="assets/soundfonts/saxo_c6.wav">../../assets/soundfonts/saxo_c6.wav</file>
+        <file alias="assets/soundfonts/flute_c2.wav">../../assets/soundfonts/flute_c2.wav</file>
+        <file alias="assets/soundfonts/flute_c3.wav">../../assets/soundfonts/flute_c3.wav</file>
+        <file alias="assets/soundfonts/flute_c4.wav">../../assets/soundfonts/flute_c4.wav</file>
+        <file alias="assets/soundfonts/flute_c5.wav">../../assets/soundfonts/flute_c5.wav</file>
+        <file alias="assets/soundfonts/flute_c6.wav">../../assets/soundfonts/flute_c6.wav</file>
+        <file alias="assets/soundfonts/cordes_c2.wav">../../assets/soundfonts/cordes_c2.wav</file>
+        <file alias="assets/soundfonts/cordes_c3.wav">../../assets/soundfonts/cordes_c3.wav</file>
+        <file alias="assets/soundfonts/cordes_c4.wav">../../assets/soundfonts/cordes_c4.wav</file>
+        <file alias="assets/soundfonts/cordes_c5.wav">../../assets/soundfonts/cordes_c5.wav</file>
+        <file alias="assets/soundfonts/cordes_c6.wav">../../assets/soundfonts/cordes_c6.wav</file>
+        <file alias="assets/soundfonts/clarinette_c2.wav">../../assets/soundfonts/clarinette_c2.wav</file>
+        <file alias="assets/soundfonts/clarinette_c3.wav">../../assets/soundfonts/clarinette_c3.wav</file>
+        <file alias="assets/soundfonts/clarinette_c4.wav">../../assets/soundfonts/clarinette_c4.wav</file>
+        <file alias="assets/soundfonts/clarinette_c5.wav">../../assets/soundfonts/clarinette_c5.wav</file>
+        <file alias="assets/soundfonts/clarinette_c6.wav">../../assets/soundfonts/clarinette_c6.wav</file>
+        <file alias="assets/soundfonts/marimba_c2.wav">../../assets/soundfonts/marimba_c2.wav</file>
+        <file alias="assets/soundfonts/marimba_c3.wav">../../assets/soundfonts/marimba_c3.wav</file>
+        <file alias="assets/soundfonts/marimba_c4.wav">../../assets/soundfonts/marimba_c4.wav</file>
+        <file alias="assets/soundfonts/marimba_c5.wav">../../assets/soundfonts/marimba_c5.wav</file>
+        <file alias="assets/soundfonts/marimba_c6.wav">../../assets/soundfonts/marimba_c6.wav</file>
+        <file alias="assets/soundfonts/harpe_c2.wav">../../assets/soundfonts/harpe_c2.wav</file>
+        <file alias="assets/soundfonts/harpe_c3.wav">../../assets/soundfonts/harpe_c3.wav</file>
+        <file alias="assets/soundfonts/harpe_c4.wav">../../assets/soundfonts/harpe_c4.wav</file>
+        <file alias="assets/soundfonts/harpe_c5.wav">../../assets/soundfonts/harpe_c5.wav</file>
+        <file alias="assets/soundfonts/harpe_c6.wav">../../assets/soundfonts/harpe_c6.wav</file>
+    <!--
+      Les bourdons enregistres : trois timbres tenus (cordes, choeur, nappe), rendus depuis la meme banque libre que
+      les instruments, par scripts/render_drone_samples.py. Deux notes chacun (re 2 et la 2), de quoi transposer le
+      bourdon dans les toniques voisines.
+
+      Meme motif que les instruments, alias compris : le chemin de ressource est celui du disque.
+    -->
+        <file alias="assets/soundfonts/drone_strings_d2.wav">../../assets/soundfonts/drone_strings_d2.wav</file>
+        <file alias="assets/soundfonts/drone_strings_a2.wav">../../assets/soundfonts/drone_strings_a2.wav</file>
+        <file alias="assets/soundfonts/drone_choir_d2.wav">../../assets/soundfonts/drone_choir_d2.wav</file>
+        <file alias="assets/soundfonts/drone_choir_a2.wav">../../assets/soundfonts/drone_choir_a2.wav</file>
+        <file alias="assets/soundfonts/drone_pad_d2.wav">../../assets/soundfonts/drone_pad_d2.wav</file>
+        <file alias="assets/soundfonts/drone_pad_a2.wav">../../assets/soundfonts/drone_pad_a2.wav</file>
     <!--
       Les sons de batterie : rendus depuis la meme banque libre, par scripts/render_drum_samples.py.
       Une percussion n'est pas une note - elle ne se transpose pas - donc elle est jouee telle quelle.
     -->
         <file alias="assets/soundfonts/drum_kick.wav">../../assets/soundfonts/drum_kick.wav</file>
+        <!-- Le wouf du chien qui raconte une anecdote : le seul son du projet qui soit SYNTHETISE, faute de banque. -->
+        <file alias="assets/soundfonts/dog_bark.wav">../../assets/soundfonts/dog_bark.wav</file>
+        <!-- Les trois autres woufs : ils TOURNENT, donc le chien ne repete pas la meme phrase deux fois de suite. -->
+        <file alias="assets/soundfonts/dog_bark_2.wav">../../assets/soundfonts/dog_bark_2.wav</file>
+        <file alias="assets/soundfonts/dog_bark_3.wav">../../assets/soundfonts/dog_bark_3.wav</file>
+        <file alias="assets/soundfonts/dog_bark_4.wav">../../assets/soundfonts/dog_bark_4.wav</file>
         <file alias="assets/soundfonts/drum_snare.wav">../../assets/soundfonts/drum_snare.wav</file>
         <file alias="assets/soundfonts/drum_hihat.wav">../../assets/soundfonts/drum_hihat.wav</file>
         <file alias="assets/soundfonts/drum_tom.wav">../../assets/soundfonts/drum_tom.wav</file>

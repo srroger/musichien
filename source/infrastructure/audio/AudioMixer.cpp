@@ -48,7 +48,7 @@ void AudioMixer::playAt( std::vector<float> p_samples, std::int64_t p_startFrame
     auto source = std::make_shared<const std::vector<float>>( std::move( p_samples ) );
 
     {
-        const std::lock_guard<std::mutex> lock{ m_mutex };
+        const std::scoped_lock lock{ m_mutex };
 
         // Un son dont l'instant est deja passe se joue TOUT DE SUITE : le silence serait pire que le retard, et un
         // appelant qui vise une position toujours derriere lui n'aurait sinon plus aucun son du tout.
@@ -64,21 +64,21 @@ void AudioMixer::playAt( std::vector<float> p_samples, std::int64_t p_startFrame
 
 void AudioMixer::clear()
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     m_voices.clear();
 }
 
 bool AudioMixer::isPlaying() const
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     return !m_voices.empty();
 }
 
 qint64 AudioMixer::bytesAvailable() const
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     if( m_grid.isRunning() )
     {
@@ -105,19 +105,24 @@ qint64 AudioMixer::bytesAvailable() const
         return QIODevice::bytesAvailable();
     }
 
-    return static_cast<qint64>( remainingFrames * static_cast<std::size_t>( m_channelCount ) * sizeof( float ) );
+    // Chaque operande est converti AVANT la multiplication : clang-tidy a raison de le demander - un produit calcule en
+    // size_t puis transtype affirme « je sais que ca tient », alors que convertir avant ne parie sur rien.
+    const auto frameCount = static_cast<qint64>( remainingFrames );
+    const auto channelCount = static_cast<qint64>( m_channelCount );
+
+    return ( frameCount * channelCount ) * static_cast<qint64>( sizeof( float ) );
 }
 
 std::size_t AudioMixer::voiceCount() const
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     return m_voices.size();
 }
 
 void AudioMixer::setMetronomeClicks( std::vector<float> p_accented, std::vector<float> p_plain )
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     m_accentedClick = std::make_shared<const std::vector<float>>( std::move( p_accented ) );
     m_plainClick = std::make_shared<const std::vector<float>>( std::move( p_plain ) );
@@ -125,7 +130,7 @@ void AudioMixer::setMetronomeClicks( std::vector<float> p_accented, std::vector<
 
 void AudioMixer::startMetronome( double p_bpm, int p_beatsPerBar )
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     // Le temps 0 tombe a la position COURANTE du flux, et non a une position choisie par l'interface : le metronome
     // demarre donc exactement quand on le lui demande, et tout se compte en echantillons depuis la.
@@ -134,7 +139,7 @@ void AudioMixer::startMetronome( double p_bpm, int p_beatsPerBar )
 
 void AudioMixer::stopMetronome()
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     m_grid.stop();
 
@@ -146,7 +151,7 @@ void AudioMixer::stopMetronome()
 
 bool AudioMixer::isMetronomeRunning() const
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     return m_grid.isRunning();
 }
@@ -168,21 +173,21 @@ std::int64_t AudioMixer::listenedFrame() const noexcept
 
 double AudioMixer::metronomeElapsedMs() const
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     return m_grid.elapsedMsAt( listenedFrame(), m_sampleRate );
 }
 
 std::int64_t AudioMixer::metronomeBeatIndex() const
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     return m_grid.beatIndexAt( listenedFrame() );
 }
 
 bool AudioMixer::isMetronomeBeatAccented() const
 {
-    const std::lock_guard<std::mutex> lock{ m_mutex };
+    const std::scoped_lock lock{ m_mutex };
 
     return m_grid.isAccented( m_grid.beatIndexAt( listenedFrame() ) );
 }
@@ -196,7 +201,7 @@ qint64 AudioMixer::readData( char * p_data, qint64 p_maximumByteCount )
 
     const auto channelCount = static_cast<std::size_t>( m_channelCount );
 
-    const auto bytesPerFrame = static_cast<qint64>( sizeof( float ) * channelCount );
+    const auto bytesPerFrame = static_cast<qint64>( sizeof( float ) ) * static_cast<qint64>( channelCount );
 
     const qint64 frameCount = p_maximumByteCount / bytesPerFrame;
 
@@ -204,7 +209,7 @@ qint64 AudioMixer::readData( char * p_data, qint64 p_maximumByteCount )
     auto * output = reinterpret_cast<float *>( p_data );
 
     {
-        const std::lock_guard<std::mutex> lock{ m_mutex };
+        const std::scoped_lock lock{ m_mutex };
 
         // La position du flux AVANT ce tampon : c'est elle qui donne leur position exacte aux clics qui tombent dedans.
         const std::int64_t firstFrame = m_framesWritten.load();
