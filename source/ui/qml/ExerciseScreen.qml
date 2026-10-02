@@ -1130,10 +1130,16 @@ Item {
                         ExerciseController.answerForeignNote(p_stepIndex);
                     }
 
-                    // La gamme de l'exercice MONTE seulement : le chemin le suit, donc il monte aussi.
+                    // La gamme de l'exercice MONTE, puis se REFERME sur sa tonique : le chemin fait donc le tour du
+                    // cercle et revient a son point de depart, ce qui referme la figure - et c'est la figure qui reste a
+                    // l'ecran une fois la musique finie.
+                    //
+                    // Le DERNIER degre est 0, et non 7 : le septieme degre du domaine EST le premier degre du cercle,
+                    // une octave plus haut. Le cercle ne porte que sept notes, donc la note qui ferme la gamme est
+                    // celle par laquelle elle a commence.
                     Connections {
                         function onModePlaybackStarted() {
-                            modeCircle.startPlayback(ExerciseController.modeSoundLeadInMs, ExerciseController.modeSoundNoteStepMs, [0, 1, 2, 3, 4, 5, 6]);
+                            modeCircle.startPlayback(ExerciseController.modeSoundLeadInMs, ExerciseController.modeSoundNoteStepMs, [0, 1, 2, 3, 4, 5, 6, 0]);
                         }
 
                         // Et la trainee S'EFFACE quand la question change : un chemin qui survivrait a sa musique montrerait

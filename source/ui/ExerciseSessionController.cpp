@@ -1804,8 +1804,11 @@ int ExerciseSessionController::modeSoundDurationMs() const
         return static_cast<int>( domain::droneDurationFor( playback.durations, PHRASE_NOTE_GAP, framing ).count() );
     }
 
+    // HUIT notes, et non sept : la gamme se REFERME sur sa tonique - voir notesOfModeClosingOnTonic. Cette note fait
+    // partie de ce qu'on entend, donc elle fait partie de ce qu'il faut annoncer : la compter pour rien couperait le son
+    // a la fin de la phrase, et ferait enchainer la question suivante par-dessus la note qui la conclut.
     const std::chrono::milliseconds oneMode =
-      domain::droneDurationFor( domain::DEGREE_COUNT, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+      domain::droneDurationFor( domain::DEGREE_COUNT + 1, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
 
     // Le vamp et la couleur font entendre DEUX modes, separes par le meme silence que celui du minuteur qui les enchaine.
     // Une question de nom n'en fait entendre qu'un.
@@ -1907,12 +1910,21 @@ void ExerciseSessionController::playForeignNoteQuestion()
     // La melodie du DOMAINE, posee deux octaves au-dessus du bourdon comme l'est celle d'un mode : c'est le meme geste,
     // donc le meme son a comparer a celui du banc d'essai.
     std::vector<domain::Note> melody;
-    melody.reserve( question.foreignMelody.size() );
+    melody.reserve( question.foreignMelody.size() + 1 );
 
     for( const domain::Note & note : question.foreignMelody )
     {
         melody.push_back( note.transposedBy( MODE_MELODY_OCTAVE_OFFSET ) );
     }
+
+    // LA GAMME SE REFERME ICI AUSSI : les sept pas, puis la tonique une octave plus haut.
+    //
+    // La note vient du DOMAINE - question.modeTonic - et non de la derniere note entendue : l'intrus peut tomber
+    // n'importe ou, y compris sur le premier pas, donc la melodie ne se termine pas forcement sur la tonique.
+    //
+    // Et elle ne dit RIEN de la reponse : c'est la tonique du mode, toujours la meme, et elle est deja connue puisque
+    // c'est sur elle que le bourdon est pose.
+    melody.push_back( question.modeTonic.transposedBy( MODE_MELODY_OCTAVE_OFFSET + domain::SEMITONES_PER_OCTAVE ) );
 
     const std::array<domain::Note, 2> drone{ question.modeTonic,
                                              question.modeTonic.transposedBy( FIFTH_IN_SEMITONES ) };
@@ -3312,8 +3324,12 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
     //
     // La melodie est posee DEUX OCTAVES au-dessus de la tonique : le bourdon tient les graves, et une melodie qui
     // partagerait son octave se battrait avec lui au lieu de se poser dessus.
+    //
+    // ET ELLE SE REFERME : le septieme degre appelle la tonique, donc la gamme revient sur elle, une octave plus haut.
+    // Sans cette note, la question restait en l'air - Roger : « est-ce que ce n'est pas mieux de boucler en entier et de
+    // revenir sur le 1er ? » - et c'est la derniere note qui NOMME le centre du mode, la ou le bourdon le donne.
     const std::vector<domain::Note> melody =
-      domain::notesOfMode( tonic.transposedBy( MODE_MELODY_OCTAVE_OFFSET ), mode );
+      domain::notesOfModeClosingOnTonic( tonic.transposedBy( MODE_MELODY_OCTAVE_OFFSET ), mode );
 
     // Le bourdon : la tonique tenue, et sa QUINTE. La MEME pour les deux modes d'une question de couleur, et c'est
     // exactement ce qui les rend comparables - tandis qu'un vamp la DEPLACE, parce que c'est le centre qui y change.

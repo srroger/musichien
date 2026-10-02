@@ -44,6 +44,17 @@ std::vector<Note> notesOfMode( Note p_tonic, Mode p_mode )
     return notes;
 }
 
+std::vector<Note> notesOfModeClosingOnTonic( Note p_tonic, Mode p_mode )
+{
+    std::vector<Note> melody = notesOfMode( p_tonic, p_mode );
+
+    // LA TONIQUE A L'OCTAVE, et non une huitieme note quelconque : c'est elle qui referme, et c'est pour cela que cette
+    // fonction porte ce nom.
+    melody.push_back( p_tonic.transposedBy( SEMITONES_PER_OCTAVE ) );
+
+    return melody;
+}
+
 std::vector<Note> modeScaleUpAndDown( Note p_tonic, Mode p_mode )
 {
     const std::vector<Note> ascending = notesOfMode( p_tonic, p_mode );

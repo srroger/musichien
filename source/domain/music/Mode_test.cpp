@@ -36,6 +36,27 @@ namespace
 
 }    // namespace
 
+// Une gamme de mode SE REFERME : les sept degres, puis la tonique a l'octave.
+TEST( ModeTest, a_scale_closes_on_its_tonic )
+{
+    // Roger : « est-ce que ce n'est pas mieux de boucler en entier et de revenir sur le 1er ? » Oui - et le domaine le
+    // disait deja pour la gamme montee-descendue : « une gamme qui monte seulement laisse la phrase en l'air ». Cette
+    // fonction applique la meme regle a la gamme qui ne monte pas.
+    const std::vector<Note> scale = notesOfModeClosingOnTonic( Note{ 60 }, Mode::Dorian );
+
+    ASSERT_EQ( DEGREE_COUNT + 1, scale.size() );
+
+    // LE PREMIER ET LE DERNIER : la tonique, une octave plus haut. C'est cet ecart qui REFERME la phrase.
+    EXPECT_EQ( 60, scale.front().midiNumber() );
+    EXPECT_EQ( 72, scale.back().midiNumber() );
+
+    // Et les sept premiers degres sont EXACTEMENT ceux de la gamme : la note ajoutee ne remplace rien. Un mode qui
+    // perdrait un degre en se refermant serait un autre mode.
+    const std::vector<Note> open = notesOfMode( Note{ 60 }, Mode::Dorian );
+
+    EXPECT_TRUE( std::equal( open.begin(), open.end(), scale.begin() ) );
+}
+
 TEST( ModeTest, every_mode_has_seven_rising_degrees_inside_one_octave )
 {
     for( std::size_t index = 0; index < MODE_COUNT; ++index )

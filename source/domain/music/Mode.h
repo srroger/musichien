@@ -127,6 +127,19 @@ inline constexpr std::array<std::int32_t, MODE_COUNT> MODE_ROTATION_INDEX{ 3, 0,
 // c'est une autre affaire.
 [[nodiscard]] std::vector<Note> notesOfMode( Note p_tonic, Mode p_mode );
 
+// Les notes d'un mode, du premier degre au septieme, PUIS LA TONIQUE A L'OCTAVE : la gamme qui se REFERME.
+//
+// Un mode qui s'arrete sur son septieme degre reste SUSPENDU. Le septieme degre n'existe que pour demander la tonique -
+// c'est sa fonction, et c'est pour cela qu'on le nomme le degre conducteur. La phrase reclame donc sa fin, et la lui
+// refuser laisse une question en l'air.
+//
+// C'est exactement la regle de modeScaleUpAndDown, ecrite juste en dessous, et elle vaut donc aussi pour une gamme qui
+// ne monte pas. Roger l'a demande : « est-ce que ce n'est pas mieux de boucler en entier et de revenir sur le 1er ? »
+//
+// Et ce n'est pas qu'une affaire de gout : la note qui CLOT la phrase est la TONIQUE, donc c'est en fermant la gamme
+// qu'un mode dit ou est son centre. Le bourdon le donne, la derniere note le NOMME.
+[[nodiscard]] std::vector<Note> notesOfModeClosingOnTonic( Note p_tonic, Mode p_mode );
+
 // L'identifiant anglais d'un mode ("lydian", "dorian"...).
 //
 // Il sert aux fichiers de contenu et aux journaux : une phrase modale doit pouvoir dire de quel mode elle est, et le

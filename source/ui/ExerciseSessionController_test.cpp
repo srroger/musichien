@@ -876,6 +876,14 @@ TEST( ExerciseSessionControllerTest, a_name_question_is_heard_as_a_melody )
     // La preuve que le temoin joue bien une GAMME, et non une phrase : c'est la seule difference entre les deux seances.
     ASSERT_FALSE( notePlayer.melodiesOverDrones().empty() );
 
+    // HUIT notes, et non sept : la gamme du JEU se REFERME sur sa tonique, une octave plus haut. Roger : « est-ce que ce
+    // n'est pas mieux de boucler en entier et de revenir sur le 1er ? » C'est la derniere note qui NOMME le centre du mode,
+    // la ou le bourdon le donne seulement - et une gamme qui s'arrete sur son septieme degre reste suspendue.
+    const std::vector<domain::Note> & playedScale = notePlayer.melodiesOverDrones().back().melody;
+
+    ASSERT_EQ( domain::DEGREE_COUNT + 1, playedScale.size() );
+    EXPECT_EQ( domain::SEMITONES_PER_OCTAVE, playedScale.back().midiNumber() - playedScale.front().midiNumber() );
+
     EXPECT_GT( controller.modeSoundDurationMs(), scaleController.modeSoundDurationMs() );
 }
 
