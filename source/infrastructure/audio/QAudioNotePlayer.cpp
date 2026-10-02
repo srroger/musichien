@@ -186,6 +186,39 @@ void QAudioNotePlayer::ensureAudioOutputIsOpen()
     // two sounds be heard at once.
     m_mixer = std::make_unique<AudioMixer>( m_audioFormat.sampleRate(), m_audioFormat.channelCount() );
 
+    // LE FILET SOUS LA CORDE, et il manquait.
+    //
+    // Une sortie qui s'arrete TOUTE SEULE alors qu'il restait quelque chose a jouer a ECHOUE : Android a refuse
+    // l'ouverture, le plafond de huit flux est atteint, la liaison a lache. Le QAudioSink reste alors en place, muet, et
+    // TOUT ce qui suit reste muet - c'est le « d'un coup j'ai perdu le son » de Roger. Un silence DEFINITIF pour une
+    // panne PASSAGERE est le pire des deux mondes.
+    //
+    // On la jette donc, et la note suivante en reconstruit une neuve : la panne coute UN son au lieu de tous ceux qui
+    // suivent.
+    //
+    // ICI, et pas plus haut : ce branchement a d'abord ete pose juste apres la creation du FLUX, ou il ne pouvait pas
+    // fonctionner - le CONTEXTE de la connexion est le mixeur, et le mixeur n'existait pas encore. Qt l'a dit tout seul,
+    // sur l'appareil : « QObject::connect(QAudioSink, Unknown): invalid nullptr parameter ». Un filet qui ne se branche
+    // pas est pire qu'aucun filet : il rassure.
+    //
+    // Le contexte est le mixeur, et non `this` : cet adaptateur n'est pas un QObject, et le mixeur lui appartient - il
+    // vit donc exactement aussi longtemps. La reparation est DIFFEREE d'un tour de boucle, parce qu'elle DETRUIT l'objet
+    // meme qui est en train d'emettre ce signal.
+    QObject::connect( m_audioSink.get(),
+                      &QAudioSink::stateChanged,
+                      m_mixer.get(),
+                      [this]( QtAudio::State p_state ) {
+                          if( ( p_state != QtAudio::StoppedState ) || ( m_mixer == nullptr ) || !m_mixer->isPlaying() )
+                          {
+                              return;
+                          }
+
+                          qWarning() << "Musichien: the audio output stopped on its own while sound was pending; "
+                                        "rebuilding it for the next note.";
+
+                          QTimer::singleShot( 0, m_mixer.get(), [this]() { closeAudioOutput(); } );
+                      } );
+
     // LE TAMPON DE SORTIE N'EST PLUS IMPOSE, ET C'EST UNE REPARATION.
     //
     // Roger : « quand je branche mes ecouteurs bluetooth, ca saccade, ca gresille ». Nous demandions seize kilooctets,
@@ -251,7 +284,26 @@ void QAudioNotePlayer::stopSinkWhenSilent()
     //
     // The mixer is the CONTEXT of the single shot, and that is deliberate: it is owned by this object, so if the
     // player is destroyed the pending call goes with it instead of touching a dangling pointer.
-    QTimer::singleShot( 250, m_mixer.get(), [this]() {
+    //
+    // -------------------------------------------------------------------------------------------------------------
+    // UNE MINUTE, ET NON UN QUART DE SECONDE, et c'est un SON PERDU qui l'a appris.
+    //
+    // Roger : « tout allait bien puis d'un coup j'ai perdu le son ». La cause est mesuree, et elle est sans appel :
+    //
+    //     E AAudioService: openStream(): exceeded max streams per process 8 >= 8
+    //     AAudioStreamBuilder_openStream() returns -896 = AAUDIO_ERROR_INTERNAL
+    //
+    // ANDROID NE LAISSE PAS OUVRIR PLUS DE HUIT FLUX AUDIO PAR PROCESSUS. Or chaque `start()` d'un QAudioSink ouvre un
+    // flux AAudio, et chaque `stop()` le ferme - mais la FERMETURE EST ASYNCHRONE. Avec un quart de seconde de patience,
+    // chaque note rendait l'appareil puis le reprenait : 93 flux ouverts en cinq minutes, une poignee encore en train de
+    // se fermer a chaque instant, et au neuvieme tout echoue. Une fois le plafond atteint, plus rien ne passe : le son
+    // ne revient jamais, et c'est exactement ce que Roger a vecu.
+    //
+    // Le remede est de ne plus JOUER AU YO-YO. Une minute de patience laisse le flux ouvert pendant toute une seance -
+    // les questions s'enchainent bien plus vite que cela - donc un seul flux est ouvert, et le plafond n'est jamais
+    // approche. L'appareil est rendu tout de meme : apres une vraie minute de silence, et immediatement a la mise en
+    // arriere-plan (voir closeAudioOutput), qui est le vrai cas de la batterie.
+    QTimer::singleShot( 60000, m_mixer.get(), [this]() {
         if( ( m_audioSink == nullptr ) || ( m_mixer == nullptr ) )
         {
             return;
