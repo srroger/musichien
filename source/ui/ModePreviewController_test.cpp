@@ -73,6 +73,14 @@ TEST( ModePreviewControllerTest, playing_a_mode_asks_the_port_for_a_melody_over_
 
     // Et le mode entendu est decrit pour l'ecran, sans que personne ait a le redemander au domaine.
     EXPECT_EQ( "dorian", controller.lastPlayedMode().value( "identifier" ).toString() );
+
+    // LA ROUE A BESOIN de deux nombres separes, et pas d'une duree totale : le silence d'entree et le pas d'une note. C'est
+    // ce qui l'empeche de partir avec le bourdon et de finir dans le silence. Voir ModeCircle.startPlayback.
+    EXPECT_GT( controller.playbackNoteStepMs(), 0 );
+
+    // Et le silence d'entree ANNONCE est celui qui a VRAIMENT ete joue : c'est l'encadrement recu par le port. Deux nombres
+    // qui doivent coincider finissent toujours par diverger, donc le test les compare.
+    EXPECT_EQ( static_cast<int>( played.framing.leadIn.count() ), controller.playbackLeadInMs() );
 }
 
 TEST( ModePreviewControllerTest, an_index_outside_the_known_modes_plays_nothing )

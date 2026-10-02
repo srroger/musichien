@@ -1805,6 +1805,31 @@ int ExerciseSessionController::modeSoundDurationMs() const
 
     return static_cast<int>( ( twoModes ? ( ( oneMode * 2 ) + MODE_COMPARISON_GAP ) : oneMode ).count() );
 }
+int ExerciseSessionController::modeSoundLeadInMs() const
+{
+    // La MEME condition que la duree : hors d'une question de mode, la roue n'est pas affichee, et une valeur inventee ici
+    // ne servirait a personne.
+    if( ( m_session == nullptr ) || !( isModeQuestion() || isForeignNoteQuestion() ) )
+    {
+        return 0;
+    }
+
+    return static_cast<int>( MODE_LEAD_IN.count() );
+}
+
+int ExerciseSessionController::modeSoundNoteStepMs() const
+{
+    if( ( m_session == nullptr ) || !( isModeQuestion() || isForeignNoteQuestion() ) )
+    {
+        return 0;
+    }
+
+    // La MEME somme que celle passee au lecteur : deux calculs qui doivent coincider finissent toujours par diverger, donc
+    // celui-ci est ecrit une seule fois.
+    return static_cast<int>( ( MODE_NOTE_DURATION + MODE_NOTE_GAP ).count() );
+}
+
+
 
 bool ExerciseSessionController::isForeignNoteQuestion() const noexcept
 {

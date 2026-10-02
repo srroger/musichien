@@ -26,9 +26,8 @@ constexpr std::int32_t TONIC_MIDI_NUMBER = 62;
 constexpr std::int32_t DRONE_ROOT_MIDI_NUMBER = 38;
 constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
 
-// Les durees : une note assez longue pour que la couleur se dise, et un silence court pour que la phrase avance. Ce
-// sont des decisions MUSICALES, donc elles se reglent a l'oreille - comme celles du banc d'essai des intervalles.
-constexpr std::chrono::milliseconds NOTE_DURATION{ 420 };
+// Le silence entre deux notes d'une phrase : court, pour que la phrase avance. C'est une decision MUSICALE, donc elle se
+// regle a l'oreille - comme celles du banc d'essai des intervalles.
 constexpr std::chrono::milliseconds GAP{ 70 };
 
 // Le plancher du tempo d'une phrase : sous quarante, elle traine au point de ne plus etre une phrase. C'est la meme
@@ -116,9 +115,9 @@ void ModePreviewController::playMode( int p_index )
     // trouve le centre : c'est en revenant sur la tonique qu'un mode se dit.
     const std::vector<domain::Note> melody = domain::modeScaleUpAndDown( tonic, mode );
 
-    // LA DUREE TOTALE de la gamme, pour que la roue sache en combien de temps parcourir son chemin. Elle se calcule a
-    // partir des MEMES valeurs que le son qui va suivre, donc le dessin ne peut pas prendre du retard sur la musique.
-    m_lastScaleDurationMs = static_cast<int>( melody.size() * ( noteDuration + gap ).count() );
+    // LE PAS de la gamme, pour que la roue sache a quelle vitesse parcourir son chemin. Il se calcule a partir des MEMES
+    // valeurs que le son qui va suivre, donc le dessin ne peut pas prendre du retard sur la musique.
+    m_lastScaleNoteStepMs = static_cast<int>( ( noteDuration + gap ).count() );
 
     const std::array<domain::Note, 2> drone{ domain::Note{ DRONE_ROOT_MIDI_NUMBER },
                                              domain::Note{ DRONE_ROOT_MIDI_NUMBER + FIFTH_IN_SEMITONES } };
@@ -129,7 +128,7 @@ void ModePreviewController::playMode( int p_index )
     // Le bourdon est demande au PORT, avec sa quinte : c'est le DOMAINE qui decide combien de temps il tient, et
     // l'adaptateur qui choisit avec quel timbre. Le banc d'essai ne dit rien d'autre que le mode qu'il veut entendre -
     // et c'est pour cela que ce qu'il fait entendre est exactement ce que l'exercice fera entendre.
-    m_notePlayer.playMelodyOverDrone( melody, drone, noteDuration, gap );
+    m_notePlayer.playMelodyOverDrone( melody, drone, noteDuration, gap, SCALE_FRAMING );
 
     const QVariantMap description = describeMode( mode );
 

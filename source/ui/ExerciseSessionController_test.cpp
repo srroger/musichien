@@ -774,6 +774,16 @@ TEST( ExerciseSessionControllerTest, a_two_mode_question_announces_twice_the_sou
 
     ASSERT_GT( oneMode, 0 );
 
+    // LA ROUE A BESOIN DE DEUX NOMBRES SEPARES, et pas seulement du total : le silence d'entree, et le pas d'une note.
+    // Calee sur le total, sa tete partait avec le bourdon et finissait dans le silence - Roger l'a entendu : « la boule des
+    // lignes dans les modes est un peu lente par rapport au son ».
+    EXPECT_GT( nameController.modeSoundLeadInMs(), 0 );
+    EXPECT_GT( nameController.modeSoundNoteStepMs(), 0 );
+
+    // La DERNIERE note sonne AVANT la fin : ce qui reste est le bourdon qui traine, et la tete ne doit pas y voyager. Sept
+    // notes se rejoignent par six pas, d'ou le 6.
+    EXPECT_LT( nameController.modeSoundLeadInMs() + ( 6 * nameController.modeSoundNoteStepMs() ), oneMode );
+
     domain::PlayerPreferencesFake colourStore;
     storeColourOnlyShares( colourStore );
 
@@ -790,6 +800,11 @@ TEST( ExerciseSessionControllerTest, a_two_mode_question_announces_twice_the_sou
     intervalController.startOrdinarySession();
 
     EXPECT_EQ( 0, intervalController.modeSoundDurationMs() );
+
+    // Et AUCUN des deux nombres de la roue : hors d'une question de mode, la roue n'est pas affichee, et une valeur inventee
+    // ici ne servirait a personne.
+    EXPECT_EQ( 0, intervalController.modeSoundLeadInMs() );
+    EXPECT_EQ( 0, intervalController.modeSoundNoteStepMs() );
 }
 
 TEST( ExerciseSessionControllerTest, a_name_question_is_heard_as_a_melody )

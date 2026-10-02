@@ -1424,7 +1424,7 @@ ApplicationWindow {
                                 ModeController.playMode(modelData.index);
                                 // ET LA ROUE S'ANIME : sa tete part de la tonique et parcourt la gamme, de note en
                                 // note. La duree vient du CONTROLEUR - c'est le temps que la gamme met vraiment a sonner.
-                                modeBenchCircle.startPlayback(ModeController.playbackDurationMs);
+                                modeBenchCircle.startPlayback(ModeController.playbackLeadInMs, ModeController.playbackNoteStepMs);
                             }
                         }
 

@@ -36,6 +36,14 @@
 namespace musichien::ui
 {
 
+// L'ENCADREMENT de la gamme du banc d'essai : le bourdon sonne seul avant, et seul apres.
+//
+// C'est la valeur par DEFAUT du domaine - le banc d'essai n'a jamais eu de raison d'en choisir une autre - et elle est
+// nommee ici parce que la roue a maintenant besoin de la CONNAITRE : c'est le silence d'entree, donc le temps pendant
+// lequel sa tete reste posee sur la tonique. La passer explicitement au lecteur garantit que le nombre annonce a la roue
+// est celui qui a vraiment ete joue.
+constexpr domain::DroneFraming SCALE_FRAMING{};
+
 class ModePreviewController final : public QObject
 {
     Q_OBJECT
@@ -60,11 +68,16 @@ class ModePreviewController final : public QObject
     // la fenetre de notes pendant qu'on l'entend est exactement ce qui apprend a la reconnaitre.
     Q_PROPERTY( QVariantList playedModeCircle READ playedModeCircle NOTIFY playedModeCircleChanged )
 
-    // COMBIEN DE TEMPS la gamme du dernier mode a sonne, en millisecondes.
+    // LES DEUX NOMBRES DONT LA ROUE A BESOIN pour arriver sur chaque pastille a l'instant ou la note sonne : le silence
+    // d'entree de la gamme, et le temps d'un pas.
     //
-    // La roue s'en sert pour faire voyager sa tete de note en note : la duree vient du CONTROLEUR, donc du domaine et de
-    // son tempo, et une constante ecrite dans le QML mentirait le jour ou le tempo change.
-    Q_PROPERTY( int playbackDurationMs READ playbackDurationMs NOTIFY playedModeCircleChanged )
+    // Une duree TOTALE ne suffit pas : elle comprend le bourdon seul du debut et de la fin, donc une tete calee dessus
+    // part trop tot et finit dans le silence. Voir ModeCircle.startPlayback.
+    //
+    // Les deux viennent du CONTROLEUR, donc du domaine et de son tempo : une constante ecrite dans le QML mentirait le jour
+    // ou le tempo change.
+    Q_PROPERTY( int playbackLeadInMs READ playbackLeadInMs NOTIFY playedModeCircleChanged )
+    Q_PROPERTY( int playbackNoteStepMs READ playbackNoteStepMs NOTIFY playedModeCircleChanged )
 
 public:
     explicit ModePreviewController( domain::NotePlayer & p_notePlayer, QObject * p_parent = nullptr );
@@ -74,7 +87,11 @@ public:
     [[nodiscard]] QVariantMap lastPlayedPhrase() const;
     [[nodiscard]] QVariantList playedModeCircle() const;
 
-    [[nodiscard]] int playbackDurationMs() const noexcept { return m_lastScaleDurationMs; }
+    // Le silence d'entree de la gamme, en millisecondes : le bourdon seul, avant la premiere note.
+    [[nodiscard]] int playbackLeadInMs() const noexcept { return static_cast<int>( SCALE_FRAMING.leadIn.count() ); }
+
+    // Le temps d'un pas, en millisecondes : une note ET le silence qui la suit.
+    [[nodiscard]] int playbackNoteStepMs() const noexcept { return m_lastScaleNoteStepMs; }
 
     // Le temperament et le diapason, donnes par la couche de cablage - comme pour les intervalles.
     void setTuning( domain::TuningContext p_tuning );
@@ -120,8 +137,9 @@ private:
     QVariantMap m_lastPlayedPhrase;
     QVariantList m_playedModeCircle;
 
-    // La duree de la derniere gamme jouee, en millisecondes. Voir playbackDurationMs.
-    int m_lastScaleDurationMs{ 0 };
+    // Le temps d'un pas de la derniere gamme jouee : une note ET le silence qui la suit, en millisecondes. Voir
+    // playbackNoteStepMs.
+    int m_lastScaleNoteStepMs{ 0 };
 
     // Les reglages du joueur : nul tant qu'ils n'ont pas ete donnes, et c'est un cas normal.
     const domain::PlayerPreferences * m_preferences{ nullptr };

@@ -214,6 +214,21 @@ class ExerciseSessionController final : public QObject
     // doivent coincider finissent toujours par diverger.
     Q_PROPERTY( int modeSoundDurationMs READ modeSoundDurationMs NOTIFY questionChanged )
 
+    // LES DEUX NOMBRES DONT LA ROUE A BESOIN pour arriver sur chaque pastille a l'instant ou la note sonne : le silence
+    // d'entree, et le temps d'un pas.
+    //
+    // Une duree TOTALE ne suffit pas : elle comprend le bourdon seul du debut et de la fin, donc une tete calee dessus
+    // part trop tot et finit dans le silence. Roger : « la boule des lignes dans les modes est un peu lente par rapport au
+    // son ». Voir ModeCircle.startPlayback.
+    //
+    // Zero quand la question n'a pas de mode : la roue n'est alors pas affichee, et une valeur inventee ici ne servirait a
+    // personne.
+    //
+    // La roue ne s'anime QUE sur la gamme. Une phrase ne l'anime pas - voir playPhraseQuestion - donc ces deux nombres
+    // decrivent exactement ce que la roue suit, et rien d'autre.
+    Q_PROPERTY( int modeSoundLeadInMs READ modeSoundLeadInMs NOTIFY questionChanged )
+    Q_PROPERTY( int modeSoundNoteStepMs READ modeSoundNoteStepMs NOTIFY questionChanged )
+
     // Les deux parts de l'harmonie, en pour cent : comparer deux modes, et nommer un mode. Deux reglages, parce que ce
     // sont deux competences - un joueur peut vouloir la comparaison sans le vocabulaire, et l'inverse.
     Q_PROPERTY( int modeColourQuestionShare READ modeColourQuestionShare WRITE setModeColourQuestionShare NOTIFY
@@ -499,6 +514,13 @@ public:
     [[nodiscard]] QString modeCircleLabel() const;
 
     [[nodiscard]] int modeSoundDurationMs() const;
+
+    // Le silence d'entree de la gamme, en millisecondes : le bourdon seul, avant la premiere note. Voir les Q_PROPERTY.
+    [[nodiscard]] int modeSoundLeadInMs() const;
+
+    // Le temps d'un pas, en millisecondes : une note ET le silence qui la suit. La roue en a besoin separement de la
+    // duree totale, parce que c'est lui qui dit quand la note suivante sonne.
+    [[nodiscard]] int modeSoundNoteStepMs() const;
 
     [[nodiscard]] bool isForeignNoteQuestion() const noexcept;
 

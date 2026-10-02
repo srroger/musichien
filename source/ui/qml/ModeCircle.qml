@@ -45,7 +45,12 @@ Item {
     readonly property real radius: (Math.min(width, height) / 2) - (dotSize / 2) - 4
     // LES DEGRES, dans l'ordre ou ils sonnent : la gamme monte puis descend, comme le domaine la joue. Le chemin en
     // INDICES DU CERCLE s'en deduit, parce que chaque case porte le degre de sa note (voir describeModeCircle).
-    property var playbackDegrees: [0, 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1, 0]
+    //
+    // TREIZE DEGRES, et c'est une CORRECTION : la gamme montee puis descendue partage sa note du haut, donc elle compte
+    // treize notes et non quatorze (voir modeScaleUpAndDown). Le degre 6 y figurait deux fois de suite, ce qui ajoutait un
+    // bond de longueur NULLE - la tete restait donc un pas en arriere jusqu'a la fin, en plus d'attendre sur place au
+    // sommet.
+    property var playbackDegrees: [0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1, 0]
     property real playbackHead: 0
     property bool playing: false
     readonly property var playbackPath: {
@@ -73,33 +78,59 @@ Item {
 
     // p_degrees est OPTIONNEL : le banc d'essai joue la gamme MONTEE puis DESCENDUE, et l'exercice la joue MONTE seulement
     // (une question doit tenir en quelques secondes). Le chemin suit ce qu'on entend, donc il se règle avec lui.
-    function startPlayback(p_durationMs, p_degrees) {
+    //
+    // DEUX NOMBRES, ET NON UNE DUREE TOTALE. Roger : « la boule des lignes dans les modes est un peu lente par rapport au
+    // son ». Le parcours etait cale sur la duree TOTALE de la musique, or celle-ci commence et finit par un BOURDON SEUL :
+    // la tete partait donc avec le bourdon, et finissait dans le silence qui le suit - elle arrivait sur la derniere
+    // pastille alors que la musique etait finie. Elle est maintenant calee sur ce qu'on ENTEND : le silence d'entree, puis
+    // un pas par note. Elle arrive donc sur chaque pastille a l'instant ou la note sonne.
+    function startPlayback(p_leadInMs, p_noteStepMs, p_degrees) {
         if (p_degrees !== undefined)
             playbackDegrees = p_degrees;
 
+        // Le silence d'entree : la tete reste SUR la tonique pendant que le bourdon s'installe. C'est vrai - c'est ce
+        // qu'on entend - et c'est aussi ce qui se regarde : on voit d'ou l'on part.
+        leadInPause.duration = Math.max(0, p_leadInMs);
+
+        // n notes se rejoignent par n-1 intervalles : le dernier pas n'est pas un deplacement.
+        //
         // LA DUREE SE POSE SUR L'ANIMATION, et c'est une CORRECTION : `restart()` ne prend AUCUN argument, donc celle que
         // je lui passais etait ignoree - et le parcours se faisait en une fraction de seconde. Roger l'a vu avant moi :
         // « le trait se dessine hyper vite, genre en une fraction de seconde ».
-        headAnimation.duration = Math.max(1, p_durationMs);
+        headAnimation.duration = Math.max(1, (playbackPath.length - 1) * p_noteStepMs);
         playbackHead = 0;
         playing = true;
-        headAnimation.restart();
+        startAnimation.restart();
     }
 
     implicitWidth: span
     implicitHeight: span
 
-    NumberAnimation {
-        id: headAnimation
+    // Le silence d'entree, PUIS le parcours : deux temps, et un seul depart. C'est une SEQUENCE, et non une animation dont
+    // la duree engloberait le silence : sinon la tete avancerait pendant que rien ne sonne - exactement le defaut que
+    // Roger a entendu.
+    SequentialAnimation {
+        id: startAnimation
 
-        target: root
-        property: "playbackHead"
-        from: 0
-        to: Math.max(0, root.playbackPath.length - 1)
-        // Une duree par DEFAUT, posee par startPlayback avant chaque depart. Une animation a zero dure une fraction de
-        // seconde, et c'est exactement ce que Roger a entendu.
-        duration: 2000
-        easing.type: Easing.Linear
+        PauseAnimation {
+            id: leadInPause
+
+            duration: 0
+        }
+
+        NumberAnimation {
+            id: headAnimation
+
+            target: root
+            property: "playbackHead"
+            from: 0
+            to: Math.max(0, root.playbackPath.length - 1)
+            // Une duree par DEFAUT, posee par startPlayback avant chaque depart. Une animation a zero dure une fraction
+            // de seconde, et c'est exactement ce que Roger a entendu.
+            duration: 2000
+            easing.type: Easing.Linear
+        }
+
     }
 
     // Un Canvas, comme le camembert des statistiques : aucun module a deployer pour un trait. Il est repeint a chaque

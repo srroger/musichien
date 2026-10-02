@@ -1113,8 +1113,16 @@ Item {
 
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 6
-                    span: 288
-                    dotSize: 50
+                    // LA ROUE S'OXYGENE : Roger l'a vue jouer - « les points sont pas assez espaces pour que ca rende
+                    // vraiment bien ». Une case fait trente degres, donc l'ecart entre deux pastilles vaut environ la
+                    // moitie du rayon : la seule facon d'ouvrir cet ecart est de faire GRANDIR le cercle ou de reduire les
+                    // pastilles. Les deux ont ete poussees d'un cran, et d'un seul : un rayon plus grand demande de la
+                    // hauteur, et l'ecran n'en a pas beaucoup.
+                    //
+                    // Les pastilles restent grandes : elles sont CLIQUEES sur une question de note etrangere, et une cible
+                    // qui retrecit trop fait rater la note qu'on visait.
+                    span: 304
+                    dotSize: 46
                     visible: ExerciseController.isHarmonyQuestion
                     selectable: ExerciseController.isForeignNoteQuestion
                     notes: ExerciseController.modeCircle
@@ -1125,7 +1133,7 @@ Item {
                     // La gamme de l'exercice MONTE seulement : le chemin le suit, donc il monte aussi.
                     Connections {
                         function onModePlaybackStarted() {
-                            modeCircle.startPlayback(ExerciseController.modeSoundDurationMs, [0, 1, 2, 3, 4, 5, 6]);
+                            modeCircle.startPlayback(ExerciseController.modeSoundLeadInMs, ExerciseController.modeSoundNoteStepMs, [0, 1, 2, 3, 4, 5, 6]);
                         }
 
                         // Et la trainee S'EFFACE quand la question change : un chemin qui survivrait a sa musique montrerait
