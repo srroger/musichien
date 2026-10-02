@@ -844,14 +844,28 @@ public:
     Q_INVOKABLE void setArcadeLives( int p_lives );
 
     // LE TITRE du joueur, d'apres ses bilans reussis - et sa devise, en une phrase.
+    //
+    // Q_PROPERTY, ET NON SEULEMENT UNE METHODE, et c'est une CORRECTION. Roger : « a la victoire d'arcade, je vois
+    // constamment que j'ai gagne le nouveau titre : Toutou. »
+    //
+    // L'ecran ecrivait `ExerciseController.titleJustIncreased` SANS parentheses. Une methode non appelee n'est pas un
+    // booleen : c'est un OBJET FONCTION, et un objet fonction est TOUJOURS VRAI. Le badge s'affichait donc a chaque fin
+    // de partie, avec le titre du moment - « Toutou » - comme s'il venait d'etre gagne.
+    //
+    // Et une methode ne suffirait pas, meme appelee : QML ne sait pas QUAND sa reponse change, donc une liaison qui
+    // l'appelle reste figee sur ce qu'elle valait a sa creation. Une propriete notifiable dit les deux choses : quelle
+    // valeur, et quand elle a change. La methode est gardee a cote, pour que les appels explicites restent possibles.
+    Q_PROPERTY( QVariantMap playerTitle READ playerTitle NOTIFY playerProgressChanged )
     [[nodiscard]] Q_INVOKABLE QVariantMap playerTitle() const;
 
     // LES TROPHEES, avec leur etat : {identifier, name, description, earned}. Gagnes au Bilan, gardes pour de bon.
+    Q_PROPERTY( QVariantList trophies READ trophies NOTIFY playerProgressChanged )
     [[nodiscard]] Q_INVOKABLE QVariantList trophies() const;
 
     // TOUS les titres, du plus modeste au plus haut, avec leur etat. Roger veut les VOIR, meme non acquis : « on peut
     // voir la liste dans la page de profil (mais en grise). Histoire de donner des "objectifs" au joueur. » L'echelle
     // entiere est donc un objectif, et pas seulement le titre du moment.
+    Q_PROPERTY( QVariantList allTitles READ allTitles NOTIFY playerProgressChanged )
     [[nodiscard]] Q_INVOKABLE QVariantList allTitles() const;
 
     // CE QUE LE DERNIER BILAN VIENT DE RAPPORTER : les trophees tout neufs, et si le titre a monte.
@@ -859,7 +873,10 @@ public:
     // Roger : « a la fin du bilan, si il a gagne un trophee ou une recompense, il faut lui dire (et lui dire qu'ils sont
     // dans "profil") ». Vides et faux pour tout autre mode, et remis a zero au debut de chaque partie : une annonce qui
     // survivrait a sa partie serait une annonce qui ment.
+    Q_PROPERTY( QVariantList newlyEarnedTrophies READ newlyEarnedTrophies NOTIFY playerProgressChanged )
     [[nodiscard]] Q_INVOKABLE QVariantList newlyEarnedTrophies() const { return m_newlyEarnedTrophies; }
+
+    Q_PROPERTY( bool titleJustIncreased READ titleJustIncreased NOTIFY playerProgressChanged )
     [[nodiscard]] Q_INVOKABLE bool titleJustIncreased() const noexcept { return m_titleJustIncreased; }
 
     // Le plus haut palier de difficulte que l'experience du joueur lui ouvre.
@@ -1057,6 +1074,12 @@ signals:
     void runningChanged();
     void questionChanged();
     void sessionChanged();
+
+    // CE QUE LE JOUEUR A ACQUIS a change : son titre, ses trophees, ou ce que le dernier bilan vient de rapporter.
+    //
+    // Sans ce signal, rien de tout cela ne se rafraichit : QML ne sait pas qu'une METHODE a change de reponse, donc une
+    // liaison qui l'appelle reste figee sur ce qu'elle valait a sa creation. C'est la seconde moitie du bug du badge.
+    void playerProgressChanged();
 
     // Le nombre de coeurs de l'Arcade a change : la page de reglages se redessine, et la prochaine partie en tiendra compte.
     void arcadeLivesChanged();

@@ -1524,7 +1524,11 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.topMargin: 8
-                visible: (ExerciseController.newlyEarnedTrophies().length > 0) || ExerciseController.titleJustIncreased
+                // ELLES SONT LUES COMME DES PROPRIETES, et c'est une CORRECTION : ecrire `titleJustIncreased` sans
+                // parentheses n'appelait PAS la methode - c'etait un objet fonction, donc toujours vrai, et le badge
+                // s'affichait a chaque fin de partie avec « Toutou ». Et une propriete notifiable est ce qui permet a
+                // cette liaison de se rafraichir quand ce que le bilan a rapporte change.
+                visible: (ExerciseController.newlyEarnedTrophies.length > 0) || ExerciseController.titleJustIncreased
                 spacing: 4
 
                 Text {
@@ -1533,11 +1537,11 @@ Item {
                     color: "#ffd479"
                     font.pixelSize: 17
                     font.bold: true
-                    text: ExerciseController.titleJustIncreased ? qsTr("🏆 Nouveau titre : %1").arg(ExerciseController.playerTitle().name) : qsTr("🏆 Récompense !")
+                    text: ExerciseController.titleJustIncreased ? qsTr("🏆 Nouveau titre : %1").arg(ExerciseController.playerTitle.name) : qsTr("🏆 Récompense !")
                 }
 
                 Repeater {
-                    model: ExerciseController.newlyEarnedTrophies()
+                    model: ExerciseController.newlyEarnedTrophies
 
                     delegate: Text {
                         required property var modelData

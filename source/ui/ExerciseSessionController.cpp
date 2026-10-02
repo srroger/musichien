@@ -1092,6 +1092,10 @@ void ExerciseSessionController::recordBilanOutcome()
     }
 
     m_titleJustIncreased = domain::titleEarnedBy( after ) > domain::titleEarnedBy( before );
+
+    // Et l'ecran l'apprend ICI : tout ce que ce bilan vient de rapporter est pret, donc le badge peut se montrer - ou
+    // rester cache, ce qui est le cas ordinaire.
+    emit playerProgressChanged();
 }
 
 QVariantMap ExerciseSessionController::playerTitle() const
@@ -1268,6 +1272,10 @@ void ExerciseSessionController::beginSession( domain::SessionSettings p_settings
     // d'aujourd'hui. Un bilan le remplira de nouveau, s'il y a lieu.
     m_newlyEarnedTrophies.clear();
     m_titleJustIncreased = false;
+
+    // L'annonce de la partie PRECEDENTE s'efface aussi A L'ECRAN : sans ce signal, le badge du bilan resterait affiche
+    // pendant la partie qui commence.
+    emit playerProgressChanged();
 
     // Le bouton a repondu : un clic tres court et discret, pour que la main soit entendue.
     m_notePlayer.playTapCue();

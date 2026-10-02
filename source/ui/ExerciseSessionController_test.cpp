@@ -2793,6 +2793,38 @@ TEST( ExerciseSessionControllerTest, the_arcade_hearts_are_configurable )
     EXPECT_EQ( 1, controller.arcadeLives() );
 }
 
+TEST( ExerciseSessionControllerTest, the_reward_announcement_is_cleared_at_every_session_start )
+{
+    // LE BADGE DE FIN DE PARTIE, et ce qui n'allait pas.
+    //
+    // Roger : « a la victoire d'arcade, je vois constamment que j'ai gagne le nouveau titre : Toutou. » Deux fautes s'y
+    // ajoutaient : l'ecran lisait `titleJustIncreased` SANS parentheses - une methode non appelee est un objet fonction,
+    // donc toujours vrai - et aucune propriete n'etait notifiable, donc la liaison restait figee.
+    //
+    // Ce que ce test tient est la seconde moitie : l'annonce est remise a ZERO au debut de chaque partie, et l'ecran
+    // doit l'APPRENDRE. Sans le signal, le badge du bilan precedent resterait affiche par-dessus la partie suivante - et
+    // une arcade, qui n'accorde aucun titre, montrerait celui d'hier.
+    domain::NotePlayerFake notePlayer;
+
+    ExerciseSessionController controller{ notePlayer, { intervalOnlySettings() } };
+
+    int announcements = 0;
+
+    QObject::connect( &controller,
+                      &ExerciseSessionController::playerProgressChanged,
+                      &controller,
+                      [&announcements]() { ++announcements; } );
+
+    controller.startOrdinarySession();
+
+    EXPECT_FALSE( controller.titleJustIncreased() );
+    EXPECT_TRUE( controller.newlyEarnedTrophies().isEmpty() );
+
+    // UNE FOIS, et pas zero : ce n'est pas la valeur qui compte ici, c'est que l'ecran soit PREVENU.
+    EXPECT_EQ( 1, announcements );
+}
+
+
 // LES TITRES ET LES TROPHEES se lisent des compteurs du Bilan, et rien d'autre.
 TEST( ExerciseSessionControllerTest, the_title_and_the_trophies_come_from_the_bilan )
 {

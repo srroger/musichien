@@ -2306,7 +2306,7 @@ ApplicationWindow {
                     color: "#ffd479"
                     font.pixelSize: 20
                     font.bold: true
-                    text: ExerciseController.playerTitle().name
+                    text: ExerciseController.playerTitle.name
                 }
 
                 Text {
@@ -2317,7 +2317,7 @@ ApplicationWindow {
                     font.pixelSize: 12
                     font.italic: true
                     wrapMode: Text.WordWrap
-                    text: ExerciseController.playerTitle().motto
+                    text: ExerciseController.playerTitle.motto
                 }
 
                 // TOUTE L'ECHELLE DES TITRES, et pas seulement celui du moment. Roger : « on peut voir la liste dans la page
@@ -2329,7 +2329,7 @@ ApplicationWindow {
                     spacing: 2
 
                     Repeater {
-                        model: ExerciseController.allTitles()
+                        model: ExerciseController.allTitles
 
                         delegate: RowLayout {
                             required property var modelData
@@ -2365,7 +2365,7 @@ ApplicationWindow {
                     spacing: 3
 
                     Repeater {
-                        model: ExerciseController.trophies()
+                        model: ExerciseController.trophies
 
                         delegate: RowLayout {
                             required property var modelData
