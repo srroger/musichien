@@ -43,13 +43,25 @@
 #
 #   4 styles de widgets (Fusion, Imagine, Universal, FluentWinUI3)  -> MATERIAL et BASIC restent
 #   les plugins de debogage QML (qmldbg_*)                         -> ils ne sont PAS dans la liste de chargement
+#   le moteur multimedia FFmpeg, ET les bibliotheques libav*       -> 'androidmediaplugin' reste, c'est lui qui SORT le son
 #
 # BASIC reste, et c'est une ceinture : c'est le style PAR DEFAUT du module, et le laisser garantit que l'application
 # s'affiche meme si Material manquait un jour.
 #
-# LE MOTEUR MULTIMEDIA N'EST PAS TOUCHE. Ses plugins sont dans la liste de chargement, donc les retirer demanderait de
-# retirer aussi leurs bibliotheques libav*, et c'est le SON qui en dependrait. Un paquet plus petit ne vaut pas une
-# application muette : cette piste est laissee de cote, et elle est notee.
+# FFMPEG PART AUSSI, et c'est la preuve qui l'autorise : 'libQt6Multimedia' n'exige AUCUNE bibliotheque FFmpeg - seul le
+# GREFFON les exige, et il est le seul a les demander au chargeur. Musichien ne lit aucun fichier media : il fabrique ses
+# echantillons et lit ses propres WAV dans le domaine. Le drapeau '--keep-media' le remet, et c'est le seul : la ou le son
+# est en jeu, c'est l'oreille qui tranche, pas un raisonnement.
+#
+# ---------------------------------------------------------------------------------------------------------------------
+# LA LIGNE QUI A FAILLI FAIRE ECHOUER TOUT LE LOT
+#
+# La liste de chargement contient une entree faite d'une CHAINE, separee par des deux-points :
+#
+#     <item>arm64-v8a;libplugins_platforms_qtforandroid_...so:libavcodec.so:...:libplugins_multimedia_androidmediaplugin_...so</item>
+#
+# Elle se filtre MAILLON PAR MAILLON : retirer la ligne entiere emporterait le greffon de plateforme et celui du son, qui
+# n'ont rien a voir avec FFmpeg, et l'application ne demarrerait plus du tout.
 #
 # ---------------------------------------------------------------------------------------------------------------------
 # CE QU'IL NE TOUCHE PAS
@@ -61,6 +73,7 @@
 #
 #   scripts/build_android.sh --no-install      # construit et signe, comme d'habitude
 #   scripts/shrink_apk.sh                      # allege, relance Gradle, re-signe
+#   scripts/shrink_apk.sh --keep-media         # la meme chose, moteur FFmpeg compris
 #
 # ---------------------------------------------------------------------------------------------------------------------
 
@@ -89,13 +102,56 @@ if [ ! -f "${LIBRARIES_XML}" ]; then
 fi
 
 # Les motifs retires, ecrits EN CLAIR pour qu'un lecteur - ou Roger - puisse verifier la liste.
+#
+# LE MEME MOTIF SERT AUX DEUX FORMES : la liste de chargement nomme les bibliotheques une par une ('avcodec'), et sa chaine
+# de dependances les nomme avec leur prefixe de fichier ('libavcodec.so'). Un motif qui apparait dans les deux, comme
+# 'avcodec', les attrape donc toutes les deux.
 REMOVED_PATTERNS=(
+    # Les styles de widgets que l'ecran ne montre jamais : il n'utilise que Material.
     "Qt6QuickControls2Fusion"
     "Qt6QuickControls2Imagine"
     "Qt6QuickControls2Universal"
     "Qt6QuickControls2FluentWinUI3"
+    # Les plugins de debogage QML : ils servent a inspecter depuis Qt Creator, et rien d'autre.
     "plugins_qmltooling_"
+    # LE MOTEUR FFMPEG, quand il est retire : voir KEEP_MEDIA_ENGINE plus bas.
+    "ffmpegmediaplugin"
+    "FFmpegStub"
+    "avcodec"
+    "avformat"
+    "avutil"
+    "swscale"
+    "swresample"
 )
+
+# Le moteur multimedia FFmpeg part par DEFAUT. Il ne sert a RIEN ici - Musichien ne lit aucun fichier media, il fabrique
+# ses echantillons et lit ses propres WAV dans le domaine - et il pese a lui seul environ DIX-SEPT megaoctets.
+#
+# La preuve qu'il peut partir est dans l'edition de liens, et elle a ete verifiee : 'libQt6Multimedia' n'exige AUCUNE
+# bibliotheque FFmpeg. Seul le GREFFON les exige, et c'est le seul qui les demande au chargeur. Sans lui, Qt Multimedia
+# garde 'androidmediaplugin', qui est celui dont QAudioSink se sert pour SORTIR du son.
+#
+# '--keep-media' le remet, et c'est le seul drapeau : un paquet ou le son est en jeu se remet en cause par l'oreille, pas
+# par un raisonnement.
+KEEP_MEDIA_ENGINE="false"
+
+if [ "${1:-}" = "--keep-media" ]; then
+    KEEP_MEDIA_ENGINE="true"
+fi
+
+if [ "${KEEP_MEDIA_ENGINE}" = "true" ]; then
+    # Les neuf derniers motifs sont ceux du moteur : le tableau est reecrit sans eux.
+    REMOVED_PATTERNS=(
+        "Qt6QuickControls2Fusion"
+        "Qt6QuickControls2Imagine"
+        "Qt6QuickControls2Universal"
+        "Qt6QuickControls2FluentWinUI3"
+        "plugins_qmltooling_"
+    )
+
+    echo "  (--keep-media: the FFmpeg engine stays in the package)"
+    echo
+fi
 
 echo "--- Musichien: shrinking the package ----------------------------------------------------------"
 echo
@@ -125,6 +181,11 @@ import sys
 path = sys.argv[1]
 patterns = sys.argv[2:]
 
+
+def is_wanted(segment):
+    return not any(pattern in segment for pattern in patterns)
+
+
 kept = []
 removed = 0
 
@@ -132,12 +193,29 @@ with open(path, encoding="utf-8") as source:
     for line in source:
         stripped = line.strip()
 
-        # Seules les lignes d'ENTREE sont filtrees : les balises et le commentaire du fichier restent intacts.
-        if stripped.startswith("<item>") and any(pattern in stripped for pattern in patterns):
-            removed += 1
+        # Les balises, les commentaires et les chaines simples restent intacts : seules les ENTREES sont filtrees.
+        if not stripped.startswith("<item>") or not stripped.endswith("</item>"):
+            kept.append(line)
             continue
 
-        kept.append(line)
+        body = stripped[len("<item>"):-len("</item>")]
+
+        # Une entree peut etre une CHAINE, separee par des deux-points : le chargeur en ouvre alors chaque maillon dans
+        # l'ordre. C'est ainsi qu'est declaree 'load_local_libs', ou le greffon de plateforme, celui du multimedia et les
+        # bibliotheques FFmpeg se suivent sur UNE SEULE ligne.
+        #
+        # Elle se filtre donc MAILLON PAR MAILLON. Retirer la ligne entiere emporterait le greffon de plateforme et celui
+        # du son - qui n'ont rien a voir avec FFmpeg - et l'application ne demarrerait plus du tout.
+        abi, separator, chain = body.partition(";")
+        segments = chain.split(":")
+        remaining = [segment for segment in segments if is_wanted(segment)]
+
+        removed += len(segments) - len(remaining)
+
+        if not remaining:
+            continue
+
+        kept.append("        <item>" + abi + separator + ":".join(remaining) + "</item>\n")
 
 with open(path, "w", encoding="utf-8") as target:
     target.writelines(kept)
@@ -177,6 +255,24 @@ while IFS= read -r library_file; do
 done < <(find "${NATIVE_LIBRARIES_DIRECTORY}" -type f -name '*.so')
 
 echo "    ${REMOVED_LIBRARIES} bibliotheque(s) retiree(s)"
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# 1 bis. La LISTE et les FICHIERS doivent coincider
+#
+# Une bibliotheque annoncee par la liste mais absente du dossier fait echouer 'loadLibrary', et Qt appelle System.exit :
+# c'est le defaut que ce script existe pour corriger. Il se represente quand on redemande le moteur multimedia sur un
+# dossier ou il a DEJA ete retire : les fichiers ne reviennent pas tout seuls, et le paquet qui en sortirait ne demarrerait
+# pas. Mieux vaut s'arreter ici que de fabriquer une application morte.
+# ---------------------------------------------------------------------------------------------------------------------
+if [ "${KEEP_MEDIA_ENGINE}" = "true" ] &&
+   ! find "${NATIVE_LIBRARIES_DIRECTORY}" -type f -name 'libplugins_multimedia_ffmpegmediaplugin_*.so' | grep -q .; then
+    echo
+    echo "  ERROR: '--keep-media' was asked for, but the FFmpeg libraries are gone from:"
+    echo "         ${NATIVE_LIBRARIES_DIRECTORY}"
+    echo "         Rebuild first, then shrink: scripts/build_android.sh --no-install"
+    exit 1
+fi
 
 
 # ---------------------------------------------------------------------------------------------------------------------
