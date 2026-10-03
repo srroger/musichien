@@ -1186,17 +1186,21 @@ Item {
                 // Le DEGRE est ecrit noir sur blanc parce que c'est exactement ce qu'il demande : le bourdon n'est pas
                 // « une note au hasard sous la gamme », c'est LA TONIQUE - le degre 1 - et c'est ce qui en fait un centre.
                 Text {
+                    // La roue n'existe que sur une question de mode : c'est donc elle qui dit quand expliquer.
+
                     Layout.fillWidth: true
                     Layout.preferredWidth: 0
                     Layout.minimumWidth: 0
-                    Layout.bottomMargin: 4
+                    Layout.bottomMargin: 2
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
-                    color: "#a58ad0"
-                    font.pixelSize: 12
-                    // La roue n'existe que sur une question de mode : c'est donc elle qui dit quand expliquer.
+                    color: "#8a77ad"
+                    font.pixelSize: 11
+                    // COURT, et volontairement : Roger a trouve le premier texte trop long - « ca a tendance a descendre
+                    // tout le cercle et les boutons d'actions, ce qui est dommage ». Une explication qui pousse les
+                    // commandes hors de portee coute plus qu'elle n'apprend. Deux lignes au maximum.
                     visible: ExerciseController.modeCircle.length > 0
-                    text: qsTr("Le bourdon, c'est ce qu'on tient sous la gamme — ici la tonique ET sa quinte (degrés 1 et 5). C'est lui qui donne le centre : les mêmes sept notes sur un autre bourdon ne font pas la même musique.")
+                    text: qsTr("Le bourdon : la tonique et sa quinte, tenues sous la gamme. C'est lui qui donne le centre.")
                 }
 
                 // Elle est là PENDANT la question, et c'est un choix de Roger : « je mettrais quand même la roue dans la
@@ -1226,7 +1230,9 @@ Item {
                     id: modeCircle
 
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 6
+                    // Un souffle, et pas davantage : la roue est le sujet de la question, et chaque pixel pris au-dessus
+                    // d'elle est un pixel retire au dessin et aux boutons.
+                    Layout.topMargin: 2
                     // Les pastilles restent grandes : elles sont CLIQUEES sur une question de note etrangere, et une cible
                     // qui retrecit trop fait rater la note qu'on visait.
                     span: 304
@@ -1242,7 +1248,15 @@ Item {
                     // une octave plus haut. Le cercle ne porte que sept notes, donc la note qui ferme la gamme est
                     // celle par laquelle elle a commence.
                     Connections {
+                        // LA ROUE SUIT LE PASSAGE QUI SONNE, et elle le relit ICI.
+
                         function onModePlaybackStarted() {
+                            // `modeCircle` change de valeur quand le second passage d'une comparaison commence - c'est
+                            // tout le sujet : le premier mode se dessine pendant qu'il sonne, le second prend sa place
+                            // ensuite. La lecture est donc IMPERATIVE : la donnee n'a pas de signal a elle, et une
+                            // liaison declarative ne se recalculerait pas. Le signal part au meme moment que le son,
+                            // donc le dessin et la musique changent ensemble.
+                            modeCircle.notes = ExerciseController.modeCircle;
                             modeCircle.startPlayback(ExerciseController.modeSoundLeadInMs, ExerciseController.modeSoundNoteStepMs, [0, 1, 2, 3, 4, 5, 6, 0]);
                         }
 

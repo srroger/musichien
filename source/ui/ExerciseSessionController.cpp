@@ -1839,22 +1839,29 @@ QVariantList ExerciseSessionController::modeCircle() const
 
     const domain::Question & question = m_session->currentQuestion();
 
-    // LE REPERE DE LA ROUE : la tonique du PREMIER mode, quand deux modes s'enchainent.
+    // LE MODE QUI SONNE, et non celui de la question.
     //
-    // C'est la correction que Roger a demandee, et sa description est exactement celle-ci : « meme si la tonique du
-    // premier reste en haut, la tonique deviendrait un autre bouton dans le cercle, donc un autre bouton deviendrait
-    // jaune a la place de l'ancien, et d'autres boutons s'afficheraient ».
-    //
-    // Sans cela, la roue tournait avec le mode AFFICHE - donc deux modes relatifs, qui partagent leurs sept notes,
-    // donnaient litteralement la meme image, et la question etait illisible.
+    // C'est la seconde moitie de la correction, et c'est Roger qui l'a vue : « la roue ne bouge absolument, il y a rien
+    // qui change ». Sur une comparaison, les deux passages passent l'un APRES l'autre - et la roue renvoyait toujours
+    // `question.mode`, c'est-a-dire le SECOND. Elle ne montrait donc jamais le premier passage, et l'ecran n'avait aucune
+    // raison de changer entre les deux.
+    const bool hasPrevious = question.previousMode.has_value();
+    const bool drawSecondPassage = !hasPrevious || m_modeSecondPassageIsPlaying;
+
+    const domain::Mode mode = drawSecondPassage ? question.mode : *question.previousMode;
+    const domain::Note tonic = drawSecondPassage ? question.modeTonic : question.previousModeTonic;
+
+    // LE REPERE DE LA ROUE : la tonique du PREMIER mode. Sur une comparaison, les deux passages partagent leur bourdon
+    // (voir buildModeQuestion), donc le repere ne bouge pas entre eux - c'est ce qui rend la comparaison lisible : seules
+    // les notes allumees changent. Sur un VAMP, le centre se deplace, et la roue le suit.
     std::int32_t frameTonicPitchClass = question.modeTonic.pitchClassIndex();
 
-    if( question.previousMode.has_value() )
+    if( hasPrevious )
     {
         frameTonicPitchClass = question.previousModeTonic.pitchClassIndex();
     }
 
-    return describeModeCircle( question.mode, question.modeTonic.pitchClassIndex(), frameTonicPitchClass );
+    return describeModeCircle( mode, tonic.pitchClassIndex(), frameTonicPitchClass );
 }
 
 QString ExerciseSessionController::modeCircleLabel() const
@@ -3399,6 +3406,13 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
     // sonner « la derniere » par-dessus. Arreter ici, en tete, couvre tous les chemins : la reponse, l'ecoute a nouveau,
     // et la question suivante.
     m_modeTimer.stop();
+
+    // QUEL PASSAGE SONNE : c'est l'etat que la roue lit pour savoir quel mode dessiner (voir modeCircle).
+    //
+    // Pose ICI, en tete, et pas a l'endroit ou le second est programme : tous les chemins passent par cette fonction - la
+    // question, la relecture apres une erreur, le second passage du minuteur - donc un seul endroit suffit a ne jamais
+    // laisser la roue en retard d'un passage.
+    m_modeSecondPassageIsPlaying = p_secondOnly;
 
     const domain::Question & question = m_session->currentQuestion();
 

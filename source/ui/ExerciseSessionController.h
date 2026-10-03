@@ -1503,6 +1503,10 @@ private:
     // encore tape" et "j'ai tape a cote" sont deux choses differentes, et l'ecran les montre differemment.
     static constexpr int NO_RHYTHM_TAP = -1;
 
+    // Quel passage de la comparaison SONNE : deux modes s'enchainent, et la roue doit dessiner celui qu'on entend - voir
+    // modeCircle, ou cette valeur decide du mode affiche.
+    bool m_modeSecondPassageIsPlaying{ false };
+
     QTimer m_rhythmTimer;
 
     // Le minuteur qui pose le SECOND mode d'une question de couleur, apres le premier.
