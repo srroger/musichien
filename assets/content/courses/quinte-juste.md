@@ -3,10 +3,9 @@ titre: La quinte juste
 sous-titre: Deux notes qui n'ont rien à se prouver
 chapitre: 1
 ordre: 1
-concepts: [ { demi_tons: 7 } ]
+concepts: 7
 ---
 
-# La quinte juste
 
 ## Deux notes, et rien entre elles
 

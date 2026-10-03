@@ -119,6 +119,11 @@ musichienFunction_AddLibrary(domain
     exercise/PlayerLevel.h
     exercise/PlayerLevel.cpp
     exercise/PlayerPreferences.h
+
+    # LES COURS DE L'ECOLE DES CHIOTS, comme donnee pure : des paragraphes et des cartes, dans l'ordre du
+    # fichier. Aucun chemin, aucun rendu, aucune dependance - c'est l'infrastructure qui lit, et l'interface
+    # qui affiche. Voir le contrat, note 29 du Vault.
+    lesson/Course.h
 )
 
 # Expose the module to the rest of the project under a stable name.

@@ -3,7 +3,6 @@ titre: Pourquoi la quinte sonne juste
 famille: harmonie
 ---
 
-# Pourquoi la quinte sonne juste
 
 *Un os à mâcher. Rien ici n'est nécessaire pour jouer. C'est ce qu'on lit quand on veut savoir
 **pourquoi** une chose qu'on entend marche.*

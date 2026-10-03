@@ -28,6 +28,11 @@ musichienFunction_AddLibrary(infrastructure
     # Le livre des phrases modales : le meme contrat que les indices - du TEXTE en entree, un livre du domaine en sortie.
     content/JsonPhraseBook.h
     content/JsonPhraseBook.cpp
+
+    # LES COURS DE L'ECOLE DES CHIOTS. Meme contrat, autre format : du MARKDOWN, ou le contenu porte des
+    # cartes (ce que le jeu joue, ce qu'on va ecouter ailleurs, ce qu'on essaie). Voir le contrat, note 29.
+    content/MarkdownCourse.h
+    content/MarkdownCourse.cpp
     haptics/DeviceHaptics.h
     haptics/DeviceHaptics.cpp
     notifications/NotificationScheduler.h
@@ -77,6 +82,10 @@ if(MUSICHIEN_BUILD_TESTING)
         content/JsonHintBook_test.cpp
         content/JsonTunerGuide_test.cpp
         content/JsonPhraseBook_test.cpp
+
+        # Le contrat des cours, verifie comme les autres : une faute dans un fichier ecrit a la main
+        # coute une carte, jamais l'application.
+        content/MarkdownCourse_test.cpp
         statistics/JsonLinesQuestionLog_test.cpp
     )
 
