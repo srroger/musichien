@@ -1601,6 +1601,38 @@ TEST( ExerciseSessionTest, answering_the_foreign_note_means_designing_its_step )
     EXPECT_FALSE( intervalSession.answerForeignNote( 0 ) );
 }
 
+TEST( ExerciseSessionTest, the_two_passages_of_a_colour_comparison_share_their_tonic )
+{
+    // Roger a teste la roue des deux modes et elle n'avait pas bouge. La cause n'etait PAS le dessin : le PREMIER passage
+    // etait joue sur la tonique par defaut de l'en-tete - un re, note 62 - pendant que le SECOND etait joue sur celle de
+    // la question. Une comparaison de couleur sur deux centres differents n'est pas une comparaison : la difference
+    // entendue n'est pas celle qu'on demande de juger.
+    //
+    // Et c'est aussi ce qui rendait la roue immobile : son repere est la tonique du premier mode, qui ne changeait donc
+    // jamais.
+    SessionSettings settings = intervalOnlySettings();
+    settings.modeColourQuestionShare = 100;
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    for( std::size_t questionIndex = 0; questionIndex < session.settings().questionCount; ++questionIndex )
+    {
+        const Question & question = session.currentQuestion();
+
+        ASSERT_EQ( QuestionKind::ModeColour, question.kind );
+        ASSERT_TRUE( question.previousMode.has_value() );
+
+        // LE MEME BOURDON POUR LES DEUX PASSAGES - c'est ce qui les rend comparables.
+        EXPECT_EQ( question.modeTonic.midiNumber(), question.previousModeTonic.midiNumber() )
+          << "le premier passage serait joue sur " << question.previousModeTonic.midiNumber()
+          << " et le second sur " << question.modeTonic.midiNumber();
+
+        EXPECT_TRUE( session.answerModeColour( expectedColourAnswer( question ) ) );
+
+        session.advance();
+    }
+}
+
 TEST( ExerciseSessionTest, a_vamp_plays_the_same_notes_on_two_different_centres )
 {
     SessionSettings settings = intervalOnlySettings();

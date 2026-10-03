@@ -84,6 +84,26 @@ public:
                                                std::chrono::milliseconds{ 0 } } );
     }
 
+    // Ce que le joueur a joue, puis la reponse : les DEUX, dans cet ordre et gardes ENSEMBLE.
+    //
+    // L'ordre est tout ce qu'un test doit pouvoir verifier - c'est lui que Roger a demande de changer (« d'abord l'accord
+    // appuye, PUIS l'accord voulu ») - et deux listes separees ne le diraient pas.
+    struct PlayedChordPair
+    {
+        std::vector<Note> first;
+        std::vector<Note> second;
+        std::chrono::milliseconds gap{ 0 };
+    };
+
+    void playChordThenChord( std::span<const Note> p_first,
+                             std::span<const Note> p_second,
+                             std::chrono::milliseconds p_gap ) override
+    {
+        m_chordPairs.push_back( PlayedChordPair{ std::vector<Note>{ p_first.begin(), p_first.end() },
+                                                 std::vector<Note>{ p_second.begin(), p_second.end() },
+                                                 p_gap } );
+    }
+
     void playMelodyOverDrone( std::span<const Note> p_melody,
                               std::span<const Note> p_drone,
                               std::chrono::milliseconds p_noteDuration,
@@ -117,11 +137,35 @@ public:
         ++m_mistakeCueCount;
     }
 
+    // OU EN EST LE SON, pour un test : la position est POSEE, et non mesuree.
+    //
+    // Sans cela, un fake repondrait toujours zero et aucun test ne pourrait dire qu'un curseur AVANCE - ni qu'il recule
+    // quand le son repart de zero. Voir ExerciseSessionController::rhythmPositionInBeats.
+    void setPlayedMilliseconds( std::chrono::milliseconds p_position ) { m_playedMilliseconds = p_position; }
+
+    [[nodiscard]] std::chrono::milliseconds playedMilliseconds() const override { return m_playedMilliseconds; }
+
     // Le wouf du chien, compte a part : c'est ce qui permet a un test de dire QUAND il aboie - a la fin d'une partie, et
     // pas pendant.
     void playDogBark() override
     {
         ++m_dogBarkCount;
+    }
+
+    // Le tic du compte et la fanfare de victoire, comptes a part comme le wouf : c'est ce qui permet a un test de dire
+    // QUAND ils sonnent - a la fin d'une partie, et pas pendant.
+    //
+    // Le DERNIER progres recu est garde : le tic doit MONTER avec le chiffre, et « il a sonne » ne suffirait pas a le
+    // verifier.
+    void playScoreTick( int p_progressPercent ) override
+    {
+        ++m_scoreTickCount;
+        m_lastScoreTickProgress = p_progressPercent;
+    }
+
+    void playVictoryFanfare() override
+    {
+        ++m_victoryFanfareCount;
     }
 
     // Le metronome et la batterie sont des sons A PART : les compter separement est ce qui permet a un test de dire
@@ -193,6 +237,8 @@ public:
     [[nodiscard]] const std::vector<PlayedGroup> & playedMelodies() const noexcept { return m_playedMelodies; }
     [[nodiscard]] const std::vector<PlayedGroup> & playedChords() const noexcept { return m_playedChords; }
 
+    [[nodiscard]] const std::vector<PlayedChordPair> & playedChordPairs() const noexcept { return m_chordPairs; }
+
     // Les appels « melodie sur bourdon », avec les deux voix : c'est ce qu'un test lit pour verifier que le bourdon
     // a bien ete demande EN MEME TEMPS que la melodie.
     [[nodiscard]] const std::vector<PlayedOverDrone> & melodiesOverDrones() const noexcept
@@ -211,6 +257,13 @@ public:
     // Le nombre de woufs demandes. Un chien qui aboie a chaque question serait pire que pas de chien du tout : c'est ce
     // compteur qui permet de le verifier.
     [[nodiscard]] int dogBarkCount() const noexcept { return m_dogBarkCount; }
+
+    [[nodiscard]] int scoreTickCount() const noexcept { return m_scoreTickCount; }
+
+    // Le dernier progres annonce par l'ecran pendant que le compte grimpe, de 0 a 100.
+    [[nodiscard]] int lastScoreTickProgress() const noexcept { return m_lastScoreTickProgress; }
+
+    [[nodiscard]] int victoryFanfareCount() const noexcept { return m_victoryFanfareCount; }
 
     [[nodiscard]] int stopCount() const noexcept { return m_stopCount; }
 
@@ -257,10 +310,14 @@ public:
         m_playedNotes.clear();
         m_playedMelodies.clear();
         m_playedChords.clear();
+        m_chordPairs.clear();
         m_melodiesOverDrones.clear();
         m_phrasesOverDrones.clear();
         m_mistakeCueCount = 0;
         m_dogBarkCount = 0;
+        m_scoreTickCount = 0;
+        m_lastScoreTickProgress = 0;
+        m_victoryFanfareCount = 0;
         m_stopCount = 0;
         m_metronomeClickCount = 0;
         m_accentedClickCount = 0;
@@ -278,10 +335,20 @@ private:
     std::vector<Note> m_playedNotes;
     std::vector<PlayedGroup> m_playedMelodies;
     std::vector<PlayedGroup> m_playedChords;
+
+    // Les paires « ce qu'il a joue, puis la reponse » - voir PlayedChordPair.
+    std::vector<PlayedChordPair> m_chordPairs;
+
+    // La position du son, posee par un test : voir setPlayedMilliseconds.
+    std::chrono::milliseconds m_playedMilliseconds{ 0 };
     std::vector<PlayedOverDrone> m_melodiesOverDrones;
     std::vector<PlayedPhraseOverDrone> m_phrasesOverDrones;
     int m_mistakeCueCount{ 0 };
     int m_dogBarkCount{ 0 };
+
+    int m_scoreTickCount{ 0 };
+    int m_lastScoreTickProgress{ 0 };
+    int m_victoryFanfareCount{ 0 };
     int m_stopCount{ 0 };
     int m_metronomeClickCount{ 0 };
     int m_accentedClickCount{ 0 };

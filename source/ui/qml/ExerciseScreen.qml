@@ -40,6 +40,12 @@ Item {
     // LE BOSS
     // La derniere question d'une Arcade est la NOTE ETRANGERE, et Roger l'a voulue comme un combat de fin : « le chien
     // levite lentement en plein milieu de la page, et tout le fond devient en fondu doux rouge feu ».
+    // LE COMPTE QUI GRIMPE, ET SON BRUITAGE.
+    // Roger : « une animation sur les nombres en mode nombre qui s'incremente tres vite jusqu'au nombre atteint », puis
+    // « un bruitage de jeux video gling gling gling, ou de machine a sous quand ces chiffres s'incrementent ... et un
+    // bruitage ou melodie ou accord de victoire ». Et il l'assume pour ce que c'est : « c'est juste un bruitage pour
+    // rendre le jeu moins austere, et faire appel a des biais cognitifs d'addiction, comme dans les machines a sous ».
+    // LE TIC : un minuteur plutot qu'un appel par image.
 
     id: exerciseScreen
 
@@ -58,7 +64,12 @@ Item {
     // Horizontal offset of the whole screen during the shake. Zero is the resting state, and it is both
     // where the animation starts and where it ends.
     property real shakeOffset: 0
-    // The interval the player chose, when there is one.
+    // UN SEUL compte pour TOUS les nombres - XP, serie, pourcentages. Un compteur par nombre les ferait arriver les uns
+    // apres les autres, alors que le plaisir est justement de les voir grimper ENSEMBLE.
+    property real rewardCountUp: 0
+    // Vrai des que le compte de CETTE fin de partie a demarre : c'est ce qui empeche `sessionChanged`, qui passe a
+    // chaque question, de relancer l'animation pendant qu'elle tourne.
+    property bool rewardCountUpStarted: false
     readonly property var answeredInterval: ExerciseController.answeredInterval
     // Both checks, and not just the second one: reading a property of something that does not exist yet
     // is an error in QML, and a screen must never be one binding away from throwing.
@@ -66,6 +77,12 @@ Item {
     // La meme chose pour un accord : ce que le joueur vient de repondre, et s'il y a quelque chose a montrer.
     readonly property var answeredChordData: ExerciseController.answeredChord
     readonly property bool hasAnsweredChord: answeredChordData !== undefined && answeredChordData.name !== undefined
+
+    // Le nombre AFFICHE, a un instant donne du compte : la valeur finale, multipliee par l'avancement. Arrondi, parce
+    // qu'un compteur montre des entiers - et c'est l'arrondi qui fait le dechiffrement rapide qu'on vient chercher.
+    function rewardValue(p_final) {
+        return Math.round(p_final * rewardCountUp);
+    }
 
     // LE CHRONO, en minutes:secondes. Une fonction plutot qu'une expression : elle sert une fois aujourd'hui et servira
     // partout ou l'on voudra dire un temps.
@@ -157,6 +174,57 @@ Item {
 
         return verdict;
     }
+
+    NumberAnimation {
+        id: rewardCountUpAnimation
+
+        target: exerciseScreen
+        property: "rewardCountUp"
+        from: 0
+        to: 1
+        // Assez long pour qu'on ait le temps de voir le chiffre grimper, assez court pour qu'on ne s'impatiente pas
+        // devant un ecran qui a deja tout dit.
+        duration: 1300
+        // L'essentiel du chemin se fait au debut : le chiffre part vite et se pose. C'est la courbe d'une machine a
+        // sous, pas celle d'un ascenseur.
+        easing.type: Easing.OutCubic
+        onStopped: {
+            // LA FANFARE arrive QUAND LE COMPTE ARRIVE, et seulement s'il est alle au bout : une animation interrompue -
+            // l'ecran quitte, une nouvelle partie lancee - ne doit pas sonner comme une victoire.
+            if (exerciseScreen.rewardCountUp >= 1)
+                ExerciseController.playVictoryFanfare();
+
+        }
+    }
+
+    // Par image, le tic suivrait le rafraichissement de l'ecran - soixante par seconde sur ce telephone - et le
+    // bruitage deviendrait un bourdonnement continu. Trente-huit millisecondes font une vingtaine de crans par seconde :
+    // assez pour que ca crepite, pas assez pour que ca se confonde.
+    Timer {
+        interval: 38
+        repeat: true
+        running: rewardCountUpAnimation.running
+        onTriggered: ExerciseController.playScoreTick(Math.round(exerciseScreen.rewardCountUp * 100))
+    }
+
+    Connections {
+        function onSessionChanged() {
+            // Une nouvelle partie remet le compteur a zero : le gain de la precedente ne doit pas rester affiche.
+            if (!ExerciseController.isFinished) {
+                exerciseScreen.rewardCountUpStarted = false;
+                exerciseScreen.rewardCountUp = 0;
+                return ;
+            }
+            if (exerciseScreen.rewardCountUpStarted)
+                return ;
+
+            exerciseScreen.rewardCountUpStarted = true;
+            rewardCountUpAnimation.restart();
+        }
+
+        target: ExerciseController
+    }
+    // The interval the player chose, when there is one.
 
     Timer {
         // Read when the timer is RESTARTED, which happens the moment the verdict appears: the pause
@@ -957,11 +1025,28 @@ Item {
                     }
 
                     Rectangle {
-                        x: (ExerciseController.rhythmBeatInBar / rhythmBar.beatsPerBar) * rhythmBar.width
+                        // LA POSITION VIENT DU SON, et non d'un minuteur de cet ecran : c'est la seule facon que le
+                        // curseur soit d'accord avec ce que le joueur ENTEND (voir rhythmPositionInBar). Un entier qui
+                        // saute d'un temps a l'autre ne pouvait pas etre suivi du regard - c'est la remarque de Roger :
+                        // « le son n'est pas synchro avec la note jouee ».
+
+                        id: rhythmCursor
+
+                        // La minuterie ne FABRIQUE pas la position, elle la RELIT : l'affichage a besoin d'une image
+                        // souvent, le son a besoin d'etre la seule autorite. Vingt millisecondes, c'est le
+                        // rafraichissement d'un ecran.
                         y: 0
                         width: 3
                         height: rhythmBar.height
                         color: ExerciseController.isRhythmPlaying ? "#8ef2b0" : "#6f5c96"
+
+                        Timer {
+                            interval: 20
+                            repeat: true
+                            running: ExerciseController.questionKind === 3
+                            onTriggered: rhythmCursor.x = (ExerciseController.rhythmPositionInBar / rhythmBar.beatsPerBar) * rhythmBar.width
+                        }
+
                     }
 
                 }
@@ -1041,6 +1126,8 @@ Item {
                 // Les boutons de la note etrangere ont DISPARU : c'est la roue du dessus qui repond, depuis qu'elle est
                 // cliquable. Une rangee de sept boutons plats disait la meme chose en plus petit, et son texte etait elide
                 // jusqu'au « ... » - Roger l'a vu jouer : « on voit ... au lieu de la note a l'interieur ».
+                // LE BOURDON, DIT AU JOUEUR - c'est une des deux questions qui reviennent le plus, et le jeu ne la posait
+                // jamais. Roger : « c'est quoi le bourdon (il faut lui expliquer les degres qu'on utilise) ».
 
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -1096,10 +1183,33 @@ Item {
                     text: modeVerdict.visible && !modeVerdict.sameness && ExerciseController.previousMode.name !== undefined ? ExerciseController.modeDifference.sentence : ""
                 }
 
+                // Le DEGRE est ecrit noir sur blanc parce que c'est exactement ce qu'il demande : le bourdon n'est pas
+                // « une note au hasard sous la gamme », c'est LA TONIQUE - le degre 1 - et c'est ce qui en fait un centre.
+                Text {
+                    // La roue n'existe que sur une question de mode : c'est donc elle qui dit quand expliquer.
+
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.bottomMargin: 2
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8a77ad"
+                    font.pixelSize: 11
+                    // COURT, et volontairement : Roger a trouve le premier texte trop long - « ca a tendance a descendre
+                    // tout le cercle et les boutons d'actions, ce qui est dommage ». Une explication qui pousse les
+                    // commandes hors de portee coute plus qu'elle n'apprend. Deux lignes au maximum.
+                    visible: ExerciseController.modeCircle.length > 0
+                    text: qsTr("Le bourdon : la tonique et sa quinte, tenues sous la gamme. C'est lui qui donne le centre.")
+                }
+
                 // Elle est là PENDANT la question, et c'est un choix de Roger : « je mettrais quand même la roue dans la
                 // question, l'utilisateur pourra ne pas trop la regarder ». Elle donne le mode à qui sait la lire - et
-                // c'est justement ce qu'on veut apprendre. La tonique reste en haut, toujours : c'est ce qui rend l'arc
-                // lisible d'un coup d'œil.
+                // c'est justement ce qu'on veut apprendre.
+                // LA ROUE NE TOURNE PLUS : son repère reste la tonique du PREMIER mode quand deux modes s'enchaînent, et
+                // le second est dessiné DEDANS. Roger l'a demandé après avoir vu deux modes relatifs donner exactement
+                // la même image : « même si la tonique du premier reste en haut, la tonique deviendrait un autre bouton
+                // dans le cercle ». Une image qui tourne avec la tonique ne pouvait pas le montrer.
                 // La ROUE, et c'est elle qui REPOND sur une question de note etrangere : ses sept notes allumees sont
                 // exactement les sept pas de la gamme, donc appuyer sur l'une d'elles designe l'intrus. Roger l'a demande -
                 // « il suffit d'appuyer sur un de ces boutons non ? » - et il a raison : les pastilles sont plus grandes que
@@ -1108,17 +1218,21 @@ Item {
                     // LA ROUE S'ANIME : sa tete part de la tonique et parcourt la gamme, de note en note, pendant que la
                     // musique joue. Roger l'a voulue ici - « dans les exercices, quand on affiche les modes dans leur
                     // cercle » - parce qu'elle dit QUELLE note sonne, et qu'a la fin le chemin laisse une forme.
-
-                    id: modeCircle
-
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 6
                     // LA ROUE S'OXYGENE : Roger l'a vue jouer - « les points sont pas assez espaces pour que ca rende
                     // vraiment bien ». Une case fait trente degres, donc l'ecart entre deux pastilles vaut environ la
                     // moitie du rayon : la seule facon d'ouvrir cet ecart est de faire GRANDIR le cercle ou de reduire les
                     // pastilles. Les deux ont ete poussees d'un cran, et d'un seul : un rayon plus grand demande de la
                     // hauteur, et l'ecran n'en a pas beaucoup.
-                    //
+                    // La gamme de l'exercice MONTE, puis se REFERME sur sa tonique : le chemin fait donc le tour du
+                    // cercle et revient a son point de depart, ce qui referme la figure - et c'est la figure qui reste a
+                    // l'ecran une fois la musique finie.
+
+                    id: modeCircle
+
+                    Layout.alignment: Qt.AlignHCenter
+                    // Un souffle, et pas davantage : la roue est le sujet de la question, et chaque pixel pris au-dessus
+                    // d'elle est un pixel retire au dessin et aux boutons.
+                    Layout.topMargin: 2
                     // Les pastilles restent grandes : elles sont CLIQUEES sur une question de note etrangere, et une cible
                     // qui retrecit trop fait rater la note qu'on visait.
                     span: 304
@@ -1126,19 +1240,27 @@ Item {
                     visible: ExerciseController.isHarmonyQuestion
                     selectable: ExerciseController.isForeignNoteQuestion
                     notes: ExerciseController.modeCircle
+                    // L'INTRUS N'EST MARQUE QU'APRES LA REPONSE, et c'est le verdict qui le dit : `foreignNoteVerdict`
+                    // n'existe qu'une fois la reponse donnee, donc la couleur ne peut pas vendre la meche. Le pas est
+                    // compte de 1 a 7 par le domaine, et de 0 a 6 dans la roue - d'ou le retrait.
+                    foreignStep: ExerciseController.foreignNoteVerdict.stepNumber !== undefined ? ExerciseController.foreignNoteVerdict.stepNumber - 1 : -1
                     onNoteChosen: (p_stepIndex) => {
                         ExerciseController.answerForeignNote(p_stepIndex);
                     }
 
-                    // La gamme de l'exercice MONTE, puis se REFERME sur sa tonique : le chemin fait donc le tour du
-                    // cercle et revient a son point de depart, ce qui referme la figure - et c'est la figure qui reste a
-                    // l'ecran une fois la musique finie.
-                    //
                     // Le DERNIER degre est 0, et non 7 : le septieme degre du domaine EST le premier degre du cercle,
                     // une octave plus haut. Le cercle ne porte que sept notes, donc la note qui ferme la gamme est
                     // celle par laquelle elle a commence.
                     Connections {
+                        // LA ROUE SUIT LE PASSAGE QUI SONNE, et elle le relit ICI.
+
                         function onModePlaybackStarted() {
+                            // `modeCircle` change de valeur quand le second passage d'une comparaison commence - c'est
+                            // tout le sujet : le premier mode se dessine pendant qu'il sonne, le second prend sa place
+                            // ensuite. La lecture est donc IMPERATIVE : la donnee n'a pas de signal a elle, et une
+                            // liaison declarative ne se recalculerait pas. Le signal part au meme moment que le son,
+                            // donc le dessin et la musique changent ensemble.
+                            modeCircle.notes = ExerciseController.modeCircle;
                             modeCircle.startPlayback(ExerciseController.modeSoundLeadInMs, ExerciseController.modeSoundNoteStepMs, [0, 1, 2, 3, 4, 5, 6, 0]);
                         }
 
@@ -1420,7 +1542,7 @@ Item {
                         horizontalAlignment: Text.AlignHCenter
                         color: "#cbb8e8"
                         font.pixelSize: 16
-                        text: qsTr("⏱ %1").arg(exerciseScreen.durationLabel(ExerciseController.sessionDurationSeconds))
+                        text: qsTr("⏱ %1").arg(exerciseScreen.durationLabel(exerciseScreen.rewardValue(ExerciseController.sessionDurationSeconds)))
                     }
 
                     Text {
@@ -1428,7 +1550,7 @@ Item {
                         horizontalAlignment: Text.AlignHCenter
                         color: "#cbb8e8"
                         font.pixelSize: 16
-                        text: qsTr("🔥 série %1").arg(ExerciseController.sessionLongestStreak)
+                        text: qsTr("🔥 série %1").arg(exerciseScreen.rewardValue(ExerciseController.sessionLongestStreak))
                     }
 
                 }
@@ -1441,7 +1563,7 @@ Item {
                     color: "#ffd479"
                     font.pixelSize: 22
                     font.bold: true
-                    text: ExerciseController.arcadeMultiplierPercent > 100 ? qsTr("+%1 XP  ·  x%2").arg(ExerciseController.arcadeXpEarned).arg(ExerciseController.arcadeMultiplierPercent / 100) : qsTr("+%1 XP").arg(ExerciseController.arcadeXpEarned)
+                    text: ExerciseController.arcadeMultiplierPercent > 100 ? qsTr("+%1 XP  ·  x%2").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned)).arg(ExerciseController.arcadeMultiplierPercent / 100) : qsTr("+%1 XP").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned))
                 }
 
                 // LES TROIS FAMILLES : demandees, reussies, et le taux. C'est la ou le joueur voit ce que la partie a
@@ -1474,7 +1596,7 @@ Item {
                             color: modelData.percent < 50 ? "#ff8fb0" : "#8ef2b0"
                             font.pixelSize: 14
                             font.bold: true
-                            text: qsTr("%1 %").arg(modelData.percent)
+                            text: qsTr("%1 %").arg(exerciseScreen.rewardValue(modelData.percent))
                         }
 
                     }

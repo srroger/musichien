@@ -113,6 +113,41 @@ inline constexpr std::array<std::int32_t, MODE_COUNT> MODE_ROTATION_INDEX{ 3, 0,
     return offsets;
 }
 
+// LE DEGRE QUI COLORE UN MODE : celui qui le distingue de ses voisins dans l'ordre de couleur.
+//
+// Zero quand le mode n'a rien a demontrer - l'ionien et l'eolien sont les deux references, et c'est justement pour cela
+// qu'elles servent de reference.
+//
+// Il vit ICI parce que c'est une regle SUR LES MODES, et non sur les phrases : le generateur s'en sert pour insister sur
+// la bonne note, et l'ecran s'en sert pour la MONTRER. Deux copies finiraient par se contredire, et le joueur verrait une
+// note mise en avant que la phrase ne joue pas davantage que les autres.
+[[nodiscard]] constexpr std::int32_t modeCharacteristicDegree( Mode p_mode ) noexcept
+{
+    switch( p_mode )
+    {
+        case Mode::Lydian:
+            return 4;
+
+        case Mode::Mixolydian:
+            return 7;
+
+        case Mode::Dorian:
+            return 6;
+
+        case Mode::Phrygian:
+            return 2;
+
+        case Mode::Locrian:
+            return 5;
+
+        case Mode::Ionian:
+        case Mode::Aeolian:
+            return 0;
+    }
+
+    return 0;
+}
+
 // L'ecart, en demi-tons, entre un degre et la tonique. Le degre se compte de 1 a 7, comme un musicien le dit.
 [[nodiscard]] constexpr std::int32_t degreeOffset( Mode p_mode, std::int32_t p_degree ) noexcept
 {

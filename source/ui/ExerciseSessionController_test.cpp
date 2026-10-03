@@ -3,6 +3,7 @@
 #include "domain/audio/NotePlayerFake.h"
 #include "domain/music/PhraseBook.h"
 #include "domain/music/Temperament.h"
+#include "ui/IntervalDescription.h"
 #include "ui/MicrophoneController.h"
 
 #include <QStringList>
@@ -1837,6 +1838,149 @@ TEST( ExerciseSessionControllerTest, a_wrong_answer_that_leaves_the_question_ope
     EXPECT_EQ( 2, log.records().front().attemptCount );
 }
 
+TEST( ExerciseSessionControllerTest, a_wrong_chord_is_heard_then_the_answer )
+{
+    // Roger : « quand on clique sur un accord et qu'on se trompe, on re-entend directement le bon accord. Je changerais
+    // ca : entendre d'abord l'accord appuye, PUIS l'accord voulu. C'est moins perturbant. »
+    //
+    // Et la raison est plus profonde que le confort : entendre la reponse avant sa propre erreur efface l'ECART entre les
+    // deux, et l'ecart est toute la lecon.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    domain::SessionSettings settings = chordOnlySettings();
+    settings.lives = std::nullopt;    // la question reste posee, donc la paire se joue
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startOrdinarySession();
+
+    const std::size_t chordsHeardBefore = notePlayer.playedChords().size();
+
+    const int playedQuality = wrongChordChoice( controller );
+
+    controller.answerChord( playedQuality );
+
+    // UNE seule paire, et non deux appels : un nouveau son REMPLACE le precedent, donc deux appels ne feraient entendre
+    // que le second - exactement ce qu'on corrige.
+    ASSERT_EQ( 1U, notePlayer.playedChordPairs().size() );
+
+    // Et la question n'est PAS rejouee par le chemin commun : c'est la paire qui a parle.
+    EXPECT_EQ( chordsHeardBefore, notePlayer.playedChords().size() );
+
+    const domain::NotePlayerFake::PlayedChordPair & pair = notePlayer.playedChordPairs().front();
+
+    // L'ORDRE est le sujet : ce que le joueur a joue d'abord, la reponse ensuite.
+    ASSERT_EQ( 3U, pair.first.size() );
+    ASSERT_EQ( 3U, pair.second.size() );
+
+    // Les deux accords partent de la MEME tonique : c'est ce qui rend l'ecart audible sur une seule note de depart, et
+    // deux toniques differentes ne seraient plus comparables.
+    EXPECT_EQ( pair.first.front().midiNumber(), pair.second.front().midiNumber() );
+
+    // ...et ils sont bien DIFFERENTS. Toute la liste, et pas une note isolee : majeur et mineur partagent leur quinte,
+    // donc comparer une seule note ne prouverait rien.
+    EXPECT_NE( pair.first, pair.second );
+
+    // Et le silence entre les deux existe, sans quoi ils s'entendraient comme un seul accord qui bouge.
+    EXPECT_GT( pair.gap.count(), 0 );
+}
+
+TEST( ExerciseSessionControllerTest, a_review_list_names_chords_too )
+{
+    // Roger, apres 1.6.30 : « le Bilan me montre toujours le Dorien ». La cause n'etait pas les modes du tout : les
+    // listes etaient bornees par le nombre de CIBLES, puis chacune ecartait les cibles SANS NOM - et un accord n'avait
+    // pas de nom sur cette page. Chaque accord rate mangeait donc une place en silence, jusqu'a ne laisser qu'une ligne.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    const auto now = std::chrono::system_clock::now();
+
+    const auto add = [&log, &now]( domain::QuestionKind p_kind, std::int32_t p_target, bool p_correct ) {
+        for( int index = 0; index < 4; ++index )
+        {
+            domain::QuestionRecord record;
+
+            record.askedAt = now - std::chrono::hours{ 1 };
+            record.kind = p_kind;
+            record.target = p_target;
+            record.direction = domain::IntervalDirection::Ascending;
+            record.outcome = p_correct ? domain::QuestionOutcome::CorrectFirstTry : domain::QuestionOutcome::Failed;
+
+            log.append( record );
+        }
+    };
+
+    // Quatre cibles, dont un ACCORD rate - et un accord qui porte un nom de COULEUR, pas de tonique : c'est la cible telle
+    // que le journal l'ecrit.
+    add( domain::QuestionKind::NamedInterval, 12, true );
+    add( domain::QuestionKind::NamedInterval, 7, true );
+    add( domain::QuestionKind::NamedInterval, 5, false );
+    add( domain::QuestionKind::Chord, static_cast<std::int32_t>( domain::ChordQuality::Minor ), false );
+
+    // Les DEUX genres sont ouverts : le bilan ecarte les questions que le joueur a fermees, et un test qui n'ouvrirait
+    // que l'intervalle verrait l'accord disparaitre avant meme d'arriver a la page.
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 50;
+    settings.chordQuestionShare = 50;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    ASSERT_TRUE( controller.isReviewOpeningVisible() );
+
+    const QVariantList weak = controller.reviewWeakPoints();
+
+    // DEUX points faibles, et pas un seul : l'accord nomme ne mange plus la place d'un intervalle. C'est exactement le
+    // symptome que Roger decrivait - une liste videe par ce qu'elle ne savait pas dire.
+    ASSERT_EQ( 2U, weak.size() );
+
+    // Les DEUX noms y sont, et le test ne se prononce pas sur leur ordre : les deux cibles sont ratees, donc a 0 % toutes
+    // les deux, et un tri n'a rien a decider entre deux exgaux. Exiger un ordre ici serait tester une coincidence.
+    QStringList names;
+
+    for( const QVariant & point : weak )
+    {
+        names.append( point.toMap().value( "name" ).toString() );
+    }
+
+    names.sort();
+
+    // Une liste construite a part : les virgules d'une liste entre accolades coupent la macro de test en deux, et
+    // l'erreur parle alors de « trop d'arguments », ce qui n'aide personne.
+    //
+    // L'ORDRE EST CELUI D'UN TRI DE CHAINES, majuscules d'abord : « Quarte... » avant « mineur ». C'est une consequence
+    // de la majuscule du nom, pas une intention - et le tri reste le plus sur, puisqu'il ne depend pas du tri interne des
+    // cibles a egalite.
+    const QStringList expected{ QStringLiteral( "Mineur" ), QStringLiteral( "Quarte juste montante" ) };
+
+    EXPECT_EQ( expected, names );
+}
+
+TEST( ExerciseSessionControllerTest, an_interval_is_named_in_french_for_the_player )
+{
+    // Roger : « effectivement les intervalles sont ecrits en anglais, je n'avais pas fait attention a ca, il faudrait les
+    // ecrire en francais partout ou ca s'affiche ». Le modele GARDE son nom anglais - c'est le nom du code, celui qui
+    // sert aux fichiers et aux cles - et c'est l'AFFICHAGE qui traduit.
+    const QVariantMap fifth = describeInterval( domain::Interval{ 7 } );
+
+    // L'identifiant reste anglais et stable : c'est lui qu'un fichier de sauvegarde ou un contenu garderait.
+    EXPECT_EQ( QStringLiteral( "P5" ), fifth.value( "identifier" ).toString() );
+    EXPECT_EQ( QStringLiteral( "Quinte juste" ), fifth.value( "name" ).toString() );
+
+    // L'ACCORD DE GENRE, et c'est le piege de la langue : l'unisson est le SEUL masculin.
+    EXPECT_EQ( QStringLiteral( "Unisson juste" ), describeInterval( domain::Interval{ 0 } ).value( "name" ).toString() );
+    EXPECT_EQ( QStringLiteral( "Tierce majeure" ), describeInterval( domain::Interval{ 4 } ).value( "name" ).toString() );
+    EXPECT_EQ( QStringLiteral( "Sixte mineure" ), describeInterval( domain::Interval{ 8 } ).value( "name" ).toString() );
+
+    // Et un intervalle COMPOSE, qui ne doit pas perdre son nom en chemin : la neuvieme majeure, une octave au-dessus de la
+    // seconde majeure.
+    EXPECT_EQ( QStringLiteral( "Neuvième majeure" ), describeInterval( domain::Interval{ 14 } ).value( "name" ).toString() );
+}
+
 TEST( ExerciseSessionControllerTest, answering_twice_writes_one_line )
 {
     domain::NotePlayerFake notePlayer;
@@ -1949,14 +2093,187 @@ TEST( ExerciseSessionControllerTest, a_review_session_plans_its_questions )
 
     controller.startReviewSession();
 
-    EXPECT_TRUE( controller.running() );
+    // LE BILAN S'OUVRE SUR SA PAGE, et non sur une question : rien n'est compte avant que le joueur ait lu ce que
+    // l'app sait de lui. Roger a demande cette page comme une PORTE vers le cote academique de l'app.
+    EXPECT_FALSE( controller.running() );
     EXPECT_TRUE( controller.isReviewRunning() );
+    EXPECT_TRUE( controller.isReviewOpeningVisible() );
+
+    controller.beginReviewQuestions();
+
+    EXPECT_TRUE( controller.running() );
+    EXPECT_FALSE( controller.isReviewOpeningVisible() );
 
     // Le bilan est FINI : ses questions sont decidees, donc son compte est celui du plan - et il ne se perd pas, puisqu'un
     // bilan sans vies ne peut pas s'arreter au milieu.
     EXPECT_GT( controller.questionCount(), 0 );
     EXPECT_LT( controller.questionCount(), 10 );
     EXPECT_TRUE( controller.hasUnlimitedLives() );
+}
+
+TEST( ExerciseSessionControllerTest, the_review_opens_on_what_the_app_knows_about_the_player )
+{
+    // LA PAGE D'OUVERTURE, et ce qu'elle doit contenir : les points FORTS et les points FAIBLES du joueur, tires de son
+    // journal - la demande de Roger, mot pour mot : « avec les intervalles et les modes que le joueur reussit le plus,
+    // ainsi que ceux qu'il reussit le moins ».
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    fillJournalWithWorkedTargets( log );
+
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    ASSERT_TRUE( controller.isReviewOpeningVisible() );
+
+    const QVariantList strong = controller.reviewStrongPoints();
+    const QVariantList weak = controller.reviewWeakPoints();
+
+    ASSERT_FALSE( strong.isEmpty() );
+    ASSERT_FALSE( weak.isEmpty() );
+
+    // Le journal contient six intervalles : trois sus (12, 7 et 4 demi-tons) et trois rates (2, 6 et 11). Les deux
+    // listes disent donc deux choses opposees, et elles sont lues dans la MEME source triee - donc le meilleur ne peut
+    // pas se retrouver parmi les faibles.
+    //
+    // Le tri ne garantit pas l'ordre des exgaux : on verifie donc le TAUX et la langue, pas un nom precis.
+    EXPECT_EQ( 100, strong.first().toMap().value( "percent" ).toInt() );
+    EXPECT_EQ( 0, weak.first().toMap().value( "percent" ).toInt() );
+
+    // Le nom est FRANCAIS et il porte la direction : « Quinte montante ». L'intervalle du domaine, lui, se nomme en
+    // anglais - c'est le nom du modele, et la page parle au joueur.
+    EXPECT_TRUE( strong.first().toMap().value( "name" ).toString().endsWith( QStringLiteral( " montante" ) ) );
+    EXPECT_GE( weak.first().toMap().value( "asked" ).toInt(), 1 );
+
+    // ET RIEN N'EST COMMENCE : c'est tout l'objet de la page. Une question jouee derriere l'explication serait perdue -
+    // le joueur l'entendrait sans la regarder.
+    EXPECT_FALSE( controller.running() );
+
+    // « Plus tard » : le bilan n'a pas eu lieu, et RIEN n'a ete compte.
+    controller.cancelReviewOpening();
+
+    EXPECT_FALSE( controller.isReviewOpeningVisible() );
+    EXPECT_FALSE( controller.isReviewRunning() );
+    EXPECT_FALSE( controller.running() );
+}
+
+TEST( ExerciseSessionControllerTest, the_two_review_lists_never_share_a_point )
+{
+    // Roger, sur son propre ecran : « ce qui te resiste encore me montre [...] Octave montante 100 % ». Un taux parfait
+    // dans la liste des faiblesses n'est pas une nuance, c'est une contradiction.
+    //
+    // La cause : les deux listes sont tirees de la MEME liste triee, l'une par la fin, l'autre par le debut, et rien ne
+    // les empechait de se rejoindre. Avec quatre cibles travaillees, les deux tranches se recouvraient de deux lignes -
+    // donc la meilleure cible du joueur pouvait etre presentee comme ce qui lui resiste.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    const auto now = std::chrono::system_clock::now();
+
+    const auto add = [&log, &now]( std::int32_t p_semitones, bool p_correct ) {
+        for( int index = 0; index < 3; ++index )
+        {
+            domain::QuestionRecord record;
+
+            record.askedAt = now - std::chrono::hours{ 1 };
+            record.kind = domain::QuestionKind::NamedInterval;
+            record.target = p_semitones;
+            record.direction = domain::IntervalDirection::Ascending;
+            record.outcome = p_correct ? domain::QuestionOutcome::CorrectFirstTry : domain::QuestionOutcome::Failed;
+
+            log.append( record );
+        }
+    };
+
+    // Quatre cibles, trois observations chacune : le seuil qui fait un point faible est atteint, et il y a de quoi
+    // remplir deux listes - mais pas de quoi les remplir sans qu'elles se recouvrent.
+    add( 12, true );
+    add( 7, true );
+    add( 5, false );
+    add( 2, false );
+
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    ASSERT_TRUE( controller.isReviewOpeningVisible() );
+
+    const QVariantList strong = controller.reviewStrongPoints();
+    const QVariantList weak = controller.reviewWeakPoints();
+
+    ASSERT_FALSE( strong.isEmpty() );
+    ASSERT_FALSE( weak.isEmpty() );
+
+    // Aucun point faible n'est aussi un point fort : c'est toute la garantie, et elle vaut mieux qu'un raisonnement sur
+    // les indices.
+    for( const QVariant & weakPoint : weak )
+    {
+        for( const QVariant & strongPoint : strong )
+        {
+            EXPECT_NE( weakPoint.toMap().value( "name" ).toString(), strongPoint.toMap().value( "name" ).toString() );
+        }
+
+        // Et le symptome exact que Roger a vu : un taux parfait ne peut pas etre dans ce qui resiste.
+        EXPECT_LT( weakPoint.toMap().value( "percent" ).toInt(), 100 );
+    }
+}
+
+TEST( ExerciseSessionControllerTest, a_target_seen_once_is_not_what_resisted_the_player )
+{
+    // Ce que Roger a entendu, et qui n'etait pas vrai : « des fois tu dis : bravo, c'etait quelque chose qui te
+    // resistait alors que pas du tout ».
+    //
+    // La cause : une cible ratee UNE SEULE fois affiche 0 % de reussite, donc elle arrive en tete du tri par faiblesse,
+    // donc en premiere ligne du bilan, avec la phrase qui va avec. Le joueur, lui, ne se souvient pas de l'avoir ratee -
+    // il ne l'a pour ainsi dire jamais rencontree, et l'app lui racontait alors une histoire sur lui-meme qu'elle
+    // n'avait pas les moyens de connaitre.
+    //
+    // Le seuil est celui de la page de statistiques : la meme regle vaut donc partout ou l'app designe ce qui resiste.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    fillJournalWithWorkedTargets( log );
+
+    // UNE fois, et ratee : elle vaut 0 % de reussite, et c'est precisement pour cela qu'elle n'a rien a faire dans un
+    // bilan. Une cible vue une fois n'est pas un point faible, c'est un hasard.
+    const auto now = std::chrono::system_clock::now();
+
+    domain::QuestionRecord seenOnce;
+    seenOnce.askedAt = now - std::chrono::hours{ 1 };
+    seenOnce.kind = domain::QuestionKind::NamedInterval;
+    seenOnce.target = 9;
+    seenOnce.direction = domain::IntervalDirection::Ascending;
+    seenOnce.outcome = domain::QuestionOutcome::Failed;
+
+    log.append( seenOnce );
+
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    // Le bilan s'ouvre sur sa page : le plan est pret, mais les questions attendent d'etre lues.
+    ASSERT_TRUE( controller.isReviewOpeningVisible() );
+
+    controller.beginReviewQuestions();
+
+    ASSERT_TRUE( controller.running() );
+
+    // Six cibles retenues - trois en echauffement, trois en difficulte. La septieme, vue une fois, n'existe pas pour le
+    // bilan : sans la garde, elle entrerait dans le plan et le compte vaudrait QUATRE.
+    EXPECT_EQ( 3, controller.questionCount() );
 }
 
 TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_player_closed )
@@ -2089,7 +2406,6 @@ TEST( ExerciseSessionControllerTest, a_foreign_note_question_walks_the_wheel_alo
     EXPECT_GT( controller.modeSoundNoteStepMs(), 0 );
     EXPECT_GT( controller.modeSoundDurationMs(), 0 );
 }
-
 
 TEST( ExerciseSessionControllerTest, the_circle_carries_the_step_of_each_note )
 {
@@ -2413,6 +2729,9 @@ TEST( ExerciseSessionControllerTest, the_encouragement_speaks_only_during_a_revi
 
     controller.stopSession();
     controller.startReviewSession();
+
+    // La page d'ouverture, puis ses questions : c'est le meme geste pour le joueur, et le test le fait.
+    controller.beginReviewQuestions();
 
     // Le bilan, lui, parle - au minimum quand il attaque ce qui resiste.
     bool spokeAtSomePoint = false;
@@ -2832,8 +3151,27 @@ TEST( ExerciseSessionControllerTest, the_reward_announcement_is_cleared_at_every
     EXPECT_EQ( 1, announcements );
 }
 
-
 // LES TITRES ET LES TROPHEES se lisent des compteurs du Bilan, et rien d'autre.
+TEST( ExerciseSessionControllerTest, the_end_screen_sounds_go_through_to_the_port )
+{
+    // Le compte qui grimpe et la fanfare de victoire sont du GAME FEEL - Roger les a demandes comme des bruitages
+    // « pour rendre le jeu moins austere ». Mais ils passent par le PORT comme tout le reste : c'est ce qui permet a un
+    // adaptateur sans son de les ignorer, et a ce test de dire qu'ils ont bien ete demandes.
+    //
+    // Le PROGRES fait partie de la demande : c'est lui qui fait monter le tic avec le chiffre, et l'oublier rendrait un
+    // tic monotone sans que rien ne le signale.
+    domain::NotePlayerFake notePlayer;
+
+    ExerciseSessionController controller{ notePlayer, { intervalOnlySettings() } };
+
+    controller.playScoreTick( 40 );
+    controller.playVictoryFanfare();
+
+    EXPECT_EQ( 1, notePlayer.scoreTickCount() );
+    EXPECT_EQ( 40, notePlayer.lastScoreTickProgress() );
+    EXPECT_EQ( 1, notePlayer.victoryFanfareCount() );
+}
+
 TEST( ExerciseSessionControllerTest, the_title_and_the_trophies_come_from_the_bilan )
 {
     domain::NotePlayerFake notePlayer;

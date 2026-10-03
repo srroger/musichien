@@ -70,10 +70,15 @@ public:
     }
 
 private:
-    // How long a note must be held before it counts as the note the singer MEANT. Long on purpose: a whole second
-    // means a wobble, a breath or a slide never reads as a note - the voice gets the time it needs, and the result
-    // feels smooth rather than twitchy.
-    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 1000;
+    // How long a note must be held before it counts as the note the singer MEANT. Long on purpose: a wobble, a breath
+    // or a slide never reads as a note - the voice gets the time it needs, and the result feels smooth rather than
+    // twitchy.
+    //
+    // SEVEN HUNDRED AND FIFTY, and not a whole second. Roger relayed what the singers told him: "c'etait dur d'arriver
+    // au bout de la progress bar". A second was chosen for smoothness, but the bar is what the singer actually watches,
+    // and it RESTARTS at zero the moment the note moves - so the second did not buy smoothness, it bought despair.
+    // Three quarters of a second still outlasts a wobble, and the bar can now be filled by an honest voice.
+    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 750;
 
     // Combien de temps de silence fait une REPRISE.
     //

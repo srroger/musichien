@@ -116,6 +116,22 @@ std::vector<TargetStatistics> statisticsByTarget( std::span<const QuestionRecord
             continue;
         }
 
+        // LA COMPARAISON DE DEUX MODES NE COMPTE PAS PAR MODE, et c'est une decision de Roger (02/10/2026) : « pour
+        // l'utilisateur ca peut etre complexe a discerner, peut-etre le A est la meilleure idee oui ».
+        //
+        // Une question « plus clair ou plus sombre » porte DEUX modes - c'est le domaine qui le dit : elle compare
+        // `mode` a `previousMode`. Le journal n'en enregistre qu'UN, donc la statistique d'un mode melangerait deux
+        // competences (« je reconnais cette couleur » et « je sais la comparer a une autre »), et le mode qui sert de
+        // REFERENCE ne serait jamais compte du tout.
+        //
+        // La comparaison est donc une competence de COUPLE, pas d'un mode. Elle garde sa place dans le journal et dans
+        // les TOTAUX - elle n'a simplement plus de cible, donc plus de ligne de faiblesse a elle. C'est la seule option
+        // qui REND CHAQUE CHIFFRE VRAI, et elle reduit le nombre de categories au lieu de l'augmenter.
+        if( record.kind == QuestionKind::ModeColour )
+        {
+            continue;
+        }
+
         // Une cible, c'est le TRIPLE (genre, cible, direction) : une sixte montante et une sixte descendante sont deux
         // exercices differents, et les confondre effacerait exactement ce que ces statistiques doivent montrer.
         const auto sameTarget = [&record]( const TargetStatistics & p_entry ) {

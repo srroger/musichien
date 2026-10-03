@@ -161,7 +161,7 @@ void ModePreviewController::setPreferences( const domain::PlayerPreferences & p_
 
 void ModePreviewController::showCircleFor( domain::Mode p_mode, std::int32_t p_tonicPitchClass )
 {
-    const QVariantList circle = describeModeCircle( p_mode, p_tonicPitchClass );
+    const QVariantList circle = describeModeCircle( p_mode, p_tonicPitchClass, p_tonicPitchClass );
 
     if( m_playedModeCircle != circle )
     {

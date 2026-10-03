@@ -11,6 +11,7 @@
 #include "ui/ModeDescription.h"
 
 #include <QColor>
+#include <QCoreApplication>
 #include <QDate>
 #include <QDebug>
 #include <QString>
@@ -120,6 +121,18 @@ constexpr std::size_t REVIEW_EASY_QUESTION_COUNT = 3;
 // exercice rate il y a six mois n'est plus une faiblesse, c'est un souvenir.
 constexpr int REVIEW_PERIOD_DAYS = 30;
 
+// Combien de points forts - et de points faibles - la page d'ouverture du bilan MONTRE.
+//
+// TROIS de chaque cote : c'est ce qu'une page peut dire sans devenir une liste, et c'est assez pour que le joueur
+// reconnaisse son profil en la lisant. Au-dela, il ne lit plus, il survole - et une page qu'on survole n'explique rien.
+constexpr std::size_t REVIEW_OPENING_POINT_COUNT = 3;
+
+// Le silence entre ce que le joueur a joue et la reponse, sur une question d'accord ratee.
+//
+// Assez long pour que les deux accords soient DEUX accords, assez court pour qu'ils restent une seule phrase. Un souffle,
+// pas une pause : c'est ce qui separe « ce que j'ai cru » de « ce qui etait » sans les eloigner.
+constexpr std::chrono::milliseconds WRONG_CHORD_GAP{ 240 };
+
 // La qualite d'une frappe, dans la convention de l'ecran : 0 = Miss, 1 = Good, 2 = Perfect.
 //
 // La page Rythme parle deja cette langue, et la question de rythme doit parler la MEME : deux ecrans qui
@@ -156,6 +169,45 @@ constexpr int REVIEW_PERIOD_DAYS = 30;
 //
 // L'ecran AFFICHE, il n'assemble rien : un symbole compose dans le QML serait compose autrement le jour ou un deuxieme
 // ecran le montrerait, et les deux divergeraient en silence.
+// Le nom d'une couleur d'accord, EN FRANCAIS, pour la meme raison que les intervalles : le modele nomme, l'ecran traduit
+// - et l'ordre suit ChordQuality, comme la table du domaine, pour qu'une couleur ajoutee ailleurs fasse echouer la
+// compilation ici plutot que de glisser un nom faux dans un verdict.
+//
+// « sus4 » et « sus2 » ne sont pas traduits : ce sont les noms qu'un musicien lit sur une grille, en francais comme en
+// anglais, et les franciser inventerait un vocabulaire que personne n'utilise.
+constexpr std::array<const char *, domain::CHORD_QUALITY_COUNT> CHORD_QUALITY_WORDS{
+  // LA MAJUSCULE, parce que ce sont des LIBELLES : un verdict affiche « Mineur », pas « mineur » au milieu d'une phrase.
+  // C'est la meme regle que les intervalles, ou le nom ouvre toujours le libelle - « Quinte juste ».
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Majeur" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Mineur" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Sus4" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Sus2" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Diminué" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Augmenté" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Septième de dominante" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Septième majeure" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Septième mineure" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Sixte" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Demi-diminué" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Septième diminuée" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Mineur septième majeure" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Ajoutée neuvième" ),
+};
+
+[[nodiscard]] QString chordQualityWord( domain::ChordQuality p_quality )
+{
+    const auto slot = static_cast<std::size_t>( p_quality );
+
+    if( slot >= CHORD_QUALITY_WORDS.size() )
+    {
+        // Une couleur hors table n'existe pas, et un ecran doit pouvoir afficher quelque chose : le nom du modele vaut
+        // mieux qu'une case vide, et cette branche ne doit jamais s'ouvrir.
+        return QString::fromUtf8( domain::chordQualityName( p_quality ).data() );
+    }
+
+    return QCoreApplication::translate( "ExerciseSessionController", CHORD_QUALITY_WORDS.at( slot ) );
+}
+
 [[nodiscard]] QVariantMap describeChord( const domain::Chord & p_chord )
 {
     const domain::Note root{ p_chord.rootMidiNumber };
@@ -168,8 +220,7 @@ constexpr int REVIEW_PERIOD_DAYS = 30;
 
     described.insert( QStringLiteral( "quality" ), static_cast<int>( p_chord.quality ) );
 
-    described.insert( QStringLiteral( "name" ),
-                      QString::fromStdString( std::string{ domain::chordQualityName( p_chord.quality ) } ) );
+    described.insert( QStringLiteral( "name" ), chordQualityWord( p_chord.quality ) );
 
     described.insert( QStringLiteral( "rootName" ), QString::fromStdString( rootName ) );
 
@@ -443,6 +494,16 @@ void ExerciseSessionController::pickChibaImage()
     std::uniform_int_distribution<std::size_t> draw{ 0, CHIBA_IMAGES.size() - 1 };
 
     m_chibaImageSource = QString::fromLatin1( CHIBA_IMAGES.at( draw( entropySource ) ) );
+}
+
+void ExerciseSessionController::playScoreTick( int p_progressPercent )
+{
+    m_notePlayer.playScoreTick( p_progressPercent );
+}
+
+void ExerciseSessionController::playVictoryFanfare()
+{
+    m_notePlayer.playVictoryFanfare();
 }
 
 void ExerciseSessionController::tellAnotherAnecdote()
@@ -753,7 +814,7 @@ void ExerciseSessionController::applyStoredQuestionShares( domain::SessionSettin
     p_settings.modeVampQuestionShare = m_levelStore->storedModeVampQuestionShare();
 }
 
-QVariantList ExerciseSessionController::playerLevels()
+QVariantList ExerciseSessionController::playerLevels() const
 {
     QVariantList levels;
 
@@ -1508,6 +1569,38 @@ int ExerciseSessionController::rhythmBeatInBar() const noexcept
     return ( beatsPerBar > 0 ) ? ( m_rhythmBeatIndex % beatsPerBar ) : 0;
 }
 
+double ExerciseSessionController::rhythmPositionInBar() const
+{
+    const int beatsPerBar = rhythmBeatsPerBar();
+
+    if( beatsPerBar <= 0 )
+    {
+        return 0.0;
+    }
+
+    // Le modulo d'un flottant, et non d'un entier : c'est TOUT le sujet. Le curseur doit GLISSER d'un temps au suivant,
+    // pas y sauter - et un index entier ne peut que sauter.
+    return std::fmod( rhythmPositionInBeats(), static_cast<double>( beatsPerBar ) );
+}
+
+std::int64_t ExerciseSessionController::rhythmElapsedMilliseconds() const
+{
+    // LE PUITS AUDIO D'ABORD - c'est lui qui a raison. L'horloge de l'interface ne mesure que le moment ou l'on a
+    // DEMANDE le son ; le puits mesure celui ou l'oreille le recoit, tampon compris. Roger : « le son n'est pas synchro
+    // avec la note jouee » - et il ne pouvait pas l'etre, les deux horloges etant differentes.
+    const std::chrono::milliseconds audioPosition = m_notePlayer.playedMilliseconds();
+
+    if( audioPosition.count() > 0 )
+    {
+        return audioPosition.count();
+    }
+
+    // LE REPLI, et ce n'est pas un ornement : un adaptateur sans horloge audio (les tests, un appareil qui ne repond pas)
+    // repond zero, et un curseur FIGE serait pire que le desaccord qu'on corrige. Zero veut donc dire « je ne sais pas »,
+    // jamais « le son vient de commencer ».
+    return m_rhythmClock.elapsed();
+}
+
 bool ExerciseSessionController::isRhythmPlaying() const noexcept
 {
     return m_rhythmIsPlaying;
@@ -1746,7 +1839,29 @@ QVariantList ExerciseSessionController::modeCircle() const
 
     const domain::Question & question = m_session->currentQuestion();
 
-    return describeModeCircle( question.mode, question.modeTonic.pitchClassIndex() );
+    // LE MODE QUI SONNE, et non celui de la question.
+    //
+    // C'est la seconde moitie de la correction, et c'est Roger qui l'a vue : « la roue ne bouge absolument, il y a rien
+    // qui change ». Sur une comparaison, les deux passages passent l'un APRES l'autre - et la roue renvoyait toujours
+    // `question.mode`, c'est-a-dire le SECOND. Elle ne montrait donc jamais le premier passage, et l'ecran n'avait aucune
+    // raison de changer entre les deux.
+    const bool hasPrevious = question.previousMode.has_value();
+    const bool drawSecondPassage = !hasPrevious || m_modeSecondPassageIsPlaying;
+
+    const domain::Mode mode = drawSecondPassage ? question.mode : *question.previousMode;
+    const domain::Note tonic = drawSecondPassage ? question.modeTonic : question.previousModeTonic;
+
+    // LE REPERE DE LA ROUE : la tonique du PREMIER mode. Sur une comparaison, les deux passages partagent leur bourdon
+    // (voir buildModeQuestion), donc le repere ne bouge pas entre eux - c'est ce qui rend la comparaison lisible : seules
+    // les notes allumees changent. Sur un VAMP, le centre se deplace, et la roue le suit.
+    std::int32_t frameTonicPitchClass = question.modeTonic.pitchClassIndex();
+
+    if( hasPrevious )
+    {
+        frameTonicPitchClass = question.previousModeTonic.pitchClassIndex();
+    }
+
+    return describeModeCircle( mode, tonic.pitchClassIndex(), frameTonicPitchClass );
 }
 
 QString ExerciseSessionController::modeCircleLabel() const
@@ -1839,8 +1954,6 @@ int ExerciseSessionController::modeSoundNoteStepMs() const
     // celui-ci est ecrit une seule fois.
     return static_cast<int>( ( MODE_NOTE_DURATION + MODE_NOTE_GAP ).count() );
 }
-
-
 
 bool ExerciseSessionController::isForeignNoteQuestion() const noexcept
 {
@@ -2035,9 +2148,19 @@ void ExerciseSessionController::processAnswer( bool p_isCorrect )
     {
         if( !isRhythm )
         {
-            // A wrong answer is heard again IMMEDIATELY, and in its original form: there is something to
-            // catch up on, and the melody is what gives the second note its meaning.
-            playCurrentQuestion();
+            // UNE QUESTION D'ACCORD SE REJOUE EN DEUX TEMPS : ce que le joueur a joue, PUIS la reponse.
+            //
+            // Roger : « quand on clique sur un accord et qu'on se trompe, on re-entend directement le bon accord. Je
+            // changerais ca : entendre d'abord l'accord appuye, puis l'accord voulu. C'est moins perturbant. »
+            //
+            // Il a raison, et la raison est plus profonde que le confort : entendre la REPONSE avant sa propre erreur
+            // efface l'ECART entre les deux - et l'ecart est toute la lecon.
+            if( !playWrongChordThenAnswer() )
+            {
+                // A wrong answer is heard again IMMEDIATELY, and in its original form: there is something to
+                // catch up on, and the melody is what gives the second note its meaning.
+                playCurrentQuestion();
+            }
         }
 
         // And it is announced, so that the screen can answer with its BODY - the shake, and the
@@ -2971,7 +3094,7 @@ void ExerciseSessionController::stopRhythmLoop()
 // attendre une seconde, qu'un battement en retard ne decale pas ceux qui suivent.
 void ExerciseSessionController::scheduleNextRhythmBeat()
 {
-    const domain::BeatSchedule schedule = domain::planNextBeat( static_cast<double>( rhythmBpm() ), static_cast<std::size_t>( m_rhythmBeatIndex ), static_cast<double>( m_rhythmClock.elapsed() ) );
+    const domain::BeatSchedule schedule = domain::planNextBeat( static_cast<double>( rhythmBpm() ), static_cast<std::size_t>( m_rhythmBeatIndex ), static_cast<double>( rhythmElapsedMilliseconds() ) );
 
     // Le recalage eventuel de la grille - apres un reveil du telephone, par exemple - remonte par l'index : s'il
     // depasse la mesure, le prochain battement est celui d'une NOUVELLE mesure, et onRhythmBeat basculera de phase.
@@ -3118,7 +3241,7 @@ double ExerciseSessionController::rhythmPositionInBeats() const noexcept
         return 0.0;
     }
 
-    return static_cast<double>( m_rhythmClock.elapsed() ) / beatMs;
+    return static_cast<double>( rhythmElapsedMilliseconds() ) / beatMs;
 }
 
 int ExerciseSessionController::coveredOnsetCount() const noexcept
@@ -3283,6 +3406,13 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
     // sonner « la derniere » par-dessus. Arreter ici, en tete, couvre tous les chemins : la reponse, l'ecoute a nouveau,
     // et la question suivante.
     m_modeTimer.stop();
+
+    // QUEL PASSAGE SONNE : c'est l'etat que la roue lit pour savoir quel mode dessiner (voir modeCircle).
+    //
+    // Pose ICI, en tete, et pas a l'endroit ou le second est programme : tous les chemins passent par cette fonction - la
+    // question, la relecture apres une erreur, le second passage du minuteur - donc un seul endroit suffit a ne jamais
+    // laisser la roue en retard d'un passage.
+    m_modeSecondPassageIsPlaying = p_secondOnly;
 
     const domain::Question & question = m_session->currentQuestion();
 
@@ -3474,16 +3604,178 @@ void ExerciseSessionController::startReviewSession()
     m_reviewEasyQuestionCount = std::max<std::size_t>( 1, std::min( REVIEW_EASY_QUESTION_COUNT, plan.size() / 2 ) );
     m_isReviewRunning = true;
 
-    beginSession( settings );
+    // ET LES QUESTIONS ATTENDENT. C'est la page d'ouverture qui ouvre le bilan, pas le bouton du menu.
+    //
+    // Le joueur lit d'abord CE QUE L'APP SAIT DE LUI - ses points forts, ses points faibles, et pourquoi on va lui poser
+    // ces questions-la. Roger l'a demande comme une PORTE plutot qu'un ecran de plus : « le bilan, en montrant les points
+    // forts et les points faibles, serait une super porte d'acces vers ce cote plus academique ».
+    //
+    // Rien ne commence donc avant qu'il ait lu. Une premiere question jouee DERRIERE une page d'explication serait une
+    // question perdue : il l'entendrait sans la regarder, et le bilan s'ouvrirait sur un echec qu'il n'a pas joue.
+    m_reviewOpeningVisible = true;
+    m_pendingReviewSettings = settings;
+
+    emit sessionChanged();
 }
 
-std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() const
+bool ExerciseSessionController::isReviewOpeningVisible() const noexcept
 {
-    std::vector<domain::QuestionTarget> plan;
+    return m_reviewOpeningVisible;
+}
+
+void ExerciseSessionController::beginReviewQuestions()
+{
+    if( !m_reviewOpeningVisible )
+    {
+        return;
+    }
+
+    m_reviewOpeningVisible = false;
+
+    beginSession( m_pendingReviewSettings );
+}
+
+void ExerciseSessionController::cancelReviewOpening()
+{
+    if( !m_reviewOpeningVisible )
+    {
+        return;
+    }
+
+    // Refermer la page, c'est renoncer au bilan - et RIEN n'a ete compte : aucune question n'a ete posee, aucun essai
+    // n'est entre au journal. Le bouton peut donc etre repris plus tard sans laisser de trace, ce qui est le minimum
+    // quand une page propose de commencer quelque chose.
+    m_reviewOpeningVisible = false;
+    m_isReviewRunning = false;
+    m_reviewEasyQuestionCount = 0;
+    m_pendingReviewSettings = domain::SessionSettings{};
+
+    emit sessionChanged();
+}
+
+QVariantList ExerciseSessionController::reviewStrongPoints() const
+{
+    return reviewPointsOf( true );
+}
+
+QVariantList ExerciseSessionController::reviewWeakPoints() const
+{
+    return reviewPointsOf( false );
+}
+
+QVariantList ExerciseSessionController::reviewPointsOf( bool p_strong ) const
+{
+    QVariantList points;
+
+    const std::vector<domain::TargetStatistics> insights = reviewInsights();
+
+    // D'ABORD LES CIBLES NOMMABLES, de la plus faible a la mieux reussie : la page ne parle que de celles-la, donc c'est
+    // sur celles-la qu'il faut partager la place.
+    //
+    // C'est une CORRECTION, et c'est Roger qui l'a vue : « le Bilan me montre toujours le Dorien ». Les deux listes
+    // etaient bornees par le nombre de CIBLES, puis chacune ecartait les cibles SANS NOM. Avec beaucoup d'accords rates -
+    // que cette page ne nommait pas - la moitie des places se perdait en silence, et une liste de trois lignes pouvait
+    // n'en montrer qu'une. Le tri vivait sur les cibles, la page vivait sur les noms, et les deux ne parlaient pas du
+    // meme ensemble.
+    QVariantList named;
+
+    for( const domain::TargetStatistics & target : insights )
+    {
+        const QString label = targetLabel( target );
+
+        if( label.isEmpty() )
+        {
+            continue;
+        }
+
+        QVariantMap point;
+        point.insert( QStringLiteral( "name" ), label );
+        point.insert( QStringLiteral( "percent" ), target.statistics.successPercent() );
+        point.insert( QStringLiteral( "asked" ), static_cast<int>( target.statistics.questionCount ) );
+
+        named.append( point );
+    }
+
+    // LES DEUX LISTES NE SE PARTAGENT AUCUNE CIBLE, et chacune prend au plus la moitie : le recouvrement est impossible
+    // par construction. C'est la meme correction que « Octave montante 100 % » dans ce qui resiste - la meilleure cible
+    // du joueur ne peut plus y apparaitre.
+    // Le compte est SIGNE, comme l'index de QVariantList : melanger un std::size_t non signe et un qsizetype signe dans
+    // la meme soustraction est une conversion que la norme laisse libre, et clang-tidy a raison de la refuser.
+    const qsizetype listSize = std::min( static_cast<qsizetype>( REVIEW_OPENING_POINT_COUNT ), named.size() / 2 );
+
+    for( qsizetype index = 0; index < listSize; ++index )
+    {
+        points.append( p_strong ? named.at( named.size() - 1 - index ) : named.at( index ) );
+    }
+
+    return points;
+}
+
+QString ExerciseSessionController::targetLabel( const domain::TargetStatistics & p_target )
+{
+    // LE NOM VIENT DE describeInterval, et il n'est PAS refait ici : c'est lui qui porte le francais (« Quinte juste »),
+    // et deux tables de noms dans deux fichiers finiraient par se contredire devant le joueur. L'intervalle du domaine
+    // se nomme en anglais - c'est le nom du modele - et c'est l'affichage qui traduit.
+
+    switch( p_target.kind )
+    {
+        case domain::QuestionKind::NamedInterval:
+        case domain::QuestionKind::Direction: {
+            const QString name = describeInterval( domain::Interval{ p_target.target } )
+                                   .value( QStringLiteral( "name" ) )
+                                   .toString();
+
+            if( name.isEmpty() )
+            {
+                return QString{};
+            }
+
+            const QString direction = p_target.direction == domain::IntervalDirection::Ascending ? tr( "montante" )
+                                                                                                 : tr( "descendante" );
+
+            const QString full = tr( "%1 %2" ).arg( name, direction );
+
+            // LE GENRE EST DIT quand ce n'est pas celui de reference, et ce n'est pas un ornement. Le domaine SEPARE les
+            // genres a dessein - « un joueur qui reussit l'un en ratant l'autre apprend quelque chose de lui-meme » - et
+            // deux genres sont donc DEUX cibles pour la meme distance.
+            //
+            // Sans le dire, deux lignes portaient le meme mot avec deux chiffres differents, et Roger l'a vu tout de
+            // suite : « Dorien 100 % sur 3 questions » d'un cote, « Dorien 10 questions 90 % » de l'autre. Ce n'etait
+            // pas un comptage faux, c'etait un comptage muet.
+            return p_target.kind == domain::QuestionKind::Direction ? tr( "%1 · sens" ).arg( full ) : full;
+        }
+
+        case domain::QuestionKind::ModeName:
+            return describeMode( static_cast<domain::Mode>( p_target.target ) ).value( QStringLiteral( "name" ) ).toString();
+
+            // ModeColour n'a PLUS de cas : la comparaison de deux modes ne fabrique plus de cible (voir
+            // statisticsByTarget), donc cette page ne peut pas en recevoir une. Le `default` ci-dessous le dit mieux qu'un
+            // cas qui ne s'executerait jamais.
+
+        case domain::QuestionKind::ModeVamp:
+            return tr( "%1 · contexte" )
+              .arg( describeMode( static_cast<domain::Mode>( p_target.target ) ).value( QStringLiteral( "name" ) ).toString() );
+
+        // LES ACCORDS AUSSI, et pas seulement les intervalles et les modes : Roger avait demande les deux, mais une page
+        // qui ECARTE en silence tout un genre n'est pas discrete, elle est MUETTE sur une partie de ce qu'il a joue.
+        //
+        // C'est cette omission qui vidait ses listes : plus il ratait d'accords, plus les places se perdaient, jusqu'a
+        // ne plus montrer qu'une ligne. La cible d'un accord est sa COULEUR - il n'y a pas de tonique dans un taux.
+        case domain::QuestionKind::Chord:
+            return chordQualityWord( static_cast<domain::ChordQuality>( p_target.target ) );
+
+        default:
+            return QString{};
+    }
+}
+
+std::vector<domain::TargetStatistics> ExerciseSessionController::reviewInsights() const
+{
+    std::vector<domain::TargetStatistics> insights;
 
     if( m_questionLog == nullptr )
     {
-        return plan;
+        return insights;
     }
 
     const auto since = std::chrono::system_clock::now() - ( std::chrono::hours{ 24 } * REVIEW_PERIOD_DAYS );
@@ -3491,8 +3783,33 @@ std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() cons
     domain::StatisticsFilter filter;
     filter.since = since;
 
-    const std::vector<domain::TargetStatistics> byTarget =
-      domain::statisticsByTarget( m_questionLog->since( since ), filter );
+    insights = domain::statisticsByTarget( m_questionLog->since( since ), filter );
+
+    // UNE CIBLE VUE UNE OU DEUX FOIS N'EST PAS UN POINT FAIBLE : c'est un hasard, et c'est exactement ce que Roger a
+    // entendu - « des fois tu dis : bravo, c'etait quelque chose qui te resistait alors que pas du tout ».
+    //
+    // Une cible ratee une seule fois affiche 0 % de reussite, donc elle arrive EN TETE du tri par faiblesse, donc en
+    // premiere ligne du bilan, avec la phrase qui va avec. Le joueur, lui, ne se souvient pas de l'avoir ratee : il ne
+    // l'a pour ainsi dire jamais rencontree. L'app lui racontait alors une histoire sur lui-meme qu'elle n'avait pas
+    // les moyens de connaitre.
+    //
+    // Le seuil est celui de la page de statistiques. La MEME regle doit valoir partout ou l'app designe ce qui resiste,
+    // sinon les deux ecrans se contrediraient devant le joueur - et c'est le genre de contradiction qui apprend a ne
+    // plus croire ni l'un ni l'autre.
+    std::erase_if( insights, []( const domain::TargetStatistics & p_target ) {
+        return p_target.statistics.questionCount < domain::MINIMUM_OBSERVATIONS_FOR_A_WEAKNESS;
+    } );
+
+    return insights;
+}
+
+std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() const
+{
+    std::vector<domain::QuestionTarget> plan;
+
+    // Les DEUX pages du bilan lisent la meme chose : la page d'ouverture montre ces cibles au joueur, et le plan les
+    // lui pose, dans l'ordre. Une seule source, donc un ecran ne peut pas annoncer autre chose que ce qui suit.
+    const std::vector<domain::TargetStatistics> byTarget = reviewInsights();
 
     if( byTarget.size() < 4 )
     {
@@ -3728,6 +4045,33 @@ void ExerciseSessionController::playCurrentQuestionAsChord()
     const std::array<domain::Note, 2> notes{ rootNote, upperNote };
 
     m_notePlayer.playChord( notes );
+}
+
+bool ExerciseSessionController::playWrongChordThenAnswer()
+{
+    if( ( m_session == nullptr ) || !isChordQuestion() )
+    {
+        return false;
+    }
+
+    const std::optional<domain::ChordQuality> answer = m_session->lastChordAnswer();
+
+    if( !answer.has_value() )
+    {
+        // Le joueur n'a pas repondu : il a passe. Il n'y a donc pas d'accord « appuye » a lui faire entendre, et la
+        // reponse seule suffit - c'est exactement ce que playCurrentQuestion fait deja.
+        return false;
+    }
+
+    // La MEME tonique que la question, et la couleur que le joueur a CHOISIE : c'est ce qui rend l'ecart audible sur une
+    // seule note de depart. Deux toniques differentes feraient entendre deux accords etrangers l'un a l'autre, et il n'y
+    // aurait plus rien a comparer.
+    const domain::Chord played{ .quality = *answer,
+                                .rootMidiNumber = m_session->currentQuestion().chord.rootMidiNumber };
+
+    m_notePlayer.playChordThenChord( played.notes(), m_session->currentQuestion().chord.notes(), WRONG_CHORD_GAP );
+
+    return true;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

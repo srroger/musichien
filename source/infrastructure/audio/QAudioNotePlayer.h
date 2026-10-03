@@ -55,6 +55,15 @@ public:
     // The sustained chord: the same notes, held for the given duration, so the beating between them can be counted.
     void playChordFor( std::span<const domain::Note> p_notes, std::chrono::milliseconds p_duration ) override;
 
+    // Ce que le joueur a joue, puis la reponse - dans UN SEUL rendu, voir le port pour la raison.
+    void playChordThenChord( std::span<const domain::Note> p_first,
+                             std::span<const domain::Note> p_second,
+                             std::chrono::milliseconds p_gap ) override;
+
+    // Ou en est le son, lu sur le PUITS : voir le port pour la raison. Zero quand le puits a ete recree, ce qui dit
+    // « je ne sais pas » plutot que de mentir sur une position.
+    [[nodiscard]] std::chrono::milliseconds playedMilliseconds() const override;
+
     // Fait ENTENDRE un instrument : la gamme, un silence, puis l'accord, tous deux avec CE timbre et aucun autre.
     //
     // TOUT TIENT DANS UN SEUL TAMPON, et c'est la seule facon de faire : deux appels a playSamples se SUPERPOSENT, parce
@@ -148,6 +157,14 @@ public:
 
     // Et il se joue quand le chien ouvre la bouche : une seule fois, sans boucle, par-dessus ce qui joue deja.
     void playDogBark() override;
+
+    // LE BRUITAGE DE GAIN : le tic qui grimpe avec le compte, et la fanfare qui le conclut.
+    //
+    // Ce sont des BRUITAGES, pas de la musique : ils ne transposent rien, ne s'accordent a rien, et leur seul role est
+    // de rendre un gain agreable a regarder s'afficher. Voir le port, NotePlayer::playScoreTick.
+    void playScoreTick( int p_progressPercent ) override;
+
+    void playVictoryFanfare() override;
 
     // Le petit arpège de l'accueil : montant, ouvert, au piano, et VOLONTAIREMENT discret.
     //
@@ -258,6 +275,15 @@ private:
     [[nodiscard]] std::vector<float> effectiveClick( bool p_accented );
 
     std::unique_ptr<QAudioSink> m_audioSink;
+
+    // LA POSITION DU PUITS AU MOMENT OU LE DERNIER SON A COMMENCE, en microsecondes.
+    //
+    // C'est l'origine de playedMilliseconds : le puits compte depuis son propre demarrage, et ce qu'on veut dire au
+    // joueur, c'est « ou en est CE son-la ». Zero quand rien n'a encore ete joue.
+    //
+    // Seul playSamples la deplace. mixSamples, qui AJOUTE un clic ou une percussion, ne doit surtout pas y toucher : le
+    // curseur doit continuer d'avancer pendant que les clics tombent dedans.
+    qint64 m_playbackSinkOriginUs{ -1 };
 
     // Everything the sink reads. Owned here, handed to the sink by start().
     std::unique_ptr<AudioMixer> m_mixer;

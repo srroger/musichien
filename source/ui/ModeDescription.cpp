@@ -4,10 +4,13 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace musichien::ui
 {
@@ -157,14 +160,38 @@ QVariantMap describePhrase( const domain::Phrase & p_phrase )
     return description;
 }
 
-QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchClass )
-{
-    QVariantList circle;
+// Une QUINTE vaut sept demi-tons - et sept est son propre inverse modulo douze (7 x 7 = 49 = 1 + 4 x 12). Le rang d'une
+// note dans une suite de quintes se calcule donc directement depuis son ecart au repere, sans parcourir la suite.
+constexpr std::int32_t FIFTHS_STEP = 7;
 
-    // LE PAS de chaque note, et il est calcule ICI parce que la roue et la gamme ne sont pas rangees pareil : la roue
-    // suit les QUINTES, la gamme suit les DEGRES. C'est ce pas que l'exercice de la note etrangere attend quand on
-    // appuie sur une pastille, et l'ecran n'a donc rien a reconcilier - il envoie ce que le domaine lui donne.
+QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchClass, std::int32_t p_framePitchClass )
+{
+    // LA PLACE DE CHAQUE NOTE DANS LA ROUE, calculee AVANT d'etre rangee - et c'est une CORRECTION, demandee par Roger :
+    // « quand on a les 2 modes, on voit exactement le meme cercle, avec exactement les memes notes et exactement le meme
+    // motif. Pourtant, les notes devraient etre differentes, non ? »
+    //
+    // Il a raison. Un mode relatif a les MEMES sept notes que son majeur : do ionien et re dorien, ce sont les memes
+    // touches. Ce qui change, ce n'est pas quelles notes s'allument, c'est LAQUELLE EST LA TONIQUE - donc ou le trace
+    // commence. Or la roue etait construite depuis la tonique du mode AFFICHE, c'est-a-dire qu'elle TOURNAIT avec lui :
+    // deux modes relatifs donnaient litteralement la meme image.
+    //
+    // LA ROUE NE TOURNE PLUS. Son repere est la tonique du PREMIER mode (voir l'appelant), et le mode demande est dessine
+    // DEDANS : sa tonique tombe sur un autre bouton, d'autres notes s'allument, et le trace ne part plus forcement du
+    // haut. Quand les deux modes sont identiques, l'image est identique - et c'est acceptable : Roger l'a dit, « c'est un
+    // jeu educatif, si le joueur triche avec la forme, ce n'est pas grave ».
+    //
+    // LE PAS de chaque note, lui, se compte toujours depuis LA TONIQUE DU MODE, et non depuis le repere : un rang de degre
+    // parle du mode, pas de l'endroit ou on le regarde.
     const std::array<std::int32_t, domain::DEGREE_COUNT> offsets = domain::modeDegreeOffsets( p_mode );
+
+    // LE DEGRE CARACTERISTIQUE : celui qui distingue le mode de ses voisins, et que l'ecran marque a part. Il vaut zero
+    // pour les deux modes de reference - l'ionien et l'eolien n'ont rien a demontrer - donc ramene a un rang il vaut -1,
+    // et aucun pas ne le porte. C'est exactement ce qu'on veut : rien a marquer.
+    const std::int32_t characteristicStep = domain::modeCharacteristicDegree( p_mode ) - 1;
+
+    std::vector<std::pair<std::int32_t, QVariantMap>> placed;
+
+    placed.reserve( domain::SEMITONES_PER_OCTAVE );
 
     for( const domain::CircleNote & entry : domain::modeCircleNotes( p_mode, p_tonicPitchClass ) )
     {
@@ -191,8 +218,27 @@ QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchC
         description.insert( QStringLiteral( "inMode" ), entry.belongsToMode );
         description.insert( QStringLiteral( "isTonic" ), entry.isTonic );
         description.insert( QStringLiteral( "stepIndex" ), stepIndex );
+        description.insert( QStringLiteral( "isCharacteristic" ), stepIndex == characteristicStep );
 
-        circle.append( description );
+        // LA POSITION DANS LA ROUE : le rang de la note dans une suite de QUINTES partie du repere. Une quinte vaut sept
+        // demi-tons, et sept est son propre inverse modulo douze (7 x 7 = 49 = 1 + 4 x 12), donc l'ordre des quintes
+        // avance de 7 rangs par demi-ton - ce qui rend la position calculable sans rien parcourir.
+        const std::int32_t fromFrame = ( ( ( entry.pitchClassIndex - p_framePitchClass ) % domain::SEMITONES_PER_OCTAVE )
+                                         + domain::SEMITONES_PER_OCTAVE )
+                                       % domain::SEMITONES_PER_OCTAVE;
+
+        placed.emplace_back( ( fromFrame * FIFTHS_STEP ) % domain::SEMITONES_PER_OCTAVE, description );
+    }
+
+    std::ranges::sort( placed, std::less{}, &std::pair<std::int32_t, QVariantMap>::first );
+
+    QVariantList circle;
+
+    circle.reserve( static_cast<qsizetype>( placed.size() ) );
+
+    for( const auto & item : placed )
+    {
+        circle.append( item.second );
     }
 
     return circle;

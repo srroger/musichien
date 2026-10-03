@@ -648,8 +648,23 @@ void ExerciseSession::buildModeQuestion( Question & p_question, bool p_compare )
 
     p_question.mode = drawMode();
 
+    // LES DEUX PASSAGES D'UNE COMPARAISON ONT LE MEME CENTRE, et il fallait l'ECRIRE.
+    //
+    // C'est une CORRECTION, et elle vient de Roger : « je viens de tester le cercle des deux modes et ca ne fonctionne
+    // pas. La roue reste exactement identique (meme notes, meme tonique, meme trace, meme depart) ».
+    //
+    // La cause n'etait pas le dessin : `previousModeTonic` n'etait JAMAIS rempli sur une comparaison. Il gardait donc sa
+    // valeur par defaut - un RE, la note 62 de l'en-tete - et le PREMIER passage etait joue sur ce re-la pendant que le
+    // second etait joue sur la tonique tiree. Deux centres differents pour une comparaison de COULEUR : la question
+    // etait injuste, parce que la difference entendue n'etait pas celle qu'on demandait de juger. Et la roue, elle,
+    // prenait un repere fixe au lieu de celui du premier mode - ce qui la faisait paraitre immobile.
+    //
+    // Sur une comparaison, les deux modes sont joues sur le MEME bourdon : c'est exactement ce qui les rend comparables,
+    // et c'est ce que la roue appelle « le repere ». Un VAMP, lui, deplace le centre - voir buildModeVampQuestion : c'est
+    // le centre qui y change, et c'est toute la question.
     if( p_compare )
     {
+        p_question.previousModeTonic = p_question.modeTonic;
         // Parfois, la MEME couleur DEUX FOIS, et c'est deliberé : c'est la seule facon pour que « pareil » soit une bonne
         // reponse de temps en temps. Roger a demande le bouton ; encore fallait-il lui donner quelque chose a entendre.
         //

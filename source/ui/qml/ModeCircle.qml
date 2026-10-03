@@ -27,6 +27,14 @@ Item {
     // sonner, et une constante ecrite ici mentirait le jour ou le tempo change.
     // LE DESSIN DU PARCOURS : la trainee et la tete, DERRIERE les pastilles - elles doivent rester lisibles pendant que
     // le chemin se dessine.
+    // LES DEGRES, dans l'ordre ou ils sonnent : la gamme monte puis descend, comme le domaine la joue. Le chemin en
+    // INDICES DU CERCLE s'en deduit, parce que chaque case porte le degre de sa note (voir describeModeCircle).
+    // p_degrees est OPTIONNEL : le banc d'essai joue la gamme MONTEE puis DESCENDUE, et l'exercice la joue MONTE seulement
+    // (une question doit tenir en quelques secondes). Le chemin suit ce qu'on entend, donc il se règle avec lui.
+    // n notes se rejoignent par n-1 intervalles : le dernier pas n'est pas un deplacement.
+    // LA TEINTE DIT LE DEGRE : du jaune de la tonique vers le vert du septieme, en suivant l'ORDRE DES DEGRES. C'est la
+    // demande de Roger - « changer les couleurs de la note en degrade du jaune vers le vert [...] le degrade suivant
+    // l'ordre des degres de la gamme, histoire d'avoir l'aspect reellement visuel du mode dans le cercle ».
 
     id: root
 
@@ -42,10 +50,28 @@ Item {
     // demande de Roger pour la note etrangere : « on a deja le cercle en haut avec toutes les notes de la gamme allumees.
     // Il suffit d'appuyer sur un de ces boutons non ? »
     property bool selectable: false
+    // LE PAS DE L'INTRUS, quand il y en a un : -1 le reste du temps. L'ecran seul sait si la reponse est donnee, donc il
+    // le dit ; la roue, elle, ne fait que le colorer.
+    property int foreignStep: -1
+    // OU EST L'INTRUS DANS LA ROUE, et ou est la note caracteristique. Deux indices, calcules une fois, plutot qu'une
+    // recherche par pastille : douze pastilles feraient douze parcours pour la meme reponse.
+    readonly property int foreignCircleIndex: {
+        for (var index = 0; index < notes.length; ++index) {
+            if (notes[index].stepIndex === foreignStep)
+                return index;
+
+        }
+        return -1;
+    }
+    readonly property int characteristicCircleIndex: {
+        for (var index = 0; index < notes.length; ++index) {
+            if (notes[index].isCharacteristic)
+                return index;
+
+        }
+        return -1;
+    }
     readonly property real radius: (Math.min(width, height) / 2) - (dotSize / 2) - 4
-    // LES DEGRES, dans l'ordre ou ils sonnent : la gamme monte puis descend, comme le domaine la joue. Le chemin en
-    // INDICES DU CERCLE s'en deduit, parce que chaque case porte le degre de sa note (voir describeModeCircle).
-    //
     // TREIZE DEGRES, et c'est une CORRECTION : la gamme montee puis descendue partage sa note du haut, donc elle compte
     // treize notes et non quatorze (voir modeScaleUpAndDown). Le degre 6 y figurait deux fois de suite, ce qui ajoutait un
     // bond de longueur NULLE - la tete restait donc un pas en arriere jusqu'a la fin, en plus d'attendre sur place au
@@ -69,6 +95,24 @@ Item {
     // Le pas de la gamme de la note choisie : c'est ce que le domaine a mis dans chaque case (voir describeModeCircle).
     signal noteChosen(int p_stepIndex)
 
+    // Le septieme est le dernier pas de l'echelle des teintes : la gamme se lit alors comme un degrade continu, et la
+    // tonique garde le jaune qu'elle avait.
+    function degreeColour(p_stepIndex) {
+        // DU JAUNE (50 degres de teinte) VERS LE VERT (140), en traversant une teinte FRANCHE.
+        // La premiere version interpolait betement les deux couleurs de la palette, et elles sont CLAIRES toutes les deux :
+        // le milieu du degrade tombait donc sur un vert-jaune delave, et Roger l'a vu tout de suite - « le jaune vert le
+        // vert donne un truc bizarre, comme si le degrade etait trop leger ». Ce n'etait pas une impression : deux
+        // pastels melanges donnent un pastel, jamais une couleur.
+
+        if (p_stepIndex < 0)
+            return "#6fd08a";
+
+        // Ici la TEINTE bouge et la saturation ne bouge plus : meme quantite de jaune et de vert, mais une couleur qu'on
+        // peut NOMMER - et sept pastilles qui se distinguent l'une de l'autre.
+        var ratio = Math.max(0, Math.min(1, p_stepIndex / 6));
+        return Qt.hsla(0.14 + (0.25 * ratio), 0.68, 0.56, 1);
+    }
+
     // Le centre d'une CASE, en coordonnees locales. Une seule fonction, donc le dessin du chemin et celui de la tete ne
     // peuvent pas diverger.
     function dotCentre(p_circleIndex) {
@@ -76,9 +120,6 @@ Item {
         return Qt.point((width / 2) + (Math.cos(angle) * radius), (height / 2) + (Math.sin(angle) * radius));
     }
 
-    // p_degrees est OPTIONNEL : le banc d'essai joue la gamme MONTEE puis DESCENDUE, et l'exercice la joue MONTE seulement
-    // (une question doit tenir en quelques secondes). Le chemin suit ce qu'on entend, donc il se règle avec lui.
-    //
     // DEUX NOMBRES, ET NON UNE DUREE TOTALE. Roger : « la boule des lignes dans les modes est un peu lente par rapport au
     // son ». Le parcours etait cale sur la duree TOTALE de la musique, or celle-ci commence et finit par un BOURDON SEUL :
     // la tete partait donc avec le bourdon, et finissait dans le silence qui le suit - elle arrivait sur la derniere
@@ -91,9 +132,6 @@ Item {
         // Le silence d'entree : la tete reste SUR la tonique pendant que le bourdon s'installe. C'est vrai - c'est ce
         // qu'on entend - et c'est aussi ce qui se regarde : on voit d'ou l'on part.
         leadInPause.duration = Math.max(0, p_leadInMs);
-
-        // n notes se rejoignent par n-1 intervalles : le dernier pas n'est pas un deplacement.
-        //
         // LA DUREE SE POSE SUR L'ANIMATION, et c'est une CORRECTION : `restart()` ne prend AUCUN argument, donc celle que
         // je lui passais etait ignoree - et le parcours se faisait en une fraction de seconde. Roger l'a vu avant moi :
         // « le trait se dessine hyper vite, genre en une fraction de seconde ».
@@ -195,15 +233,32 @@ Item {
             required property int index
             // Trente degres par case, et la case 0 - la tonique - EN HAUT : la convention de toutes les roues imprimees.
             readonly property real angle: ((-90 + (index * 30)) * Math.PI) / 180
+            // La couleur dit l'appartenance au mode, et rien d'autre : la tonique est doree, les six autres notes du mode
+            // sont vertes, et tout ce qui n'en fait pas partie reste eteint - c'est ce qui fait voir l'armure.
+            // DEUX EXCEPTIONS, ET ELLES SONT ROUGES TOUTES LES DEUX parce qu'elles disent la meme chose : « regarde
+            // celle-la ». La note CARACTERISTIQUE - celle qui distingue le mode de ses voisins - et, sur une question de
+            // note etrangere, L'INTRUS. Roger a demande la couleur pour l'intrus avant tout le reste : « il y a beaucoup
+            // de texte pendant la reponse, beaucoup trop pour etre lu dans le temps imparti - la couleur est plus
+            // parlante ». Le texte reste, mais il n'est plus le seul a parler.
+            readonly property color dotColour: {
+                if (!modelData.inMode)
+                    return "#2a1b45";
+
+                if (index === root.foreignCircleIndex)
+                    return "#ff3b30";
+
+                if (index === root.characteristicCircleIndex)
+                    return "#ff7a8a";
+
+                return root.degreeColour(modelData.stepIndex);
+            }
 
             x: (root.width / 2) + (Math.cos(angle) * root.radius) - (width / 2)
             y: (root.height / 2) + (Math.sin(angle) * root.radius) - (height / 2)
             width: root.dotSize
             height: root.dotSize
             radius: width / 2
-            // La couleur dit l'appartenance au mode, et rien d'autre : la tonique est doree, les six autres notes du mode
-            // sont vertes, et tout ce qui n'en fait pas partie reste eteint - c'est ce qui fait voir l'armure.
-            color: modelData.inMode ? (modelData.isTonic ? "#ffd479" : "#6fd08a") : "#2a1b45"
+            color: dotColour
             border.width: modelData.isTonic ? 2 : 1
             border.color: modelData.isTonic ? "#fff3c4" : "#4a3170"
 

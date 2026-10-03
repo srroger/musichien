@@ -57,6 +57,31 @@ constexpr std::chrono::milliseconds PREVIEW_SILENCE{ 400 };
 // onze, simplement sans la difference.
 constexpr std::int32_t PREVIEW_CHORD_DURATION_MULTIPLIER = 5;
 
+// LE BRUITAGE D'UN GAIN QUI S'AFFICHE : le tic du compte, et la fanfare qui le conclut.
+//
+// Roger les a demandes comme des BRUITAGES, et c'est le mot juste : « c'est juste un bruitage pour rendre le jeu moins
+// austere, et faire appel a des biais cognitifs d'addiction, comme dans les machines a sous ». Rien de musical la-dedans
+// - et c'est pour cela que la forme d'onde est CARREE : ses harmoniques impaires sonnent creux et brillant, exactement
+// ce qu'un jeu video fait sonner depuis quarante ans, la ou une corde frappee sonnerait un instrument.
+//
+// LE TIC est TRES court - 45 ms - parce qu'un bruitage plus long deviendrait une note, et qu'une note, elle, se
+// reconnait. Et son HAUTEUR MONTE avec le chiffre : le tic grimpe, et l'oreille entend le gain grandir avant de le lire.
+constexpr std::int32_t SCORE_TICK_LOWEST_MIDI = 79;
+constexpr std::int32_t SCORE_TICK_HIGHEST_MIDI = 91;
+constexpr std::chrono::milliseconds SCORE_TICK_DURATION{ 45 };
+
+// Discret : le tic sonne des dizaines de fois en une seconde, donc fort il deviendrait vite insupportable. C'est le
+// volume d'un compteur qui tourne, pas celui d'une reponse.
+constexpr float SCORE_TICK_GAIN = 0.16F;
+
+// LA FANFARE DE VICTOIRE : un accord parfait MAJEUR, monte.
+//
+// Majeur, et c'est toute la difference avec l'aperge de l'accueil : celui-la est OUVERT - do, sol, do, sans tierce - pour
+// ne rien affirmer et laisser flotter. Ici la TIERCE MAJEURE dit « gagne », et c'est exactement ce qu'on veut dire.
+constexpr std::chrono::milliseconds VICTORY_NOTE_DURATION{ 150 };
+constexpr std::chrono::milliseconds VICTORY_GAP{ 25 };
+constexpr float VICTORY_GAIN = 0.32F;
+
 }    // namespace
 
 QAudioNotePlayer::QAudioNotePlayer() = default;
@@ -334,6 +359,34 @@ void QAudioNotePlayer::playSamples( std::vector<float> p_samples, float p_gain )
 
     startSinkIfNeeded();
     stopSinkWhenSilent();
+
+    // L'ORIGINE DE LA POSITION se pose ICI, et nulle part ailleurs : c'est le seul endroit qui sache qu'un nouveau son
+    // commence. Tout ce qui se superpose ensuite passe par mixSamples et ne la deplace pas - le curseur doit continuer
+    // d'avancer pendant que les clics du metronome tombent dans le meme son.
+    if( m_audioSink != nullptr )
+    {
+        m_playbackSinkOriginUs = m_audioSink->processedUSecs();
+    }
+}
+
+std::chrono::milliseconds QAudioNotePlayer::playedMilliseconds() const
+{
+    if( ( m_audioSink == nullptr ) || ( m_playbackSinkOriginUs < 0 ) )
+    {
+        return std::chrono::milliseconds{ 0 };
+    }
+
+    const qint64 processedUs = m_audioSink->processedUSecs();
+
+    // processedUSecs repart de ZERO quand le puits repart. Une position ANTERIEURE a l'origine n'est donc pas un temps
+    // negatif : c'est un puits neuf, et zero est alors la seule reponse honnete. L'appelant sait quoi en faire - il
+    // retombe sur sa propre horloge au lieu d'afficher un curseur qui recule.
+    if( processedUs < m_playbackSinkOriginUs )
+    {
+        return std::chrono::milliseconds{ 0 };
+    }
+
+    return std::chrono::milliseconds{ ( processedUs - m_playbackSinkOriginUs ) / 1000 };
 }
 
 void QAudioNotePlayer::mixSamples( std::vector<float> p_samples, float p_gain )
@@ -454,6 +507,37 @@ void QAudioNotePlayer::playInstrumentPreview( std::span<const domain::Note> p_sc
     preview.insert( preview.end(), chord.begin(), chord.end() );
 
     playSamples( preview );
+}
+
+void QAudioNotePlayer::playChordThenChord( std::span<const domain::Note> p_first,
+                                           std::span<const domain::Note> p_second,
+                                           std::chrono::milliseconds p_gap )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // DEUX accords dans UN SEUL rendu, et c'est la seule facon : un nouveau son REMPLACE le precedent (voir playSamples),
+    // donc enchainer par deux appels ferait disparaitre le premier - celui que le joueur vient justement de jouer.
+    //
+    // Le silence entre les deux n'est pas un ornement : sans lui, les deux accords se suivraient sans couture et
+    // s'entendraient comme un seul accord qui bouge. C'est la respiration qui separe « ce que j'ai cru » de « ce qui
+    // etait ».
+    std::vector<float> pair = renderChordFor( p_first, noteDuration() );
+
+    const auto sampleRate = static_cast<std::size_t>( std::max( 1, m_audioFormat.sampleRate() ) );
+    const auto silenceSampleCount = static_cast<std::size_t>( sampleRate * p_gap.count() / 1000 );
+
+    pair.insert( pair.end(), silenceSampleCount, 0.0F );
+
+    const std::vector<float> answer = renderChordFor( p_second, noteDuration() );
+
+    pair.insert( pair.end(), answer.begin(), answer.end() );
+
+    playSamples( pair );
 }
 
 void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_instruments,
@@ -1197,6 +1281,64 @@ void QAudioNotePlayer::playGreeting()
     }
 
     playSamples( std::move( samples ) );
+}
+
+void QAudioNotePlayer::playScoreTick( int p_progressPercent )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // OU EN EST LE COMPTE, ramene dans les bornes : c'est l'ecran qui l'annonce, et un ecran ne doit pas pouvoir faire
+    // sortir de la gamme de hauteurs prevue.
+    const int progress = std::clamp( p_progressPercent, 0, 100 );
+
+    const std::int32_t midiNumber = SCORE_TICK_LOWEST_MIDI
+                                    + ( ( SCORE_TICK_HIGHEST_MIDI - SCORE_TICK_LOWEST_MIDI ) * progress / 100 );
+
+    std::vector<float> samples = m_synthesizer->renderWaveNote( domain::Note{ midiNumber },
+                                                                domain::Waveform::Square,
+                                                                SCORE_TICK_DURATION );
+
+    for( float & sample : samples )
+    {
+        sample *= SCORE_TICK_GAIN;
+    }
+
+    // AJOUTE, et non substitué : les tics se suivent a quelques dizaines de millisecondes, et le suivant ne doit pas
+    // COUPER le precedent - une machine a sous ne s'interrompt pas entre deux crans.
+    mixSamples( std::move( samples ) );
+}
+
+void QAudioNotePlayer::playVictoryFanfare()
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // DO, MI, SOL, DO : l'accord parfait majeur, monte. La tierce est la tout ce qui compte - sans elle, l'aperge serait
+    // ouvert, et un accord ouvert ne dit pas qu'on a gagne.
+    const std::array<domain::Note, 4> fanfare{ domain::Note{ 72 }, domain::Note{ 76 }, domain::Note{ 79 }, domain::Note{ 84 } };
+
+    std::vector<float> samples = m_synthesizer->renderWaveMelody( fanfare,
+                                                                  domain::Waveform::Square,
+                                                                  VICTORY_NOTE_DURATION,
+                                                                  VICTORY_GAP );
+
+    for( float & sample : samples )
+    {
+        sample *= VICTORY_GAIN;
+    }
+
+    // AJOUTE aussi : la fanfare arrive sur le dernier tic, et les deux doivent s'entendre ensemble - le tic comme la
+    // virgule, la fanfare comme la phrase.
+    mixSamples( std::move( samples ) );
 }
 
 }    // namespace musichien::infrastructure

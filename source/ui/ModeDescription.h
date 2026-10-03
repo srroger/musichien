@@ -55,7 +55,10 @@ namespace musichien::ui
 // L'ORDRE de la liste est l'ordre des quintes en partant de la tonique, et c'est tout le dessin : les sept notes d'un
 // mode y sont voisines, donc l'arc allume est toujours d'un seul tenant, et ce qui distingue les modes est la place de
 // la tonique dans cet arc. Voir domain::modeCircleNotes.
-[[nodiscard]] QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchClass );
+// LE REPERE DE LA ROUE est une tonique, et il n'est pas toujours celle du mode dessine : quand deux modes s'enchainent
+// (une comparaison, un vamp), la roue garde le repere du PREMIER et dessine le second DEDANS. Voir describeModeCircle.
+[[nodiscard]] QVariantList
+describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchClass, std::int32_t p_framePitchClass );
 
 // Les SEPT notes d'une gamme, dans l'ordre des degres - la ou le cercle les donne dans l'ordre des quintes.
 //

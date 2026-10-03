@@ -114,6 +114,12 @@ class ExerciseSessionController final : public QObject
     // Le temps qui sonne, 0 = le premier. L'ecran le montre plus un, pour compter comme un musicien.
     Q_PROPERTY( int rhythmBeatInBar READ rhythmBeatInBar NOTIFY rhythmStateChanged )
 
+    // OU EN EST LE SON, dans la mesure, en TEMPS (et fractionnaire) : 0.0 au premier temps, 1.5 a la moitie du deuxieme.
+    //
+    // C'est ce que lit le CURSEUR de la mesure, et c'est pour lui que cette propriete existe : un entier qui saute d'un
+    // temps a l'autre ne peut pas etre suivi du regard. Voir rhythmPositionInBeats pour la source de la mesure.
+    Q_PROPERTY( double rhythmPositionInBar READ rhythmPositionInBar NOTIFY rhythmStateChanged )
+
     // Vrai pendant la REPRODUCTION : c'est le moment ou le doigt est juge. Faux pendant l'ecoute, ou une frappe sonne
     // sans rien valoir - celui qui accompagne la cellule pendant qu'elle s'ecoute ne perd pas de vie.
     Q_PROPERTY( bool isRhythmPlaying READ isRhythmPlaying NOTIFY rhythmStateChanged )
@@ -470,6 +476,15 @@ public:
     [[nodiscard]] QVariantList rhythmHits() const;
 
     [[nodiscard]] int rhythmBeatInBar() const noexcept;
+
+    // La position dans la mesure, en temps et fractionnaire : voir la propriete.
+    [[nodiscard]] double rhythmPositionInBar() const;
+
+    // OU EN EST LE SON, en millisecondes. Le PUITS AUDIO d'abord, l'horloge de l'interface seulement en repli.
+    //
+    // C'est la seule facon que le curseur soit d'accord avec ce que le joueur ENTEND : celle de l'interface mesure le
+    // moment ou l'on a DEMANDE le son, et entre les deux il y a le tampon du systeme.
+    [[nodiscard]] std::int64_t rhythmElapsedMilliseconds() const;
     [[nodiscard]] bool isRhythmPlaying() const noexcept;
     [[nodiscard]] int rhythmLastQuality() const noexcept;
     [[nodiscard]] int rhythmCoveredOnsets() const noexcept;
@@ -707,6 +722,17 @@ public:
     // Le joueur appuie sur le chien : il raconte autre chose.
     Q_INVOKABLE void tellAnotherAnecdote();
 
+    // LE BRUITAGE D'UN GAIN QUI S'AFFICHE, et l'ecran seul sait quand il sonne.
+    //
+    // Roger : « une animation sur les nombres ... et un bruitage de jeux video gling gling gling ... et un bruitage ou
+    // melodie ou accord de victoire ». C'est du GAME FEEL, donc cela appartient a l'ecran : LUI seul sait quand le
+    // compte commence, ou il en est, et quand il arrive. Le controleur ne fait que porter la demande jusqu'au son.
+    //
+    // p_progressPercent dit ou en est le compte, de 0 a 100 - c'est ce qui fait monter le tic avec le chiffre.
+    Q_INVOKABLE void playScoreTick( int p_progressPercent );
+
+    Q_INVOKABLE void playVictoryFanfare();
+
     // Tire une des quatre humeurs du chien. Privee : c'est le deroulement - la fin d'une partie, ou le clic du joueur -
     // qui la declenche, jamais l'ecran.
     void pickChibaImage();
@@ -722,7 +748,7 @@ public:
     [[nodiscard]] int playerLevel() const noexcept;
     // Les difficultes proposees, avec leur etat : ouvertes ou FERMEES tant que l'experience ne les a pas meritees. Pas
     // `static` : elle lit l'etat du joueur (son experience, le code de developpeur), donc elle a besoin de l'instance.
-    [[nodiscard]] QVariantList playerLevels();
+    [[nodiscard]] QVariantList playerLevels() const;
 
     [[nodiscard]] bool godModeIsChosen() const noexcept { return m_godModeIsChosen; }
 
@@ -883,7 +909,7 @@ public:
     //
     // Les paliers superieurs se FERMENT tant qu'on ne les a pas merites : c'est ce qui donne au GodMode son sens - un
     // passe-droit pour qui veut tester le jeu sans y etre regulier. Voir unlockAllLevels pour le raccourci de developpeur.
-    Q_INVOKABLE bool isLevelUnlocked( int p_index ) const;
+    [[nodiscard]] Q_INVOKABLE bool isLevelUnlocked( int p_index ) const;
 
     // Le code de developpeur : choisir GodMode SEPT fois d'affilee deverrouille toutes les difficultes.
     //
@@ -1044,6 +1070,31 @@ public:
 
     // Vrai pendant un bilan : l'ecran sait alors que la session est differente, et peut le dire.
     [[nodiscard]] bool isReviewRunning() const noexcept { return m_isReviewRunning; }
+
+    // LA PAGE D'OUVERTURE DU BILAN : elle dit au joueur ce que l'app sait de lui - ses points forts, ses points faibles
+    // - et a quoi le bilan sert, AVANT de lui poser la premiere question.
+    //
+    // C'est la piece que Roger a demandee en premier, et il l'a formulee comme une porte plutot qu'un ecran : « le
+    // bilan, en montrant les points forts et les points faibles, serait une super porte d'acces vers ce cote plus
+    // academique ». Un joueur qui comprend POURQUOI on lui pose ces questions travaille ; un joueur qui les subit
+    // repond.
+    Q_PROPERTY( bool isReviewOpeningVisible READ isReviewOpeningVisible NOTIFY sessionChanged )
+
+    // Ce que le joueur reussit le mieux, et le moins bien : des INTERVALLES et des MODES, nommes en francais. Chaque
+    // entree porte 'name', 'percent' et 'asked'.
+    Q_PROPERTY( QVariantList reviewStrongPoints READ reviewStrongPoints NOTIFY sessionChanged )
+    Q_PROPERTY( QVariantList reviewWeakPoints READ reviewWeakPoints NOTIFY sessionChanged )
+
+    [[nodiscard]] bool isReviewOpeningVisible() const noexcept;
+
+    [[nodiscard]] QVariantList reviewStrongPoints() const;
+    [[nodiscard]] QVariantList reviewWeakPoints() const;
+
+    // Le joueur a lu la page : le bilan commence, avec SES questions et pas avant.
+    Q_INVOKABLE void beginReviewQuestions();
+
+    // Le joueur referme la page : le bilan n'a pas eu lieu, et RIEN n'a ete compte.
+    Q_INVOKABLE void cancelReviewOpening();
 
     // Le mot du moment : un encouragement AVANT une difficulte connue, et apres une reussite sur ce qui resistait.
     //
@@ -1279,6 +1330,13 @@ private:
     // Plays the same two notes TOGETHER, whatever direction the question was asked in.
     void playCurrentQuestionAsChord();
 
+    // Ce que le joueur a JOUE, puis la reponse - et VRAI seulement si la paire a ete jouee.
+    //
+    // Faux quand il n'y a pas d'accord appuye a faire entendre (le joueur a passe) : l'appelant retombe alors sur
+    // playCurrentQuestion, qui joue la reponse seule. Un booleen plutot qu'un void, parce que « rien n'a ete joue » doit
+    // pouvoir se dire.
+    [[nodiscard]] bool playWrongChordThenAnswer();
+
     // Ecrit une ligne pour la question en cours, qui vient d'etre CONCLUE.
     //
     // L'horloge est lue ICI et nulle part ailleurs : le domaine recoit une date, il ne la demande jamais - c'est ce qui
@@ -1288,6 +1346,20 @@ private:
     // Les questions d'un BILAN, construites a partir des STATISTIQUES : ce que le joueur reussit d'abord, ce qui lui
     // resiste ensuite. Vide quand il n'y a pas de journal, ou pas assez de matiere pour dire « facile puis difficile ».
     [[nodiscard]] std::vector<domain::QuestionTarget> reviewPlan() const;
+
+    // CE QUE LE BILAN SAIT DU JOUEUR : les cibles de son journal, de la plus faible a la mieux reussie, gardees par la
+    // meme regle que la page de statistiques - une cible vue une seule fois n'est pas un point faible.
+    //
+    // Une seule source pour les DEUX pages du bilan. La page d'ouverture les MONTRE, le plan les POSE, et il devient
+    // impossible qu'un ecran annonce autre chose que ce qui suit.
+    [[nodiscard]] std::vector<domain::TargetStatistics> reviewInsights() const;
+
+    // La meilleure ou la pire tranche de ces cibles, prete a afficher : au plus REVIEW_OPENING_POINT_COUNT entrees.
+    [[nodiscard]] QVariantList reviewPointsOf( bool p_strong ) const;
+
+    // Le nom qu'un JOUEUR lit pour une cible : « Quinte montante », « Dorien ». Vide pour ce que cette page ne nomme
+    // pas - un accord, une cellule rythmique.
+    [[nodiscard]] static QString targetLabel( const domain::TargetStatistics & p_target );
 
     // La question en cours fait-elle partie de ce qui RESISTE au joueur ?
     //
@@ -1392,6 +1464,11 @@ private:
     int m_lastSungCentsOffset{ 0 };
     std::size_t m_reviewEasyQuestionCount{ 0 };
 
+    // LA PAGE D'OUVERTURE : visible apres le clic sur « Bilan », avant la premiere question. Les reglages prepares
+    // attendent ici, parce que le bilan ne commence qu'une fois la page lue - voir beginReviewQuestions.
+    bool m_reviewOpeningVisible{ false };
+    domain::SessionSettings m_pendingReviewSettings{};
+
     // Read once from the store, then kept here: the screen asks for it on every question, and a settings file
     // has no business being read that often.
     std::optional<domain::PlayerLevel> m_playerLevel;
@@ -1425,6 +1502,10 @@ private:
     // Ce que vaut rhythmLastQuality quand rien n'a encore ete frappe. Distinct de 0, qui est un Miss : "je n'ai pas
     // encore tape" et "j'ai tape a cote" sont deux choses differentes, et l'ecran les montre differemment.
     static constexpr int NO_RHYTHM_TAP = -1;
+
+    // Quel passage de la comparaison SONNE : deux modes s'enchainent, et la roue doit dessiner celui qu'on entend - voir
+    // modeCircle, ou cette valeur decide du mode affiche.
+    bool m_modeSecondPassageIsPlaying{ false };
 
     QTimer m_rhythmTimer;
 

@@ -58,6 +58,45 @@ public:
         playChord( p_notes );
     }
 
+    // DEUX accords, l'un APRES l'autre, dans un seul rendu : le premier est ce que le joueur a joue, le second est la
+    // reponse.
+    //
+    // Roger, apres avoir joue une question d'accords : « quand on clique sur un accord et qu'on se trompe, on re-entend
+    // directement le bon accord. Je changerais ca : entendre d'abord l'accord appuye, PUIS l'accord voulu. C'est moins
+    // perturbant. »
+    //
+    // Il a raison, et la raison est plus profonde que le confort : entendre la REPONSE avant d'avoir entendu sa propre
+    // erreur efface l'ECART entre les deux - et cet ecart est toute la lecon. L'oreille doit pouvoir se dire « voila ce
+    // que j'ai cru, voila ce qui etait », dans cet ordre.
+    //
+    // UN SEUL APPEL, et non deux : un nouveau son REMPLACE le precedent (voir QAudioNotePlayer::playSamples), donc deux
+    // appels ne feraient entendre que le second - exactement ce qu'on cherche a corriger.
+    //
+    // Un corps par defaut, comme playChordFor : un adaptateur qui ne sait pas enchainer joue la REPONSE, qui est la
+    // partie a ne pas manquer.
+    virtual void playChordThenChord( std::span<const Note> p_first,
+                                     std::span<const Note> p_second,
+                                     std::chrono::milliseconds p_gap )
+    {
+        (void)p_first;
+        (void)p_gap;
+
+        playChord( p_second );
+    }
+
+    // OU EN EST LE SON, en millisecondes depuis le debut du DERNIER son joue.
+    //
+    // C'est la SEULE horloge qui puisse etre d'accord avec ce que le joueur entend. Celle de l'interface mesure le moment
+    // ou l'on a DEMANDE le son ; celle-ci mesure le moment ou l'oreille le recoit. Entre les deux il y a le tampon du
+    // systeme, et c'est exactement l'ecart que Roger entend : « le son n'est pas synchro avec la note jouee ».
+    //
+    // Aucune unite de temps n'entre ici : le domaine demande une POSITION, l'adaptateur sait d'ou elle vient.
+    //
+    // Un corps par defaut, comme playChordFor : un adaptateur sans horloge audio repond ZERO, et l'appelant le sait -
+    // voir ExerciseSessionController::rhythmPositionInBeats, qui retombe alors sur sa propre horloge plutot que de
+    // figer le curseur.
+    [[nodiscard]] virtual std::chrono::milliseconds playedMilliseconds() const { return std::chrono::milliseconds{ 0 }; }
+
     // Fait ENTENDRE un instrument, pour qu'on puisse le CHOISIR : la gamme demandee, puis l'accord demande, avec CE
     // timbre et aucun autre.
     //
@@ -167,6 +206,24 @@ public:
     // meme phrase - un son de chien « doux et tres court », « ou sinon, juste le meme petit son que tu avais sur les
     // boutons de la difficulte ». Un adaptateur qui n'a pas d'aboiement continuera donc de repondre quelque chose.
     virtual void playDogBark() { playTapCue(); }
+
+    // LE TIC DU COMPTE QUI GRIMPE, ET LA FANFARE DE VICTOIRE.
+    //
+    // Roger : « une animation sur les nombres ... et un bruitage de jeux video gling gling gling, ou de machine a sous
+    // ... et un bruitage ou melodie ou accord de victoire ». Et il l'assume pour ce que c'est : « c'est juste un
+    // bruitage pour rendre le jeu moins austere, et faire appel a des biais cognitifs d'addiction, comme dans les
+    // machines a sous ».
+    //
+    // Deux CORPS PAR DEFAUT, comme playTapCue et playDogBark : un adaptateur sans retour sonore n'a rien a implementer,
+    // et un test qui ne compte que les notes n'a rien a entendre. Ce qui appartient au DOMAINE est qu'un gain soit
+    // AUDIBLE - jamais ce qu'il sonne.
+    //
+    // p_progressPercent dit OU EN EST le compte, de 0 a 100 : c'est ce qui permet au tic de MONTER avec le chiffre. Le
+    // domaine n'en fait rien, mais l'adaptateur a besoin de le savoir, et le lui redemander a l'ecran serait une
+    // dependance de plus pour rien.
+    virtual void playScoreTick( int p_progressPercent ) { (void)p_progressPercent; }
+
+    virtual void playVictoryFanfare() {}
 
     // LE TIMBRE D'UNE SESSION, choisi une fois et garde jusqu'au bout.
     //
