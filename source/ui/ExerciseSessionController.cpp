@@ -1,5 +1,6 @@
 #include "ui/ExerciseSessionController.h"
 
+#include "domain/exercise/GodModePalette.h"
 #include "domain/exercise/Trophy.h"
 #include "domain/exercise/Weekend.h"
 #include "domain/music/ChordTree.h"
@@ -47,8 +48,20 @@ constexpr std::chrono::milliseconds ARPEGGIO_NOTE_GAP{ 450 };
 //
 // Plus courtes que celles du banc d'essai, et c'est voulu : dans une session, une question doit tenir en quelques
 // secondes - et deux modes, c'est deja le double d'une question ordinaire.
-constexpr std::chrono::milliseconds MODE_NOTE_DURATION{ 340 };
-constexpr std::chrono::milliseconds MODE_NOTE_GAP{ 40 };
+// LA DUREE D'UNE NOTE DE GAMME DEPEND DU TEMPO - elle n'est plus une constante.
+//
+// Roger : « j'ai beau monter le bpm a fond, la vitesse des modes et des phrases reste lente et la meme ». Il a raison, et
+// la cause etait une valeur FIXE ici : la phrase suivait le reglage, la gamme non - deux musiques dans la meme page dont
+// une seule obeissait.
+//
+// UNE CROCHHE : la gamme monte une note par demi-temps, ce qui est la valeur qu'un musicien joue quand il MONTRE une
+// gamme. A 72, cela fait 417 millisecondes - tout pres des 340 d'avant, donc rien ne bouge par defaut ; a 144, la moitie,
+// et c'est exactement ce qu'on demande en montant le tempo.
+//
+// Elle vit en FONCTION, et pas en constante, pour une raison simple : trois endroits doivent dire la MEME chose - la note
+// jouee, la duree du bourdon qui l'encadre, et le pas de la tete sur le cercle. Une constante recopiee a trois endroits
+// finit toujours par en oublier un, et l'animation se desynchronise en silence.
+constexpr std::int32_t MODE_NOTE_GAP_MILLISECONDS = 40;
 
 // L'APERCU D'UN INSTRUMENT : la meme tonique que le banc d'essai des modes, pour que ce qu'on ecoute en reglant ses
 // instruments soit dans la region ou ils sonneront en exercice.
@@ -126,6 +139,12 @@ constexpr int REVIEW_PERIOD_DAYS = 30;
 // TROIS de chaque cote : c'est ce qu'une page peut dire sans devenir une liste, et c'est assez pour que le joueur
 // reconnaisse son profil en la lisant. Au-dela, il ne lit plus, il survole - et une page qu'on survole n'explique rien.
 constexpr std::size_t REVIEW_OPENING_POINT_COUNT = 3;
+
+// COMBIEN DE QUESTIONS, DANS UN BILAN, VONT CHERCHER CE QU'ON N'A JAMAIS TRAVAILLE.
+//
+// DEUX : assez pour ouvrir une porte, trop peu pour transformer un bilan en cours. Le bilan sert d'abord a voir ou l'on en
+// est, et une ouverture qu'on n'a pas demandee se retient mieux qu'une lecon qu'on a subie.
+constexpr std::size_t REVIEW_LEAST_WORKED_QUESTION_COUNT = 2;
 
 // Le silence entre ce que le joueur a joue et la reponse, sur une question d'accord ratee.
 //
@@ -1923,7 +1942,7 @@ int ExerciseSessionController::modeSoundDurationMs() const
     // partie de ce qu'on entend, donc elle fait partie de ce qu'il faut annoncer : la compter pour rien couperait le son
     // a la fin de la phrase, et ferait enchainer la question suivante par-dessus la note qui la conclut.
     const std::chrono::milliseconds oneMode =
-      domain::droneDurationFor( domain::DEGREE_COUNT + 1, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+      domain::droneDurationFor( domain::DEGREE_COUNT + 1, modeNoteDuration(), modeNoteGap(), framing );
 
     // Le vamp et la couleur font entendre DEUX modes, separes par le meme silence que celui du minuteur qui les enchaine.
     // Une question de nom n'en fait entendre qu'un.
@@ -1952,7 +1971,7 @@ int ExerciseSessionController::modeSoundNoteStepMs() const
 
     // La MEME somme que celle passee au lecteur : deux calculs qui doivent coincider finissent toujours par diverger, donc
     // celui-ci est ecrit une seule fois.
-    return static_cast<int>( ( MODE_NOTE_DURATION + MODE_NOTE_GAP ).count() );
+    return static_cast<int>( ( modeNoteDuration() + modeNoteGap() ).count() );
 }
 
 bool ExerciseSessionController::isForeignNoteQuestion() const noexcept
@@ -2044,8 +2063,8 @@ void ExerciseSessionController::playForeignNoteQuestion()
 
     m_notePlayer.playMelodyOverDrone( melody,
                                       drone,
-                                      MODE_NOTE_DURATION,
-                                      MODE_NOTE_GAP,
+                                      modeNoteDuration(),
+                                      modeNoteGap(),
                                       domain::DroneFraming{ MODE_LEAD_IN, MODE_TAIL } );
 
     // LA ROUE S'ANIME ICI AUSSI, et c'est Roger qui l'a demande : « j'aimerais bien que pour la note etrangere il y
@@ -2672,6 +2691,18 @@ void ExerciseSessionController::setForeignNoteQuestionShare( int p_share )
     m_settings.foreignNoteQuestionShare = p_share;
 
     emit foreignNoteQuestionShareChanged();
+}
+
+std::chrono::milliseconds ExerciseSessionController::modeNoteDuration() const noexcept
+{
+    // UNE CROCHHE au tempo du joueur : la moitie d'un temps. La gamme suit donc le reglage des phrases, comme elle le
+    // devrait depuis le debut.
+    return std::chrono::milliseconds{ ( 60'000 / std::max( 1, phraseTempoBpm() ) ) / 2 };
+}
+
+std::chrono::milliseconds ExerciseSessionController::modeNoteGap() const noexcept
+{
+    return std::chrono::milliseconds{ MODE_NOTE_GAP_MILLISECONDS };
 }
 
 int ExerciseSessionController::phraseTempoBpm() const
@@ -3467,7 +3498,7 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
 
     const domain::DroneFraming framing{ MODE_LEAD_IN, MODE_TAIL };
 
-    m_notePlayer.playMelodyOverDrone( melody, drone, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+    m_notePlayer.playMelodyOverDrone( melody, drone, modeNoteDuration(), modeNoteGap(), framing );
 
     // LA ROUE S'ANIME : l'ecran part de la tonique et parcourt la gamme, de note en note. Le signal est emis ICI, au
     // moment ou le son part - donc le dessin et la musique commencent ensemble, sans un decalage que rien n'expliquerait.
@@ -3480,7 +3511,7 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
     if( !p_secondOnly && hasPrevious )
     {
         const auto modeDuration =
-          domain::droneDurationFor( domain::DEGREE_COUNT, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+          domain::droneDurationFor( domain::DEGREE_COUNT, modeNoteDuration(), modeNoteGap(), framing );
 
         m_modeTimer.start( static_cast<int>( ( modeDuration + MODE_COMPARISON_GAP ).count() ) );
     }
@@ -3566,7 +3597,9 @@ void ExerciseSessionController::startReviewSession()
     // normal, et le repli sur une partie ordinaire quand il n'y a rien a reviser).
     m_gameMode = domain::GameMode::Review;
 
-    std::vector<domain::QuestionTarget> plan = reviewPlan();
+    std::size_t resistingCount = 0;
+
+    std::vector<domain::QuestionTarget> plan = reviewPlan( &resistingCount );
 
     // Un genre FERME par le joueur n'entre pas dans un bilan.
     //
@@ -3602,6 +3635,14 @@ void ExerciseSessionController::startReviewSession()
     // L'echauffement, c'est la premiere tranche du plan, bornee : au-dela, la difficulte commence - et c'est ce qui
     // permet a l'encouragement d'arriver au bon moment.
     m_reviewEasyQuestionCount = std::max<std::size_t>( 1, std::min( REVIEW_EASY_QUESTION_COUNT, plan.size() / 2 ) );
+
+    // ET LA PARTIE QUI RESISTE FINIT AVANT LES CIBLES JAMAIS TRAVAILLEES.
+    //
+    // C'est LA borne de l'encouragement, et elle est nouvelle parce que le plan a un troisieme temps : sans elle, l'app
+    // dirait « c'est exactement ce qui te resistait » a propos d'une cible que le joueur n'a jamais rencontree. Ce
+    // mensonge-la, on l'a deja paye une fois.
+    m_reviewHardQuestionCount = resistingCount;
+
     m_isReviewRunning = true;
 
     // ET LES QUESTIONS ATTENDENT. C'est la page d'ouverture qui ouvre le bilan, pas le bouton du menu.
@@ -3711,6 +3752,151 @@ QVariantList ExerciseSessionController::reviewPointsOf( bool p_strong ) const
     return points;
 }
 
+std::vector<std::pair<domain::QuestionTarget, std::size_t>> ExerciseSessionController::leastWorkedCandidates() const
+{
+    std::vector<std::pair<domain::QuestionTarget, std::size_t>> ordered;
+
+    // CE QUE LE NIVEAU ATTEND, ET QU'ON N'A PAS TRAVAILLE.
+    //
+    // C'est la demande de Roger, et sa precision est le coeur de la chose : « le moins travaille DANS le contexte du
+    // niveau, pas dans la totalite des possibilites. Evidemment qu'on ne va pas demander a un debutant de reconnaitre un
+    // demi-diminue. »
+    //
+    // La PALETTE DU NIVEAU est exactement cette reponse, et elle vient de `paletteForLevel` : un seul endroit decide de ce
+    // qu'un joueur devrait connaitre, et cette page ne peut donc pas dire autre chose que ce que le jeu lui pose vraiment.
+    //
+    // Et c'est ce qui ouvre le CIRCUIT FERME que Roger a decrit : le plan du bilan ne naissait que des ECHECS enregistres,
+    // donc ce qui n'est jamais tombe n'existait pas pour lui. Une cible jamais posee a ZERO observation - le journal ne
+    // peut pas le dire, parce qu'une cible absente du journal est une cible qu'on n'a pas travaillee, pas une cible qui
+    // n'existe pas. C'est cette ligne-la qu'on cherche.
+    if( m_questionLog == nullptr )
+    {
+        return ordered;
+    }
+
+    const domain::GodModePalette expected =
+      domain::paletteForLevel( m_playerLevel.value_or( domain::PlayerLevel::Beginner ) );
+
+    const auto since = std::chrono::system_clock::now() - ( std::chrono::hours{ 24 } * REVIEW_PERIOD_DAYS );
+
+    domain::StatisticsFilter filter;
+    filter.since = since;
+
+    const std::vector<domain::TargetStatistics> worked =
+      domain::statisticsByTarget( m_questionLog->since( since ), filter );
+
+    struct Candidate
+    {
+        domain::QuestionTarget target;
+        std::size_t observations;
+    };
+
+    std::vector<Candidate> candidates;
+
+    // Combien de fois cette cible a ete posee, dans la meme fenetre que le bilan - et zero si elle ne l'a jamais ete.
+    const auto observationsOf = [&worked]( const domain::QuestionTarget & p_target ) {
+        std::size_t count = 0;
+
+        for( const domain::TargetStatistics & entry : worked )
+        {
+            if( ( entry.kind == p_target.kind ) && ( entry.target == p_target.target )
+                && ( entry.direction == p_target.direction ) )
+            {
+                count += entry.statistics.questionCount;
+            }
+        }
+
+        return count;
+    };
+
+    const auto addCandidate = [&candidates, &observationsOf]( const domain::QuestionTarget & p_target ) {
+        // Le nom vient de la MEME fonction que les deux autres listes : trois facons de nommer une cible finiraient par se
+        // contredire devant le joueur.
+        domain::TargetStatistics asStatistics;
+        asStatistics.kind = p_target.kind;
+        asStatistics.target = p_target.target;
+        asStatistics.direction = p_target.direction;
+
+        const QString label = targetLabel( asStatistics );
+
+        if( !label.isEmpty() )
+        {
+            candidates.push_back( Candidate{ p_target, observationsOf( p_target ) } );
+        }
+    };
+
+    // LES INTERVALLES ATTENDUS, dans les deux sens : Roger l'a tranche, un intervalle montant et le meme descendant sont
+    // DEUX cibles, et le journal les compte separement depuis toujours.
+    for( const domain::Interval & interval : expected.intervals )
+    {
+        for( const domain::IntervalDirection direction :
+             { domain::IntervalDirection::Ascending, domain::IntervalDirection::Descending } )
+        {
+            addCandidate( domain::QuestionTarget{ domain::QuestionKind::NamedInterval, interval.semitones(), direction } );
+        }
+    }
+
+    // ET LES MODES ATTENDUS. Le genre est celui du NOM - c'est la question la plus directe qu'on puisse poser sur un mode,
+    // et c'est celle qu'un joueur qui ne l'a jamais travaille ne saura pas repondre.
+    for( const domain::Mode mode : expected.modes )
+    {
+        addCandidate( domain::QuestionTarget{ domain::QuestionKind::ModeName,
+                                              static_cast<std::int32_t>( domain::modeIndex( mode ) ),
+                                              domain::IntervalDirection::Ascending } );
+    }
+
+    // LES MOINS TRAVAILLEES D'ABORD. A egalite, l'ordre de la palette decide - il est deja celui de l'apprentissage, donc
+    // le tri est stable et ne change pas d'une fois a l'autre.
+    std::ranges::stable_sort( candidates, {}, &Candidate::observations );
+
+    ordered.reserve( candidates.size() );
+
+    for( const Candidate & candidate : candidates )
+    {
+        ordered.emplace_back( candidate.target, candidate.observations );
+    }
+
+    return ordered;
+}
+
+QVariantList ExerciseSessionController::reviewLeastWorkedPoints() const
+{
+    // LA PAGE : les memes cibles, NOMMEES, et coupees a trois.
+    //
+    // C'est ici, et seulement ici, qu'on ecarte ce qui n'a pas de nom - la page parle, le plan pose. Un accord sans nom ne
+    // doit pas disparaitre du PLAN pour autant : c'est la page qui ne sait pas l'afficher, pas le bilan qui ne doit pas le
+    // travailler.
+    QVariantList points;
+
+    for( const auto & [target, observations] : leastWorkedCandidates() )
+    {
+        if( points.size() >= static_cast<qsizetype>( REVIEW_OPENING_POINT_COUNT ) )
+        {
+            break;
+        }
+
+        domain::TargetStatistics asStatistics;
+        asStatistics.kind = target.kind;
+        asStatistics.target = target.target;
+        asStatistics.direction = target.direction;
+
+        const QString label = targetLabel( asStatistics );
+
+        if( label.isEmpty() )
+        {
+            continue;
+        }
+
+        QVariantMap point;
+        point.insert( QStringLiteral( "name" ), label );
+        point.insert( QStringLiteral( "asked" ), static_cast<int>( observations ) );
+
+        points.append( point );
+    }
+
+    return points;
+}
+
 QString ExerciseSessionController::targetLabel( const domain::TargetStatistics & p_target )
 {
     // LE NOM VIENT DE describeInterval, et il n'est PAS refait ici : c'est lui qui porte le francais (« Quinte juste »),
@@ -3803,13 +3989,23 @@ std::vector<domain::TargetStatistics> ExerciseSessionController::reviewInsights(
     return insights;
 }
 
-std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() const
+std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan( std::size_t * p_resistingCount ) const
 {
     std::vector<domain::QuestionTarget> plan;
 
     // Les DEUX pages du bilan lisent la meme chose : la page d'ouverture montre ces cibles au joueur, et le plan les
     // lui pose, dans l'ordre. Une seule source, donc un ecran ne peut pas annoncer autre chose que ce qui suit.
-    const std::vector<domain::TargetStatistics> byTarget = reviewInsights();
+    std::vector<domain::TargetStatistics> byTarget = reviewInsights();
+
+    // UN GENRE FERME N'ENTRE PAS DANS UN BILAN, et on l'ecarte ICI plutot qu'apres coup.
+    //
+    // Le plan se coupe en TROIS temps, et la borne du deuxieme est relevee plus bas : un tri qui s'appliquerait APRES
+    // deplacerait les frontieres sans le dire, et l'encouragement se remettrait a viser la mauvaise question. Filtrer en
+    // tete garde les trois temps alignes quoi qu'il arrive - et le filtre de `startReviewSession` ne fait plus rien, ce
+    // qui est exactement ce qu'on veut : une seule regle, appliquee une seule fois.
+    std::erase_if( byTarget, [this]( const domain::TargetStatistics & p_target ) {
+        return !domain::isKindOpen( m_settings, p_target.kind );
+    } );
 
     if( byTarget.size() < 4 )
     {
@@ -3838,6 +4034,45 @@ std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() cons
         plan.push_back( toPlannedQuestion( byTarget.at( index ) ) );
     }
 
+    // ET C'EST ICI QUE FINIT CE QUI RESISTE : les deux premiers temps sont poses, le troisieme commence.
+    if( p_resistingCount != nullptr )
+    {
+        *p_resistingCount = plan.size();
+    }
+
+    // ENFIN CE QU'ON N'A JAMAIS TRAVAILLE - et c'est ce qui OUVRE le bilan au lieu de le refermer.
+    //
+    // Jusqu'ici son plan ne naissait que des ECHECS enregistres : ce que les tirages ne proposaient jamais n'existait pas
+    // pour lui, et Roger l'a vu sans lire le code - « ca m'etonne qu'il n'y ait qu'un seul truc qui me resiste ». Une cible
+    // jamais posee n'a pas de faiblesse a reprendre, elle a une PORTE a ouvrir.
+    //
+    // ELLES VIENNENT EN DERNIER, et ce n'est pas un detail d'ordre : le bilan commence par ce qu'on sait, continue par ce
+    // qui resiste, et finit par ce qu'on n'a jamais vu. Finir sur une ouverture vaut mieux que finir sur un reproche.
+    //
+    // ET ELLES SONT FILTREES PAR LES MEMES REGLES que le reste : un genre que le joueur a ferme ne revient pas par cette
+    // porte-la. C'est le filtre de `startReviewSession` qui s'en charge, et il s'applique au plan entier.
+    std::size_t leastWorkedAdded = 0;
+
+    for( const auto & entry : leastWorkedCandidates() )
+    {
+        if( leastWorkedAdded >= REVIEW_LEAST_WORKED_QUESTION_COUNT )
+        {
+            break;
+        }
+
+        // MEME REGLE QUE LE RESTE, et appliquee ICI plutot qu'apres : le filtre des genres fermes s'applique au plan
+        // entier, mais il le raccourcit - et la borne de l'encouragement, relevee plus haut, ne vaudrait alors plus rien.
+        // Filtrer a la source garde les trois temps alignes quoi qu'il arrive.
+        if( !domain::isKindOpen( m_settings, entry.first.kind ) )
+        {
+            continue;
+        }
+
+        plan.push_back( entry.first );
+
+        ++leastWorkedAdded;
+    }
+
     return plan;
 }
 
@@ -3850,7 +4085,11 @@ bool ExerciseSessionController::isCurrentQuestionAHardPart() const noexcept
 
     // Le rang dans le plan : au-dela de l'echauffement, c'est ce qui resiste. Le controleeur a construit le plan dans cet
     // ordre, donc il le sait - sans recroiser les statistiques a chaque question.
-    return m_session->questionNumber() > m_reviewEasyQuestionCount;
+    // LE PLAN SE LIT EN TROIS TEMPS : l'echauffement, ce qui resiste, et ce qu'on n'a jamais travaille. Ce qui resiste est
+    // le DEUXIEME, et il a maintenant une FIN - les cibles jamais vues ne lui appartiennent pas, et l'app n'a aucun droit
+    // de dire qu'elles ont resiste a qui que ce soit.
+    return ( m_session->questionNumber() > m_reviewEasyQuestionCount )
+           && ( m_session->questionNumber() <= m_reviewHardQuestionCount );
 }
 
 QString ExerciseSessionController::encouragementText() const
@@ -3860,6 +4099,16 @@ QString ExerciseSessionController::encouragementText() const
         // Hors bilan, il n'y a rien a dire : un ecran qui parle pour ne rien dire devient un ecran qu'on n'ecoute plus, et
         // le silence est ce qui donne du poids aux mots qui restent.
         return QString{};
+    }
+
+    // ET POUR CE QU'ON N'A JAMAIS ENTENDU, on le dit AVANT : c'est une PORTE, pas un piege.
+    //
+    // Un joueur qui verrait « ce qui te resistait » sur une chose qu'il decouvre se demanderait ce qu'il a fait de mal - et
+    // il n'a rien fait. Le mot juste ici ne consiste pas a l'encourager, mais a lui DIRE ce qu'on lui fait : quelque chose
+    // qu'il n'a jamais croise, et c'est une bonne nouvelle.
+    if( isAsking() && ( m_session->questionNumber() > m_reviewHardQuestionCount ) )
+    {
+        return tr( "Celle-ci, tu ne l'as jamais croisée. Écoute-la pour elle-même." );
     }
 
     // Une reussite sur ce qui resistait : le mot juste, et il arrive au bon moment.

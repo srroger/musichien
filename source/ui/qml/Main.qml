@@ -83,6 +83,24 @@ ApplicationWindow {
     // peu plus de poids qu'un texte courant. C'est une decision d'ECRAN, pas une propriete de chaque bouton - et c'est
     // ici qu'elle se change.
     // LA MESURE D'UN LIBELLE, pour les listes deroulantes.
+    // =================================================================================================================
+    // LE BOUTON "RETOUR" D'ANDROID, EN UN SEUL ENDROIT
+    // Sur Android, le retour arrive ici comme une demande de FERMETURE de la fenetre. Refuser la fermeture
+    // (`close.accepted = false`) est donc le seul moyen d'aller ailleurs qu'a la sortie de l'application.
+    // L'APPLICATION AVAIT TROIS COMPORTEMENTS DIFFERENTS, et Roger les a tous rencontres :
+    //   * une page dans un Dialogue se fermait, donc on revenait a la garde - reglages, profil : ca allait ;
+    //   * un JEU, qui est un CALQUE et non un dialogue, laissait le retour FERMER l'application : « je me suis fait
+    //     beaucoup avoir » ;
+    //   * l'Ecole des Chiots, ouverte en dialogue, ramenait a la garde depuis une lecon, alors qu'on en attendait le
+    //     CATALOGUE.
+    // Plein ecran, comme l'accordeur, et pour la meme raison : c'est une page qu'on LIT, pas un message qu'on acquitte.
+    // La roue a besoin de la place pour que ses douze cases respirent, chacune portant trois informations.
+    // =================================================================================================================
+    // L'ECOLE DES CHIOTS, EN CALQUE ET NON EN DIALOGUE.
+    // C'est ce qui rend le bouton retour d'Android possible : un Dialogue consomme le retour pour se fermer, donc on
+    // traversait DEUX crans d'un coup - la lecon ET l'Ecole - et on retombait sur la page de garde. Un calque laisse le
+    // retour a la fenetre, et c'est elle qui decide (voir onClosing, plus haut).
+    // LA CONFIRMATION AVANT DE QUITTER UNE PARTIE.
 
     id: mainWindow
 
@@ -121,6 +139,12 @@ ApplicationWindow {
     readonly property bool hasHeardInterval: heardInterval.identifier !== undefined && heardInterval.identifier !== ""
     // Local UI state: it belongs to the screen, not to the domain.
     property bool feedbackVisible: false
+    // Leaving the screen must never leave an audio stream open: on a phone that is a battery drain,
+    // and a bug. The view model was given a method for exactly this call.
+    // L'ECOLE DES CHIOTS EST-ELLE OUVERTE ? La page est un CALQUE dans la fenetre, comme l'ecran d'exercice, et non un
+    // Dialogue : c'est ce qui permet au bouton retour d'Android de remonter d'un cran dans l'Ecole au lieu de traverser
+    // le dialogue et de ramener a la garde.
+    property bool schoolIsOpen: false
 
     function kindColour(index) {
         return kindColours[index % kindColours.length];
@@ -218,9 +242,31 @@ ApplicationWindow {
     minimumHeight: 480
     visible: true
     title: qsTr("Musichien")
-    // Leaving the screen must never leave an audio stream open: on a phone that is a battery drain,
-    // and a bug. The view model was given a method for exactly this call.
-    onClosing: IntervalController.stopPlayback()
+    // LA REGLE MAINTENANT, ET ELLE VAUT PARTOUT : le retour REMONTE D'UN CRAN DANS L'APPLICATION, et ne quitte jamais
+    // sans demander. Une lecon remonte a la liste, la liste remonte a la garde, et une partie en cours demande
+    // confirmation.
+    // =================================================================================================================
+    onClosing: function(close) {
+        // DANS L'ECOLE : on remonte d'un cran, toujours, et jamais hors de l'application.
+        if (mainWindow.schoolIsOpen) {
+            close.accepted = false;
+            if (CourseController.reading)
+                CourseController.close();
+            else
+                mainWindow.schoolIsOpen = false;
+            return ;
+        }
+        // UNE PARTIE EN COURS : on ne sort pas d'une partie sur une touche qu'on a pu frôler. Roger : « pour les jeux,
+        // je preferais quand meme une popup ». Elle propose la page de garde, pas la sortie de l'application.
+        if (ExerciseController.running) {
+            close.accepted = false;
+            leaveGameDialog.open();
+            return ;
+        }
+        // Sinon la sortie est demandee et on la laisse faire - en coupant le son au passage : un flux audio laisse
+        // ouvert sur un telephone est une batterie qui se vide.
+        IntervalController.stopPlayback();
+    }
 
     // Elle vit ICI, a la racine, et non dans le composant DarkComboBox : un composant inline n'accepte pas d'objet
     // enfant - seule une definition d'objet en accepte - et le declarer la empechait l'ecran entier de s'instancier.
@@ -945,6 +991,36 @@ ApplicationWindow {
                     text: qsTr("Un parcours qui commence par ce que tu réussis, et finit par ce qui te résiste.")
                 }
 
+                // L'ECOLE DES CHIOTS : les cours. Ce n'est pas un jeu et ca ne paie pas - c'est un lieu ou l'on apprend,
+                // pose a la suite du Bilan. Meme famille de couleur que lui : la page d'etude, pas la page de jeu.
+                TintedMenuButton {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 46
+                    tintColour: mainWindow.questColour
+                    labelColour: mainWindow.questLabelColour
+                    text: qsTr("📖  L'École des Chiots")
+                    onClicked: {
+                        // ON OUVRE TOUJOURS SUR LE CATALOGUE : une lecon laissee ouverte la derniere fois ne doit pas
+                        // reprendre toute seule.
+                        CourseController.close();
+                        mainWindow.schoolIsOpen = true;
+                    }
+                }
+
+                // Ce que c'est, en une phrase : un bouton dont on ne sait pas ce qu'il fait ne se clique pas.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    text: qsTr("Des leçons courtes, avec des exemples à écouter.")
+                }
+
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
@@ -1153,6 +1229,19 @@ ApplicationWindow {
                         onClicked: {
                             ExerciseController.playTapCue();
                             keyCircleDialog.open();
+                        }
+                    }
+
+                    // LA PAGE DES GAMMES : un mode a PART, dedie a ceux qui connaissent deja et veulent pratiquer. Elle ne
+                    // partage rien avec les jeux - pas de session, pas de vies, pas de journal - donc elle ne peut rien
+                    // leur faire. C'est ce qui a permis de l'ajouter sans toucher au reste.
+                    MenuButton {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Gammes")
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            scaleTrainingDialog.open();
                         }
                     }
 
@@ -1673,6 +1762,51 @@ ApplicationWindow {
                                     font.pixelSize: 15
                                     font.bold: true
                                     text: qsTr("%1 %").arg(modelData.percent)
+                                }
+
+                            }
+
+                        }
+
+                        // CE QUE TU TRAVAILLES PEU - la troisieme liste, et c'est celle qui OUVRE le bilan au lieu de le
+                        // refermer. Roger : « ca m'etonne qu'il n'y ait qu'un seul truc qui me resiste », et il a raison -
+                        // le plan ne naissait que des ECHECS, donc ce que les tirages ne lui ont jamais propose n'existait
+                        // pas pour lui. Ici on regarde au contraire ce que son NIVEAU attend et qu'il n'a jamais entendu :
+                        // « evidemment qu'on ne va pas demander a un debutant de reconnaitre un demi-diminue ».
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 6
+                            color: "#ffd479"
+                            font.pixelSize: 17
+                            font.bold: true
+                            visible: ExerciseController.reviewLeastWorkedPoints.length > 0
+                            text: qsTr("Ce que tu travailles peu")
+                        }
+
+                        Repeater {
+                            model: ExerciseController.reviewLeastWorkedPoints
+
+                            delegate: RowLayout {
+                                required property var modelData
+
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    color: "#e8dcff"
+                                    font.pixelSize: 15
+                                    text: modelData.name
+                                }
+
+                                // « JAMAIS POSE » PLUTOT QUE « 0 QUESTIONS » : c'est la difference entre un chiffre qui
+                                // constate et une phrase qui explique, et c'est exactement ce qu'on veut dire ici.
+                                Text {
+                                    Layout.preferredWidth: 96
+                                    horizontalAlignment: Text.AlignRight
+                                    color: "#8a77ad"
+                                    font.pixelSize: 12
+                                    text: modelData.asked === 0 ? qsTr("jamais posé") : qsTr("%1 questions").arg(modelData.asked)
                                 }
 
                             }
@@ -3069,9 +3203,104 @@ ApplicationWindow {
 
     }
 
-    // Plein ecran, comme l'accordeur, et pour la meme raison : c'est une page qu'on LIT, pas un message qu'on acquitte.
-    // La roue a besoin de la place pour que ses douze cases respirent, chacune portant trois informations.
-    // =================================================================================================================
+    // Le calque de l'ecran d'exercice est declare PLUS BAS dans ce fichier, et l'ordre est ce qui decide qui passe
+    // devant : une partie lancee depuis une lecon s'affiche par-dessus l'Ecole, et non derriere elle.
+    CourseScreen {
+        id: courseScreen
+
+        anchors.fill: parent
+        opacity: mainWindow.schoolIsOpen ? 1 : 0
+        visible: opacity > 0
+        // Pendant la fonte, le calque est encore visible : le desactiver evite qu'il avale un tap destine a la garde.
+        enabled: mainWindow.schoolIsOpen
+        // LE BOUTON DE SORTIE SUIT LA MEME REGLE QUE LE RETOUR DU TELEPHONE, et c'est voulu : le geste et le bouton ne
+        // peuvent pas se contredire. Depuis une lecon, on remonte a la liste ; depuis la liste, on sort de l'Ecole.
+        onCloseRequested: {
+            if (CourseController.reading)
+                CourseController.close();
+            else
+                mainWindow.schoolIsOpen = false;
+        }
+        // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
+        onVisibleChanged: {
+            if (!visible) {
+                CourseController.close();
+            }
+        }
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 150
+            }
+
+        }
+
+    }
+
+    // Roger l'a demandee explicitement pour les jeux : le retour du telephone, qu'on peut frôler sans le vouloir, ne doit
+    // pas jeter une partie en cours. « Je me suis fait beaucoup avoir. »
+    Dialog {
+        // LA QUESTION EST LE TITRE, ET IL N'Y A PAS DE CONTENU LIBRE.
+
+        id: leaveGameDialog
+
+        anchors.centerIn: parent
+        // C'est une lecon, pas une preference. Un contenu de dialogue se dimensionne sur la largeur IMPLICITE de son
+        // texte, c'est-a-dire celle de sa plus longue ligne : preferred et minimum a zero n'y changent rien tant qu'un
+        // QQuickPopupItem reste maitre du calcul, et le test de l'ecran a vu 477 points pour une vue de 352. Un titre
+        // court, deux boutons standards, et rien d'autre : le dialogue tient alors tout seul dans l'ecran.
+        title: qsTr("Revenir à la page principale ?")
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        // Ok ARRETE la partie et laisse le joueur sur la page de garde - c'est ce qu'il demande, et non fermer
+        // l'application. L'ecran d'exercice disparait de lui-meme, puisqu'il ne s'affiche que si une partie tourne.
+        onAccepted: ExerciseController.stopSession()
+
+        // Le fond du dialogue lui-meme, et pas seulement celui de la page : le style garde sa feuille blanche, et cette
+        // application est sombre.
+        background: Rectangle {
+            color: "#1d1033"
+        }
+
+    }
+
+    // LA PAGE DES GAMMES. Elle s'ouvre comme les autres pages de reference, et elle est PLEIN ECRAN parce qu'elle contient
+    // un cercle : un dessin de deux cent soixante pixels ne tient pas dans une popup.
+    Dialog {
+        // LA SEANCE COMMENCE A L'OUVERTURE, et pas avant : une gamme posee par-dessus la page precedente serait une
+        // question qu'on n'a pas demandee, entendue a moitie.
+        // LE FOND DU DIALOGUE LUI-MEME, et pas seulement celui de la page.
+
+        id: scaleTrainingDialog
+
+        anchors.centerIn: parent
+        width: mainWindow.width
+        height: mainWindow.height
+        modal: true
+        // NI TITRE, NI BOUTONS STANDARD, ET LE PADDING A ZERO : les trois creent une en-tete ou un pied de page, qui
+        // gardent le BLANC du style et laissent mon fond sombre ne remplir que la zone de contenu. Roger l'a vu tout de
+        // suite - « un bout a la couleur de fond, mais le haut est blanc ». La page entiere est donc la page, et elle
+        // porte elle-meme son titre et sa sortie, comme KeyCircleScreen et l'accordeur.
+        padding: 0
+        onOpened: ScaleController.start()
+
+        ScaleScreen {
+            anchors.fill: parent
+            // La sortie appartient a la page, et c'est la page qui la demande : le dialogue ne fait que l'ecouter. Une
+            // page qui se ferme elle-meme aurait besoin de connaitre le dialogue qui la porte.
+            onCloseRequested: scaleTrainingDialog.close()
+        }
+
+        // Le dialogue laisse sinon voir la feuille blanche du style dans la bande que la page ne couvre pas - Roger l'a vue
+        // tout de suite : « une legere barre blanche en haut de l'ecran, tres moche ». La page peint son fond, et le
+        // dialogue peint le sien : c'est le seul moyen que TOUT soit sombre, quelle que soit la bande que l'un ou l'autre
+        // n'atteint pas.
+        background: Rectangle {
+            color: "#1d1033"
+        }
+
+    }
+
     Dialog {
         id: keyCircleDialog
 

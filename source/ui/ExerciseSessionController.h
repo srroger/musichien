@@ -1087,6 +1087,11 @@ public:
 
     [[nodiscard]] bool isReviewOpeningVisible() const noexcept;
 
+    // CE QUE LE NIVEAU ATTEND, ET QU'ON N'A PAS TRAVAILLE.
+    Q_PROPERTY( QVariantList reviewLeastWorkedPoints READ reviewLeastWorkedPoints NOTIFY sessionChanged )
+
+    [[nodiscard]] QVariantList reviewLeastWorkedPoints() const;
+
     [[nodiscard]] QVariantList reviewStrongPoints() const;
     [[nodiscard]] QVariantList reviewWeakPoints() const;
 
@@ -1343,9 +1348,14 @@ private:
     // garde le domaine pur et le journal testable sans attendre une seconde.
     void recordCurrentQuestion( bool p_wasCorrect, bool p_wasRevealed );
 
-    // Les questions d'un BILAN, construites a partir des STATISTIQUES : ce que le joueur reussit d'abord, ce qui lui
-    // resiste ensuite. Vide quand il n'y a pas de journal, ou pas assez de matiere pour dire « facile puis difficile ».
-    [[nodiscard]] std::vector<domain::QuestionTarget> reviewPlan() const;
+    // Les questions d'un BILAN, construites a partir des STATISTIQUES, en TROIS temps : ce qui va bien, ce qui resiste, et
+    // ce qu'on n'a jamais travaille. Vide quand il n'y a pas de journal, ou pas assez de matiere pour dire « facile puis
+    // difficile ».
+    //
+    // p_resistingCount recoit le nombre de questions AVANT le dernier temps : c'est la borne de l'encouragement, et elle
+    // est lue ICI parce que c'est ici que le plan se coupe en trois. La recalculer ailleurs serait la recalculer faux le
+    // jour ou l'un des trois temps changera.
+    [[nodiscard]] std::vector<domain::QuestionTarget> reviewPlan( std::size_t * p_resistingCount = nullptr ) const;
 
     // CE QUE LE BILAN SAIT DU JOUEUR : les cibles de son journal, de la plus faible a la mieux reussie, gardees par la
     // meme regle que la page de statistiques - une cible vue une seule fois n'est pas un point faible.
@@ -1353,6 +1363,12 @@ private:
     // Une seule source pour les DEUX pages du bilan. La page d'ouverture les MONTRE, le plan les POSE, et il devient
     // impossible qu'un ecran annonce autre chose que ce qui suit.
     [[nodiscard]] std::vector<domain::TargetStatistics> reviewInsights() const;
+
+    // Les cibles que le NIVEAU attend, et qu'on a le MOINS travaillees - des moins vues aux plus vues.
+    //
+    // UNE SEULE SOURCE pour la page et pour le plan du bilan : la page les nomme, le plan les pose, et deux calculs separes
+    // finiraient par ne plus parler des memes cibles - exactement ce qui est arrive aux deux premieres listes.
+    [[nodiscard]] std::vector<std::pair<domain::QuestionTarget, std::size_t>> leastWorkedCandidates() const;
 
     // La meilleure ou la pire tranche de ces cibles, prete a afficher : au plus REVIEW_OPENING_POINT_COUNT entrees.
     [[nodiscard]] QVariantList reviewPointsOf( bool p_strong ) const;
@@ -1376,6 +1392,15 @@ private:
     // p_secondOnly est ce qui permet les DEUX temps d'une question de couleur : le premier mode est pose tout de suite,
     // et le second par le minuteur, quand le premier a fini de sonner. Sur une question de nom, un seul appel suffit.
     void playModeQuestion( bool p_secondOnly );
+
+    // LA DUREE D'UNE NOTE DE GAMME, ET L'ECART ENTRE DEUX : les deux lisent le MEME tempo - celui du joueur.
+    //
+    // Elles vivent en fonctions parce que TROIS endroits doivent dire la meme chose : la note jouee, le bourdon qui
+    // l'encadre, et le pas de la tete sur le cercle. Une duree recopiee a trois endroits finit par en oublier un, et la
+    // roue se desynchronise alors en silence - le defaut qu'on a mis une journee a corriger.
+    [[nodiscard]] std::chrono::milliseconds modeNoteDuration() const noexcept;
+
+    [[nodiscard]] std::chrono::milliseconds modeNoteGap() const noexcept;
 
     // Fait entendre une PHRASE du contenu, avec le bourdon qui la porte : la question de NOM y gagne une melodie la ou
     // une gamme montante disait la meme chose en moins de musique.
@@ -1463,6 +1488,12 @@ private:
     // apres, et la mesure serait perdue avec lui.
     int m_lastSungCentsOffset{ 0 };
     std::size_t m_reviewEasyQuestionCount{ 0 };
+
+    // OU FINIT LA PARTIE QUI RESISTE, dans le plan du bilan. C'est la borne de l'encouragement, et elle n'est plus la fin
+    // du plan : depuis que les cibles JAMAIS travaillees y sont ajoutees, la derniere question n'est plus forcement une
+    // faiblesse. Sans cette borne, l'app dirait « c'est exactement ce qui te resistait » a propos d'une cible que le
+    // joueur n'a jamais rencontree - le mensonge qu'on a passe une soiree a corriger.
+    std::size_t m_reviewHardQuestionCount{ 0 };
 
     // LA PAGE D'OUVERTURE : visible apres le clic sur « Bilan », avant la premiere question. Les reglages prepares
     // attendent ici, parce que le bilan ne commence qu'une fois la page lue - voir beginReviewQuestions.

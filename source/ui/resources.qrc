@@ -21,6 +21,21 @@
           l'afficher pendant la question serait donner la reponse.
         -->
         <file>qml/ModeCircle.qml</file>
+        <file>qml/ScaleScreen.qml</file>
+        <!--
+          L'Ecole des Chiots. La page est un ecran SEPARE, comme ScaleScreen : Main.qml fait deja quatre mille cinq cents
+          lignes, et rien de neuf ne s'y ajoute au-dela du bouton qui l'ouvre.
+        -->
+        <file>qml/CourseScreen.qml</file>
+        <!--
+          LES COURS, un fichier par lecon, en Markdown. Meme motif que les autres contenus, alias compris : le chemin de
+          ressource est celui du disque, sur le PC comme sur le telephone.
+
+          Un cours NEUF demande une ligne ICI et un rebuild : c'est le prix d'un contenu embarque, et il vaut mieux
+          l'ecrire que le decouvrir. Le contenu lui-meme reste de la donnee - aucune ligne de code ne change.
+        -->
+        <file alias="assets/content/courses/quinte-juste.md">../../assets/content/courses/quinte-juste.md</file>
+        <file alias="assets/content/courses/pourquoi-la-quinte-sonne-juste.md">../../assets/content/courses/pourquoi-la-quinte-sonne-juste.md</file>
         <!--
           The content files live at the root of the project, as docs/ARCHITECTURE.md requires, and the
           alias gives each one the runtime path it has on disk: ':/assets/content/...'. An alias rather

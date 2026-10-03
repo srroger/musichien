@@ -2271,9 +2271,10 @@ TEST( ExerciseSessionControllerTest, a_target_seen_once_is_not_what_resisted_the
 
     ASSERT_TRUE( controller.running() );
 
-    // Six cibles retenues - trois en echauffement, trois en difficulte. La septieme, vue une fois, n'existe pas pour le
-    // bilan : sans la garde, elle entrerait dans le plan et le compte vaudrait QUATRE.
-    EXPECT_EQ( 3, controller.questionCount() );
+    // Six cibles retenues - trois en echauffement, trois en difficulte - ET DEUX CIBLES JAMAIS TRAVAILLEES, que le plan
+    // ajoute depuis qu'il se lit en trois temps. La septieme, vue une fois, n'existe pas pour le bilan : sans la garde,
+    // elle entrerait dans le plan et le compte vaudrait un de plus.
+    EXPECT_EQ( 5, controller.questionCount() );
 }
 
 TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_player_closed )
