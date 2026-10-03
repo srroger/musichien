@@ -1886,6 +1886,75 @@ TEST( ExerciseSessionControllerTest, a_wrong_chord_is_heard_then_the_answer )
     EXPECT_GT( pair.gap.count(), 0 );
 }
 
+TEST( ExerciseSessionControllerTest, a_review_list_names_chords_too )
+{
+    // Roger, apres 1.6.30 : « le Bilan me montre toujours le Dorien ». La cause n'etait pas les modes du tout : les
+    // listes etaient bornees par le nombre de CIBLES, puis chacune ecartait les cibles SANS NOM - et un accord n'avait
+    // pas de nom sur cette page. Chaque accord rate mangeait donc une place en silence, jusqu'a ne laisser qu'une ligne.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    const auto now = std::chrono::system_clock::now();
+
+    const auto add = [&log, &now]( domain::QuestionKind p_kind, std::int32_t p_target, bool p_correct ) {
+        for( int index = 0; index < 4; ++index )
+        {
+            domain::QuestionRecord record;
+
+            record.askedAt = now - std::chrono::hours{ 1 };
+            record.kind = p_kind;
+            record.target = p_target;
+            record.direction = domain::IntervalDirection::Ascending;
+            record.outcome = p_correct ? domain::QuestionOutcome::CorrectFirstTry : domain::QuestionOutcome::Failed;
+
+            log.append( record );
+        }
+    };
+
+    // Quatre cibles, dont un ACCORD rate - et un accord qui porte un nom de COULEUR, pas de tonique : c'est la cible telle
+    // que le journal l'ecrit.
+    add( domain::QuestionKind::NamedInterval, 12, true );
+    add( domain::QuestionKind::NamedInterval, 7, true );
+    add( domain::QuestionKind::NamedInterval, 5, false );
+    add( domain::QuestionKind::Chord, static_cast<std::int32_t>( domain::ChordQuality::Minor ), false );
+
+    // Les DEUX genres sont ouverts : le bilan ecarte les questions que le joueur a fermees, et un test qui n'ouvrirait
+    // que l'intervalle verrait l'accord disparaitre avant meme d'arriver a la page.
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 50;
+    settings.chordQuestionShare = 50;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    ASSERT_TRUE( controller.isReviewOpeningVisible() );
+
+    const QVariantList weak = controller.reviewWeakPoints();
+
+    // DEUX points faibles, et pas un seul : l'accord nomme ne mange plus la place d'un intervalle. C'est exactement le
+    // symptome que Roger decrivait - une liste videe par ce qu'elle ne savait pas dire.
+    ASSERT_EQ( 2U, weak.size() );
+
+    // Les DEUX noms y sont, et le test ne se prononce pas sur leur ordre : les deux cibles sont ratees, donc a 0 % toutes
+    // les deux, et un tri n'a rien a decider entre deux exgaux. Exiger un ordre ici serait tester une coincidence.
+    QStringList names;
+
+    for( const QVariant & point : weak )
+    {
+        names.append( point.toMap().value( "name" ).toString() );
+    }
+
+    names.sort();
+
+    // Une liste construite a part : les virgules d'une liste entre accolades coupent la macro de test en deux, et
+    // l'erreur parle alors de « trop d'arguments », ce qui n'aide personne.
+    const QStringList expected{ QStringLiteral( "Minor" ), QStringLiteral( "Quarte montante" ) };
+
+    EXPECT_EQ( expected, names );
+}
+
 TEST( ExerciseSessionControllerTest, answering_twice_writes_one_line )
 {
     domain::NotePlayerFake notePlayer;
