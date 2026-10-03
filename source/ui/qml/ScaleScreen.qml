@@ -5,6 +5,11 @@
 // ecoute autant de fois qu'on veut, on repond, on recommence. Dediee a ceux qui connaissent deja les gammes et veulent
 // les entendre - c'est le seul endroit du jeu ou l'on suppose la connaissance.
 
+// LE MODULE DE L'APPLICATION, ET C'EST LUI QUI DONNE ACCES AUX CONTROLEURS : `ScaleController` est un singleton
+// ENREGISTRE, il n'existe donc pour une page que si elle importe le module qui le declare. Un composant du meme dossier
+// (ModeCircle) se resout tout seul ; un singleton, non - et l'erreur a l'execution est un simple « is not defined »,
+// qui laisse la page BLANCHE et sans boutons plutot que de la faire planter. C'est exactement ce qui s'est passe.
+import Musichien
 import QtQuick
 import QtQuick.Controls.Material
 import QtQuick.Layouts
