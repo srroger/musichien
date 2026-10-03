@@ -1393,6 +1393,15 @@ private:
     // et le second par le minuteur, quand le premier a fini de sonner. Sur une question de nom, un seul appel suffit.
     void playModeQuestion( bool p_secondOnly );
 
+    // LA DUREE D'UNE NOTE DE GAMME, ET L'ECART ENTRE DEUX : les deux lisent le MEME tempo - celui du joueur.
+    //
+    // Elles vivent en fonctions parce que TROIS endroits doivent dire la meme chose : la note jouee, le bourdon qui
+    // l'encadre, et le pas de la tete sur le cercle. Une duree recopiee a trois endroits finit par en oublier un, et la
+    // roue se desynchronise alors en silence - le defaut qu'on a mis une journee a corriger.
+    [[nodiscard]] std::chrono::milliseconds modeNoteDuration() const noexcept;
+
+    [[nodiscard]] std::chrono::milliseconds modeNoteGap() const noexcept;
+
     // Fait entendre une PHRASE du contenu, avec le bourdon qui la porte : la question de NOM y gagne une melodie la ou
     // une gamme montante disait la meme chose en moins de musique.
     void playPhraseQuestion( const domain::Phrase & p_phrase );

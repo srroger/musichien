@@ -48,8 +48,20 @@ constexpr std::chrono::milliseconds ARPEGGIO_NOTE_GAP{ 450 };
 //
 // Plus courtes que celles du banc d'essai, et c'est voulu : dans une session, une question doit tenir en quelques
 // secondes - et deux modes, c'est deja le double d'une question ordinaire.
-constexpr std::chrono::milliseconds MODE_NOTE_DURATION{ 340 };
-constexpr std::chrono::milliseconds MODE_NOTE_GAP{ 40 };
+// LA DUREE D'UNE NOTE DE GAMME DEPEND DU TEMPO - elle n'est plus une constante.
+//
+// Roger : « j'ai beau monter le bpm a fond, la vitesse des modes et des phrases reste lente et la meme ». Il a raison, et
+// la cause etait une valeur FIXE ici : la phrase suivait le reglage, la gamme non - deux musiques dans la meme page dont
+// une seule obeissait.
+//
+// UNE CROCHHE : la gamme monte une note par demi-temps, ce qui est la valeur qu'un musicien joue quand il MONTRE une
+// gamme. A 72, cela fait 417 millisecondes - tout pres des 340 d'avant, donc rien ne bouge par defaut ; a 144, la moitie,
+// et c'est exactement ce qu'on demande en montant le tempo.
+//
+// Elle vit en FONCTION, et pas en constante, pour une raison simple : trois endroits doivent dire la MEME chose - la note
+// jouee, la duree du bourdon qui l'encadre, et le pas de la tete sur le cercle. Une constante recopiee a trois endroits
+// finit toujours par en oublier un, et l'animation se desynchronise en silence.
+constexpr std::int32_t MODE_NOTE_GAP_MILLISECONDS = 40;
 
 // L'APERCU D'UN INSTRUMENT : la meme tonique que le banc d'essai des modes, pour que ce qu'on ecoute en reglant ses
 // instruments soit dans la region ou ils sonneront en exercice.
@@ -1930,7 +1942,7 @@ int ExerciseSessionController::modeSoundDurationMs() const
     // partie de ce qu'on entend, donc elle fait partie de ce qu'il faut annoncer : la compter pour rien couperait le son
     // a la fin de la phrase, et ferait enchainer la question suivante par-dessus la note qui la conclut.
     const std::chrono::milliseconds oneMode =
-      domain::droneDurationFor( domain::DEGREE_COUNT + 1, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+      domain::droneDurationFor( domain::DEGREE_COUNT + 1, modeNoteDuration(), modeNoteGap(), framing );
 
     // Le vamp et la couleur font entendre DEUX modes, separes par le meme silence que celui du minuteur qui les enchaine.
     // Une question de nom n'en fait entendre qu'un.
@@ -1959,7 +1971,7 @@ int ExerciseSessionController::modeSoundNoteStepMs() const
 
     // La MEME somme que celle passee au lecteur : deux calculs qui doivent coincider finissent toujours par diverger, donc
     // celui-ci est ecrit une seule fois.
-    return static_cast<int>( ( MODE_NOTE_DURATION + MODE_NOTE_GAP ).count() );
+    return static_cast<int>( ( modeNoteDuration() + modeNoteGap() ).count() );
 }
 
 bool ExerciseSessionController::isForeignNoteQuestion() const noexcept
@@ -2051,8 +2063,8 @@ void ExerciseSessionController::playForeignNoteQuestion()
 
     m_notePlayer.playMelodyOverDrone( melody,
                                       drone,
-                                      MODE_NOTE_DURATION,
-                                      MODE_NOTE_GAP,
+                                      modeNoteDuration(),
+                                      modeNoteGap(),
                                       domain::DroneFraming{ MODE_LEAD_IN, MODE_TAIL } );
 
     // LA ROUE S'ANIME ICI AUSSI, et c'est Roger qui l'a demande : « j'aimerais bien que pour la note etrangere il y
@@ -2679,6 +2691,18 @@ void ExerciseSessionController::setForeignNoteQuestionShare( int p_share )
     m_settings.foreignNoteQuestionShare = p_share;
 
     emit foreignNoteQuestionShareChanged();
+}
+
+std::chrono::milliseconds ExerciseSessionController::modeNoteDuration() const noexcept
+{
+    // UNE CROCHHE au tempo du joueur : la moitie d'un temps. La gamme suit donc le reglage des phrases, comme elle le
+    // devrait depuis le debut.
+    return std::chrono::milliseconds{ ( 60'000 / std::max( 1, phraseTempoBpm() ) ) / 2 };
+}
+
+std::chrono::milliseconds ExerciseSessionController::modeNoteGap() const noexcept
+{
+    return std::chrono::milliseconds{ MODE_NOTE_GAP_MILLISECONDS };
 }
 
 int ExerciseSessionController::phraseTempoBpm() const
@@ -3474,7 +3498,7 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
 
     const domain::DroneFraming framing{ MODE_LEAD_IN, MODE_TAIL };
 
-    m_notePlayer.playMelodyOverDrone( melody, drone, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+    m_notePlayer.playMelodyOverDrone( melody, drone, modeNoteDuration(), modeNoteGap(), framing );
 
     // LA ROUE S'ANIME : l'ecran part de la tonique et parcourt la gamme, de note en note. Le signal est emis ICI, au
     // moment ou le son part - donc le dessin et la musique commencent ensemble, sans un decalage que rien n'expliquerait.
@@ -3487,7 +3511,7 @@ void ExerciseSessionController::playModeQuestion( bool p_secondOnly )
     if( !p_secondOnly && hasPrevious )
     {
         const auto modeDuration =
-          domain::droneDurationFor( domain::DEGREE_COUNT, MODE_NOTE_DURATION, MODE_NOTE_GAP, framing );
+          domain::droneDurationFor( domain::DEGREE_COUNT, modeNoteDuration(), modeNoteGap(), framing );
 
         m_modeTimer.start( static_cast<int>( ( modeDuration + MODE_COMPARISON_GAP ).count() ) );
     }
