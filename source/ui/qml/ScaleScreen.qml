@@ -25,6 +25,10 @@ Item {
 
     id: scaleScreen
 
+    // La page demande a sortir, et celui qui la porte decide comment : c'est ce qui lui permet d'ignorer s'il y a un
+    // dialogue autour d'elle, ou autre chose.
+    signal closeRequested()
+
     anchors.fill: parent
 
     // La couleur est celle de KeyCircleScreen, et ce n'est pas une coincidence : deux pages de reference doivent se
@@ -36,8 +40,30 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 18
-        spacing: 10
+        anchors.margins: 14
+        spacing: 8
+
+        // LE TITRE ET LA SORTIE APPARTIENNENT A LA PAGE, et pas au dialogue : c'est ce qui permet au fond de couvrir
+        // TOUT. Une en-tete de style resterait blanche, et couperait la page en deux couleurs - ce que Roger a vu :
+        // « un bout a la couleur de fond, mais le haut est blanc ».
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Text {
+                Layout.fillWidth: true
+                color: "#ffd479"
+                font.pixelSize: 20
+                font.bold: true
+                text: qsTr("Les gammes")
+            }
+
+            Button {
+                text: qsTr("Fermer")
+                onClicked: scaleScreen.closeRequested()
+            }
+
+        }
 
         Text {
             Layout.fillWidth: true

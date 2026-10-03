@@ -3094,17 +3094,20 @@ ApplicationWindow {
         width: mainWindow.width
         height: mainWindow.height
         modal: true
-        padding: 6
-        title: qsTr("Les gammes")
-        // Le bouton de fermeture du style : la page n'a pas de « fin », elle a une SORTIE. C'est ce qui dit qu'on est en
-        // train de pratiquer et non de jouer une partie.
-        standardButtons: Dialog.Close
+        // NI TITRE, NI BOUTONS STANDARD, ET LE PADDING A ZERO : les trois creent une en-tete ou un pied de page, qui
+        // gardent le BLANC du style et laissent mon fond sombre ne remplir que la zone de contenu. Roger l'a vu tout de
+        // suite - « un bout a la couleur de fond, mais le haut est blanc ». La page entiere est donc la page, et elle
+        // porte elle-meme son titre et sa sortie, comme KeyCircleScreen et l'accordeur.
+        padding: 0
         // LA SEANCE COMMENCE A L'OUVERTURE, et pas avant : une gamme posee par-dessus la page precedente serait une
         // question qu'on n'a pas demandee, entendue a moitie.
         onOpened: ScaleController.start()
 
         ScaleScreen {
             anchors.fill: parent
+            // La sortie appartient a la page, et c'est la page qui la demande : le dialogue ne fait que l'ecouter. Une
+            // page qui se ferme elle-meme aurait besoin de connaitre le dialogue qui la porte.
+            onCloseRequested: scaleTrainingDialog.close()
         }
 
     }

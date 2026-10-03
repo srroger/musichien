@@ -108,7 +108,11 @@ Item {
 
         // Ici la TEINTE bouge et la saturation ne bouge plus : meme quantite de jaune et de vert, mais une couleur qu'on
         // peut NOMMER - et sept pastilles qui se distinguent l'une de l'autre.
-        var count = ((modelData !== undefined) && (modelData.degreeCount !== undefined)) ? modelData.degreeCount : 7;
+        // LE COMPTE VIENT DU PARAMETRE, et surtout PAS de `modelData` : cette fonction vit sur la RACINE du composant, ou
+        // `modelData` n'existe pas - il n'appartient qu'au delegue. L'y lire ne leve rien a la compilation, ne se voit pas
+        // a qmllint, et **casse la couleur de toutes les pastilles** a l'execution : c'est exactement ce que Roger a vu
+        // (« les boutons de notes n'ont plus de couleur »), et logcat l'a dit en une ligne.
+        var count = (p_degreeCount !== undefined) ? p_degreeCount : 7;
         var ratio = Math.max(0, Math.min(1, p_stepIndex / Math.max(2, count - 1)));
         return Qt.hsla(0.14 + (0.25 * ratio), 0.68, 0.56, 1);
     }
