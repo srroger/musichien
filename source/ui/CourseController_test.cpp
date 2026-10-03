@@ -178,4 +178,30 @@ TEST( CourseControllerTest, closing_gives_back_an_empty_page )
     EXPECT_EQ( controller.library().size(), 1 );
 }
 
+TEST( CourseControllerTest, a_descending_card_really_descends )
+{
+    // LE BUG QUE ROGER A ENTENDU : « le sol -> do me fait encore l'ascendant ». La direction n'etait pas lue du tout, et
+    // le fichier avait raison de la porter. Un test qui aurait compte les appels n'aurait RIEN vu : ce qui compte est
+    // l'ORDRE des deux notes.
+    domain::NotePlayerFake notePlayer;
+
+    CourseController controller{ notePlayer, { makeQuintCourse() } };
+
+    controller.playInterval( 7, static_cast<int>( domain::IntervalDirection::Ascending ) );
+
+    ASSERT_EQ( notePlayer.playedMelodies().size(), 1U );
+    ASSERT_EQ( notePlayer.playedMelodies().front().notes.size(), 2U );
+
+    // Montant : la note grave d'abord.
+    EXPECT_LT( notePlayer.playedMelodies().front().notes.at( 0 ), notePlayer.playedMelodies().front().notes.at( 1 ) );
+
+    controller.playInterval( 7, static_cast<int>( domain::IntervalDirection::Descending ) );
+
+    ASSERT_EQ( notePlayer.playedMelodies().size(), 2U );
+    ASSERT_EQ( notePlayer.playedMelodies().back().notes.size(), 2U );
+
+    // Descendant : la note AIGUE d'abord. C'est tout, et c'est tout ce qui manquait.
+    EXPECT_GT( notePlayer.playedMelodies().back().notes.at( 0 ), notePlayer.playedMelodies().back().notes.at( 1 ) );
+}
+
 }    // namespace musichien::ui

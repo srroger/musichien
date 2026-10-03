@@ -79,8 +79,11 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     color: "#cbbde8"
-                    font.pixelSize: 16
-                    text: qsTr("✕")
+                    font.pixelSize: 22
+                    // MULTIPLICATION SIGN, pas une croix de symbole : U+00D7 est en Latin-1 et vit dans TOUTES les polices,
+                    // alors que le '✕' que j'avais mis (U+2715) n'est pas dans Quicksand - et Quicksand est impose comme
+                    // police de l'interface. Le resultat etait le rectangle que Roger a vu : « une icone manquante ».
+                    text: qsTr("×")
                 }
 
                 MouseArea {
@@ -148,7 +151,9 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             color: "#cbbde8"
                             font.pixelSize: 18
-                            text: qsTr("›")
+                            // Un chevron ASCII, et pas '›' (U+203A) : meme raison que le bouton de sortie, c'est la police
+                            // de l'interface qui decide, et elle n'a pas a avoir tous les symboles du monde.
+                            text: qsTr(">")
                         }
 
                         MouseArea {
@@ -229,7 +234,7 @@ Item {
                                 wrapMode: Text.WordWrap
                                 color: "#cdeec6"
                                 font.pixelSize: 14
-                                text: qsTr("▶  %1").arg(modelData.caption)
+                                text: qsTr("🔊  %1").arg(modelData.caption)
                             }
 
                             MouseArea {
@@ -288,7 +293,7 @@ Item {
                                         anchors.centerIn: parent
                                         color: "#ffffff"
                                         font.pixelSize: 14
-                                        text: modelData.source === "spotify" ? qsTr("▶  Écouter sur Spotify") : qsTr("▶  Écouter sur YouTube")
+                                        text: modelData.source === "spotify" ? qsTr("Écouter sur Spotify") : qsTr("Écouter sur YouTube")
                                     }
 
                                     MouseArea {

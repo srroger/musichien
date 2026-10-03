@@ -165,11 +165,18 @@ void CourseController::playInterval( int p_semitones, int p_direction )
     const domain::Note rootNote{ EXERCISE_ROOT_MIDI_NUMBER };
     const domain::Note upperNote = rootNote.transposedBy( p_semitones );
 
-    const std::array<domain::Note, 2> notes{ rootNote, upperNote };
+    const auto direction = static_cast<domain::IntervalDirection>( p_direction );
 
-    // LES TROIS FACONS DU DOMAINE, et rien d'autre. Une quinte harmonique s'entend comme un accord, une quinte montante
-    // comme une melodie : c'est la distinction du jeu entier, et un cours n'a pas a en inventer une autre.
-    if( static_cast<domain::IntervalDirection>( p_direction ) == domain::IntervalDirection::Harmonic )
+    // LE SENS EST DANS L'ORDRE DES NOTES, et c'est le seul endroit ou il se dit : le domaine connait une MAGNITUDE, et la
+    // direction appartient a ce qu'on joue - le fichier d'origine le dit deja.
+    //
+    // Roger l'a entendu tout de suite : « le sol -> do me fait encore l'ascendant ». Il avait raison, et la cause etait un
+    // copier-coller du banc d'essai des intervalles, qui ne joue jamais qu'en montant parce qu'il compare des couleurs.
+    const std::array<domain::Note, 2> notes = ( direction == domain::IntervalDirection::Descending )
+                                                ? std::array<domain::Note, 2>{ upperNote, rootNote }
+                                                : std::array<domain::Note, 2>{ rootNote, upperNote };
+
+    if( direction == domain::IntervalDirection::Harmonic )
     {
         m_notePlayer.playChord( notes );
     }
