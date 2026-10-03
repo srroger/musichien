@@ -18,9 +18,21 @@ import QtQuick.Layouts
 // les peint. Une gamme de cinq notes s'y dessine aussi bien qu'un mode de sept.
 // =====================================================================================================================
 Item {
+    // LE FOND APPARTIENT A L'ECRAN, PAS AU DIALOGUE.
+    // Les dialogues de cette application n'ont pas de fond a eux : ils laissent voir la feuille BLANCHE du style, et c'est
+    // chaque page qui peint la sienne - KeyCircleScreen et l'accordeur font exactement cela. Ma page ne le faisait pas, et
+    // Roger a vu « le fond tout blanc » : ses textes clairs sur une feuille blanche, donc illisibles.
+
     id: scaleScreen
 
     anchors.fill: parent
+
+    // La couleur est celle de KeyCircleScreen, et ce n'est pas une coincidence : deux pages de reference doivent se
+    // ressembler, sinon le joueur croit avoir change d'application.
+    Rectangle {
+        anchors.fill: parent
+        color: "#1d1033"
+    }
 
     ColumnLayout {
         anchors.fill: parent
