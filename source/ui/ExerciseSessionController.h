@@ -1056,6 +1056,31 @@ public:
     // Vrai pendant un bilan : l'ecran sait alors que la session est differente, et peut le dire.
     [[nodiscard]] bool isReviewRunning() const noexcept { return m_isReviewRunning; }
 
+    // LA PAGE D'OUVERTURE DU BILAN : elle dit au joueur ce que l'app sait de lui - ses points forts, ses points faibles
+    // - et a quoi le bilan sert, AVANT de lui poser la premiere question.
+    //
+    // C'est la piece que Roger a demandee en premier, et il l'a formulee comme une porte plutot qu'un ecran : « le
+    // bilan, en montrant les points forts et les points faibles, serait une super porte d'acces vers ce cote plus
+    // academique ». Un joueur qui comprend POURQUOI on lui pose ces questions travaille ; un joueur qui les subit
+    // repond.
+    Q_PROPERTY( bool isReviewOpeningVisible READ isReviewOpeningVisible NOTIFY sessionChanged )
+
+    // Ce que le joueur reussit le mieux, et le moins bien : des INTERVALLES et des MODES, nommes en francais. Chaque
+    // entree porte 'name', 'percent' et 'asked'.
+    Q_PROPERTY( QVariantList reviewStrongPoints READ reviewStrongPoints NOTIFY sessionChanged )
+    Q_PROPERTY( QVariantList reviewWeakPoints READ reviewWeakPoints NOTIFY sessionChanged )
+
+    [[nodiscard]] bool isReviewOpeningVisible() const noexcept;
+
+    [[nodiscard]] QVariantList reviewStrongPoints() const;
+    [[nodiscard]] QVariantList reviewWeakPoints() const;
+
+    // Le joueur a lu la page : le bilan commence, avec SES questions et pas avant.
+    Q_INVOKABLE void beginReviewQuestions();
+
+    // Le joueur referme la page : le bilan n'a pas eu lieu, et RIEN n'a ete compte.
+    Q_INVOKABLE void cancelReviewOpening();
+
     // Le mot du moment : un encouragement AVANT une difficulte connue, et apres une reussite sur ce qui resistait.
     //
     // Vide quand il n'y a rien a dire, et ce n'est pas un detail : un ecran qui parle pour ne rien dire devient un ecran
@@ -1300,6 +1325,20 @@ private:
     // resiste ensuite. Vide quand il n'y a pas de journal, ou pas assez de matiere pour dire « facile puis difficile ».
     [[nodiscard]] std::vector<domain::QuestionTarget> reviewPlan() const;
 
+    // CE QUE LE BILAN SAIT DU JOUEUR : les cibles de son journal, de la plus faible a la mieux reussie, gardees par la
+    // meme regle que la page de statistiques - une cible vue une seule fois n'est pas un point faible.
+    //
+    // Une seule source pour les DEUX pages du bilan. La page d'ouverture les MONTRE, le plan les POSE, et il devient
+    // impossible qu'un ecran annonce autre chose que ce qui suit.
+    [[nodiscard]] std::vector<domain::TargetStatistics> reviewInsights() const;
+
+    // La meilleure ou la pire tranche de ces cibles, prete a afficher : au plus REVIEW_OPENING_POINT_COUNT entrees.
+    [[nodiscard]] QVariantList reviewPointsOf( bool p_strong ) const;
+
+    // Le nom qu'un JOUEUR lit pour une cible : « Quinte montante », « Dorien ». Vide pour ce que cette page ne nomme
+    // pas - un accord, une cellule rythmique.
+    [[nodiscard]] static QString targetLabel( const domain::TargetStatistics & p_target );
+
     // La question en cours fait-elle partie de ce qui RESISTE au joueur ?
     //
     // Le plan est construit dans cet ordre, donc le controleeur le sait sans recroiser les statistiques a chaque
@@ -1402,6 +1441,11 @@ private:
     // apres, et la mesure serait perdue avec lui.
     int m_lastSungCentsOffset{ 0 };
     std::size_t m_reviewEasyQuestionCount{ 0 };
+
+    // LA PAGE D'OUVERTURE : visible apres le clic sur « Bilan », avant la premiere question. Les reglages prepares
+    // attendent ici, parce que le bilan ne commence qu'une fois la page lue - voir beginReviewQuestions.
+    bool m_reviewOpeningVisible{ false };
+    domain::SessionSettings m_pendingReviewSettings{};
 
     // Read once from the store, then kept here: the screen asks for it on every question, and a settings file
     // has no business being read that often.

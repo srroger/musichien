@@ -120,6 +120,12 @@ constexpr std::size_t REVIEW_EASY_QUESTION_COUNT = 3;
 // exercice rate il y a six mois n'est plus une faiblesse, c'est un souvenir.
 constexpr int REVIEW_PERIOD_DAYS = 30;
 
+// Combien de points forts - et de points faibles - la page d'ouverture du bilan MONTRE.
+//
+// TROIS de chaque cote : c'est ce qu'une page peut dire sans devenir une liste, et c'est assez pour que le joueur
+// reconnaisse son profil en la lisant. Au-dela, il ne lit plus, il survole - et une page qu'on survole n'explique rien.
+constexpr std::size_t REVIEW_OPENING_POINT_COUNT = 3;
+
 // La qualite d'une frappe, dans la convention de l'ecran : 0 = Miss, 1 = Good, 2 = Perfect.
 //
 // La page Rythme parle deja cette langue, et la question de rythme doit parler la MEME : deux ecrans qui
@@ -3482,16 +3488,158 @@ void ExerciseSessionController::startReviewSession()
     m_reviewEasyQuestionCount = std::max<std::size_t>( 1, std::min( REVIEW_EASY_QUESTION_COUNT, plan.size() / 2 ) );
     m_isReviewRunning = true;
 
-    beginSession( settings );
+    // ET LES QUESTIONS ATTENDENT. C'est la page d'ouverture qui ouvre le bilan, pas le bouton du menu.
+    //
+    // Le joueur lit d'abord CE QUE L'APP SAIT DE LUI - ses points forts, ses points faibles, et pourquoi on va lui poser
+    // ces questions-la. Roger l'a demande comme une PORTE plutot qu'un ecran de plus : « le bilan, en montrant les points
+    // forts et les points faibles, serait une super porte d'acces vers ce cote plus academique ».
+    //
+    // Rien ne commence donc avant qu'il ait lu. Une premiere question jouee DERRIERE une page d'explication serait une
+    // question perdue : il l'entendrait sans la regarder, et le bilan s'ouvrirait sur un echec qu'il n'a pas joue.
+    m_reviewOpeningVisible = true;
+    m_pendingReviewSettings = settings;
+
+    emit sessionChanged();
 }
 
-std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() const
+bool ExerciseSessionController::isReviewOpeningVisible() const noexcept
 {
-    std::vector<domain::QuestionTarget> plan;
+    return m_reviewOpeningVisible;
+}
+
+void ExerciseSessionController::beginReviewQuestions()
+{
+    if( !m_reviewOpeningVisible )
+    {
+        return;
+    }
+
+    m_reviewOpeningVisible = false;
+
+    beginSession( m_pendingReviewSettings );
+}
+
+void ExerciseSessionController::cancelReviewOpening()
+{
+    if( !m_reviewOpeningVisible )
+    {
+        return;
+    }
+
+    // Refermer la page, c'est renoncer au bilan - et RIEN n'a ete compte : aucune question n'a ete posee, aucun essai
+    // n'est entre au journal. Le bouton peut donc etre repris plus tard sans laisser de trace, ce qui est le minimum
+    // quand une page propose de commencer quelque chose.
+    m_reviewOpeningVisible = false;
+    m_isReviewRunning = false;
+    m_reviewEasyQuestionCount = 0;
+    m_pendingReviewSettings = domain::SessionSettings{};
+
+    emit sessionChanged();
+}
+
+QVariantList ExerciseSessionController::reviewStrongPoints() const
+{
+    return reviewPointsOf( true );
+}
+
+QVariantList ExerciseSessionController::reviewWeakPoints() const
+{
+    return reviewPointsOf( false );
+}
+
+QVariantList ExerciseSessionController::reviewPointsOf( bool p_strong ) const
+{
+    QVariantList points;
+
+    const std::vector<domain::TargetStatistics> insights = reviewInsights();
+
+    // De la PLUS FAIBLE a la mieux reussie : les points faibles sont donc au debut de la liste, les forts a la fin. On
+    // la descend pour les faibles, on la remonte pour les forts - et les deux listes ne peuvent pas se contredire, ce
+    // qui arriverait si chacune refaisait son propre tri.
+    for( std::size_t index = 0; ( index < insights.size() ) && ( points.size() < REVIEW_OPENING_POINT_COUNT ); ++index )
+    {
+        const domain::TargetStatistics & target =
+          p_strong ? insights.at( insights.size() - 1 - index ) : insights.at( index );
+
+        const QString label = targetLabel( target );
+
+        if( label.isEmpty() )
+        {
+            continue;
+        }
+
+        QVariantMap point;
+        point.insert( QStringLiteral( "name" ), label );
+        point.insert( QStringLiteral( "percent" ), target.statistics.successPercent() );
+        point.insert( QStringLiteral( "asked" ), static_cast<int>( target.statistics.questionCount ) );
+
+        points.append( point );
+    }
+
+    return points;
+}
+
+QString ExerciseSessionController::targetLabel( const domain::TargetStatistics & p_target )
+{
+    // LES INTERVALLES ET LES MODES, et rien d'autre - c'est la demande de Roger, mot pour mot. Un accord ou une cellule
+    // rythmique se nomment autrement, et les melanger ici noierait les deux listes au lieu de les eclairer.
+    //
+    // LE NOM EST FRANCAIS, et c'est un choix. L'intervalle du domaine se nomme en anglais (« Perfect fifth ») : c'est le
+    // nom du MODELE, et il est fait pour ne jamais changer. La page d'ouverture, elle, parle au joueur - et
+    // « Perfect fifth montante » ne serait ni une langue ni l'autre.
+    static constexpr std::array<std::string_view, 15> FRENCH_DEGREES{
+      "Unisson",
+      "Seconde",
+      "Tierce",
+      "Quarte",
+      "Quinte",
+      "Sixte",
+      "Septieme",
+      "Octave",
+      "Neuvieme",
+      "Dixieme",
+      "Onzieme",
+      "Douzieme",
+      "Treizieme",
+      "Quatorzieme",
+      "Quinzieme",
+    };
+
+    switch( p_target.kind )
+    {
+        case domain::QuestionKind::NamedInterval:
+        case domain::QuestionKind::Direction: {
+            const domain::Interval interval{ p_target.target };
+            const auto degreeSlot = static_cast<std::size_t>( interval.number() ) - 1;
+
+            if( degreeSlot >= FRENCH_DEGREES.size() )
+            {
+                return QString{};
+            }
+
+            const QString direction = p_target.direction == domain::IntervalDirection::Ascending ? tr( "montante" )
+                                                                                                 : tr( "descendante" );
+
+            return tr( "%1 %2" ).arg( QString::fromUtf8( FRENCH_DEGREES.at( degreeSlot ).data() ), direction );
+        }
+
+        case domain::QuestionKind::ModeColour:
+        case domain::QuestionKind::ModeName:
+        case domain::QuestionKind::ModeVamp:
+            return describeMode( static_cast<domain::Mode>( p_target.target ) ).value( QStringLiteral( "name" ) ).toString();
+
+        default:
+            return QString{};
+    }
+}
+
+std::vector<domain::TargetStatistics> ExerciseSessionController::reviewInsights() const
+{
+    std::vector<domain::TargetStatistics> insights;
 
     if( m_questionLog == nullptr )
     {
-        return plan;
+        return insights;
     }
 
     const auto since = std::chrono::system_clock::now() - ( std::chrono::hours{ 24 } * REVIEW_PERIOD_DAYS );
@@ -3499,8 +3647,7 @@ std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() cons
     domain::StatisticsFilter filter;
     filter.since = since;
 
-    std::vector<domain::TargetStatistics> byTarget =
-      domain::statisticsByTarget( m_questionLog->since( since ), filter );
+    insights = domain::statisticsByTarget( m_questionLog->since( since ), filter );
 
     // UNE CIBLE VUE UNE OU DEUX FOIS N'EST PAS UN POINT FAIBLE : c'est un hasard, et c'est exactement ce que Roger a
     // entendu - « des fois tu dis : bravo, c'etait quelque chose qui te resistait alors que pas du tout ».
@@ -3513,9 +3660,20 @@ std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() cons
     // Le seuil est celui de la page de statistiques. La MEME regle doit valoir partout ou l'app designe ce qui resiste,
     // sinon les deux ecrans se contrediraient devant le joueur - et c'est le genre de contradiction qui apprend a ne
     // plus croire ni l'un ni l'autre.
-    std::erase_if( byTarget, []( const domain::TargetStatistics & p_target ) {
+    std::erase_if( insights, []( const domain::TargetStatistics & p_target ) {
         return p_target.statistics.questionCount < domain::MINIMUM_OBSERVATIONS_FOR_A_WEAKNESS;
     } );
+
+    return insights;
+}
+
+std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() const
+{
+    std::vector<domain::QuestionTarget> plan;
+
+    // Les DEUX pages du bilan lisent la meme chose : la page d'ouverture montre ces cibles au joueur, et le plan les
+    // lui pose, dans l'ordre. Une seule source, donc un ecran ne peut pas annoncer autre chose que ce qui suit.
+    const std::vector<domain::TargetStatistics> byTarget = reviewInsights();
 
     if( byTarget.size() < 4 )
     {

@@ -1949,14 +1949,73 @@ TEST( ExerciseSessionControllerTest, a_review_session_plans_its_questions )
 
     controller.startReviewSession();
 
-    EXPECT_TRUE( controller.running() );
+    // LE BILAN S'OUVRE SUR SA PAGE, et non sur une question : rien n'est compte avant que le joueur ait lu ce que
+    // l'app sait de lui. Roger a demande cette page comme une PORTE vers le cote academique de l'app.
+    EXPECT_FALSE( controller.running() );
     EXPECT_TRUE( controller.isReviewRunning() );
+    EXPECT_TRUE( controller.isReviewOpeningVisible() );
+
+    controller.beginReviewQuestions();
+
+    EXPECT_TRUE( controller.running() );
+    EXPECT_FALSE( controller.isReviewOpeningVisible() );
 
     // Le bilan est FINI : ses questions sont decidees, donc son compte est celui du plan - et il ne se perd pas, puisqu'un
     // bilan sans vies ne peut pas s'arreter au milieu.
     EXPECT_GT( controller.questionCount(), 0 );
     EXPECT_LT( controller.questionCount(), 10 );
     EXPECT_TRUE( controller.hasUnlimitedLives() );
+}
+
+TEST( ExerciseSessionControllerTest, the_review_opens_on_what_the_app_knows_about_the_player )
+{
+    // LA PAGE D'OUVERTURE, et ce qu'elle doit contenir : les points FORTS et les points FAIBLES du joueur, tires de son
+    // journal - la demande de Roger, mot pour mot : « avec les intervalles et les modes que le joueur reussit le plus,
+    // ainsi que ceux qu'il reussit le moins ».
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    fillJournalWithWorkedTargets( log );
+
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    ASSERT_TRUE( controller.isReviewOpeningVisible() );
+
+    const QVariantList strong = controller.reviewStrongPoints();
+    const QVariantList weak = controller.reviewWeakPoints();
+
+    ASSERT_FALSE( strong.isEmpty() );
+    ASSERT_FALSE( weak.isEmpty() );
+
+    // Le journal contient six intervalles : trois sus (12, 7 et 4 demi-tons) et trois rates (2, 6 et 11). Les deux
+    // listes disent donc deux choses opposees, et elles sont lues dans la MEME source triee - donc le meilleur ne peut
+    // pas se retrouver parmi les faibles.
+    //
+    // Le tri ne garantit pas l'ordre des exgaux : on verifie donc le TAUX et la langue, pas un nom precis.
+    EXPECT_EQ( 100, strong.first().toMap().value( "percent" ).toInt() );
+    EXPECT_EQ( 0, weak.first().toMap().value( "percent" ).toInt() );
+
+    // Le nom est FRANCAIS et il porte la direction : « Quinte montante ». L'intervalle du domaine, lui, se nomme en
+    // anglais - c'est le nom du modele, et la page parle au joueur.
+    EXPECT_TRUE( strong.first().toMap().value( "name" ).toString().endsWith( QStringLiteral( " montante" ) ) );
+    EXPECT_GE( weak.first().toMap().value( "asked" ).toInt(), 1 );
+
+    // ET RIEN N'EST COMMENCE : c'est tout l'objet de la page. Une question jouee derriere l'explication serait perdue -
+    // le joueur l'entendrait sans la regarder.
+    EXPECT_FALSE( controller.running() );
+
+    // « Plus tard » : le bilan n'a pas eu lieu, et RIEN n'a ete compte.
+    controller.cancelReviewOpening();
+
+    EXPECT_FALSE( controller.isReviewOpeningVisible() );
+    EXPECT_FALSE( controller.isReviewRunning() );
+    EXPECT_FALSE( controller.running() );
 }
 
 TEST( ExerciseSessionControllerTest, a_target_seen_once_is_not_what_resisted_the_player )
@@ -1995,6 +2054,11 @@ TEST( ExerciseSessionControllerTest, a_target_seen_once_is_not_what_resisted_the
     controller.setQuestionLog( &log );
 
     controller.startReviewSession();
+
+    // Le bilan s'ouvre sur sa page : le plan est pret, mais les questions attendent d'etre lues.
+    ASSERT_TRUE( controller.isReviewOpeningVisible() );
+
+    controller.beginReviewQuestions();
 
     ASSERT_TRUE( controller.running() );
 
@@ -2456,6 +2520,9 @@ TEST( ExerciseSessionControllerTest, the_encouragement_speaks_only_during_a_revi
 
     controller.stopSession();
     controller.startReviewSession();
+
+    // La page d'ouverture, puis ses questions : c'est le meme geste pour le joueur, et le test le fait.
+    controller.beginReviewQuestions();
 
     // Le bilan, lui, parle - au minimum quand il attaque ce qui resiste.
     bool spokeAtSomePoint = false;

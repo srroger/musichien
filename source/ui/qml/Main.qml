@@ -569,6 +569,8 @@ ApplicationWindow {
     Rectangle {
         // The loop itself, and the only thing the player ever sees of it: the bench below is a tool for
         // building the project, this is the game.
+        // LA PAGE D'OUVERTURE DU BILAN : elle dit au joueur CE QUE L'APP SAIT DE LUI avant de l'interroger - ses points
+        // forts, ses points faibles - et a quoi le bilan sert.
 
         anchors.fill: parent
 
@@ -1522,6 +1524,193 @@ ApplicationWindow {
             anchors.fill: parent
             visible: opacity > 0
             opacity: ExerciseController.running ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 220
+                    easing.type: Easing.OutCubic
+                }
+
+            }
+
+        }
+
+        // Elle vit ICI, et non dans l'ecran de jeu, pour une raison de fond : le bilan ne commence pas tant que la page
+        // est ouverte (voir beginReviewQuestions). Le joueur lit donc au calme, et la premiere question n'est pas jouee
+        // DERRIERE une explication - ou il l'entendrait sans la regarder.
+        Rectangle {
+            id: reviewOpeningPage
+
+            anchors.fill: parent
+            visible: opacity > 0
+            opacity: ExerciseController.isReviewOpeningVisible ? 1 : 0
+            color: "#1b1035"
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 18
+                spacing: 8
+
+                Flickable {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    contentHeight: openingColumn.height
+                    clip: true
+                    flickableDirection: Flickable.VerticalFlick
+
+                    ColumnLayout {
+                        id: openingColumn
+
+                        width: parent.width
+                        spacing: 10
+
+                        Text {
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WordWrap
+                            color: "#ffd479"
+                            font.pixelSize: 26
+                            font.bold: true
+                            text: ExerciseController.isWeekEnd ? qsTr("Bilan de la semaine") : qsTr("Bilan")
+                        }
+
+                        // POURQUOI CE BILAN, et D'ABORD pourquoi. La phrase vient avant les chiffres parce que c'est
+                        // elle qui les rend utiles : sans elle, deux listes de pourcentages sont un bulletin scolaire.
+                        // Avec elle, ce sont les deux choses sur lesquelles le joueur a decide de travailler.
+                        Text {
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WordWrap
+                            color: "#e8dcff"
+                            font.pixelSize: 15
+                            text: qsTr("Ce bilan part de TES résultats des 30 derniers jours : il commence par ce que tu réussis le mieux, puis attaque ce qui te résiste encore. Son but n'est pas de te piéger, mais de faire progresser exactement ces points-là.")
+                        }
+
+                        // LES POINTS FORTS. Le vert dit « acquis », et le NOMBRE DE QUESTIONS dit sur quoi il se fonde :
+                        // un pourcentage sans son nombre de questions ne veut rien dire, et le montrer evite d'avoir a
+                        // croire l'app sur parole.
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 6
+                            color: "#8ef2b0"
+                            font.pixelSize: 17
+                            font.bold: true
+                            visible: ExerciseController.reviewStrongPoints.length > 0
+                            text: qsTr("Ce que tu réussis le mieux")
+                        }
+
+                        Repeater {
+                            model: ExerciseController.reviewStrongPoints
+
+                            delegate: RowLayout {
+                                required property var modelData
+
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    color: "#e8dcff"
+                                    font.pixelSize: 15
+                                    text: modelData.name
+                                }
+
+                                Text {
+                                    color: "#8a77ad"
+                                    font.pixelSize: 12
+                                    text: qsTr("%1 questions").arg(modelData.asked)
+                                }
+
+                                Text {
+                                    Layout.preferredWidth: 52
+                                    horizontalAlignment: Text.AlignRight
+                                    color: "#8ef2b0"
+                                    font.pixelSize: 15
+                                    font.bold: true
+                                    text: qsTr("%1 %").arg(modelData.percent)
+                                }
+
+                            }
+
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 6
+                            color: "#ff8fb0"
+                            font.pixelSize: 17
+                            font.bold: true
+                            visible: ExerciseController.reviewWeakPoints.length > 0
+                            text: qsTr("Ce qui te résiste encore")
+                        }
+
+                        Repeater {
+                            model: ExerciseController.reviewWeakPoints
+
+                            delegate: RowLayout {
+                                required property var modelData
+
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    color: "#e8dcff"
+                                    font.pixelSize: 15
+                                    text: modelData.name
+                                }
+
+                                Text {
+                                    color: "#8a77ad"
+                                    font.pixelSize: 12
+                                    text: qsTr("%1 questions").arg(modelData.asked)
+                                }
+
+                                Text {
+                                    Layout.preferredWidth: 52
+                                    horizontalAlignment: Text.AlignRight
+                                    color: modelData.percent < 50 ? "#ff8fb0" : "#8ef2b0"
+                                    font.pixelSize: 15
+                                    font.bold: true
+                                    text: qsTr("%1 %").arg(modelData.percent)
+                                }
+
+                            }
+
+                        }
+
+                        // LA PORTE VERS L'APRES, et c'est la pensee de Roger : le Bilan est l'entree du cote plus
+                        // academique de l'app, celui ou l'on apprend POURQUOI un intervalle ou un mode sonne ainsi.
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 8
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WordWrap
+                            color: "#8a77ad"
+                            font.pixelSize: 13
+                            text: qsTr("Ces points faibles ne sont pas des reproches : ce sont les seuls endroits où progresser se voit tout de suite.")
+                        }
+
+                        // LES DEUX PORTES, et elles restent ATTEIGNABLES : c'est le contenu qui defile, pas les boutons.
+                        Button {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 4
+                            highlighted: true
+                            text: qsTr("Commencer le bilan")
+                            onClicked: ExerciseController.beginReviewQuestions()
+                        }
+
+                        Button {
+                            Layout.fillWidth: true
+                            text: qsTr("Plus tard")
+                            onClicked: ExerciseController.cancelReviewOpening()
+                        }
+
+                    }
+
+                }
+
+            }
 
             Behavior on opacity {
                 NumberAnimation {
