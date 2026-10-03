@@ -1126,6 +1126,8 @@ Item {
                 // Les boutons de la note etrangere ont DISPARU : c'est la roue du dessus qui repond, depuis qu'elle est
                 // cliquable. Une rangee de sept boutons plats disait la meme chose en plus petit, et son texte etait elide
                 // jusqu'au « ... » - Roger l'a vu jouer : « on voit ... au lieu de la note a l'interieur ».
+                // LE BOURDON, DIT AU JOUEUR - c'est une des deux questions qui reviennent le plus, et le jeu ne la posait
+                // jamais. Roger : « c'est quoi le bourdon (il faut lui expliquer les degres qu'on utilise) ».
 
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -1181,10 +1183,29 @@ Item {
                     text: modeVerdict.visible && !modeVerdict.sameness && ExerciseController.previousMode.name !== undefined ? ExerciseController.modeDifference.sentence : ""
                 }
 
+                // Le DEGRE est ecrit noir sur blanc parce que c'est exactement ce qu'il demande : le bourdon n'est pas
+                // « une note au hasard sous la gamme », c'est LA TONIQUE - le degre 1 - et c'est ce qui en fait un centre.
+                Text {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.bottomMargin: 4
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#a58ad0"
+                    font.pixelSize: 12
+                    // La roue n'existe que sur une question de mode : c'est donc elle qui dit quand expliquer.
+                    visible: ExerciseController.modeCircle.length > 0
+                    text: qsTr("Le bourdon est la note tenue sous la gamme — ici la tonique, le degré 1. C'est lui qui donne le centre : les mêmes sept notes sur un autre bourdon ne font pas la même musique.")
+                }
+
                 // Elle est là PENDANT la question, et c'est un choix de Roger : « je mettrais quand même la roue dans la
                 // question, l'utilisateur pourra ne pas trop la regarder ». Elle donne le mode à qui sait la lire - et
-                // c'est justement ce qu'on veut apprendre. La tonique reste en haut, toujours : c'est ce qui rend l'arc
-                // lisible d'un coup d'œil.
+                // c'est justement ce qu'on veut apprendre.
+                // LA ROUE NE TOURNE PLUS : son repère reste la tonique du PREMIER mode quand deux modes s'enchaînent, et
+                // le second est dessiné DEDANS. Roger l'a demandé après avoir vu deux modes relatifs donner exactement
+                // la même image : « même si la tonique du premier reste en haut, la tonique deviendrait un autre bouton
+                // dans le cercle ». Une image qui tourne avec la tonique ne pouvait pas le montrer.
                 // La ROUE, et c'est elle qui REPOND sur une question de note etrangere : ses sept notes allumees sont
                 // exactement les sept pas de la gamme, donc appuyer sur l'une d'elles designe l'intrus. Roger l'a demande -
                 // « il suffit d'appuyer sur un de ces boutons non ? » - et il a raison : les pastilles sont plus grandes que

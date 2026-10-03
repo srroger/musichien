@@ -1,6 +1,7 @@
 #include "ui/ModePreviewController.h"
 
 #include "domain/audio/NotePlayerFake.h"
+#include "ui/ModeDescription.h"
 
 #include <QVariantList>
 #include <QVariantMap>
@@ -200,6 +201,38 @@ TEST( ModePreviewControllerTest, an_index_that_designs_no_mode_is_ignored )
     EXPECT_TRUE( notePlayer.phrasesOverDrones().empty() );
     EXPECT_EQ( 0, controller.phraseCountForMode( -1 ) );
     EXPECT_EQ( 0, controller.phraseCountForMode( 99 ) );
+}
+
+TEST( ModePreviewControllerTest, two_relative_modes_do_not_show_the_same_circle )
+{
+    // Roger : « quand on a les 2 modes, on voit exactement le meme cercle, avec exactement les memes notes et exactement
+    // le meme motif ». C'est vrai, et c'est meme normal : do ionien et re dorien partagent leurs sept notes. Ce qui
+    // change, ce n'est pas quelles notes s'allument, c'est LAQUELLE EST LA TONIQUE - donc ou le trace commence.
+    //
+    // La roue ne tourne donc plus avec le mode affiche : son repere reste la tonique du PREMIER mode, et le second est
+    // dessine DEDANS.
+    constexpr std::int32_t C_PITCH_CLASS = 0;
+    constexpr std::int32_t D_PITCH_CLASS = 2;
+
+    // Le repere est do (la tonique du premier mode), et le mode dessine est le dorien sur re : c'est exactement la
+    // question de comparaison quand le second passage est plus sombre.
+    const QVariantList inTheFrameOfC = describeModeCircle( domain::Mode::Dorian, D_PITCH_CLASS, C_PITCH_CLASS );
+    const QVariantList onItsOwnFrame = describeModeCircle( domain::Mode::Dorian, D_PITCH_CLASS, D_PITCH_CLASS );
+
+    ASSERT_EQ( 12, inTheFrameOfC.size() );
+    ASSERT_EQ( 12, onItsOwnFrame.size() );
+
+    // LA TONIQUE DU REPERE EST EN TETE, et elle n'est PAS la tonique du mode : la roue ne tourne plus. Les noms de notes
+    // etaient deja en francais - « do », « ré » - et ils le restent : le modele nomme les hauteurs, l'ecran les affiche.
+    EXPECT_EQ( QStringLiteral( "do" ), inTheFrameOfC.first().toMap().value( "name" ).toString() );
+    EXPECT_FALSE( inTheFrameOfC.first().toMap().value( "isTonic" ).toBool() );
+
+    // La tonique du MODE, elle, occupe un AUTRE bouton : le troisieme de la suite des quintes de do (do, sol, RE), et le
+    // premier de sa propre suite. C'est tout le sujet - deux modes relatifs ne se superposent plus.
+    EXPECT_TRUE( inTheFrameOfC.at( 2 ).toMap().value( "isTonic" ).toBool() );
+    EXPECT_EQ( QStringLiteral( "ré" ), inTheFrameOfC.at( 2 ).toMap().value( "name" ).toString() );
+    EXPECT_TRUE( onItsOwnFrame.at( 0 ).toMap().value( "isTonic" ).toBool() );
+    EXPECT_EQ( QStringLiteral( "ré" ), onItsOwnFrame.first().toMap().value( "name" ).toString() );
 }
 
 }    // namespace musichien::ui

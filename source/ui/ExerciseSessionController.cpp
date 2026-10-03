@@ -1839,7 +1839,22 @@ QVariantList ExerciseSessionController::modeCircle() const
 
     const domain::Question & question = m_session->currentQuestion();
 
-    return describeModeCircle( question.mode, question.modeTonic.pitchClassIndex() );
+    // LE REPERE DE LA ROUE : la tonique du PREMIER mode, quand deux modes s'enchainent.
+    //
+    // C'est la correction que Roger a demandee, et sa description est exactement celle-ci : « meme si la tonique du
+    // premier reste en haut, la tonique deviendrait un autre bouton dans le cercle, donc un autre bouton deviendrait
+    // jaune a la place de l'ancien, et d'autres boutons s'afficheraient ».
+    //
+    // Sans cela, la roue tournait avec le mode AFFICHE - donc deux modes relatifs, qui partagent leurs sept notes,
+    // donnaient litteralement la meme image, et la question etait illisible.
+    std::int32_t frameTonicPitchClass = question.modeTonic.pitchClassIndex();
+
+    if( question.previousMode.has_value() )
+    {
+        frameTonicPitchClass = question.previousModeTonic.pitchClassIndex();
+    }
+
+    return describeModeCircle( question.mode, question.modeTonic.pitchClassIndex(), frameTonicPitchClass );
 }
 
 QString ExerciseSessionController::modeCircleLabel() const
