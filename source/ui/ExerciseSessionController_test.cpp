@@ -1959,6 +1959,50 @@ TEST( ExerciseSessionControllerTest, a_review_session_plans_its_questions )
     EXPECT_TRUE( controller.hasUnlimitedLives() );
 }
 
+TEST( ExerciseSessionControllerTest, a_target_seen_once_is_not_what_resisted_the_player )
+{
+    // Ce que Roger a entendu, et qui n'etait pas vrai : « des fois tu dis : bravo, c'etait quelque chose qui te
+    // resistait alors que pas du tout ».
+    //
+    // La cause : une cible ratee UNE SEULE fois affiche 0 % de reussite, donc elle arrive en tete du tri par faiblesse,
+    // donc en premiere ligne du bilan, avec la phrase qui va avec. Le joueur, lui, ne se souvient pas de l'avoir ratee -
+    // il ne l'a pour ainsi dire jamais rencontree, et l'app lui racontait alors une histoire sur lui-meme qu'elle
+    // n'avait pas les moyens de connaitre.
+    //
+    // Le seuil est celui de la page de statistiques : la meme regle vaut donc partout ou l'app designe ce qui resiste.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    fillJournalWithWorkedTargets( log );
+
+    // UNE fois, et ratee : elle vaut 0 % de reussite, et c'est precisement pour cela qu'elle n'a rien a faire dans un
+    // bilan. Une cible vue une fois n'est pas un point faible, c'est un hasard.
+    const auto now = std::chrono::system_clock::now();
+
+    domain::QuestionRecord seenOnce;
+    seenOnce.askedAt = now - std::chrono::hours{ 1 };
+    seenOnce.kind = domain::QuestionKind::NamedInterval;
+    seenOnce.target = 9;
+    seenOnce.direction = domain::IntervalDirection::Ascending;
+    seenOnce.outcome = domain::QuestionOutcome::Failed;
+
+    log.append( seenOnce );
+
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    ASSERT_TRUE( controller.running() );
+
+    // Six cibles retenues - trois en echauffement, trois en difficulte. La septieme, vue une fois, n'existe pas pour le
+    // bilan : sans la garde, elle entrerait dans le plan et le compte vaudrait QUATRE.
+    EXPECT_EQ( 3, controller.questionCount() );
+}
+
 TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_player_closed )
 {
     // LE test du bug que Roger a signale, et il est critique : « j'ai beau mettre plus clair et plus sombre a 0, je
@@ -2089,7 +2133,6 @@ TEST( ExerciseSessionControllerTest, a_foreign_note_question_walks_the_wheel_alo
     EXPECT_GT( controller.modeSoundNoteStepMs(), 0 );
     EXPECT_GT( controller.modeSoundDurationMs(), 0 );
 }
-
 
 TEST( ExerciseSessionControllerTest, the_circle_carries_the_step_of_each_note )
 {
@@ -2831,7 +2874,6 @@ TEST( ExerciseSessionControllerTest, the_reward_announcement_is_cleared_at_every
     // UNE FOIS, et pas zero : ce n'est pas la valeur qui compte ici, c'est que l'ecran soit PREVENU.
     EXPECT_EQ( 1, announcements );
 }
-
 
 // LES TITRES ET LES TROPHEES se lisent des compteurs du Bilan, et rien d'autre.
 TEST( ExerciseSessionControllerTest, the_end_screen_sounds_go_through_to_the_port )

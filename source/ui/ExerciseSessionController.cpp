@@ -1850,8 +1850,6 @@ int ExerciseSessionController::modeSoundNoteStepMs() const
     return static_cast<int>( ( MODE_NOTE_DURATION + MODE_NOTE_GAP ).count() );
 }
 
-
-
 bool ExerciseSessionController::isForeignNoteQuestion() const noexcept
 {
     return ( m_session != nullptr ) && ( m_session->currentQuestion().kind == domain::QuestionKind::ForeignNote );
@@ -3501,8 +3499,23 @@ std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() cons
     domain::StatisticsFilter filter;
     filter.since = since;
 
-    const std::vector<domain::TargetStatistics> byTarget =
+    std::vector<domain::TargetStatistics> byTarget =
       domain::statisticsByTarget( m_questionLog->since( since ), filter );
+
+    // UNE CIBLE VUE UNE OU DEUX FOIS N'EST PAS UN POINT FAIBLE : c'est un hasard, et c'est exactement ce que Roger a
+    // entendu - « des fois tu dis : bravo, c'etait quelque chose qui te resistait alors que pas du tout ».
+    //
+    // Une cible ratee une seule fois affiche 0 % de reussite, donc elle arrive EN TETE du tri par faiblesse, donc en
+    // premiere ligne du bilan, avec la phrase qui va avec. Le joueur, lui, ne se souvient pas de l'avoir ratee : il ne
+    // l'a pour ainsi dire jamais rencontree. L'app lui racontait alors une histoire sur lui-meme qu'elle n'avait pas
+    // les moyens de connaitre.
+    //
+    // Le seuil est celui de la page de statistiques. La MEME regle doit valoir partout ou l'app designe ce qui resiste,
+    // sinon les deux ecrans se contrediraient devant le joueur - et c'est le genre de contradiction qui apprend a ne
+    // plus croire ni l'un ni l'autre.
+    std::erase_if( byTarget, []( const domain::TargetStatistics & p_target ) {
+        return p_target.statistics.questionCount < domain::MINIMUM_OBSERVATIONS_FOR_A_WEAKNESS;
+    } );
 
     if( byTarget.size() < 4 )
     {
