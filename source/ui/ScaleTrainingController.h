@@ -33,6 +33,18 @@ class ScaleTrainingController : public QObject
 public:
     explicit ScaleTrainingController( domain::NotePlayer & p_notePlayer, QObject * p_parent = nullptr );
 
+    // LE TEMPS QUE LE BOURDON SONNE SEUL AVANT LA PREMIERE NOTE, et l'ecart entre deux notes.
+    //
+    // Exposes parce que l'ecran doit faire partir sa tete EN MEME TEMPS que la musique. Le bourdon tient 1,5 seconde avant
+    // que la gamme n'arrive : une animation qui partirait a l'ouverture serait en avance d'une seconde et demie, et c'est
+    // exactement le decalage qu'on a mis une journee a corriger sur le cercle des modes. On ne le refait pas ici.
+    Q_PROPERTY( int playbackLeadInMs READ playbackLeadInMs CONSTANT )
+    Q_PROPERTY( int playbackNoteStepMs READ playbackNoteStepMs CONSTANT )
+
+    [[nodiscard]] int playbackLeadInMs() const noexcept;
+
+    [[nodiscard]] int playbackNoteStepMs() const noexcept;
+
     // Le cercle : douze pastilles, celles de la gamme allumees, la tonique en haut.
     Q_PROPERTY( QVariantList circle READ circle NOTIFY questionChanged )
 

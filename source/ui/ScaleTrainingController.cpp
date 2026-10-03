@@ -30,6 +30,10 @@ constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
 constexpr std::chrono::milliseconds NOTE_DURATION{ 420 };
 constexpr std::chrono::milliseconds NOTE_GAP{ 110 };
 
+// L'ENCADREMENT DU BOURDON : le temps qu'il sonne seul avant la gamme, et apres. C'est celui du domaine, ecrit une fois
+// pour que l'ecran puisse le LIRE (voir playbackLeadInMs) au lieu de le supposer.
+constexpr domain::DroneFraming DRONE_FRAMING{};
+
 }    // namespace
 
 ScaleTrainingController::ScaleTrainingController( domain::NotePlayer & p_notePlayer, QObject * p_parent )
@@ -152,6 +156,20 @@ void ScaleTrainingController::drawQuestion()
     playCurrentScale();
 }
 
+int ScaleTrainingController::playbackLeadInMs() const noexcept
+{
+    // LE BOURDON SONNE SEUL CE TEMPS-LA avant la premiere note : c'est le `leadIn` du domaine, et l'ecran l'attend pour
+    // faire partir sa tete. Le lire ici plutot que de le deviner ailleurs, c'est ce qui garantit que les deux partent
+    // ensemble le jour ou cette valeur changera.
+    return static_cast<int>( DRONE_FRAMING.leadIn.count() );
+}
+
+int ScaleTrainingController::playbackNoteStepMs() const noexcept
+{
+    // Une note, puis le silence qui la separe de la suivante : c'est le pas de la tete.
+    return static_cast<int>( ( NOTE_DURATION + NOTE_GAP ).count() );
+}
+
 void ScaleTrainingController::playCurrentScale()
 {
     const domain::ScaleDegrees degrees = domain::scaleDegreeOffsets( m_scale );
@@ -173,7 +191,7 @@ void ScaleTrainingController::playCurrentScale()
     // ce qui est exactement ce qu'il faut pour entendre une gamme par-dessus.
     const std::array<domain::Note, 2> drone{ m_tonic, m_tonic.transposedBy( FIFTH_IN_SEMITONES ) };
 
-    m_notePlayer.playMelodyOverDrone( melody, drone, NOTE_DURATION, NOTE_GAP, domain::DroneFraming{} );
+    m_notePlayer.playMelodyOverDrone( melody, drone, NOTE_DURATION, NOTE_GAP, DRONE_FRAMING );
 
     emit playbackStarted();
 }

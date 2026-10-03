@@ -3101,6 +3101,15 @@ ApplicationWindow {
         padding: 0
         // LA SEANCE COMMENCE A L'OUVERTURE, et pas avant : une gamme posee par-dessus la page precedente serait une
         // question qu'on n'a pas demandee, entendue a moitie.
+        // LE FOND DU DIALOGUE LUI-MEME, et pas seulement celui de la page.
+        //
+        // Le dialogue laisse sinon voir la feuille blanche du style dans la bande que la page ne couvre pas - Roger l'a vue
+        // tout de suite : « une legere barre blanche en haut de l'ecran, tres moche ». La page peint son fond, et le
+        // dialogue peint le sien : c'est le seul moyen que TOUT soit sombre, quelle que soit la bande que l'un ou l'autre
+        // n'atteint pas.
+        background: Rectangle {
+            color: "#1d1033"
+        }
         onOpened: ScaleController.start()
 
         ScaleScreen {

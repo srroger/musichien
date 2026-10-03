@@ -41,6 +41,10 @@ Item {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 14
+        // LA BARRE DE NAVIGATION D'ANDROID PASSE PAR-DESSUS LA PAGE : sans cette marge, la derniere ligne - le compte de la
+        // seance - se retrouve DERRIERE les boutons du systeme. Roger l'a vu sur la premiere capture : « 2 justes sur 2 »
+        // coupe par le bas de l'ecran.
+        anchors.bottomMargin: 48
         spacing: 8
 
         // LE TITRE ET LA SORTIE APPARTIENNENT A LA PAGE, et pas au dialogue : c'est ce qui permet au fond de couvrir
@@ -84,6 +88,29 @@ Item {
             // AUCUNE PASTILLE N'EST CLIQUABLE ICI : le joueur repond avec des NOMS, pas avec des notes. La roue est un
             // dessin - et c'est justement ce qu'on veut lui apprendre a lire.
             selectable: false
+        }
+
+        // LA TETE PART AVEC LA MUSIQUE, exactement comme sur les questions de mode.
+        //
+        // ELLE ATTEND LE TEMPS QUE LE BOURDON SONNE SEUL : partir a l'ouverture la mettrait une seconde et demie en
+        // avance, et c'est precisement le decalage qu'on a mis une journee a corriger sur le cercle des modes. Le nombre
+        // de degres vient de la gamme elle-meme - cinq, six ou sept - donc le chemin suit ce qu'on entend.
+        Connections {
+            target: ScaleController
+
+            function onPlaybackStarted() {
+                var count = (ScaleController.circle.length > 0) ? ScaleController.circle[0].degreeCount : 7;
+                var degrees = [];
+                for (var step = 0; step < count; ++step)
+                    degrees.push(step);
+
+                // ET ELLE SE REFERME SUR LA TONIQUE, une octave plus haut : c'est la derniere note jouee, donc le chemin
+                // fait le tour du cercle et revient a son point de depart, comme la gamme.
+                degrees.push(0);
+
+                scaleCircle.startPlayback(ScaleController.playbackLeadInMs, ScaleController.playbackNoteStepMs, degrees);
+            }
+
         }
 
         Button {
