@@ -15,6 +15,7 @@ set(MUSICHIEN_QML_RESOURCE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc PARENT
 # Listed explicitly rather than globbed: a new QML file must be added here on purpose, which keeps
 # the build honest and reproducible.
 set(MUSICHIEN_QML_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/qml/CourseScreen.qml
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/ExerciseScreen.qml
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/Main.qml
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/StaffBall.qml
@@ -44,6 +45,11 @@ musichienFunction_AddLibrary(ui
     IntervalDescription.cpp
     IntervalPlaybackController.h
     IntervalPlaybackController.cpp
+
+    # L'ECOLE DES CHIOTS : le catalogue des cours, et la page qu'on lit. Le controleur ne connait ni fichier ni Markdown
+    # - il traduit en cartes dessinables ce que le domaine lui a donne. Voir le contrat, note 29 du Vault.
+    CourseController.h
+    CourseController.cpp
 
     # Le banc d'essai des modes : sept boutons ranges par clarte, pour entendre une couleur sur un bourdon
     ModeDescription.h
@@ -94,6 +100,7 @@ if(MUSICHIEN_BUILD_TESTING)
         RhythmController_test.cpp
         IntervalPlaybackController_test.cpp
         ModePreviewController_test.cpp
+        CourseController_test.cpp
         ExerciseScreen_test.cpp
         MainScreen_test.cpp
         MicrophoneController_test.cpp

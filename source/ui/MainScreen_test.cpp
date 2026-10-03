@@ -1,4 +1,5 @@
 #include "domain/audio/NotePlayerFake.h"
+#include "ui/CourseController.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
 #include "ui/MicrophoneController.h"
@@ -86,6 +87,11 @@ void registerViewModels()
     static auto * intervalController = new IntervalPlaybackController{ *notePlayer };
     static auto * rhythmController = new RhythmController{ *notePlayer };
 
+    // L'Ecole des Chiots. Elle est citee par un bouton de Main.qml, donc elle doit exister ici EXACTEMENT comme dans
+    // main.cpp : sans elle, le QML se charge avec un « CourseController is not defined », la page reste blanche sans
+    // boutons, et ce test est le seul endroit qui le voit avant le telephone.
+    static auto * courseController = new CourseController{ *notePlayer, {} };
+
     static auto * microphoneController = new MicrophoneController{ QStringList{}, {}, nullptr, notePlayer };
 
     // Le journal et la page de statistiques : la page de profil lit le premier a travers le second, et sans eux
@@ -99,6 +105,7 @@ void registerViewModels()
         qmlRegisterSingletonInstance( "Musichien", 1, 0, "RhythmController", rhythmController );
         qmlRegisterSingletonInstance( "Musichien", 1, 0, "MicrophoneController", microphoneController );
         qmlRegisterSingletonInstance( "Musichien", 1, 0, "StatisticsController", statisticsController );
+        qmlRegisterSingletonInstance( "Musichien", 1, 0, "CourseController", courseController );
 
         return true;
     }();

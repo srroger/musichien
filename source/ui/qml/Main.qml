@@ -945,6 +945,31 @@ ApplicationWindow {
                     text: qsTr("Un parcours qui commence par ce que tu réussis, et finit par ce qui te résiste.")
                 }
 
+                // L'ECOLE DES CHIOTS : les cours. Ce n'est pas un jeu et ca ne paie pas - c'est un lieu ou l'on apprend,
+                // pose a la suite du Bilan. Meme famille de couleur que lui : la page d'etude, pas la page de jeu.
+                TintedMenuButton {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 46
+                    tintColour: mainWindow.questColour
+                    labelColour: mainWindow.questLabelColour
+                    text: qsTr("📖  L'École des Chiots")
+                    onClicked: courseDialog.open()
+                }
+
+                // Ce que c'est, en une phrase : un bouton dont on ne sait pas ce qu'il fait ne se clique pas.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    color: "#8a77ad"
+                    font.pixelSize: 12
+                    text: qsTr("Des leçons courtes, avec des exemples à écouter.")
+                }
+
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
@@ -3132,6 +3157,34 @@ ApplicationWindow {
     // =================================================================================================================
     // LA PAGE DES GAMMES. Elle s'ouvre comme les autres pages de reference, et elle est PLEIN ECRAN parce qu'elle contient
     // un cercle : un dessin de deux cent soixante pixels ne tient pas dans une popup.
+    // L'ECOLE DES CHIOTS. Meme forme que le dialogue des gammes, et pour les memes raisons : ni titre ni boutons
+    // standard, un padding nul, et un fond peint par le dialogue ET par la page - sinon le blanc du style apparait dans
+    // la bande que l'un ou l'autre n'atteint pas, ce que Roger a vu sur cette application.
+    Dialog {
+        id: courseDialog
+
+        anchors.centerIn: parent
+        width: mainWindow.width
+        height: mainWindow.height
+        modal: true
+        padding: 0
+        // Quitter la page ferme le cours ET arrete le son. Un son qui continue apres la sortie serait un son qu'on n'a
+        // pas demande - et sur un telephone, c'est aussi une batterie qui se vide.
+        onClosed: CourseController.close()
+
+        CourseScreen {
+            anchors.fill: parent
+            // La page demande a sortir, le dialogue ecoute : la page n'a pas besoin de savoir qu'un dialogue la porte,
+            // ni meme s'il y en a un.
+            onCloseRequested: courseDialog.close()
+        }
+
+        background: Rectangle {
+            color: "#1d1033"
+        }
+
+    }
+
     Dialog {
         // LA SEANCE COMMENCE A L'OUVERTURE, et pas avant : une gamme posee par-dessus la page precedente serait une
         // question qu'on n'a pas demandee, entendue a moitie.

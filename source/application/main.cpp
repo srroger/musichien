@@ -11,6 +11,7 @@
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/content/JsonPhraseBook.h"
 #include "infrastructure/content/JsonTunerGuide.h"
+#include "infrastructure/content/MarkdownCourse.h"
 #include "infrastructure/haptics/DeviceHaptics.h"
 #ifdef Q_OS_ANDROID
 #    include "infrastructure/android/AndroidSystemBars.h"
@@ -21,6 +22,7 @@
 #include "infrastructure/preferences/QSettingsPlayerPreferences.h"
 #include "infrastructure/statistics/JsonLinesQuestionLog.h"
 #include "musichienBuildId.h"
+#include "ui/CourseController.h"
 #include "ui/ExerciseSessionController.h"
 #include "ui/IntervalPlaybackController.h"
 #include "ui/KeyCircleController.h"
@@ -41,6 +43,7 @@
 #include <QQuickStyle>
 #include <QStandardPaths>
 #include <QString>
+#include <QStringList>
 #include <QTimer>
 #include <QUrl>
 #include <QtQml>
@@ -80,6 +83,12 @@ constexpr const char * TUNER_GUIDE_RESOURCE = ":/assets/content/tuner.json";
 // une tonique et un tempo - jamais d'audio - et c'est le moteur du jeu qui les rejoue.
 constexpr const char * MODAL_PHRASES_RESOURCE = ":/assets/content/modal-phrases.json";
 
+// L'Ecole des Chiots : les lecons, un fichier Markdown par cours, tous dans le meme dossier.
+//
+// C'est le DOSSIER qui est la liste : ajouter un cours, c'est poser un fichier dedans et declarer son alias dans
+// resources.qrc. Aucune ligne de code ne change, et aucun index central ne peut se desynchroniser des fichiers.
+constexpr const char * COURSES_RESOURCE_DIRECTORY = ":/assets/content/courses";
+
 // Reads the memory hints from the resources.
 //
 // The file is opened HERE and not inside the reader: understanding JSON is the infrastructure's job,
@@ -106,6 +115,50 @@ constexpr const char * MODAL_PHRASES_RESOURCE = ":/assets/content/modal-phrases.
     std::cerr << "Musichien: " << hintBook.hintCount() << " interval hints read\n";
 
     return hintBook;
+}
+
+// LES COURS DE L'ECOLE DES CHIOTS, lus dans les ressources.
+//
+// Le DOSSIER est interroge ici, dans la couche application, parce que parcourir une arborescence de ressources est une
+// affaire Qt - le lecteur, lui, ne connait que du texte. Les fichiers sont pris dans l'ordre des NOMS, pour que la liste
+// des cours soit la meme a chaque demarrage et d'un build a l'autre.
+//
+// Un cours illisible ne coute QUE ce cours : il est signale, et les autres sont lus. C'est le contrat des contenus, et il
+// compte encore plus ici, ou un cours est un fichier de plusieurs dizaines de lignes ecrit a la main.
+[[nodiscard]] std::vector<musichien::domain::Course> loadCourses()
+{
+    std::vector<musichien::domain::Course> courses;
+
+    const QDir coursesDirectory{ QString::fromUtf8( COURSES_RESOURCE_DIRECTORY ) };
+
+    for( const QString & fileName : coursesDirectory.entryList( QDir::Files, QDir::Name ) )
+    {
+        QFile contentFile{ coursesDirectory.filePath( fileName ) };
+
+        if( !contentFile.open( QIODevice::ReadOnly ) )
+        {
+            std::cerr << "Musichien: a course could not be opened: " << fileName.toStdString() << '\n';
+
+            continue;
+        }
+
+        const QByteArray content = contentFile.readAll();
+
+        std::optional<musichien::domain::Course> course = musichien::infrastructure::readCourse(
+          std::string_view{ content.constData(), static_cast<std::size_t>( content.size() ) } );
+
+        if( !course.has_value() )
+        {
+            // readCourse a deja dit ce qui n'allait pas.
+            continue;
+        }
+
+        courses.push_back( std::move( *course ) );
+    }
+
+    std::cerr << "Musichien: " << courses.size() << " courses read\n";
+
+    return courses;
 }
 
 // Reads the loading-screen anecdotes, the Morrowind-style little texts. Same contract as the hints: a missing or
@@ -574,11 +627,23 @@ int main( int p_argumentCount, char * p_arguments[] )
     // laquelle il vit hors du moteur de questions.
     musichien::ui::ScaleTrainingController scaleTrainingController{ notePlayer };
 
+    // L'ECOLE DES CHIOTS : le catalogue des cours, et la page qu'on lit.
+    //
+    // Meme famille que la page des gammes : elle ne partage RIEN avec le moteur de questions - pas de session, pas de
+    // vies, pas de journal. C'est ce qui la rend inoffensive, et c'est aussi pourquoi elle vit dans un ecran a part.
+    musichien::ui::CourseController courseController{ notePlayer, loadCourses() };
+
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,
                                   QML_MODULE_MINOR_VERSION,
                                   "ScaleController",
                                   &scaleTrainingController );
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "CourseController",
+                                  &courseController );
 
     // L'ecran du cercle des quintes : une page de REFERENCE, qui ne joue rien. Elle n'a donc meme pas besoin du
     // lecteur de notes - seulement du domaine, qui sait tout ce qu'elle affiche.
