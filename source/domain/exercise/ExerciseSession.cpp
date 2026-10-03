@@ -190,11 +190,25 @@ Question ExerciseSession::buildQuestion()
     {
         if( targetIsDecided )
         {
-            // Le plan a dit la COULEUR ; la tonique reste tiree, parce qu'un bilan ne teste pas la hauteur, et les
-            // choix sont ceux de la palette.
+            // Le plan a dit la COULEUR ; la tonique reste tiree, parce qu'un bilan ne teste pas la hauteur.
             question.chord.quality = static_cast<ChordQuality>( planned->target );
             question.chord.rootMidiNumber = drawChordRootMidiNumber( question.chord.quality );
             question.chordChoices.assign( m_chordPalette.begin(), m_chordPalette.end() );
+
+            // LA COULEUR DEMANDEE EST TOUJOURS PARMI LES CHOIX, et ce n'est pas une precaution de style.
+            //
+            // Le PLAN vient du JOURNAL, qui garde trente jours de questions ; la PALETTE, elle, repart du niveau a chaque
+            // session. Une couleur travaillee il y a trois semaines peut donc etre demandee alors qu'elle n'est plus dans
+            // la liste - et Roger l'a vu exactement comme cela : « c'etait joue le demi-diminue, sauf qu'il n'etait pas
+            // disponible dans la liste des choix ».
+            //
+            // Une question sans sa reponse n'est pas difficile, elle est IMPOSSIBLE : le joueur a beau ecouter, aucune des
+            // pastilles ne peut lui donner raison. C'est la seule regle que ce bloc doit garantir, et il la garantit
+            // maintenant pour tous les chemins - le bilan d'aujourd'hui comme celui de dans six mois.
+            if( std::ranges::find( question.chordChoices, question.chord.quality ) == question.chordChoices.end() )
+            {
+                question.chordChoices.push_back( question.chord.quality );
+            }
 
             return question;
         }
