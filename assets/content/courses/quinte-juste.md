@@ -43,14 +43,16 @@ Maintenant, la même chose, mais écrite par quelqu'un d'autre il y a longtemps.
 
 ## Le geste
 
-Fais-le maintenant, pendant que le bourdon tourne. Ce n'est pas un exercice, c'est la chose la plus
-simple du monde :
+Fais-le maintenant, **sans bourdon** : c'est plus difficile, et c'est justement l'exercice.
 
-:: jeu | demi_tons:7 | ascendant | garde le bourdon, et chante le sol par-dessus
+:: jeu | demi_tons:7 | ascendant | do → sol : écoute, puis chante-le
 
-Tu le trouveras **du premier coup**. C'est le seul intervalle dont on puisse dire ça : monter d'une
-quinte à partir d'un bourdon, ça n'est pas une performance, ça se fait tout seul. Les autres
+Tu le trouveras **du premier coup**. C'est le seul intervalle dont on puisse dire ça : monter d'une quinte à
+partir d'une note que tu viens d'entendre, ça n'est pas une performance, ça se fait tout seul. Les autres
 demanderont ta journée. Celui-ci, non.
+
+> (Le bourdon viendra : c'est ce qui rendra le geste plus facile encore. Pour l'instant, la note est toute
+> seule, et c'est déjà assez.)
 
 ## L'essai
 

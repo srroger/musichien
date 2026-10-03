@@ -101,6 +101,15 @@ ApplicationWindow {
     // traversait DEUX crans d'un coup - la lecon ET l'Ecole - et on retombait sur la page de garde. Un calque laisse le
     // retour a la fenetre, et c'est elle qui decide (voir onClosing, plus haut).
     // LA CONFIRMATION AVANT DE QUITTER UNE PARTIE.
+    // LA REGLE MAINTENANT, ET ELLE VAUT PARTOUT : le retour REMONTE D'UN CRAN DANS L'APPLICATION, et ne quitte jamais
+    // sans demander. Une lecon remonte a la liste, la liste remonte a la garde, et une partie en cours demande
+    // confirmation.
+    // =================================================================================================================
+    // REMONTER D'UN CRAN, EN UN SEUL ENDROIT.
+    // LE BOUTON RETOUR D'ANDROID ARRIVE ICI.
+    // Qt 6 ne le livre PAS comme une fermeture de fenetre, mais comme une TOUCHE. Et quand aucun element focalise ne la
+    // prend, c'est ANDROID qui termine l'activite : l'application se ferme. C'est exactement ce que Roger a vu apres ma
+    // premiere tentative - « l'arriere quitte completement l'appli » - et il avait raison de le signaler.
 
     id: mainWindow
 
@@ -232,6 +241,27 @@ ApplicationWindow {
         return qsTr("%1 octaves plus haut").arg(p_octaveSpan);
     }
 
+    // Le bouton retour d'Android, le bouton de sortie de l'Ecole, et la fermeture de la fenetre menent tous ici : une
+    // seule regle, et trois portes. Elle rend VRAI si elle a consomme le geste, et FAUX quand il n'y a plus rien a
+    // remonter - c'est alors la sortie de l'application, et elle est demandee.
+    function goBackOneStep() {
+        if (schoolIsOpen) {
+            // D'UNE LECON, on remonte a la LISTE : c'est ce que le geste veut dire.
+            if (CourseController.reading)
+                CourseController.close();
+            else
+                schoolIsOpen = false;
+            return true;
+        }
+        // UNE PARTIE EN COURS : on ne sort pas d'une partie sur une touche qu'on a pu frôler. Roger : « pour les jeux,
+        // je preferais quand meme une popup ».
+        if (ExerciseController.running) {
+            leaveGameDialog.open();
+            return true;
+        }
+        return false;
+    }
+
     // The colour of the window itself, not of any item inside it. On Android this is what shows through a system bar
     // while the first frame paints, and it must match the top of the gradient rather than flash white.
     color: "#1b1035"
@@ -242,30 +272,44 @@ ApplicationWindow {
     minimumHeight: 480
     visible: true
     title: qsTr("Musichien")
-    // LA REGLE MAINTENANT, ET ELLE VAUT PARTOUT : le retour REMONTE D'UN CRAN DANS L'APPLICATION, et ne quitte jamais
-    // sans demander. Une lecon remonte a la liste, la liste remonte a la garde, et une partie en cours demande
-    // confirmation.
-    // =================================================================================================================
+    // LA FERMETURE DE LA FENETRE : le chemin que Qt emprunte quand le retour a ete recu proprement. On refuse de fermer
+    // si l'application sait encore remonter d'un cran.
     onClosing: function(close) {
-        // DANS L'ECOLE : on remonte d'un cran, toujours, et jamais hors de l'application.
-        if (mainWindow.schoolIsOpen) {
+        if (mainWindow.goBackOneStep()) {
             close.accepted = false;
-            if (CourseController.reading)
-                CourseController.close();
-            else
-                mainWindow.schoolIsOpen = false;
-            return ;
-        }
-        // UNE PARTIE EN COURS : on ne sort pas d'une partie sur une touche qu'on a pu frôler. Roger : « pour les jeux,
-        // je preferais quand meme une popup ». Elle propose la page de garde, pas la sortie de l'application.
-        if (ExerciseController.running) {
-            close.accepted = false;
-            leaveGameDialog.open();
             return ;
         }
         // Sinon la sortie est demandee et on la laisse faire - en coupant le son au passage : un flux audio laisse
         // ouvert sur un telephone est une batterie qui se vide.
         IntervalController.stopPlayback();
+    }
+
+    // Ce capteur est plein ecran, sans enfant, et SANS gestion de souris : il ne dessine rien et ne mange aucun tap. Il
+    // n'existe que pour garder le focus et prendre la touche, afin que le retour remonte dans l'application au lieu d'en
+    // sortir.
+    Item {
+        id: backKeyCatcher
+
+        anchors.fill: parent
+        // DERRIERE tout le reste : il ne doit rien masquer.
+        z: -1
+        focus: true
+        // Le focus se perd des qu'un dialogue s'ouvre puis se ferme. Sans cela, la touche suivante repart a Android et
+        // ferme l'application - le bug reviendrait une fois sur deux, ce qui est le pire des bugs.
+        onActiveFocusChanged: {
+            if (!activeFocus) {
+                forceActiveFocus();
+            }
+        }
+        Keys.onReleased: function(event) {
+            if (event.key !== Qt.Key_Back)
+                return ;
+
+            // La touche est PRISE quoi qu'il arrive : c'est ce qui empeche Android de fermer l'application. Reste a
+            // savoir quoi en faire, et c'est la regle commune qui decide.
+            event.accepted = true;
+            mainWindow.goBackOneStep();
+        }
     }
 
     // Elle vit ICI, a la racine, et non dans le composant DarkComboBox : un composant inline n'accepte pas d'objet
@@ -3223,9 +3267,9 @@ ApplicationWindow {
         }
         // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
         onVisibleChanged: {
-            if (!visible) {
+            if (!visible)
                 CourseController.close();
-            }
+
         }
 
         Behavior on opacity {

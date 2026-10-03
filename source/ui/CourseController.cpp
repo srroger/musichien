@@ -88,6 +88,14 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
         entry.insert( QStringLiteral( "order" ), course.order );
         entry.insert( QStringLiteral( "blockCount" ), static_cast<int>( course.blocks.size() ) );
 
+        // UN OS A MACHER N'EST PAS UN COURS, et la liste doit le dire d'un coup d'oeil - Roger : « je mettrais bien les
+        // os a macher d'une autre couleur que les cours ».
+        //
+        // La difference est deja dans les fichiers, et elle n'est pas inventee ici : un COURS est numerote (chapitre et
+        // ordre), une ANNEXE ne l'est pas - elle appartient a un chapitre auquel elle se rattache, et son en-tete porte
+        // une 'famille' a la place. Aucun champ nouveau, donc, et aucun fichier a reviser.
+        entry.insert( QStringLiteral( "isAnnexe" ), course.chapter == 0 );
+
         m_library.append( entry );
     }
 }

@@ -204,4 +204,23 @@ TEST( CourseControllerTest, a_descending_card_really_descends )
     EXPECT_GT( notePlayer.playedMelodies().back().notes.at( 0 ), notePlayer.playedMelodies().back().notes.at( 1 ) );
 }
 
+TEST( CourseControllerTest, an_annexe_is_told_apart_from_a_course )
+{
+    // Roger : « je mettrais bien les os a macher d'une autre couleur que les cours ». La difference n'est PAS inventee
+    // ici : un cours est NUMEROTE (chapitre et ordre), une annexe ne l'est pas - son en-tete porte une 'famille' a la
+    // place. Aucun champ nouveau, donc, et aucun fichier a reviser pour obtenir la distinction.
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course annexe = makeQuintCourse();
+    annexe.title = "Pourquoi la quinte sonne juste";
+    annexe.chapter = 0;
+
+    const CourseController controller{ notePlayer, { makeQuintCourse(), annexe } };
+
+    ASSERT_EQ( controller.library().size(), 2 );
+
+    EXPECT_FALSE( controller.library().at( 0 ).toMap().value( QStringLiteral( "isAnnexe" ) ).toBool() );
+    EXPECT_TRUE( controller.library().at( 1 ).toMap().value( QStringLiteral( "isAnnexe" ) ).toBool() );
+}
+
 }    // namespace musichien::ui

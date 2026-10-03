@@ -116,8 +116,11 @@ Item {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 66
                         radius: 10
-                        color: "#2a1a4a"
-                        border.color: "#4a3570"
+                        // UN OS A MACHER N'EST PAS UN COURS. La difference est deja dans les fichiers - un cours est
+                        // numerote, une annexe ne l'est pas - et l'ecran ne fait que la montrer. Roger : « je mettrais
+                        // bien les os a macher d'une autre couleur que les cours ».
+                        color: modelData.isAnnexe ? "#33244f" : "#2a1a4a"
+                        border.color: modelData.isAnnexe ? "#7a5cc0" : "#4a3570"
                         border.width: 1
 
                         Column {
@@ -129,9 +132,10 @@ Item {
                             Text {
                                 width: parent.width
                                 elide: Text.ElideRight
-                                color: "#f2ecff"
+                                color: modelData.isAnnexe ? "#cbbde8" : "#f2ecff"
                                 font.pixelSize: 15
-                                text: modelData.title
+                                // L'os dit ce qu'il est, sans qu'on ait a le deviner d'une teinte.
+                                text: (modelData.isAnnexe ? qsTr("🦴  ") : qsTr("")) + modelData.title
                             }
 
                             Text {
@@ -331,7 +335,9 @@ Item {
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: {
-                                    courseScreen.closeRequested();
+                                    // ON NE FERME PAS L'ECOLE : l'ecran d'exercice est un calque declare PLUS BAS, donc il
+                                    // passe par-dessus la page. Quitter la partie fait alors RETOMBER sur la lecon qu'on
+                                    // etait en train de lire - ce que Roger attend, et non la page de garde.
                                     ExerciseController.startTrainingSession(0);
                                 }
                             }
