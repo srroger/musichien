@@ -97,6 +97,10 @@ ApplicationWindow {
     readonly property color questColour: "#8c3a48"
     // le rouge du jeu, eteint : ce sont des variantes, elles s'annoncent sans crier
     readonly property color questLabelColour: "#ffe3e6"
+    // L'OR DU BILAN. Roger : « un truc dore qui brille, avec une etoile doree, qui ressort de l'interface ». Le Bilan
+    // n'est pas une variante du jeu : il a sa propre couleur, et c'est la seule de l'app.
+    readonly property color weekEndGoldColour: "#f0c04a"
+    readonly property color weekEndGoldLabelColour: "#2b1c05"
     // L'ENTRAINEMENT a sa propre couleur, et c'est un choix de Roger : « une couleur néon toujours mais qui évoquerait
     // l'entrainement ou le chill, genre un bleu clair ». Le rouge dit « le jeu » ; le bleu clair dit « je travaille » -
     // et les deux se lisent d'un coup d'oeil sur la page de garde, sans une phrase de plus.
@@ -916,12 +920,11 @@ ApplicationWindow {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 46
-                    // Le meme rouge que les variantes du jeu, mais eteint : c'est une porte du jeu, pas le jeu.
-                    tintColour: mainWindow.questColour
-                    labelColour: mainWindow.questLabelColour
+                    // Le week-end, le bouton change de CAMP : il quitte le rouge eteint des variantes pour l'or du bilan.
+                    // Le reste du temps il garde sa place et sa couleur - c'est jouer qui doit rester la porte d'entree.
+                    tintColour: ExerciseController.isWeekEnd ? mainWindow.weekEndGoldColour : mainWindow.questColour
+                    labelColour: ExerciseController.isWeekEnd ? mainWindow.weekEndGoldLabelColour : mainWindow.questLabelColour
                     labelSize: 20
-                    // Dore le week-end : la couleur suffit a dire « c'est le moment », et le bouton garde sa place
-                    // sous « Jouer » : c'est jouer qui doit rester la porte d'entree.
                     highlighted: ExerciseController.isWeekEnd
                     text: ExerciseController.isWeekEnd ? qsTr("★ Bilan de la semaine") : qsTr("★ Bilan")
                     onClicked: ExerciseController.startReviewSession()
