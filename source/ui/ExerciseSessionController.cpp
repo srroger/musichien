@@ -128,6 +128,12 @@ constexpr int REVIEW_PERIOD_DAYS = 30;
 // reconnaisse son profil en la lisant. Au-dela, il ne lit plus, il survole - et une page qu'on survole n'explique rien.
 constexpr std::size_t REVIEW_OPENING_POINT_COUNT = 3;
 
+// COMBIEN DE QUESTIONS, DANS UN BILAN, VONT CHERCHER CE QU'ON N'A JAMAIS TRAVAILLE.
+//
+// DEUX : assez pour ouvrir une porte, trop peu pour transformer un bilan en cours. Le bilan sert d'abord a voir ou l'on en
+// est, et une ouverture qu'on n'a pas demandee se retient mieux qu'une lecon qu'on a subie.
+constexpr std::size_t REVIEW_LEAST_WORKED_QUESTION_COUNT = 2;
+
 // Le silence entre ce que le joueur a joue et la reponse, sur une question d'accord ratee.
 //
 // Assez long pour que les deux accords soient DEUX accords, assez court pour qu'ils restent une seule phrase. Un souffle,
@@ -3567,7 +3573,9 @@ void ExerciseSessionController::startReviewSession()
     // normal, et le repli sur une partie ordinaire quand il n'y a rien a reviser).
     m_gameMode = domain::GameMode::Review;
 
-    std::vector<domain::QuestionTarget> plan = reviewPlan();
+    std::size_t resistingCount = 0;
+
+    std::vector<domain::QuestionTarget> plan = reviewPlan( &resistingCount );
 
     // Un genre FERME par le joueur n'entre pas dans un bilan.
     //
@@ -3603,6 +3611,14 @@ void ExerciseSessionController::startReviewSession()
     // L'echauffement, c'est la premiere tranche du plan, bornee : au-dela, la difficulte commence - et c'est ce qui
     // permet a l'encouragement d'arriver au bon moment.
     m_reviewEasyQuestionCount = std::max<std::size_t>( 1, std::min( REVIEW_EASY_QUESTION_COUNT, plan.size() / 2 ) );
+
+    // ET LA PARTIE QUI RESISTE FINIT AVANT LES CIBLES JAMAIS TRAVAILLEES.
+    //
+    // C'est LA borne de l'encouragement, et elle est nouvelle parce que le plan a un troisieme temps : sans elle, l'app
+    // dirait « c'est exactement ce qui te resistait » a propos d'une cible que le joueur n'a jamais rencontree. Ce
+    // mensonge-la, on l'a deja paye une fois.
+    m_reviewHardQuestionCount = resistingCount;
+
     m_isReviewRunning = true;
 
     // ET LES QUESTIONS ATTENDENT. C'est la page d'ouverture qui ouvre le bilan, pas le bouton du menu.
@@ -3712,9 +3728,9 @@ QVariantList ExerciseSessionController::reviewPointsOf( bool p_strong ) const
     return points;
 }
 
-QVariantList ExerciseSessionController::reviewLeastWorkedPoints() const
+std::vector<std::pair<domain::QuestionTarget, std::size_t>> ExerciseSessionController::leastWorkedCandidates() const
 {
-    QVariantList points;
+    std::vector<std::pair<domain::QuestionTarget, std::size_t>> ordered;
 
     // CE QUE LE NIVEAU ATTEND, ET QU'ON N'A PAS TRAVAILLE.
     //
@@ -3731,7 +3747,7 @@ QVariantList ExerciseSessionController::reviewLeastWorkedPoints() const
     // n'existe pas. C'est cette ligne-la qu'on cherche.
     if( m_questionLog == nullptr )
     {
-        return points;
+        return ordered;
     }
 
     const domain::GodModePalette expected =
@@ -3747,8 +3763,8 @@ QVariantList ExerciseSessionController::reviewLeastWorkedPoints() const
 
     struct Candidate
     {
+        domain::QuestionTarget target;
         std::size_t observations;
-        QString label;
     };
 
     std::vector<Candidate> candidates;
@@ -3781,7 +3797,7 @@ QVariantList ExerciseSessionController::reviewLeastWorkedPoints() const
 
         if( !label.isEmpty() )
         {
-            candidates.push_back( Candidate{ observationsOf( p_target ), label } );
+            candidates.push_back( Candidate{ p_target, observationsOf( p_target ) } );
         }
     };
 
@@ -3809,16 +3825,47 @@ QVariantList ExerciseSessionController::reviewLeastWorkedPoints() const
     // le tri est stable et ne change pas d'une fois a l'autre.
     std::ranges::stable_sort( candidates, {}, &Candidate::observations );
 
+    ordered.reserve( candidates.size() );
+
     for( const Candidate & candidate : candidates )
+    {
+        ordered.emplace_back( candidate.target, candidate.observations );
+    }
+
+    return ordered;
+}
+
+QVariantList ExerciseSessionController::reviewLeastWorkedPoints() const
+{
+    // LA PAGE : les memes cibles, NOMMEES, et coupees a trois.
+    //
+    // C'est ici, et seulement ici, qu'on ecarte ce qui n'a pas de nom - la page parle, le plan pose. Un accord sans nom ne
+    // doit pas disparaitre du PLAN pour autant : c'est la page qui ne sait pas l'afficher, pas le bilan qui ne doit pas le
+    // travailler.
+    QVariantList points;
+
+    for( const auto & [target, observations] : leastWorkedCandidates() )
     {
         if( points.size() >= static_cast<qsizetype>( REVIEW_OPENING_POINT_COUNT ) )
         {
             break;
         }
 
+        domain::TargetStatistics asStatistics;
+        asStatistics.kind = target.kind;
+        asStatistics.target = target.target;
+        asStatistics.direction = target.direction;
+
+        const QString label = targetLabel( asStatistics );
+
+        if( label.isEmpty() )
+        {
+            continue;
+        }
+
         QVariantMap point;
-        point.insert( QStringLiteral( "name" ), candidate.label );
-        point.insert( QStringLiteral( "asked" ), static_cast<int>( candidate.observations ) );
+        point.insert( QStringLiteral( "name" ), label );
+        point.insert( QStringLiteral( "asked" ), static_cast<int>( observations ) );
 
         points.append( point );
     }
@@ -3918,13 +3965,23 @@ std::vector<domain::TargetStatistics> ExerciseSessionController::reviewInsights(
     return insights;
 }
 
-std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() const
+std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan( std::size_t * p_resistingCount ) const
 {
     std::vector<domain::QuestionTarget> plan;
 
     // Les DEUX pages du bilan lisent la meme chose : la page d'ouverture montre ces cibles au joueur, et le plan les
     // lui pose, dans l'ordre. Une seule source, donc un ecran ne peut pas annoncer autre chose que ce qui suit.
-    const std::vector<domain::TargetStatistics> byTarget = reviewInsights();
+    std::vector<domain::TargetStatistics> byTarget = reviewInsights();
+
+    // UN GENRE FERME N'ENTRE PAS DANS UN BILAN, et on l'ecarte ICI plutot qu'apres coup.
+    //
+    // Le plan se coupe en TROIS temps, et la borne du deuxieme est relevee plus bas : un tri qui s'appliquerait APRES
+    // deplacerait les frontieres sans le dire, et l'encouragement se remettrait a viser la mauvaise question. Filtrer en
+    // tete garde les trois temps alignes quoi qu'il arrive - et le filtre de `startReviewSession` ne fait plus rien, ce
+    // qui est exactement ce qu'on veut : une seule regle, appliquee une seule fois.
+    std::erase_if( byTarget, [this]( const domain::TargetStatistics & p_target ) {
+        return !domain::isKindOpen( m_settings, p_target.kind );
+    } );
 
     if( byTarget.size() < 4 )
     {
@@ -3953,6 +4010,45 @@ std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan() cons
         plan.push_back( toPlannedQuestion( byTarget.at( index ) ) );
     }
 
+    // ET C'EST ICI QUE FINIT CE QUI RESISTE : les deux premiers temps sont poses, le troisieme commence.
+    if( p_resistingCount != nullptr )
+    {
+        *p_resistingCount = plan.size();
+    }
+
+    // ENFIN CE QU'ON N'A JAMAIS TRAVAILLE - et c'est ce qui OUVRE le bilan au lieu de le refermer.
+    //
+    // Jusqu'ici son plan ne naissait que des ECHECS enregistres : ce que les tirages ne proposaient jamais n'existait pas
+    // pour lui, et Roger l'a vu sans lire le code - « ca m'etonne qu'il n'y ait qu'un seul truc qui me resiste ». Une cible
+    // jamais posee n'a pas de faiblesse a reprendre, elle a une PORTE a ouvrir.
+    //
+    // ELLES VIENNENT EN DERNIER, et ce n'est pas un detail d'ordre : le bilan commence par ce qu'on sait, continue par ce
+    // qui resiste, et finit par ce qu'on n'a jamais vu. Finir sur une ouverture vaut mieux que finir sur un reproche.
+    //
+    // ET ELLES SONT FILTREES PAR LES MEMES REGLES que le reste : un genre que le joueur a ferme ne revient pas par cette
+    // porte-la. C'est le filtre de `startReviewSession` qui s'en charge, et il s'applique au plan entier.
+    std::size_t leastWorkedAdded = 0;
+
+    for( const auto & entry : leastWorkedCandidates() )
+    {
+        if( leastWorkedAdded >= REVIEW_LEAST_WORKED_QUESTION_COUNT )
+        {
+            break;
+        }
+
+        // MEME REGLE QUE LE RESTE, et appliquee ICI plutot qu'apres : le filtre des genres fermes s'applique au plan
+        // entier, mais il le raccourcit - et la borne de l'encouragement, relevee plus haut, ne vaudrait alors plus rien.
+        // Filtrer a la source garde les trois temps alignes quoi qu'il arrive.
+        if( !domain::isKindOpen( m_settings, entry.first.kind ) )
+        {
+            continue;
+        }
+
+        plan.push_back( entry.first );
+
+        ++leastWorkedAdded;
+    }
+
     return plan;
 }
 
@@ -3965,7 +4061,11 @@ bool ExerciseSessionController::isCurrentQuestionAHardPart() const noexcept
 
     // Le rang dans le plan : au-dela de l'echauffement, c'est ce qui resiste. Le controleeur a construit le plan dans cet
     // ordre, donc il le sait - sans recroiser les statistiques a chaque question.
-    return m_session->questionNumber() > m_reviewEasyQuestionCount;
+    // LE PLAN SE LIT EN TROIS TEMPS : l'echauffement, ce qui resiste, et ce qu'on n'a jamais travaille. Ce qui resiste est
+    // le DEUXIEME, et il a maintenant une FIN - les cibles jamais vues ne lui appartiennent pas, et l'app n'a aucun droit
+    // de dire qu'elles ont resiste a qui que ce soit.
+    return ( m_session->questionNumber() > m_reviewEasyQuestionCount )
+           && ( m_session->questionNumber() <= m_reviewHardQuestionCount );
 }
 
 QString ExerciseSessionController::encouragementText() const
@@ -3975,6 +4075,16 @@ QString ExerciseSessionController::encouragementText() const
         // Hors bilan, il n'y a rien a dire : un ecran qui parle pour ne rien dire devient un ecran qu'on n'ecoute plus, et
         // le silence est ce qui donne du poids aux mots qui restent.
         return QString{};
+    }
+
+    // ET POUR CE QU'ON N'A JAMAIS ENTENDU, on le dit AVANT : c'est une PORTE, pas un piege.
+    //
+    // Un joueur qui verrait « ce qui te resistait » sur une chose qu'il decouvre se demanderait ce qu'il a fait de mal - et
+    // il n'a rien fait. Le mot juste ici ne consiste pas a l'encourager, mais a lui DIRE ce qu'on lui fait : quelque chose
+    // qu'il n'a jamais croise, et c'est une bonne nouvelle.
+    if( isAsking() && ( m_session->questionNumber() > m_reviewHardQuestionCount ) )
+    {
+        return tr( "Celle-ci, tu ne l'as jamais croisée. Écoute-la pour elle-même." );
     }
 
     // Une reussite sur ce qui resistait : le mot juste, et il arrive au bon moment.

@@ -3133,6 +3133,10 @@ ApplicationWindow {
     // LA PAGE DES GAMMES. Elle s'ouvre comme les autres pages de reference, et elle est PLEIN ECRAN parce qu'elle contient
     // un cercle : un dessin de deux cent soixante pixels ne tient pas dans une popup.
     Dialog {
+        // LA SEANCE COMMENCE A L'OUVERTURE, et pas avant : une gamme posee par-dessus la page precedente serait une
+        // question qu'on n'a pas demandee, entendue a moitie.
+        // LE FOND DU DIALOGUE LUI-MEME, et pas seulement celui de la page.
+
         id: scaleTrainingDialog
 
         anchors.centerIn: parent
@@ -3144,17 +3148,6 @@ ApplicationWindow {
         // suite - « un bout a la couleur de fond, mais le haut est blanc ». La page entiere est donc la page, et elle
         // porte elle-meme son titre et sa sortie, comme KeyCircleScreen et l'accordeur.
         padding: 0
-        // LA SEANCE COMMENCE A L'OUVERTURE, et pas avant : une gamme posee par-dessus la page precedente serait une
-        // question qu'on n'a pas demandee, entendue a moitie.
-        // LE FOND DU DIALOGUE LUI-MEME, et pas seulement celui de la page.
-        //
-        // Le dialogue laisse sinon voir la feuille blanche du style dans la bande que la page ne couvre pas - Roger l'a vue
-        // tout de suite : « une legere barre blanche en haut de l'ecran, tres moche ». La page peint son fond, et le
-        // dialogue peint le sien : c'est le seul moyen que TOUT soit sombre, quelle que soit la bande que l'un ou l'autre
-        // n'atteint pas.
-        background: Rectangle {
-            color: "#1d1033"
-        }
         onOpened: ScaleController.start()
 
         ScaleScreen {
@@ -3162,6 +3155,14 @@ ApplicationWindow {
             // La sortie appartient a la page, et c'est la page qui la demande : le dialogue ne fait que l'ecouter. Une
             // page qui se ferme elle-meme aurait besoin de connaitre le dialogue qui la porte.
             onCloseRequested: scaleTrainingDialog.close()
+        }
+
+        // Le dialogue laisse sinon voir la feuille blanche du style dans la bande que la page ne couvre pas - Roger l'a vue
+        // tout de suite : « une legere barre blanche en haut de l'ecran, tres moche ». La page peint son fond, et le
+        // dialogue peint le sien : c'est le seul moyen que TOUT soit sombre, quelle que soit la bande que l'un ou l'autre
+        // n'atteint pas.
+        background: Rectangle {
+            color: "#1d1033"
         }
 
     }
