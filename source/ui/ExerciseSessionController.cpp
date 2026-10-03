@@ -1,5 +1,6 @@
 #include "ui/ExerciseSessionController.h"
 
+#include "domain/exercise/GodModePalette.h"
 #include "domain/exercise/Trophy.h"
 #include "domain/exercise/Weekend.h"
 #include "domain/music/ChordTree.h"
@@ -3706,6 +3707,120 @@ QVariantList ExerciseSessionController::reviewPointsOf( bool p_strong ) const
     for( qsizetype index = 0; index < listSize; ++index )
     {
         points.append( p_strong ? named.at( named.size() - 1 - index ) : named.at( index ) );
+    }
+
+    return points;
+}
+
+QVariantList ExerciseSessionController::reviewLeastWorkedPoints() const
+{
+    QVariantList points;
+
+    // CE QUE LE NIVEAU ATTEND, ET QU'ON N'A PAS TRAVAILLE.
+    //
+    // C'est la demande de Roger, et sa precision est le coeur de la chose : « le moins travaille DANS le contexte du
+    // niveau, pas dans la totalite des possibilites. Evidemment qu'on ne va pas demander a un debutant de reconnaitre un
+    // demi-diminue. »
+    //
+    // La PALETTE DU NIVEAU est exactement cette reponse, et elle vient de `paletteForLevel` : un seul endroit decide de ce
+    // qu'un joueur devrait connaitre, et cette page ne peut donc pas dire autre chose que ce que le jeu lui pose vraiment.
+    //
+    // Et c'est ce qui ouvre le CIRCUIT FERME que Roger a decrit : le plan du bilan ne naissait que des ECHECS enregistres,
+    // donc ce qui n'est jamais tombe n'existait pas pour lui. Une cible jamais posee a ZERO observation - le journal ne
+    // peut pas le dire, parce qu'une cible absente du journal est une cible qu'on n'a pas travaillee, pas une cible qui
+    // n'existe pas. C'est cette ligne-la qu'on cherche.
+    if( m_questionLog == nullptr )
+    {
+        return points;
+    }
+
+    const domain::GodModePalette expected =
+      domain::paletteForLevel( m_playerLevel.value_or( domain::PlayerLevel::Beginner ) );
+
+    const auto since = std::chrono::system_clock::now() - ( std::chrono::hours{ 24 } * REVIEW_PERIOD_DAYS );
+
+    domain::StatisticsFilter filter;
+    filter.since = since;
+
+    const std::vector<domain::TargetStatistics> worked =
+      domain::statisticsByTarget( m_questionLog->since( since ), filter );
+
+    struct Candidate
+    {
+        std::size_t observations;
+        QString label;
+    };
+
+    std::vector<Candidate> candidates;
+
+    // Combien de fois cette cible a ete posee, dans la meme fenetre que le bilan - et zero si elle ne l'a jamais ete.
+    const auto observationsOf = [&worked]( const domain::QuestionTarget & p_target ) {
+        std::size_t count = 0;
+
+        for( const domain::TargetStatistics & entry : worked )
+        {
+            if( ( entry.kind == p_target.kind ) && ( entry.target == p_target.target )
+                && ( entry.direction == p_target.direction ) )
+            {
+                count += entry.statistics.questionCount;
+            }
+        }
+
+        return count;
+    };
+
+    const auto addCandidate = [&candidates, &observationsOf]( const domain::QuestionTarget & p_target ) {
+        // Le nom vient de la MEME fonction que les deux autres listes : trois facons de nommer une cible finiraient par se
+        // contredire devant le joueur.
+        domain::TargetStatistics asStatistics;
+        asStatistics.kind = p_target.kind;
+        asStatistics.target = p_target.target;
+        asStatistics.direction = p_target.direction;
+
+        const QString label = targetLabel( asStatistics );
+
+        if( !label.isEmpty() )
+        {
+            candidates.push_back( Candidate{ observationsOf( p_target ), label } );
+        }
+    };
+
+    // LES INTERVALLES ATTENDUS, dans les deux sens : Roger l'a tranche, un intervalle montant et le meme descendant sont
+    // DEUX cibles, et le journal les compte separement depuis toujours.
+    for( const domain::Interval & interval : expected.intervals )
+    {
+        for( const domain::IntervalDirection direction :
+             { domain::IntervalDirection::Ascending, domain::IntervalDirection::Descending } )
+        {
+            addCandidate( domain::QuestionTarget{ domain::QuestionKind::NamedInterval, interval.semitones(), direction } );
+        }
+    }
+
+    // ET LES MODES ATTENDUS. Le genre est celui du NOM - c'est la question la plus directe qu'on puisse poser sur un mode,
+    // et c'est celle qu'un joueur qui ne l'a jamais travaille ne saura pas repondre.
+    for( const domain::Mode mode : expected.modes )
+    {
+        addCandidate( domain::QuestionTarget{ domain::QuestionKind::ModeName,
+                                              static_cast<std::int32_t>( domain::modeIndex( mode ) ),
+                                              domain::IntervalDirection::Ascending } );
+    }
+
+    // LES MOINS TRAVAILLEES D'ABORD. A egalite, l'ordre de la palette decide - il est deja celui de l'apprentissage, donc
+    // le tri est stable et ne change pas d'une fois a l'autre.
+    std::ranges::stable_sort( candidates, {}, &Candidate::observations );
+
+    for( const Candidate & candidate : candidates )
+    {
+        if( points.size() >= static_cast<qsizetype>( REVIEW_OPENING_POINT_COUNT ) )
+        {
+            break;
+        }
+
+        QVariantMap point;
+        point.insert( QStringLiteral( "name" ), candidate.label );
+        point.insert( QStringLiteral( "asked" ), static_cast<int>( candidate.observations ) );
+
+        points.append( point );
     }
 
     return points;

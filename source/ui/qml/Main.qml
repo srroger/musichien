@@ -1692,6 +1692,51 @@ ApplicationWindow {
 
                         }
 
+                        // CE QUE TU TRAVAILLES PEU - la troisieme liste, et c'est celle qui OUVRE le bilan au lieu de le
+                        // refermer. Roger : « ca m'etonne qu'il n'y ait qu'un seul truc qui me resiste », et il a raison -
+                        // le plan ne naissait que des ECHECS, donc ce que les tirages ne lui ont jamais propose n'existait
+                        // pas pour lui. Ici on regarde au contraire ce que son NIVEAU attend et qu'il n'a jamais entendu :
+                        // « evidemment qu'on ne va pas demander a un debutant de reconnaitre un demi-diminue ».
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 6
+                            color: "#ffd479"
+                            font.pixelSize: 17
+                            font.bold: true
+                            visible: ExerciseController.reviewLeastWorkedPoints.length > 0
+                            text: qsTr("Ce que tu travailles peu")
+                        }
+
+                        Repeater {
+                            model: ExerciseController.reviewLeastWorkedPoints
+
+                            delegate: RowLayout {
+                                required property var modelData
+
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    color: "#e8dcff"
+                                    font.pixelSize: 15
+                                    text: modelData.name
+                                }
+
+                                // « JAMAIS POSE » PLUTOT QUE « 0 QUESTIONS » : c'est la difference entre un chiffre qui
+                                // constate et une phrase qui explique, et c'est exactement ce qu'on veut dire ici.
+                                Text {
+                                    Layout.preferredWidth: 96
+                                    horizontalAlignment: Text.AlignRight
+                                    color: "#8a77ad"
+                                    font.pixelSize: 12
+                                    text: modelData.asked === 0 ? qsTr("jamais posé") : qsTr("%1 questions").arg(modelData.asked)
+                                }
+
+                            }
+
+                        }
+
                         // LA PORTE VERS L'APRES, et c'est la pensee de Roger : le Bilan est l'entree du cote plus
                         // academique de l'app, celui ou l'on apprend POURQUOI un intervalle ou un mode sonne ainsi.
                         Text {

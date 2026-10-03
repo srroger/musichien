@@ -1087,6 +1087,11 @@ public:
 
     [[nodiscard]] bool isReviewOpeningVisible() const noexcept;
 
+    // CE QUE LE NIVEAU ATTEND, ET QU'ON N'A PAS TRAVAILLE.
+    Q_PROPERTY( QVariantList reviewLeastWorkedPoints READ reviewLeastWorkedPoints NOTIFY sessionChanged )
+
+    [[nodiscard]] QVariantList reviewLeastWorkedPoints() const;
+
     [[nodiscard]] QVariantList reviewStrongPoints() const;
     [[nodiscard]] QVariantList reviewWeakPoints() const;
 
