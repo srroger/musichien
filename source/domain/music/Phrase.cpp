@@ -21,29 +21,10 @@ namespace
 // qu'elles servent de reference. Le generateur n'insiste alors sur aucun degre et laisse la marche choisir.
 [[nodiscard]] constexpr std::int32_t characteristicDegree( Mode p_mode ) noexcept
 {
-    switch( p_mode )
-    {
-        case Mode::Lydian:
-            return 4;
-
-        case Mode::Mixolydian:
-            return 7;
-
-        case Mode::Dorian:
-            return 6;
-
-        case Mode::Phrygian:
-            return 2;
-
-        case Mode::Locrian:
-            return 5;
-
-        case Mode::Ionian:
-        case Mode::Aeolian:
-            return 0;
-    }
-
-    return 0;
+    // Le degre caracteristique vit maintenant dans Mode.h : c'est une regle SUR LES MODES, et l'ecran s'en sert aussi
+    // pour la MONTRER. Ici on ne fait que l'appeler - une seule definition, donc le generateur et le cercle ne peuvent
+    // pas designer deux notes differentes.
+    return modeCharacteristicDegree( p_mode );
 }
 
 // Ramene un degre dans les sept : une marche qui sort du haut revient par le bas, et l'inverse.

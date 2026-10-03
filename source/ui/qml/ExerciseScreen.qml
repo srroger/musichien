@@ -1240,6 +1240,10 @@ Item {
                     visible: ExerciseController.isHarmonyQuestion
                     selectable: ExerciseController.isForeignNoteQuestion
                     notes: ExerciseController.modeCircle
+                    // L'INTRUS N'EST MARQUE QU'APRES LA REPONSE, et c'est le verdict qui le dit : `foreignNoteVerdict`
+                    // n'existe qu'une fois la reponse donnee, donc la couleur ne peut pas vendre la meche. Le pas est
+                    // compte de 1 a 7 par le domaine, et de 0 a 6 dans la roue - d'ou le retrait.
+                    foreignStep: ExerciseController.foreignNoteVerdict.stepNumber !== undefined ? ExerciseController.foreignNoteVerdict.stepNumber - 1 : -1
                     onNoteChosen: (p_stepIndex) => {
                         ExerciseController.answerForeignNote(p_stepIndex);
                     }

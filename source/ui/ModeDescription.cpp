@@ -184,6 +184,11 @@ QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchC
     // parle du mode, pas de l'endroit ou on le regarde.
     const std::array<std::int32_t, domain::DEGREE_COUNT> offsets = domain::modeDegreeOffsets( p_mode );
 
+    // LE DEGRE CARACTERISTIQUE : celui qui distingue le mode de ses voisins, et que l'ecran marque a part. Il vaut zero
+    // pour les deux modes de reference - l'ionien et l'eolien n'ont rien a demontrer - donc ramene a un rang il vaut -1,
+    // et aucun pas ne le porte. C'est exactement ce qu'on veut : rien a marquer.
+    const std::int32_t characteristicStep = domain::modeCharacteristicDegree( p_mode ) - 1;
+
     std::vector<std::pair<std::int32_t, QVariantMap>> placed;
 
     placed.reserve( domain::SEMITONES_PER_OCTAVE );
@@ -213,6 +218,7 @@ QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchC
         description.insert( QStringLiteral( "inMode" ), entry.belongsToMode );
         description.insert( QStringLiteral( "isTonic" ), entry.isTonic );
         description.insert( QStringLiteral( "stepIndex" ), stepIndex );
+        description.insert( QStringLiteral( "isCharacteristic" ), stepIndex == characteristicStep );
 
         // LA POSITION DANS LA ROUE : le rang de la note dans une suite de QUINTES partie du repere. Une quinte vaut sept
         // demi-tons, et sept est son propre inverse modulo douze (7 x 7 = 49 = 1 + 4 x 12), donc l'ordre des quintes
