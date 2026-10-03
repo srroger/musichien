@@ -73,7 +73,10 @@ TEST( IntervalPlaybackControllerTest, playing_a_ninth_plays_a_ninth_and_names_it
     const QVariantMap heardInterval = controller.lastPlayedInterval();
 
     EXPECT_EQ( "M9", heardInterval.value( "identifier" ).toString() );
-    EXPECT_EQ( "Major ninth", heardInterval.value( "name" ).toString() );
+
+    // LE NOM EST CELUI DU JOUEUR. L'identifiant au-dessus reste anglais et stable - c'est lui qu'un fichier garderait -
+    // mais ce qui s'AFFICHE est en francais : « for what is shown to the user, French » (Roger, 02/10/2026).
+    EXPECT_EQ( QStringLiteral( "Neuvième majeure" ), heardInterval.value( "name" ).toString() );
     EXPECT_EQ( 14, heardInterval.value( "semitones" ).toInt() );
     EXPECT_EQ( 2, heardInterval.value( "intervalClass" ).toInt() );
     EXPECT_EQ( 1, heardInterval.value( "octaveSpan" ).toInt() );

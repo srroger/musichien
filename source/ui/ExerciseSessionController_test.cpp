@@ -3,6 +3,7 @@
 #include "domain/audio/NotePlayerFake.h"
 #include "domain/music/PhraseBook.h"
 #include "domain/music/Temperament.h"
+#include "ui/IntervalDescription.h"
 #include "ui/MicrophoneController.h"
 
 #include <QStringList>
@@ -1950,9 +1951,34 @@ TEST( ExerciseSessionControllerTest, a_review_list_names_chords_too )
 
     // Une liste construite a part : les virgules d'une liste entre accolades coupent la macro de test en deux, et
     // l'erreur parle alors de « trop d'arguments », ce qui n'aide personne.
-    const QStringList expected{ QStringLiteral( "Minor" ), QStringLiteral( "Quarte montante" ) };
+    //
+    // L'ORDRE EST CELUI D'UN TRI DE CHAINES, majuscules d'abord : « Quarte... » avant « mineur ». C'est une consequence
+    // de la majuscule du nom, pas une intention - et le tri reste le plus sur, puisqu'il ne depend pas du tri interne des
+    // cibles a egalite.
+    const QStringList expected{ QStringLiteral( "Quarte juste montante" ), QStringLiteral( "mineur" ) };
 
     EXPECT_EQ( expected, names );
+}
+
+TEST( ExerciseSessionControllerTest, an_interval_is_named_in_french_for_the_player )
+{
+    // Roger : « effectivement les intervalles sont ecrits en anglais, je n'avais pas fait attention a ca, il faudrait les
+    // ecrire en francais partout ou ca s'affiche ». Le modele GARDE son nom anglais - c'est le nom du code, celui qui
+    // sert aux fichiers et aux cles - et c'est l'AFFICHAGE qui traduit.
+    const QVariantMap fifth = describeInterval( domain::Interval{ 7 } );
+
+    // L'identifiant reste anglais et stable : c'est lui qu'un fichier de sauvegarde ou un contenu garderait.
+    EXPECT_EQ( QStringLiteral( "P5" ), fifth.value( "identifier" ).toString() );
+    EXPECT_EQ( QStringLiteral( "Quinte juste" ), fifth.value( "name" ).toString() );
+
+    // L'ACCORD DE GENRE, et c'est le piege de la langue : l'unisson est le SEUL masculin.
+    EXPECT_EQ( QStringLiteral( "Unisson juste" ), describeInterval( domain::Interval{ 0 } ).value( "name" ).toString() );
+    EXPECT_EQ( QStringLiteral( "Tierce majeure" ), describeInterval( domain::Interval{ 4 } ).value( "name" ).toString() );
+    EXPECT_EQ( QStringLiteral( "Sixte mineure" ), describeInterval( domain::Interval{ 8 } ).value( "name" ).toString() );
+
+    // Et un intervalle COMPOSE, qui ne doit pas perdre son nom en chemin : la neuvieme majeure, une octave au-dessus de la
+    // seconde majeure.
+    EXPECT_EQ( QStringLiteral( "Neuvième majeure" ), describeInterval( domain::Interval{ 14 } ).value( "name" ).toString() );
 }
 
 TEST( ExerciseSessionControllerTest, answering_twice_writes_one_line )

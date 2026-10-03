@@ -11,6 +11,7 @@
 #include "ui/ModeDescription.h"
 
 #include <QColor>
+#include <QCoreApplication>
 #include <QDate>
 #include <QDebug>
 #include <QString>
@@ -168,6 +169,43 @@ constexpr std::chrono::milliseconds WRONG_CHORD_GAP{ 240 };
 //
 // L'ecran AFFICHE, il n'assemble rien : un symbole compose dans le QML serait compose autrement le jour ou un deuxieme
 // ecran le montrerait, et les deux divergeraient en silence.
+// Le nom d'une couleur d'accord, EN FRANCAIS, pour la meme raison que les intervalles : le modele nomme, l'ecran traduit
+// - et l'ordre suit ChordQuality, comme la table du domaine, pour qu'une couleur ajoutee ailleurs fasse echouer la
+// compilation ici plutot que de glisser un nom faux dans un verdict.
+//
+// « sus4 » et « sus2 » ne sont pas traduits : ce sont les noms qu'un musicien lit sur une grille, en francais comme en
+// anglais, et les franciser inventerait un vocabulaire que personne n'utilise.
+constexpr std::array<const char *, domain::CHORD_QUALITY_COUNT> CHORD_QUALITY_WORDS{
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "majeur" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "mineur" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "sus4" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "sus2" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "diminué" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "augmenté" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "septième de dominante" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "septième majeure" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "septième mineure" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "sixte" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "demi-diminué" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "septième diminuée" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "mineur septième majeure" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "ajoutée neuvième" ),
+};
+
+[[nodiscard]] QString chordQualityWord( domain::ChordQuality p_quality )
+{
+    const auto slot = static_cast<std::size_t>( p_quality );
+
+    if( slot >= CHORD_QUALITY_WORDS.size() )
+    {
+        // Une couleur hors table n'existe pas, et un ecran doit pouvoir afficher quelque chose : le nom du modele vaut
+        // mieux qu'une case vide, et cette branche ne doit jamais s'ouvrir.
+        return QString::fromUtf8( domain::chordQualityName( p_quality ).data() );
+    }
+
+    return QCoreApplication::translate( "ExerciseSessionController", CHORD_QUALITY_WORDS.at( slot ) );
+}
+
 [[nodiscard]] QVariantMap describeChord( const domain::Chord & p_chord )
 {
     const domain::Note root{ p_chord.rootMidiNumber };
@@ -180,8 +218,7 @@ constexpr std::chrono::milliseconds WRONG_CHORD_GAP{ 240 };
 
     described.insert( QStringLiteral( "quality" ), static_cast<int>( p_chord.quality ) );
 
-    described.insert( QStringLiteral( "name" ),
-                      QString::fromStdString( std::string{ domain::chordQualityName( p_chord.quality ) } ) );
+    described.insert( QStringLiteral( "name" ), chordQualityWord( p_chord.quality ) );
 
     described.insert( QStringLiteral( "rootName" ), QString::fromStdString( rootName ) );
 
@@ -3645,38 +3682,19 @@ QVariantList ExerciseSessionController::reviewPointsOf( bool p_strong ) const
 
 QString ExerciseSessionController::targetLabel( const domain::TargetStatistics & p_target )
 {
-    // LES INTERVALLES ET LES MODES, et rien d'autre - c'est la demande de Roger, mot pour mot. Un accord ou une cellule
-    // rythmique se nomment autrement, et les melanger ici noierait les deux listes au lieu de les eclairer.
-    //
-    // LE NOM EST FRANCAIS, et c'est un choix. L'intervalle du domaine se nomme en anglais (« Perfect fifth ») : c'est le
-    // nom du MODELE, et il est fait pour ne jamais changer. La page d'ouverture, elle, parle au joueur - et
-    // « Perfect fifth montante » ne serait ni une langue ni l'autre.
-    static constexpr std::array<std::string_view, 15> FRENCH_DEGREES{
-      "Unisson",
-      "Seconde",
-      "Tierce",
-      "Quarte",
-      "Quinte",
-      "Sixte",
-      "Septieme",
-      "Octave",
-      "Neuvieme",
-      "Dixieme",
-      "Onzieme",
-      "Douzieme",
-      "Treizieme",
-      "Quatorzieme",
-      "Quinzieme",
-    };
+    // LE NOM VIENT DE describeInterval, et il n'est PAS refait ici : c'est lui qui porte le francais (« Quinte juste »),
+    // et deux tables de noms dans deux fichiers finiraient par se contredire devant le joueur. L'intervalle du domaine
+    // se nomme en anglais - c'est le nom du modele - et c'est l'affichage qui traduit.
 
     switch( p_target.kind )
     {
         case domain::QuestionKind::NamedInterval:
         case domain::QuestionKind::Direction: {
-            const domain::Interval interval{ p_target.target };
-            const auto degreeSlot = static_cast<std::size_t>( interval.number() ) - 1;
+            const QString name = describeInterval( domain::Interval{ p_target.target } )
+                                   .value( QStringLiteral( "name" ) )
+                                   .toString();
 
-            if( degreeSlot >= FRENCH_DEGREES.size() )
+            if( name.isEmpty() )
             {
                 return QString{};
             }
@@ -3684,8 +3702,7 @@ QString ExerciseSessionController::targetLabel( const domain::TargetStatistics &
             const QString direction = p_target.direction == domain::IntervalDirection::Ascending ? tr( "montante" )
                                                                                                  : tr( "descendante" );
 
-            const QString name =
-              tr( "%1 %2" ).arg( QString::fromUtf8( FRENCH_DEGREES.at( degreeSlot ).data() ), direction );
+            const QString full = tr( "%1 %2" ).arg( name, direction );
 
             // LE GENRE EST DIT quand ce n'est pas celui de reference, et ce n'est pas un ornement. Le domaine SEPARE les
             // genres a dessein - « un joueur qui reussit l'un en ratant l'autre apprend quelque chose de lui-meme » - et
@@ -3694,7 +3711,7 @@ QString ExerciseSessionController::targetLabel( const domain::TargetStatistics &
             // Sans le dire, deux lignes portaient le meme mot avec deux chiffres differents, et Roger l'a vu tout de
             // suite : « Dorien 100 % sur 3 questions » d'un cote, « Dorien 10 questions 90 % » de l'autre. Ce n'etait
             // pas un comptage faux, c'etait un comptage muet.
-            return p_target.kind == domain::QuestionKind::Direction ? tr( "%1 · sens" ).arg( name ) : name;
+            return p_target.kind == domain::QuestionKind::Direction ? tr( "%1 · sens" ).arg( full ) : full;
         }
 
         case domain::QuestionKind::ModeName:
@@ -3714,8 +3731,7 @@ QString ExerciseSessionController::targetLabel( const domain::TargetStatistics &
         // C'est cette omission qui vidait ses listes : plus il ratait d'accords, plus les places se perdaient, jusqu'a
         // ne plus montrer qu'une ligne. La cible d'un accord est sa COULEUR - il n'y a pas de tonique dans un taux.
         case domain::QuestionKind::Chord:
-            return QString::fromUtf8(
-              domain::chordQualityName( static_cast<domain::ChordQuality>( p_target.target ) ).data() );
+            return chordQualityWord( static_cast<domain::ChordQuality>( p_target.target ) );
 
         default:
             return QString{};
