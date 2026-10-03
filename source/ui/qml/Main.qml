@@ -3931,7 +3931,7 @@ ApplicationWindow {
                 Layout.topMargin: 8
                 color: "#cbb8e8"
                 font.pixelSize: 12
-                text: qsTr("touche l'écran pour continuer")
+                text: qsTr("Touche l'écran pour continuer")
             }
 
         }

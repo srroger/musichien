@@ -176,20 +176,22 @@ constexpr std::chrono::milliseconds WRONG_CHORD_GAP{ 240 };
 // « sus4 » et « sus2 » ne sont pas traduits : ce sont les noms qu'un musicien lit sur une grille, en francais comme en
 // anglais, et les franciser inventerait un vocabulaire que personne n'utilise.
 constexpr std::array<const char *, domain::CHORD_QUALITY_COUNT> CHORD_QUALITY_WORDS{
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "majeur" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "mineur" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "sus4" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "sus2" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "diminué" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "augmenté" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "septième de dominante" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "septième majeure" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "septième mineure" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "sixte" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "demi-diminué" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "septième diminuée" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "mineur septième majeure" ),
-  QT_TRANSLATE_NOOP( "ExerciseSessionController", "ajoutée neuvième" ),
+  // LA MAJUSCULE, parce que ce sont des LIBELLES : un verdict affiche « Mineur », pas « mineur » au milieu d'une phrase.
+  // C'est la meme regle que les intervalles, ou le nom ouvre toujours le libelle - « Quinte juste ».
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Majeur" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Mineur" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Sus4" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Sus2" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Diminué" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Augmenté" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Septième de dominante" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Septième majeure" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Septième mineure" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Sixte" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Demi-diminué" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Septième diminuée" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Mineur septième majeure" ),
+  QT_TRANSLATE_NOOP( "ExerciseSessionController", "Ajoutée neuvième" ),
 };
 
 [[nodiscard]] QString chordQualityWord( domain::ChordQuality p_quality )

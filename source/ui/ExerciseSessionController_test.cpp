@@ -1955,7 +1955,7 @@ TEST( ExerciseSessionControllerTest, a_review_list_names_chords_too )
     // L'ORDRE EST CELUI D'UN TRI DE CHAINES, majuscules d'abord : « Quarte... » avant « mineur ». C'est une consequence
     // de la majuscule du nom, pas une intention - et le tri reste le plus sur, puisqu'il ne depend pas du tri interne des
     // cibles a egalite.
-    const QStringList expected{ QStringLiteral( "Quarte juste montante" ), QStringLiteral( "mineur" ) };
+    const QStringList expected{ QStringLiteral( "Mineur" ), QStringLiteral( "Quarte juste montante" ) };
 
     EXPECT_EQ( expected, names );
 }
