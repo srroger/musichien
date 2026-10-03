@@ -3553,10 +3553,21 @@ QVariantList ExerciseSessionController::reviewPointsOf( bool p_strong ) const
 
     const std::vector<domain::TargetStatistics> insights = reviewInsights();
 
+    // LES DEUX LISTES NE SE PARTAGENT AUCUNE CIBLE, et c'est une CORRECTION. Roger l'a vue avant nous, sur son propre
+    // ecran : « ce qui te resiste encore me montre [...] Octave montante 100 % ». Un taux parfait dans la liste des
+    // faiblesses n'est pas une nuance, c'est une contradiction.
+    //
+    // Les deux listes sont tirees de la MEME liste triee - l'une par la fin, l'autre par le debut - et rien ne les
+    // empechait de se rejoindre. Avec peu de cibles travaillees, la MEILLEURE pouvait donc etre presentee comme ce qui
+    // resiste, et le joueur avait raison de ne plus y croire.
+    //
+    // Une seule borne, donc, pour les deux : chacune prend au plus la moitie de ce qu'il y a, et le recouvrement devient
+    // impossible par construction plutot que par vigilance.
+    const std::size_t listSize = std::min( REVIEW_OPENING_POINT_COUNT, insights.size() / 2 );
+
     // De la PLUS FAIBLE a la mieux reussie : les points faibles sont donc au debut de la liste, les forts a la fin. On
-    // la descend pour les faibles, on la remonte pour les forts - et les deux listes ne peuvent pas se contredire, ce
-    // qui arriverait si chacune refaisait son propre tri.
-    for( std::size_t index = 0; ( index < insights.size() ) && ( points.size() < REVIEW_OPENING_POINT_COUNT ); ++index )
+    // la descend pour les faibles, on la remonte pour les forts.
+    for( std::size_t index = 0; index < listSize; ++index )
     {
         const domain::TargetStatistics & target =
           p_strong ? insights.at( insights.size() - 1 - index ) : insights.at( index );
@@ -3620,13 +3631,29 @@ QString ExerciseSessionController::targetLabel( const domain::TargetStatistics &
             const QString direction = p_target.direction == domain::IntervalDirection::Ascending ? tr( "montante" )
                                                                                                  : tr( "descendante" );
 
-            return tr( "%1 %2" ).arg( QString::fromUtf8( FRENCH_DEGREES.at( degreeSlot ).data() ), direction );
+            const QString name =
+              tr( "%1 %2" ).arg( QString::fromUtf8( FRENCH_DEGREES.at( degreeSlot ).data() ), direction );
+
+            // LE GENRE EST DIT quand ce n'est pas celui de reference, et ce n'est pas un ornement. Le domaine SEPARE les
+            // genres a dessein - « un joueur qui reussit l'un en ratant l'autre apprend quelque chose de lui-meme » - et
+            // deux genres sont donc DEUX cibles pour la meme distance.
+            //
+            // Sans le dire, deux lignes portaient le meme mot avec deux chiffres differents, et Roger l'a vu tout de
+            // suite : « Dorien 100 % sur 3 questions » d'un cote, « Dorien 10 questions 90 % » de l'autre. Ce n'etait
+            // pas un comptage faux, c'etait un comptage muet.
+            return p_target.kind == domain::QuestionKind::Direction ? tr( "%1 · sens" ).arg( name ) : name;
         }
 
-        case domain::QuestionKind::ModeColour:
         case domain::QuestionKind::ModeName:
-        case domain::QuestionKind::ModeVamp:
             return describeMode( static_cast<domain::Mode>( p_target.target ) ).value( QStringLiteral( "name" ) ).toString();
+
+        case domain::QuestionKind::ModeColour:
+            return tr( "%1 · couleur" )
+              .arg( describeMode( static_cast<domain::Mode>( p_target.target ) ).value( QStringLiteral( "name" ) ).toString() );
+
+        case domain::QuestionKind::ModeVamp:
+            return tr( "%1 · contexte" )
+              .arg( describeMode( static_cast<domain::Mode>( p_target.target ) ).value( QStringLiteral( "name" ) ).toString() );
 
         default:
             return QString{};

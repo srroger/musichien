@@ -2018,6 +2018,71 @@ TEST( ExerciseSessionControllerTest, the_review_opens_on_what_the_app_knows_abou
     EXPECT_FALSE( controller.running() );
 }
 
+TEST( ExerciseSessionControllerTest, the_two_review_lists_never_share_a_point )
+{
+    // Roger, sur son propre ecran : « ce qui te resiste encore me montre [...] Octave montante 100 % ». Un taux parfait
+    // dans la liste des faiblesses n'est pas une nuance, c'est une contradiction.
+    //
+    // La cause : les deux listes sont tirees de la MEME liste triee, l'une par la fin, l'autre par le debut, et rien ne
+    // les empechait de se rejoindre. Avec quatre cibles travaillees, les deux tranches se recouvraient de deux lignes -
+    // donc la meilleure cible du joueur pouvait etre presentee comme ce qui lui resiste.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    const auto now = std::chrono::system_clock::now();
+
+    const auto add = [&log, &now]( std::int32_t p_semitones, bool p_correct ) {
+        for( int index = 0; index < 3; ++index )
+        {
+            domain::QuestionRecord record;
+
+            record.askedAt = now - std::chrono::hours{ 1 };
+            record.kind = domain::QuestionKind::NamedInterval;
+            record.target = p_semitones;
+            record.direction = domain::IntervalDirection::Ascending;
+            record.outcome = p_correct ? domain::QuestionOutcome::CorrectFirstTry : domain::QuestionOutcome::Failed;
+
+            log.append( record );
+        }
+    };
+
+    // Quatre cibles, trois observations chacune : le seuil qui fait un point faible est atteint, et il y a de quoi
+    // remplir deux listes - mais pas de quoi les remplir sans qu'elles se recouvrent.
+    add( 12, true );
+    add( 7, true );
+    add( 5, false );
+    add( 2, false );
+
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+
+    ASSERT_TRUE( controller.isReviewOpeningVisible() );
+
+    const QVariantList strong = controller.reviewStrongPoints();
+    const QVariantList weak = controller.reviewWeakPoints();
+
+    ASSERT_FALSE( strong.isEmpty() );
+    ASSERT_FALSE( weak.isEmpty() );
+
+    // Aucun point faible n'est aussi un point fort : c'est toute la garantie, et elle vaut mieux qu'un raisonnement sur
+    // les indices.
+    for( const QVariant & weakPoint : weak )
+    {
+        for( const QVariant & strongPoint : strong )
+        {
+            EXPECT_NE( weakPoint.toMap().value( "name" ).toString(), strongPoint.toMap().value( "name" ).toString() );
+        }
+
+        // Et le symptome exact que Roger a vu : un taux parfait ne peut pas etre dans ce qui resiste.
+        EXPECT_LT( weakPoint.toMap().value( "percent" ).toInt(), 100 );
+    }
+}
+
 TEST( ExerciseSessionControllerTest, a_target_seen_once_is_not_what_resisted_the_player )
 {
     // Ce que Roger a entendu, et qui n'etait pas vrai : « des fois tu dis : bravo, c'etait quelque chose qui te
