@@ -359,6 +359,34 @@ void QAudioNotePlayer::playSamples( std::vector<float> p_samples, float p_gain )
 
     startSinkIfNeeded();
     stopSinkWhenSilent();
+
+    // L'ORIGINE DE LA POSITION se pose ICI, et nulle part ailleurs : c'est le seul endroit qui sache qu'un nouveau son
+    // commence. Tout ce qui se superpose ensuite passe par mixSamples et ne la deplace pas - le curseur doit continuer
+    // d'avancer pendant que les clics du metronome tombent dans le meme son.
+    if( m_audioSink != nullptr )
+    {
+        m_playbackSinkOriginUs = m_audioSink->processedUSecs();
+    }
+}
+
+std::chrono::milliseconds QAudioNotePlayer::playedMilliseconds() const
+{
+    if( ( m_audioSink == nullptr ) || ( m_playbackSinkOriginUs < 0 ) )
+    {
+        return std::chrono::milliseconds{ 0 };
+    }
+
+    const qint64 processedUs = m_audioSink->processedUSecs();
+
+    // processedUSecs repart de ZERO quand le puits repart. Une position ANTERIEURE a l'origine n'est donc pas un temps
+    // negatif : c'est un puits neuf, et zero est alors la seule reponse honnete. L'appelant sait quoi en faire - il
+    // retombe sur sa propre horloge au lieu d'afficher un curseur qui recule.
+    if( processedUs < m_playbackSinkOriginUs )
+    {
+        return std::chrono::milliseconds{ 0 };
+    }
+
+    return std::chrono::milliseconds{ ( processedUs - m_playbackSinkOriginUs ) / 1000 };
 }
 
 void QAudioNotePlayer::mixSamples( std::vector<float> p_samples, float p_gain )

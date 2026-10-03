@@ -84,6 +84,19 @@ public:
         playChord( p_second );
     }
 
+    // OU EN EST LE SON, en millisecondes depuis le debut du DERNIER son joue.
+    //
+    // C'est la SEULE horloge qui puisse etre d'accord avec ce que le joueur entend. Celle de l'interface mesure le moment
+    // ou l'on a DEMANDE le son ; celle-ci mesure le moment ou l'oreille le recoit. Entre les deux il y a le tampon du
+    // systeme, et c'est exactement l'ecart que Roger entend : « le son n'est pas synchro avec la note jouee ».
+    //
+    // Aucune unite de temps n'entre ici : le domaine demande une POSITION, l'adaptateur sait d'ou elle vient.
+    //
+    // Un corps par defaut, comme playChordFor : un adaptateur sans horloge audio repond ZERO, et l'appelant le sait -
+    // voir ExerciseSessionController::rhythmPositionInBeats, qui retombe alors sur sa propre horloge plutot que de
+    // figer le curseur.
+    [[nodiscard]] virtual std::chrono::milliseconds playedMilliseconds() const { return std::chrono::milliseconds{ 0 }; }
+
     // Fait ENTENDRE un instrument, pour qu'on puisse le CHOISIR : la gamme demandee, puis l'accord demande, avec CE
     // timbre et aucun autre.
     //

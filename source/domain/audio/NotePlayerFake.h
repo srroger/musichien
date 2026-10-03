@@ -137,6 +137,14 @@ public:
         ++m_mistakeCueCount;
     }
 
+    // OU EN EST LE SON, pour un test : la position est POSEE, et non mesuree.
+    //
+    // Sans cela, un fake repondrait toujours zero et aucun test ne pourrait dire qu'un curseur AVANCE - ni qu'il recule
+    // quand le son repart de zero. Voir ExerciseSessionController::rhythmPositionInBeats.
+    void setPlayedMilliseconds( std::chrono::milliseconds p_position ) { m_playedMilliseconds = p_position; }
+
+    [[nodiscard]] std::chrono::milliseconds playedMilliseconds() const override { return m_playedMilliseconds; }
+
     // Le wouf du chien, compte a part : c'est ce qui permet a un test de dire QUAND il aboie - a la fin d'une partie, et
     // pas pendant.
     void playDogBark() override
@@ -330,6 +338,9 @@ private:
 
     // Les paires « ce qu'il a joue, puis la reponse » - voir PlayedChordPair.
     std::vector<PlayedChordPair> m_chordPairs;
+
+    // La position du son, posee par un test : voir setPlayedMilliseconds.
+    std::chrono::milliseconds m_playedMilliseconds{ 0 };
     std::vector<PlayedOverDrone> m_melodiesOverDrones;
     std::vector<PlayedPhraseOverDrone> m_phrasesOverDrones;
     int m_mistakeCueCount{ 0 };

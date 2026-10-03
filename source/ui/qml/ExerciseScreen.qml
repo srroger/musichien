@@ -1025,11 +1025,28 @@ Item {
                     }
 
                     Rectangle {
-                        x: (ExerciseController.rhythmBeatInBar / rhythmBar.beatsPerBar) * rhythmBar.width
+                        // LA POSITION VIENT DU SON, et non d'un minuteur de cet ecran : c'est la seule facon que le
+                        // curseur soit d'accord avec ce que le joueur ENTEND (voir rhythmPositionInBar). Un entier qui
+                        // saute d'un temps a l'autre ne pouvait pas etre suivi du regard - c'est la remarque de Roger :
+                        // « le son n'est pas synchro avec la note jouee ».
+
+                        id: rhythmCursor
+
+                        // La minuterie ne FABRIQUE pas la position, elle la RELIT : l'affichage a besoin d'une image
+                        // souvent, le son a besoin d'etre la seule autorite. Vingt millisecondes, c'est le
+                        // rafraichissement d'un ecran.
                         y: 0
                         width: 3
                         height: rhythmBar.height
                         color: ExerciseController.isRhythmPlaying ? "#8ef2b0" : "#6f5c96"
+
+                        Timer {
+                            interval: 20
+                            repeat: true
+                            running: ExerciseController.questionKind === 3
+                            onTriggered: rhythmCursor.x = (ExerciseController.rhythmPositionInBar / rhythmBar.beatsPerBar) * rhythmBar.width
+                        }
+
                     }
 
                 }

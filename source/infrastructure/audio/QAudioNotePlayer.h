@@ -60,6 +60,10 @@ public:
                              std::span<const domain::Note> p_second,
                              std::chrono::milliseconds p_gap ) override;
 
+    // Ou en est le son, lu sur le PUITS : voir le port pour la raison. Zero quand le puits a ete recree, ce qui dit
+    // « je ne sais pas » plutot que de mentir sur une position.
+    [[nodiscard]] std::chrono::milliseconds playedMilliseconds() const override;
+
     // Fait ENTENDRE un instrument : la gamme, un silence, puis l'accord, tous deux avec CE timbre et aucun autre.
     //
     // TOUT TIENT DANS UN SEUL TAMPON, et c'est la seule facon de faire : deux appels a playSamples se SUPERPOSENT, parce
@@ -271,6 +275,15 @@ private:
     [[nodiscard]] std::vector<float> effectiveClick( bool p_accented );
 
     std::unique_ptr<QAudioSink> m_audioSink;
+
+    // LA POSITION DU PUITS AU MOMENT OU LE DERNIER SON A COMMENCE, en microsecondes.
+    //
+    // C'est l'origine de playedMilliseconds : le puits compte depuis son propre demarrage, et ce qu'on veut dire au
+    // joueur, c'est « ou en est CE son-la ». Zero quand rien n'a encore ete joue.
+    //
+    // Seul playSamples la deplace. mixSamples, qui AJOUTE un clic ou une percussion, ne doit surtout pas y toucher : le
+    // curseur doit continuer d'avancer pendant que les clics tombent dedans.
+    qint64 m_playbackSinkOriginUs{ -1 };
 
     // Everything the sink reads. Owned here, handed to the sink by start().
     std::unique_ptr<AudioMixer> m_mixer;
