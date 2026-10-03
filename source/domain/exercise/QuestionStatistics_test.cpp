@@ -160,6 +160,31 @@ TEST( QuestionStatisticsTest, a_target_is_its_direction_too )
     EXPECT_EQ( 100, byTarget.at( 1 ).statistics.successPercent() );
 }
 
+TEST( QuestionStatisticsTest, comparing_two_modes_makes_no_target_of_its_own )
+{
+    // Une question « plus clair ou plus sombre » porte DEUX modes, et le journal n'en enregistre qu'un : en faire une
+    // cible par mode melangerait deux competences (« je reconnais cette couleur » et « je sais la comparer ») et ne
+    // compterait jamais le mode de REFERENCE.
+    //
+    // Roger a tranche (02/10/2026) : la comparaison est une competence de COUPLE. Elle reste dans le journal et dans les
+    // TOTAUX - elle ne fabrique simplement plus de cible, donc plus de ligne de faiblesse a elle.
+    const std::vector<QuestionRecord> records{
+      recordOf( QuestionKind::ModeColour, 2, QuestionOutcome::Failed ),
+      recordOf( QuestionKind::ModeColour, 2, QuestionOutcome::Failed ),
+      recordOf( QuestionKind::ModeName, 2, QuestionOutcome::CorrectFirstTry ),
+    };
+
+    const std::vector<TargetStatistics> byTarget = statisticsByTarget( records, filterForLastDays( 30 ) );
+
+    // UNE seule cible, celle du nom : les deux comparaisons ne sont pas dans le tri par cible...
+    ASSERT_EQ( 1U, byTarget.size() );
+    EXPECT_EQ( QuestionKind::ModeName, byTarget.at( 0 ).kind );
+
+    // ...mais elles restent dans les TOTAUX, parce que le joueur les a bien jouees. Ecarter la comparaison de la
+    // statistique par mode n'est pas effacer les questions qu'il a posees.
+    EXPECT_EQ( 3U, computeStatistics( records, filterForLastDays( 30 ) ).questionCount );
+}
+
 TEST( QuestionStatisticsTest, the_weakest_target_comes_first )
 {
     const std::vector<QuestionRecord> records{
