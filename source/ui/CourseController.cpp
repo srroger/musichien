@@ -2,6 +2,7 @@
 
 #include "domain/music/Interval.h"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <utility>
@@ -68,6 +69,35 @@ constexpr const char * KIND_ANNEXE = "annexe";
     return description;
 }
 
+// LES COURS D'ABORD, LES OS A MACHER ENSUITE.
+//
+// Roger : « tu as mis en avant l'os a macher, alors que c'est plutot le cours qu'il faudrait mettre en avant ». L'ORDRE de
+// la liste dit la meme chose que les couleurs, et il n'a rien d'alphabetique : un cours est NUMEROTE (chapitre, ordre), une
+// annexe ne l'est pas et se rattache au chapitre d'un autre. Les cours montent donc en premier, et une annexe se range a la
+// fin - c'est une annexe, pas une lecon, et la liste doit le dire avant qu'on ait lu un mot.
+[[nodiscard]] bool libraryOrder( const domain::Course & p_left, const domain::Course & p_right )
+{
+    const bool leftIsAnnexe = ( p_left.chapter == 0 );
+    const bool rightIsAnnexe = ( p_right.chapter == 0 );
+
+    if( leftIsAnnexe != rightIsAnnexe )
+    {
+        return !leftIsAnnexe;
+    }
+
+    if( p_left.chapter != p_right.chapter )
+    {
+        return p_left.chapter < p_right.chapter;
+    }
+
+    if( p_left.order != p_right.order )
+    {
+        return p_left.order < p_right.order;
+    }
+
+    return p_left.title < p_right.title;
+}
+
 }    // namespace
 
 CourseController::CourseController( domain::NotePlayer & p_notePlayer,
@@ -78,6 +108,11 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
   , m_courses{ std::move( p_courses ) }
 {
     // Le catalogue est construit UNE fois : la page l'affiche, elle ne le compose jamais.
+    //
+    // Il est TRIE avant tout le reste, et le tri porte sur m_courses : la liste et l'ouverture partagent donc le meme
+    // ordre, et un index ne peut pas designer deux cours differents selon qui le lit.
+    std::sort( m_courses.begin(), m_courses.end(), libraryOrder );
+
     for( const domain::Course & course : m_courses )
     {
         QVariantMap entry;

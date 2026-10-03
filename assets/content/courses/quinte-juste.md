@@ -51,8 +51,8 @@ Tu le trouveras **du premier coup**. C'est le seul intervalle dont on puisse dir
 partir d'une note que tu viens d'entendre, ça n'est pas une performance, ça se fait tout seul. Les autres
 demanderont ta journée. Celui-ci, non.
 
-> (Le bourdon viendra : c'est ce qui rendra le geste plus facile encore. Pour l'instant, la note est toute
-> seule, et c'est déjà assez.)
+> (Tu peux déjà le faire avec l'accordeur et son micro : le geste est le même. Un bouton « chante-le » depuis
+> cette page viendra s'y brancher, et il n'y aura pas de bourdon pour autant — il polluerait la prise de son.)
 
 ## L'essai
 

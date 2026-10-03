@@ -110,18 +110,20 @@ Item {
                 spacing: 10
 
                 Repeater {
+                    // LE COURS EST LA LEÇON, l'os a macher est son ANNEXE : c'est donc le COURS qui doit ressortir.
+
                     model: CourseController.library
 
                     delegate: Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 66
                         radius: 10
-                        // UN OS A MACHER N'EST PAS UN COURS. La difference est deja dans les fichiers - un cours est
-                        // numerote, une annexe ne l'est pas - et l'ecran ne fait que la montrer. Roger : « je mettrais
-                        // bien les os a macher d'une autre couleur que les cours ».
-                        color: modelData.isAnnexe ? "#33244f" : "#2a1a4a"
-                        border.color: modelData.isAnnexe ? "#7a5cc0" : "#4a3570"
-                        border.width: 1
+                        // Roger : « tu as mis en avant l'os a macher, alors que c'est plutot le cours qu'il faudrait
+                        // mettre en avant ». Il a raison, et j'avais inverse les deux : mon annexe etait plus claire que
+                        // mes cours, ce qui mettait en avant exactement ce qui est secondaire.
+                        color: modelData.isAnnexe ? "#221a38" : "#2a1a4a"
+                        border.color: modelData.isAnnexe ? "#3a2b5c" : "#6a4fa8"
+                        border.width: modelData.isAnnexe ? 1 : 2
 
                         Column {
                             anchors.fill: parent
@@ -132,8 +134,9 @@ Item {
                             Text {
                                 width: parent.width
                                 elide: Text.ElideRight
-                                color: modelData.isAnnexe ? "#cbbde8" : "#f2ecff"
-                                font.pixelSize: 15
+                                color: modelData.isAnnexe ? "#9d8dc0" : "#f2ecff"
+                                font.pixelSize: modelData.isAnnexe ? 14 : 16
+                                font.bold: !modelData.isAnnexe
                                 // L'os dit ce qu'il est, sans qu'on ait a le deviner d'une teinte.
                                 text: (modelData.isAnnexe ? qsTr("🦴  ") : qsTr("")) + modelData.title
                             }

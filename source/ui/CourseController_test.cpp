@@ -215,10 +215,14 @@ TEST( CourseControllerTest, an_annexe_is_told_apart_from_a_course )
     annexe.title = "Pourquoi la quinte sonne juste";
     annexe.chapter = 0;
 
-    const CourseController controller{ notePlayer, { makeQuintCourse(), annexe } };
+    // L'ANNEXE EST DONNEE EN PREMIER, EXPRES : c'est le TRI qui doit remettre le cours devant, et l'ordre alphabetique
+    // aurait fait le contraire (« Pourquoi la quinte... » avant « La quinte juste »).
+    const CourseController controller{ notePlayer, { annexe, makeQuintCourse() } };
 
     ASSERT_EQ( controller.library().size(), 2 );
 
+    EXPECT_EQ( controller.library().at( 0 ).toMap().value( QStringLiteral( "title" ) ).toString(),
+               QString( "La quinte juste" ) );
     EXPECT_FALSE( controller.library().at( 0 ).toMap().value( QStringLiteral( "isAnnexe" ) ).toBool() );
     EXPECT_TRUE( controller.library().at( 1 ).toMap().value( QStringLiteral( "isAnnexe" ) ).toBool() );
 }

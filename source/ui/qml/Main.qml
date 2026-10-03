@@ -297,9 +297,9 @@ ApplicationWindow {
         // Le focus se perd des qu'un dialogue s'ouvre puis se ferme. Sans cela, la touche suivante repart a Android et
         // ferme l'application - le bug reviendrait une fois sur deux, ce qui est le pire des bugs.
         onActiveFocusChanged: {
-            if (!activeFocus) {
+            if (!activeFocus)
                 forceActiveFocus();
-            }
+
         }
         Keys.onReleased: function(event) {
             if (event.key !== Qt.Key_Back)
@@ -1654,6 +1654,10 @@ ApplicationWindow {
         ExerciseScreen {
             id: exerciseScreen
 
+            // AU-DESSUS DE TOUT, y compris de l'Ecole : une partie lancee depuis une lecon doit se VOIR. C'est un nombre
+            // plutot qu'un deplacement de bloc, et c'est volontaire : l'ordre de declaration redevient juste du jour ou le
+            // fichier sera decoupe, et personne n'aura a se souvenir de l'ordre des enfants.
+            z: 2
             anchors.fill: parent
             visible: opacity > 0
             opacity: ExerciseController.running ? 1 : 0
@@ -3250,8 +3254,14 @@ ApplicationWindow {
     // Le calque de l'ecran d'exercice est declare PLUS BAS dans ce fichier, et l'ordre est ce qui decide qui passe
     // devant : une partie lancee depuis une lecon s'affiche par-dessus l'Ecole, et non derriere elle.
     CourseScreen {
+        // L'ECOLE PASSE DEVANT LA PAGE DE GARDE, MAIS DERRIERE L'ECRAN D'EXERCICE.
+
         id: courseScreen
 
+        // C'est CE qui manquait, et Roger l'a vu tout de suite : « le jeu se lance mais derriere la page, on entend les
+        // sons mais on ne voit rien ». L'ordre de declaration decide, et l'Ecole etait declaree APRES l'ecran d'exercice
+        // - donc devant lui. Le commentaire qui affirmait le contraire etait faux, et c'est le telephone qui a tranche.
+        z: 1
         anchors.fill: parent
         opacity: mainWindow.schoolIsOpen ? 1 : 0
         visible: opacity > 0
