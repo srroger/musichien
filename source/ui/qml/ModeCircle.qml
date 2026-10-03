@@ -27,6 +27,11 @@ Item {
     // sonner, et une constante ecrite ici mentirait le jour ou le tempo change.
     // LE DESSIN DU PARCOURS : la trainee et la tete, DERRIERE les pastilles - elles doivent rester lisibles pendant que
     // le chemin se dessine.
+    // LES DEGRES, dans l'ordre ou ils sonnent : la gamme monte puis descend, comme le domaine la joue. Le chemin en
+    // INDICES DU CERCLE s'en deduit, parce que chaque case porte le degre de sa note (voir describeModeCircle).
+    // p_degrees est OPTIONNEL : le banc d'essai joue la gamme MONTEE puis DESCENDUE, et l'exercice la joue MONTE seulement
+    // (une question doit tenir en quelques secondes). Le chemin suit ce qu'on entend, donc il se règle avec lui.
+    // n notes se rejoignent par n-1 intervalles : le dernier pas n'est pas un deplacement.
 
     id: root
 
@@ -43,9 +48,6 @@ Item {
     // Il suffit d'appuyer sur un de ces boutons non ? »
     property bool selectable: false
     readonly property real radius: (Math.min(width, height) / 2) - (dotSize / 2) - 4
-    // LES DEGRES, dans l'ordre ou ils sonnent : la gamme monte puis descend, comme le domaine la joue. Le chemin en
-    // INDICES DU CERCLE s'en deduit, parce que chaque case porte le degre de sa note (voir describeModeCircle).
-    //
     // TREIZE DEGRES, et c'est une CORRECTION : la gamme montee puis descendue partage sa note du haut, donc elle compte
     // treize notes et non quatorze (voir modeScaleUpAndDown). Le degre 6 y figurait deux fois de suite, ce qui ajoutait un
     // bond de longueur NULLE - la tete restait donc un pas en arriere jusqu'a la fin, en plus d'attendre sur place au
@@ -76,9 +78,6 @@ Item {
         return Qt.point((width / 2) + (Math.cos(angle) * radius), (height / 2) + (Math.sin(angle) * radius));
     }
 
-    // p_degrees est OPTIONNEL : le banc d'essai joue la gamme MONTEE puis DESCENDUE, et l'exercice la joue MONTE seulement
-    // (une question doit tenir en quelques secondes). Le chemin suit ce qu'on entend, donc il se règle avec lui.
-    //
     // DEUX NOMBRES, ET NON UNE DUREE TOTALE. Roger : « la boule des lignes dans les modes est un peu lente par rapport au
     // son ». Le parcours etait cale sur la duree TOTALE de la musique, or celle-ci commence et finit par un BOURDON SEUL :
     // la tete partait donc avec le bourdon, et finissait dans le silence qui le suit - elle arrivait sur la derniere
@@ -91,9 +90,6 @@ Item {
         // Le silence d'entree : la tete reste SUR la tonique pendant que le bourdon s'installe. C'est vrai - c'est ce
         // qu'on entend - et c'est aussi ce qui se regarde : on voit d'ou l'on part.
         leadInPause.duration = Math.max(0, p_leadInMs);
-
-        // n notes se rejoignent par n-1 intervalles : le dernier pas n'est pas un deplacement.
-        //
         // LA DUREE SE POSE SUR L'ANIMATION, et c'est une CORRECTION : `restart()` ne prend AUCUN argument, donc celle que
         // je lui passais etait ignoree - et le parcours se faisait en une fraction de seconde. Roger l'a vu avant moi :
         // « le trait se dessine hyper vite, genre en une fraction de seconde ».

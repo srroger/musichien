@@ -40,6 +40,12 @@ Item {
     // LE BOSS
     // La derniere question d'une Arcade est la NOTE ETRANGERE, et Roger l'a voulue comme un combat de fin : « le chien
     // levite lentement en plein milieu de la page, et tout le fond devient en fondu doux rouge feu ».
+    // LE COMPTE QUI GRIMPE, ET SON BRUITAGE.
+    // Roger : « une animation sur les nombres en mode nombre qui s'incremente tres vite jusqu'au nombre atteint », puis
+    // « un bruitage de jeux video gling gling gling, ou de machine a sous quand ces chiffres s'incrementent ... et un
+    // bruitage ou melodie ou accord de victoire ». Et il l'assume pour ce que c'est : « c'est juste un bruitage pour
+    // rendre le jeu moins austere, et faire appel a des biais cognitifs d'addiction, comme dans les machines a sous ».
+    // LE TIC : un minuteur plutot qu'un appel par image.
 
     id: exerciseScreen
 
@@ -58,80 +64,12 @@ Item {
     // Horizontal offset of the whole screen during the shake. Zero is the resting state, and it is both
     // where the animation starts and where it ends.
     property real shakeOffset: 0
-
-    // LE COMPTE QUI GRIMPE, ET SON BRUITAGE.
-    //
-    // Roger : « une animation sur les nombres en mode nombre qui s'incremente tres vite jusqu'au nombre atteint », puis
-    // « un bruitage de jeux video gling gling gling, ou de machine a sous quand ces chiffres s'incrementent ... et un
-    // bruitage ou melodie ou accord de victoire ». Et il l'assume pour ce que c'est : « c'est juste un bruitage pour
-    // rendre le jeu moins austere, et faire appel a des biais cognitifs d'addiction, comme dans les machines a sous ».
-    //
     // UN SEUL compte pour TOUS les nombres - XP, serie, pourcentages. Un compteur par nombre les ferait arriver les uns
     // apres les autres, alors que le plaisir est justement de les voir grimper ENSEMBLE.
     property real rewardCountUp: 0
     // Vrai des que le compte de CETTE fin de partie a demarre : c'est ce qui empeche `sessionChanged`, qui passe a
     // chaque question, de relancer l'animation pendant qu'elle tourne.
     property bool rewardCountUpStarted: false
-
-    // Le nombre AFFICHE, a un instant donne du compte : la valeur finale, multipliee par l'avancement. Arrondi, parce
-    // qu'un compteur montre des entiers - et c'est l'arrondi qui fait le dechiffrement rapide qu'on vient chercher.
-    function rewardValue(p_final) {
-        return Math.round(p_final * rewardCountUp);
-    }
-
-    NumberAnimation {
-        id: rewardCountUpAnimation
-
-        target: exerciseScreen
-        property: "rewardCountUp"
-        from: 0
-        to: 1
-        // Assez long pour qu'on ait le temps de voir le chiffre grimper, assez court pour qu'on ne s'impatiente pas
-        // devant un ecran qui a deja tout dit.
-        duration: 1300
-        // L'essentiel du chemin se fait au debut : le chiffre part vite et se pose. C'est la courbe d'une machine a
-        // sous, pas celle d'un ascenseur.
-        easing.type: Easing.OutCubic
-
-        onStopped: {
-            // LA FANFARE arrive QUAND LE COMPTE ARRIVE, et seulement s'il est alle au bout : une animation interrompue -
-            // l'ecran quitte, une nouvelle partie lancee - ne doit pas sonner comme une victoire.
-            if (exerciseScreen.rewardCountUp >= 1)
-                ExerciseController.playVictoryFanfare();
-        }
-    }
-
-    // LE TIC : un minuteur plutot qu'un appel par image.
-    //
-    // Par image, le tic suivrait le rafraichissement de l'ecran - soixante par seconde sur ce telephone - et le
-    // bruitage deviendrait un bourdonnement continu. Trente-huit millisecondes font une vingtaine de crans par seconde :
-    // assez pour que ca crepite, pas assez pour que ca se confonde.
-    Timer {
-        interval: 38
-        repeat: true
-        running: rewardCountUpAnimation.running
-        onTriggered: ExerciseController.playScoreTick(Math.round(exerciseScreen.rewardCountUp * 100))
-    }
-
-    Connections {
-        target: ExerciseController
-
-        function onSessionChanged() {
-            // Une nouvelle partie remet le compteur a zero : le gain de la precedente ne doit pas rester affiche.
-            if (!ExerciseController.isFinished) {
-                exerciseScreen.rewardCountUpStarted = false;
-                exerciseScreen.rewardCountUp = 0;
-                return;
-            }
-
-            if (exerciseScreen.rewardCountUpStarted)
-                return;
-
-            exerciseScreen.rewardCountUpStarted = true;
-            rewardCountUpAnimation.restart();
-        }
-    }
-    // The interval the player chose, when there is one.
     readonly property var answeredInterval: ExerciseController.answeredInterval
     // Both checks, and not just the second one: reading a property of something that does not exist yet
     // is an error in QML, and a screen must never be one binding away from throwing.
@@ -139,6 +77,12 @@ Item {
     // La meme chose pour un accord : ce que le joueur vient de repondre, et s'il y a quelque chose a montrer.
     readonly property var answeredChordData: ExerciseController.answeredChord
     readonly property bool hasAnsweredChord: answeredChordData !== undefined && answeredChordData.name !== undefined
+
+    // Le nombre AFFICHE, a un instant donne du compte : la valeur finale, multipliee par l'avancement. Arrondi, parce
+    // qu'un compteur montre des entiers - et c'est l'arrondi qui fait le dechiffrement rapide qu'on vient chercher.
+    function rewardValue(p_final) {
+        return Math.round(p_final * rewardCountUp);
+    }
 
     // LE CHRONO, en minutes:secondes. Une fonction plutot qu'une expression : elle sert une fois aujourd'hui et servira
     // partout ou l'on voudra dire un temps.
@@ -230,6 +174,57 @@ Item {
 
         return verdict;
     }
+
+    NumberAnimation {
+        id: rewardCountUpAnimation
+
+        target: exerciseScreen
+        property: "rewardCountUp"
+        from: 0
+        to: 1
+        // Assez long pour qu'on ait le temps de voir le chiffre grimper, assez court pour qu'on ne s'impatiente pas
+        // devant un ecran qui a deja tout dit.
+        duration: 1300
+        // L'essentiel du chemin se fait au debut : le chiffre part vite et se pose. C'est la courbe d'une machine a
+        // sous, pas celle d'un ascenseur.
+        easing.type: Easing.OutCubic
+        onStopped: {
+            // LA FANFARE arrive QUAND LE COMPTE ARRIVE, et seulement s'il est alle au bout : une animation interrompue -
+            // l'ecran quitte, une nouvelle partie lancee - ne doit pas sonner comme une victoire.
+            if (exerciseScreen.rewardCountUp >= 1)
+                ExerciseController.playVictoryFanfare();
+
+        }
+    }
+
+    // Par image, le tic suivrait le rafraichissement de l'ecran - soixante par seconde sur ce telephone - et le
+    // bruitage deviendrait un bourdonnement continu. Trente-huit millisecondes font une vingtaine de crans par seconde :
+    // assez pour que ca crepite, pas assez pour que ca se confonde.
+    Timer {
+        interval: 38
+        repeat: true
+        running: rewardCountUpAnimation.running
+        onTriggered: ExerciseController.playScoreTick(Math.round(exerciseScreen.rewardCountUp * 100))
+    }
+
+    Connections {
+        function onSessionChanged() {
+            // Une nouvelle partie remet le compteur a zero : le gain de la precedente ne doit pas rester affiche.
+            if (!ExerciseController.isFinished) {
+                exerciseScreen.rewardCountUpStarted = false;
+                exerciseScreen.rewardCountUp = 0;
+                return ;
+            }
+            if (exerciseScreen.rewardCountUpStarted)
+                return ;
+
+            exerciseScreen.rewardCountUpStarted = true;
+            rewardCountUpAnimation.restart();
+        }
+
+        target: ExerciseController
+    }
+    // The interval the player chose, when there is one.
 
     Timer {
         // Read when the timer is RESTARTED, which happens the moment the verdict appears: the pause
@@ -1181,17 +1176,19 @@ Item {
                     // LA ROUE S'ANIME : sa tete part de la tonique et parcourt la gamme, de note en note, pendant que la
                     // musique joue. Roger l'a voulue ici - « dans les exercices, quand on affiche les modes dans leur
                     // cercle » - parce qu'elle dit QUELLE note sonne, et qu'a la fin le chemin laisse une forme.
-
-                    id: modeCircle
-
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 6
                     // LA ROUE S'OXYGENE : Roger l'a vue jouer - « les points sont pas assez espaces pour que ca rende
                     // vraiment bien ». Une case fait trente degres, donc l'ecart entre deux pastilles vaut environ la
                     // moitie du rayon : la seule facon d'ouvrir cet ecart est de faire GRANDIR le cercle ou de reduire les
                     // pastilles. Les deux ont ete poussees d'un cran, et d'un seul : un rayon plus grand demande de la
                     // hauteur, et l'ecran n'en a pas beaucoup.
-                    //
+                    // La gamme de l'exercice MONTE, puis se REFERME sur sa tonique : le chemin fait donc le tour du
+                    // cercle et revient a son point de depart, ce qui referme la figure - et c'est la figure qui reste a
+                    // l'ecran une fois la musique finie.
+
+                    id: modeCircle
+
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 6
                     // Les pastilles restent grandes : elles sont CLIQUEES sur une question de note etrangere, et une cible
                     // qui retrecit trop fait rater la note qu'on visait.
                     span: 304
@@ -1203,10 +1200,6 @@ Item {
                         ExerciseController.answerForeignNote(p_stepIndex);
                     }
 
-                    // La gamme de l'exercice MONTE, puis se REFERME sur sa tonique : le chemin fait donc le tour du
-                    // cercle et revient a son point de depart, ce qui referme la figure - et c'est la figure qui reste a
-                    // l'ecran une fois la musique finie.
-                    //
                     // Le DERNIER degre est 0, et non 7 : le septieme degre du domaine EST le premier degre du cercle,
                     // une octave plus haut. Le cercle ne porte que sept notes, donc la note qui ferme la gamme est
                     // celle par laquelle elle a commence.
