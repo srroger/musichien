@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.26)
 
 cmake_policy(VERSION 3.26)
 
-project(Musichien VERSION 1.8.3 LANGUAGES C CXX)
+project(Musichien VERSION 1.8.4 LANGUAGES C CXX)
 
 
 # Organise the targets into folders in Qt Creator, Visual Studio and Xcode.

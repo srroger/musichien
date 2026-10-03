@@ -110,6 +110,8 @@ ApplicationWindow {
     // Qt 6 ne le livre PAS comme une fermeture de fenetre, mais comme une TOUCHE. Et quand aucun element focalise ne la
     // prend, c'est ANDROID qui termine l'activite : l'application se ferme. C'est exactement ce que Roger a vu apres ma
     // premiere tentative - « l'arriere quitte completement l'appli » - et il avait raison de le signaler.
+    // Le calque de l'ecran d'exercice est declare PLUS BAS dans ce fichier, et l'ordre est ce qui decide qui passe
+    // devant : une partie lancee depuis une lecon s'affiche par-dessus l'Ecole, et non derriere elle.
 
     id: mainWindow
 
@@ -661,6 +663,10 @@ ApplicationWindow {
         // building the project, this is the game.
         // LA PAGE D'OUVERTURE DU BILAN : elle dit au joueur CE QUE L'APP SAIT DE LUI avant de l'interroger - ses points
         // forts, ses points faibles - et a quoi le bilan sert.
+        // The passage is a CROSS FADE rather than a switch, and it is short: Material motion asks for a change that
+        // is felt without being watched - 220 ms is the length of a breath, and the eye reads the arrival instead of
+        // the cut. The screen is only invisible once the fade is over, so it never eats a tap.
+        // L'ECOLE DES CHIOTS, FRERE DE L'ECRAN D'EXERCICE.
 
         anchors.fill: parent
 
@@ -1648,9 +1654,38 @@ ApplicationWindow {
 
         }
 
-        // The passage is a CROSS FADE rather than a switch, and it is short: Material motion asks for a change that
-        // is felt without being watched - 220 ms is the length of a breath, and the eye reads the arrival instead of
-        // the cut. The screen is only invisible once the fade is over, so it never eats a tap.
+        // C'EST CE QUI MANQUAIT, et il a fallu deux essais. Le premier : l'Ecole etait declaree APRES l'ecran
+        // d'exercice, donc devant lui - le jeu se lancait invisible, et Roger n'entendait que le son. Le second : je
+        // lui ai donne un z superieur, en croyant que cela suffirait. Non - l'ecran d'exercice est IMBRIQUE dans un
+        // conteneur, et z n'ordonne que des FRERES. Les voici donc freres pour de vrai, et l'ordre de declaration
+        // redevient ce qu'il n'aurait jamais du cesser d'etre.
+        CourseScreen {
+            id: courseScreen
+
+            anchors.fill: parent
+            opacity: mainWindow.schoolIsOpen ? 1 : 0
+            visible: opacity > 0
+            // Pendant la fonte, le calque est encore visible : le desactiver evite qu'il avale un tap destine a la garde.
+            enabled: mainWindow.schoolIsOpen
+            // LE BOUTON DE SORTIE SUIT LA MEME REGLE QUE LE RETOUR DU TELEPHONE : depuis une lecon, on remonte a la
+            // liste ; depuis la liste, on sort de l'Ecole.
+            onCloseRequested: mainWindow.goBackOneStep()
+            // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
+            onVisibleChanged: {
+                if (!visible) {
+                    CourseController.close();
+                }
+            }
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 150
+                }
+
+            }
+
+        }
+
         ExerciseScreen {
             id: exerciseScreen
 
@@ -3251,73 +3286,6 @@ ApplicationWindow {
 
     }
 
-    // Le calque de l'ecran d'exercice est declare PLUS BAS dans ce fichier, et l'ordre est ce qui decide qui passe
-    // devant : une partie lancee depuis une lecon s'affiche par-dessus l'Ecole, et non derriere elle.
-    CourseScreen {
-        // L'ECOLE PASSE DEVANT LA PAGE DE GARDE, MAIS DERRIERE L'ECRAN D'EXERCICE.
-
-        id: courseScreen
-
-        // C'est CE qui manquait, et Roger l'a vu tout de suite : « le jeu se lance mais derriere la page, on entend les
-        // sons mais on ne voit rien ». L'ordre de declaration decide, et l'Ecole etait declaree APRES l'ecran d'exercice
-        // - donc devant lui. Le commentaire qui affirmait le contraire etait faux, et c'est le telephone qui a tranche.
-        z: 1
-        anchors.fill: parent
-        opacity: mainWindow.schoolIsOpen ? 1 : 0
-        visible: opacity > 0
-        // Pendant la fonte, le calque est encore visible : le desactiver evite qu'il avale un tap destine a la garde.
-        enabled: mainWindow.schoolIsOpen
-        // LE BOUTON DE SORTIE SUIT LA MEME REGLE QUE LE RETOUR DU TELEPHONE, et c'est voulu : le geste et le bouton ne
-        // peuvent pas se contredire. Depuis une lecon, on remonte a la liste ; depuis la liste, on sort de l'Ecole.
-        onCloseRequested: {
-            if (CourseController.reading)
-                CourseController.close();
-            else
-                mainWindow.schoolIsOpen = false;
-        }
-        // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
-        onVisibleChanged: {
-            if (!visible)
-                CourseController.close();
-
-        }
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 150
-            }
-
-        }
-
-    }
-
-    // Roger l'a demandee explicitement pour les jeux : le retour du telephone, qu'on peut frôler sans le vouloir, ne doit
-    // pas jeter une partie en cours. « Je me suis fait beaucoup avoir. »
-    Dialog {
-        // LA QUESTION EST LE TITRE, ET IL N'Y A PAS DE CONTENU LIBRE.
-
-        id: leaveGameDialog
-
-        anchors.centerIn: parent
-        // C'est une lecon, pas une preference. Un contenu de dialogue se dimensionne sur la largeur IMPLICITE de son
-        // texte, c'est-a-dire celle de sa plus longue ligne : preferred et minimum a zero n'y changent rien tant qu'un
-        // QQuickPopupItem reste maitre du calcul, et le test de l'ecran a vu 477 points pour une vue de 352. Un titre
-        // court, deux boutons standards, et rien d'autre : le dialogue tient alors tout seul dans l'ecran.
-        title: qsTr("Revenir à la page principale ?")
-        modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        // Ok ARRETE la partie et laisse le joueur sur la page de garde - c'est ce qu'il demande, et non fermer
-        // l'application. L'ecran d'exercice disparait de lui-meme, puisqu'il ne s'affiche que si une partie tourne.
-        onAccepted: ExerciseController.stopSession()
-
-        // Le fond du dialogue lui-meme, et pas seulement celui de la page : le style garde sa feuille blanche, et cette
-        // application est sombre.
-        background: Rectangle {
-            color: "#1d1033"
-        }
-
-    }
-
     // LA PAGE DES GAMMES. Elle s'ouvre comme les autres pages de reference, et elle est PLEIN ECRAN parce qu'elle contient
     // un cercle : un dessin de deux cent soixante pixels ne tient pas dans une popup.
     Dialog {
@@ -4217,6 +4185,100 @@ ApplicationWindow {
                 text: qsTr("Touche l'écran pour continuer")
             }
 
+        }
+
+    }
+
+    Dialog {
+        id: leaveGameDialog
+
+        anchors.centerIn: parent
+        width: mainWindow.width
+        height: mainWindow.height
+        modal: true
+        padding: 0
+        onAccepted: ExerciseController.stopSession()
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: mainWindow.width - 80
+            spacing: 18
+
+            Text {
+                Layout.preferredWidth: 0
+                Layout.minimumWidth: 0
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                color: "#f2ecff"
+                font.pixelSize: 16
+                text: qsTr("Revenir à la page principale ?")
+            }
+
+            Text {
+                Layout.preferredWidth: 0
+                Layout.minimumWidth: 0
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                color: "#8a77ad"
+                font.pixelSize: 13
+                text: qsTr("La partie en cours sera perdue.")
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                spacing: 10
+
+                Rectangle {
+                    Layout.preferredWidth: 120
+                    Layout.preferredHeight: 44
+                    radius: 10
+                    color: "#6a4fa8"
+
+                    Text {
+                        anchors.centerIn: parent
+                        color: "#ffffff"
+                        font.pixelSize: 15
+                        text: qsTr("Revenir")
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            leaveGameDialog.close();
+                            ExerciseController.stopSession();
+                        }
+                    }
+
+                }
+
+                Rectangle {
+                    Layout.preferredWidth: 120
+                    Layout.preferredHeight: 44
+                    radius: 10
+                    color: "#2a1a4a"
+
+                    Text {
+                        anchors.centerIn: parent
+                        color: "#cbbde8"
+                        font.pixelSize: 15
+                        text: qsTr("Continuer")
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: leaveGameDialog.close()
+                    }
+
+                }
+
+            }
+
+        }
+
+        background: Rectangle {
+            color: "#1d1033"
         }
 
     }
