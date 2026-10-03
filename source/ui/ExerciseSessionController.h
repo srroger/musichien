@@ -114,6 +114,12 @@ class ExerciseSessionController final : public QObject
     // Le temps qui sonne, 0 = le premier. L'ecran le montre plus un, pour compter comme un musicien.
     Q_PROPERTY( int rhythmBeatInBar READ rhythmBeatInBar NOTIFY rhythmStateChanged )
 
+    // OU EN EST LE SON, dans la mesure, en TEMPS (et fractionnaire) : 0.0 au premier temps, 1.5 a la moitie du deuxieme.
+    //
+    // C'est ce que lit le CURSEUR de la mesure, et c'est pour lui que cette propriete existe : un entier qui saute d'un
+    // temps a l'autre ne peut pas etre suivi du regard. Voir rhythmPositionInBeats pour la source de la mesure.
+    Q_PROPERTY( double rhythmPositionInBar READ rhythmPositionInBar NOTIFY rhythmStateChanged )
+
     // Vrai pendant la REPRODUCTION : c'est le moment ou le doigt est juge. Faux pendant l'ecoute, ou une frappe sonne
     // sans rien valoir - celui qui accompagne la cellule pendant qu'elle s'ecoute ne perd pas de vie.
     Q_PROPERTY( bool isRhythmPlaying READ isRhythmPlaying NOTIFY rhythmStateChanged )
@@ -470,6 +476,15 @@ public:
     [[nodiscard]] QVariantList rhythmHits() const;
 
     [[nodiscard]] int rhythmBeatInBar() const noexcept;
+
+    // La position dans la mesure, en temps et fractionnaire : voir la propriete.
+    [[nodiscard]] double rhythmPositionInBar() const;
+
+    // OU EN EST LE SON, en millisecondes. Le PUITS AUDIO d'abord, l'horloge de l'interface seulement en repli.
+    //
+    // C'est la seule facon que le curseur soit d'accord avec ce que le joueur ENTEND : celle de l'interface mesure le
+    // moment ou l'on a DEMANDE le son, et entre les deux il y a le tampon du systeme.
+    [[nodiscard]] std::int64_t rhythmElapsedMilliseconds() const;
     [[nodiscard]] bool isRhythmPlaying() const noexcept;
     [[nodiscard]] int rhythmLastQuality() const noexcept;
     [[nodiscard]] int rhythmCoveredOnsets() const noexcept;
@@ -733,7 +748,7 @@ public:
     [[nodiscard]] int playerLevel() const noexcept;
     // Les difficultes proposees, avec leur etat : ouvertes ou FERMEES tant que l'experience ne les a pas meritees. Pas
     // `static` : elle lit l'etat du joueur (son experience, le code de developpeur), donc elle a besoin de l'instance.
-    [[nodiscard]] QVariantList playerLevels();
+    [[nodiscard]] QVariantList playerLevels() const;
 
     [[nodiscard]] bool godModeIsChosen() const noexcept { return m_godModeIsChosen; }
 
@@ -894,7 +909,7 @@ public:
     //
     // Les paliers superieurs se FERMENT tant qu'on ne les a pas merites : c'est ce qui donne au GodMode son sens - un
     // passe-droit pour qui veut tester le jeu sans y etre regulier. Voir unlockAllLevels pour le raccourci de developpeur.
-    Q_INVOKABLE bool isLevelUnlocked( int p_index ) const;
+    [[nodiscard]] Q_INVOKABLE bool isLevelUnlocked( int p_index ) const;
 
     // Le code de developpeur : choisir GodMode SEPT fois d'affilee deverrouille toutes les difficultes.
     //

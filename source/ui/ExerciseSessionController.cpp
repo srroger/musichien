@@ -775,7 +775,7 @@ void ExerciseSessionController::applyStoredQuestionShares( domain::SessionSettin
     p_settings.modeVampQuestionShare = m_levelStore->storedModeVampQuestionShare();
 }
 
-QVariantList ExerciseSessionController::playerLevels()
+QVariantList ExerciseSessionController::playerLevels() const
 {
     QVariantList levels;
 
@@ -1528,6 +1528,38 @@ int ExerciseSessionController::rhythmBeatInBar() const noexcept
     // L'ecran place un curseur sur la mesure : il lui faut un temps REEL, jamais le signal de fin de mesure. Le modulo
     // le lui garantit, meme apres un recalage de la grille qui aurait fait bondir l'index.
     return ( beatsPerBar > 0 ) ? ( m_rhythmBeatIndex % beatsPerBar ) : 0;
+}
+
+double ExerciseSessionController::rhythmPositionInBar() const
+{
+    const int beatsPerBar = rhythmBeatsPerBar();
+
+    if( beatsPerBar <= 0 )
+    {
+        return 0.0;
+    }
+
+    // Le modulo d'un flottant, et non d'un entier : c'est TOUT le sujet. Le curseur doit GLISSER d'un temps au suivant,
+    // pas y sauter - et un index entier ne peut que sauter.
+    return std::fmod( rhythmPositionInBeats(), static_cast<double>( beatsPerBar ) );
+}
+
+std::int64_t ExerciseSessionController::rhythmElapsedMilliseconds() const
+{
+    // LE PUITS AUDIO D'ABORD - c'est lui qui a raison. L'horloge de l'interface ne mesure que le moment ou l'on a
+    // DEMANDE le son ; le puits mesure celui ou l'oreille le recoit, tampon compris. Roger : « le son n'est pas synchro
+    // avec la note jouee » - et il ne pouvait pas l'etre, les deux horloges etant differentes.
+    const std::chrono::milliseconds audioPosition = m_notePlayer.playedMilliseconds();
+
+    if( audioPosition.count() > 0 )
+    {
+        return audioPosition.count();
+    }
+
+    // LE REPLI, et ce n'est pas un ornement : un adaptateur sans horloge audio (les tests, un appareil qui ne repond pas)
+    // repond zero, et un curseur FIGE serait pire que le desaccord qu'on corrige. Zero veut donc dire « je ne sais pas »,
+    // jamais « le son vient de commencer ».
+    return m_rhythmClock.elapsed();
 }
 
 bool ExerciseSessionController::isRhythmPlaying() const noexcept
@@ -3001,7 +3033,7 @@ void ExerciseSessionController::stopRhythmLoop()
 // attendre une seconde, qu'un battement en retard ne decale pas ceux qui suivent.
 void ExerciseSessionController::scheduleNextRhythmBeat()
 {
-    const domain::BeatSchedule schedule = domain::planNextBeat( static_cast<double>( rhythmBpm() ), static_cast<std::size_t>( m_rhythmBeatIndex ), static_cast<double>( m_rhythmClock.elapsed() ) );
+    const domain::BeatSchedule schedule = domain::planNextBeat( static_cast<double>( rhythmBpm() ), static_cast<std::size_t>( m_rhythmBeatIndex ), static_cast<double>( rhythmElapsedMilliseconds() ) );
 
     // Le recalage eventuel de la grille - apres un reveil du telephone, par exemple - remonte par l'index : s'il
     // depasse la mesure, le prochain battement est celui d'une NOUVELLE mesure, et onRhythmBeat basculera de phase.
@@ -3148,7 +3180,7 @@ double ExerciseSessionController::rhythmPositionInBeats() const noexcept
         return 0.0;
     }
 
-    return static_cast<double>( m_rhythmClock.elapsed() ) / beatMs;
+    return static_cast<double>( rhythmElapsedMilliseconds() ) / beatMs;
 }
 
 int ExerciseSessionController::coveredOnsetCount() const noexcept
@@ -3569,25 +3601,18 @@ QVariantList ExerciseSessionController::reviewPointsOf( bool p_strong ) const
 
     const std::vector<domain::TargetStatistics> insights = reviewInsights();
 
-    // LES DEUX LISTES NE SE PARTAGENT AUCUNE CIBLE, et c'est une CORRECTION. Roger l'a vue avant nous, sur son propre
-    // ecran : « ce qui te resiste encore me montre [...] Octave montante 100 % ». Un taux parfait dans la liste des
-    // faiblesses n'est pas une nuance, c'est une contradiction.
+    // D'ABORD LES CIBLES NOMMABLES, de la plus faible a la mieux reussie : la page ne parle que de celles-la, donc c'est
+    // sur celles-la qu'il faut partager la place.
     //
-    // Les deux listes sont tirees de la MEME liste triee - l'une par la fin, l'autre par le debut - et rien ne les
-    // empechait de se rejoindre. Avec peu de cibles travaillees, la MEILLEURE pouvait donc etre presentee comme ce qui
-    // resiste, et le joueur avait raison de ne plus y croire.
-    //
-    // Une seule borne, donc, pour les deux : chacune prend au plus la moitie de ce qu'il y a, et le recouvrement devient
-    // impossible par construction plutot que par vigilance.
-    const std::size_t listSize = std::min( REVIEW_OPENING_POINT_COUNT, insights.size() / 2 );
+    // C'est une CORRECTION, et c'est Roger qui l'a vue : « le Bilan me montre toujours le Dorien ». Les deux listes
+    // etaient bornees par le nombre de CIBLES, puis chacune ecartait les cibles SANS NOM. Avec beaucoup d'accords rates -
+    // que cette page ne nommait pas - la moitie des places se perdait en silence, et une liste de trois lignes pouvait
+    // n'en montrer qu'une. Le tri vivait sur les cibles, la page vivait sur les noms, et les deux ne parlaient pas du
+    // meme ensemble.
+    QVariantList named;
 
-    // De la PLUS FAIBLE a la mieux reussie : les points faibles sont donc au debut de la liste, les forts a la fin. On
-    // la descend pour les faibles, on la remonte pour les forts.
-    for( std::size_t index = 0; index < listSize; ++index )
+    for( const domain::TargetStatistics & target : insights )
     {
-        const domain::TargetStatistics & target =
-          p_strong ? insights.at( insights.size() - 1 - index ) : insights.at( index );
-
         const QString label = targetLabel( target );
 
         if( label.isEmpty() )
@@ -3600,7 +3625,17 @@ QVariantList ExerciseSessionController::reviewPointsOf( bool p_strong ) const
         point.insert( QStringLiteral( "percent" ), target.statistics.successPercent() );
         point.insert( QStringLiteral( "asked" ), static_cast<int>( target.statistics.questionCount ) );
 
-        points.append( point );
+        named.append( point );
+    }
+
+    // LES DEUX LISTES NE SE PARTAGENT AUCUNE CIBLE, et chacune prend au plus la moitie : le recouvrement est impossible
+    // par construction. C'est la meme correction que « Octave montante 100 % » dans ce qui resiste - la meilleure cible
+    // du joueur ne peut plus y apparaitre.
+    const std::size_t listSize = std::min( REVIEW_OPENING_POINT_COUNT, static_cast<std::size_t>( named.size() ) / 2 );
+
+    for( std::size_t index = 0; index < listSize; ++index )
+    {
+        points.append( p_strong ? named.at( named.size() - 1 - index ) : named.at( index ) );
     }
 
     return points;
@@ -3670,6 +3705,15 @@ QString ExerciseSessionController::targetLabel( const domain::TargetStatistics &
         case domain::QuestionKind::ModeVamp:
             return tr( "%1 · contexte" )
               .arg( describeMode( static_cast<domain::Mode>( p_target.target ) ).value( QStringLiteral( "name" ) ).toString() );
+
+        // LES ACCORDS AUSSI, et pas seulement les intervalles et les modes : Roger avait demande les deux, mais une page
+        // qui ECARTE en silence tout un genre n'est pas discrete, elle est MUETTE sur une partie de ce qu'il a joue.
+        //
+        // C'est cette omission qui vidait ses listes : plus il ratait d'accords, plus les places se perdaient, jusqu'a
+        // ne plus montrer qu'une ligne. La cible d'un accord est sa COULEUR - il n'y a pas de tonique dans un taux.
+        case domain::QuestionKind::Chord:
+            return QString::fromUtf8(
+              domain::chordQualityName( static_cast<domain::ChordQuality>( p_target.target ) ).data() );
 
         default:
             return QString{};
