@@ -1196,7 +1196,7 @@ Item {
                     font.pixelSize: 12
                     // La roue n'existe que sur une question de mode : c'est donc elle qui dit quand expliquer.
                     visible: ExerciseController.modeCircle.length > 0
-                    text: qsTr("Le bourdon est la note tenue sous la gamme — ici la tonique, le degré 1. C'est lui qui donne le centre : les mêmes sept notes sur un autre bourdon ne font pas la même musique.")
+                    text: qsTr("Le bourdon, c'est ce qu'on tient sous la gamme — ici la tonique ET sa quinte (degrés 1 et 5). C'est lui qui donne le centre : les mêmes sept notes sur un autre bourdon ne font pas la même musique.")
                 }
 
                 // Elle est là PENDANT la question, et c'est un choix de Roger : « je mettrais quand même la roue dans la
