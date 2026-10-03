@@ -98,11 +98,19 @@ Item {
     // Le septieme est le dernier pas de l'echelle des teintes : la gamme se lit alors comme un degrade continu, et la
     // tonique garde le jaune qu'elle avait.
     function degreeColour(p_stepIndex) {
+        // DU JAUNE (50 degres de teinte) VERS LE VERT (140), en traversant une teinte FRANCHE.
+        // La premiere version interpolait betement les deux couleurs de la palette, et elles sont CLAIRES toutes les deux :
+        // le milieu du degrade tombait donc sur un vert-jaune delave, et Roger l'a vu tout de suite - « le jaune vert le
+        // vert donne un truc bizarre, comme si le degrade etait trop leger ». Ce n'etait pas une impression : deux
+        // pastels melanges donnent un pastel, jamais une couleur.
+
         if (p_stepIndex < 0)
             return "#6fd08a";
 
+        // Ici la TEINTE bouge et la saturation ne bouge plus : meme quantite de jaune et de vert, mais une couleur qu'on
+        // peut NOMMER - et sept pastilles qui se distinguent l'une de l'autre.
         var ratio = Math.max(0, Math.min(1, p_stepIndex / 6));
-        return Qt.rgba(1 - (0.44 * ratio), 0.83 + (0.12 * ratio), 0.47 + (0.22 * ratio), 1);
+        return Qt.hsla(0.14 + (0.25 * ratio), 0.68, 0.56, 1);
     }
 
     // Le centre d'une CASE, en coordonnees locales. Une seule fonction, donc le dessin du chemin et celui de la tete ne
