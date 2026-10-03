@@ -3631,9 +3631,11 @@ QVariantList ExerciseSessionController::reviewPointsOf( bool p_strong ) const
     // LES DEUX LISTES NE SE PARTAGENT AUCUNE CIBLE, et chacune prend au plus la moitie : le recouvrement est impossible
     // par construction. C'est la meme correction que « Octave montante 100 % » dans ce qui resiste - la meilleure cible
     // du joueur ne peut plus y apparaitre.
-    const std::size_t listSize = std::min( REVIEW_OPENING_POINT_COUNT, static_cast<std::size_t>( named.size() ) / 2 );
+    // Le compte est SIGNE, comme l'index de QVariantList : melanger un std::size_t non signe et un qsizetype signe dans
+    // la meme soustraction est une conversion que la norme laisse libre, et clang-tidy a raison de la refuser.
+    const qsizetype listSize = std::min( static_cast<qsizetype>( REVIEW_OPENING_POINT_COUNT ), named.size() / 2 );
 
-    for( std::size_t index = 0; index < listSize; ++index )
+    for( qsizetype index = 0; index < listSize; ++index )
     {
         points.append( p_strong ? named.at( named.size() - 1 - index ) : named.at( index ) );
     }
