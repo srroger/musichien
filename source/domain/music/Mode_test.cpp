@@ -1,6 +1,7 @@
 #include "domain/music/Mode.h"
 
 #include "domain/music/Chord.h"
+#include "domain/music/Scale.h"
 
 #include <gtest/gtest.h>
 
@@ -395,6 +396,119 @@ TEST( ModeTest, the_phrygian_signature_chord_is_a_major_a_semitone_above_the_ton
     {
         EXPECT_EQ( 63 + chordIntervals( ChordQuality::Major ).at( index ), chord.at( index ).midiNumber() );
     }
+}
+
+TEST( ScaleTest, the_six_scales_have_the_notes_they_are_supposed_to )
+{
+    // UNE GAMME FAUSSE S'ENTEND MAIS NE SE VOIT PAS. C'est pour cela que ce test existe : personne, en lisant un tableau
+    // de degres, ne remarque qu'une septieme est majeure la ou elle devrait etre mineure. Le tableau est donc verifie
+    // contre ce qui definit chaque gamme, une propriete a la fois.
+
+    // LA PENTATONIQUE : cinq notes, et AUCUN demi-ton. C'est ce qui la rend facile - aucune note voisine a rater - et
+    // c'est pour cela qu'elle sert des la premiere jam. Si un demi-ton y apparaissait, ce ne serait plus elle.
+    const ScaleDegrees pentatonic = scaleDegreeOffsets( Scale::PentatonicMinor );
+
+    EXPECT_EQ( 5U, pentatonic.count );
+
+    for( std::size_t index = 0; index < pentatonic.count; ++index )
+    {
+        const std::int32_t gap = ( pentatonic.offsets.at( ( index + 1 ) % pentatonic.count )
+                                   - pentatonic.offsets.at( index ) + SEMITONES_PER_OCTAVE )
+                                 % SEMITONES_PER_OCTAVE;
+
+        EXPECT_GE( gap, 2 ) << "un demi-ton au degre " << index;
+    }
+
+    // LE BLUES, C'EST LA PENTATONIQUE MINEURE PLUS UNE NOTE : la quinte diminuee, la « note bleue ». Meme depart, une
+    // note de plus, et c'est toute la couleur du genre.
+    const ScaleDegrees blues = scaleDegreeOffsets( Scale::Blues );
+
+    EXPECT_EQ( 6U, blues.count );
+
+    for( std::size_t index = 0; index < pentatonic.count; ++index )
+    {
+        const bool isInBlues = std::ranges::find( blues.offsets.begin(),
+                                                  blues.offsets.begin() + static_cast<std::ptrdiff_t>( blues.count ),
+                                                  pentatonic.offsets.at( index ) )
+                               != blues.offsets.begin() + static_cast<std::ptrdiff_t>( blues.count );
+
+        EXPECT_TRUE( isInBlues ) << "le blues a perdu une note de la pentatonique : " << pentatonic.offsets.at( index );
+    }
+
+    EXPECT_EQ( 1, std::ranges::count( blues.offsets.begin(), blues.offsets.begin() + 6, 6 ) ) << "la note bleue a disparu";
+
+    // LE MINEUR HARMONIQUE : le majeur, avec une SIXTE MINEURE et une SEPTIEME MAJEURE. C'est le demi-ton entre les deux
+    // qui fait tout son caractere - le majeur, lui, a un ton entier a cet endroit.
+    const ScaleDegrees harmonic = scaleDegreeOffsets( Scale::HarmonicMinor );
+
+    ASSERT_EQ( 7U, harmonic.count );
+
+    EXPECT_EQ( 3, harmonic.offsets.at( 2 ) ) << "la tierce doit etre mineure";
+    EXPECT_EQ( 8, harmonic.offsets.at( 5 ) ) << "la sixte doit etre mineure";
+    EXPECT_EQ( 11, harmonic.offsets.at( 6 ) ) << "la septieme doit etre majeure";
+
+    // LE PHRYGIEN DOMINANT est le CINQUIEME mode du mineur harmonique. Le test le verifie comme une propriete, et non en
+    // recopiant un tableau : on remonte la gamme depuis son cinquieme degre, on ramene tout a la tonique, et on doit
+    // retrouver exactement ses degres. C'est la seule facon de garantir que les deux gammes disent la meme chose.
+    std::array<std::int32_t, MAX_SCALE_DEGREE_COUNT> rotation{};
+
+    for( std::size_t degree = 0; degree < harmonic.count; ++degree )
+    {
+        const std::int32_t fromFifth = ( harmonic.offsets.at( ( degree + 4 ) % harmonic.count ) - harmonic.offsets.at( 4 )
+                                         + SEMITONES_PER_OCTAVE )
+                                       % SEMITONES_PER_OCTAVE;
+
+        rotation.at( degree ) = fromFifth;
+    }
+
+    std::ranges::sort( rotation.begin(), rotation.begin() + 7 );
+
+    const ScaleDegrees phrygian = scaleDegreeOffsets( Scale::PhrygianDominant );
+
+    ASSERT_EQ( 7U, phrygian.count );
+
+    for( std::size_t degree = 0; degree < phrygian.count; ++degree )
+    {
+        EXPECT_EQ( phrygian.offsets.at( degree ), rotation.at( degree ) );
+    }
+
+    // ET LE MINEUR MELODIQUE, MONTE : un mineur naturel avec une SIXTE MAJEURE (9), septieme majeure (11).
+    const ScaleDegrees melodic = scaleDegreeOffsets( Scale::MelodicMinor );
+
+    ASSERT_EQ( 7U, melodic.count );
+
+    EXPECT_EQ( 3, melodic.offsets.at( 2 ) ) << "la tierce doit etre mineure";
+    EXPECT_EQ( 9, melodic.offsets.at( 5 ) ) << "la sixte doit etre MAJEURE - c'est tout ce qui le separe du naturel";
+    EXPECT_EQ( 11, melodic.offsets.at( 6 ) );
+}
+
+TEST( ScaleTest, every_scale_starts_on_its_tonic_and_never_above_the_octave )
+{
+    // DEUX EVIDENCES QU'UN TABLEAU ECRIT A LA MAIN CASSE TOUJOURS UN JOUR : le premier degre est la tonique, et aucun
+    // degre ne depasse l'octave. La seconde se voit mal a l'oeil - un 12 au lieu d'un 0 se lit comme une note de plus,
+    // alors que c'est la meme, et le cercle aurait alors deux fois la tonique.
+    for( std::size_t index = 0; index < SCALE_COUNT; ++index )
+    {
+        const Scale scale = scaleFromIndex( index );
+        const ScaleDegrees degrees = scaleDegreeOffsets( scale );
+
+        EXPECT_EQ( 0, degrees.offsets.at( 0 ) ) << scaleIdentifier( scale );
+        EXPECT_GE( degrees.count, 5U ) << scaleIdentifier( scale );
+        EXPECT_LE( degrees.count, MAX_SCALE_DEGREE_COUNT ) << scaleIdentifier( scale );
+
+        for( std::size_t degree = 1; degree < degrees.count; ++degree )
+        {
+            const std::int32_t offset = degrees.offsets.at( degree );
+
+            EXPECT_GT( offset, degrees.offsets.at( degree - 1 ) ) << scaleIdentifier( scale ) << " degre " << degree;
+            EXPECT_LT( offset, SEMITONES_PER_OCTAVE ) << scaleIdentifier( scale ) << " degre " << degree;
+        }
+    }
+
+    // Et un rang absurde rend la premiere gamme plutot qu'une valeur inventee : un reglage abime ne doit jamais couter
+    // plus cher qu'un reglage.
+    EXPECT_EQ( Scale::PentatonicMinor, scaleFromIndex( SCALE_COUNT ) );
+    EXPECT_EQ( Scale::PentatonicMinor, scaleFromIndex( 99 ) );
 }
 
 }    // namespace musichien::domain

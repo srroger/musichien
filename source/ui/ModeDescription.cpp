@@ -1,5 +1,6 @@
 #include "ui/ModeDescription.h"
 
+#include <QCoreApplication>
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
@@ -164,6 +165,105 @@ QVariantMap describePhrase( const domain::Phrase & p_phrase )
 // note dans une suite de quintes se calcule donc directement depuis son ecart au repere, sans parcourir la suite.
 constexpr std::int32_t FIFTHS_STEP = 7;
 
+namespace
+{
+
+// LE NOM FRANCAIS DE CHAQUE GAMME, dans l'ordre de l'enumeration du domaine - comme les modes, et pour la meme raison :
+// le domaine nomme en anglais et ne bouge plus, l'ecran parle la langue du joueur.
+//
+// « Blues », « Pentatonique », « Phrygien dominant » : ce sont les mots qu'un musicien emploie, en francais comme en
+// anglais, et les inventer autrement serait un vocabulaire que personne n'utilise.
+constexpr std::array<const char *, domain::SCALE_COUNT> SCALE_DISPLAY_NAMES{
+  QT_TRANSLATE_NOOP( "ModeDescription", "Pentatonique mineure" ),
+  QT_TRANSLATE_NOOP( "ModeDescription", "Pentatonique majeure" ),
+  QT_TRANSLATE_NOOP( "ModeDescription", "Blues" ),
+  QT_TRANSLATE_NOOP( "ModeDescription", "Mineur harmonique" ),
+  QT_TRANSLATE_NOOP( "ModeDescription", "Phrygien dominant" ),
+  QT_TRANSLATE_NOOP( "ModeDescription", "Mineur mélodique" ),
+};
+
+}    // namespace
+
+QString describeScaleName( domain::Scale p_scale )
+{
+    const auto slot = static_cast<std::size_t>( p_scale );
+
+    if( slot >= SCALE_DISPLAY_NAMES.size() )
+    {
+        // Une gamme hors table n'existe pas, mais un ecran doit pouvoir afficher quelque chose : l'identifiant anglais
+        // vaut mieux qu'une case vide, et cette branche ne doit jamais s'ouvrir.
+        return QString::fromUtf8( domain::scaleIdentifier( p_scale ).data() );
+    }
+
+    return QCoreApplication::translate( "ModeDescription", SCALE_DISPLAY_NAMES.at( slot ) );
+}
+
+QVariantList describeScaleCircle( domain::Scale p_scale, std::int32_t p_tonicPitchClass, std::int32_t p_framePitchClass )
+{
+    // MEME CONSTRUCTION QUE LE CERCLE D'UN MODE, et volontairement ECRITE A PART.
+    //
+    // Factoriser les deux demanderait de toucher describeModeCircle, qui vient d'etre corrige et verifie : on ne remanie
+    // pas ce qu'on vient de reparer, surtout quand le prochain chantier s'appuie dessus. Le jour ou une TROISIEME forme
+    // arrivera, le point commun sera ecrit une bonne fois - et il sera alors visible dans deux fichiers au lieu d'un.
+    const domain::ScaleDegrees degrees = domain::scaleDegreeOffsets( p_scale );
+
+    std::vector<std::pair<std::int32_t, QVariantMap>> placed;
+
+    placed.reserve( domain::SEMITONES_PER_OCTAVE );
+
+    for( std::int32_t pitchClass = 0; pitchClass < static_cast<std::int32_t>( domain::SEMITONES_PER_OCTAVE ); ++pitchClass )
+    {
+        const std::int32_t fromTonic = ( ( pitchClass - p_tonicPitchClass ) % domain::SEMITONES_PER_OCTAVE
+                                         + domain::SEMITONES_PER_OCTAVE )
+                                       % domain::SEMITONES_PER_OCTAVE;
+
+        std::int32_t stepIndex = -1;
+
+        for( std::size_t degree = 0; degree < degrees.count; ++degree )
+        {
+            if( degrees.offsets.at( degree ) == fromTonic )
+            {
+                stepIndex = static_cast<std::int32_t>( degree );
+            }
+        }
+
+        QVariantMap description;
+
+        description.insert( QStringLiteral( "name" ),
+                            QString::fromUtf8( PITCH_CLASS_NAMES.at( static_cast<std::size_t>( pitchClass ) ) ) );
+        description.insert( QStringLiteral( "inMode" ), stepIndex >= 0 );
+        description.insert( QStringLiteral( "isTonic" ), stepIndex == 0 );
+        description.insert( QStringLiteral( "stepIndex" ), stepIndex );
+
+        // RIEN N'EST MARQUE « CARACTERISTIQUE » ICI, et c'est exact : c'est une notion des MODES - la note qui les
+        // distingue de leurs voisins dans l'ordre de couleur. Une gamme n'a pas de voisins de ce genre.
+        description.insert( QStringLiteral( "isCharacteristic" ), false );
+
+        // LE NOMBRE DE DEGRES VOYAGE DANS CHAQUE PASTILLE : le degrade de l'ecran se divise par le nombre d'ECARTS, et
+        // cinq notes n'en ont pas autant que sept. Sans cela, une pentatonique se dessinerait sur un degrade trop long.
+        description.insert( QStringLiteral( "degreeCount" ), static_cast<int>( degrees.count ) );
+
+        const std::int32_t fromFrame = ( ( pitchClass - p_framePitchClass ) % domain::SEMITONES_PER_OCTAVE
+                                         + domain::SEMITONES_PER_OCTAVE )
+                                       % domain::SEMITONES_PER_OCTAVE;
+
+        placed.emplace_back( ( fromFrame * FIFTHS_STEP ) % domain::SEMITONES_PER_OCTAVE, description );
+    }
+
+    std::ranges::sort( placed, std::less{}, &std::pair<std::int32_t, QVariantMap>::first );
+
+    QVariantList circle;
+
+    circle.reserve( static_cast<qsizetype>( placed.size() ) );
+
+    for( const auto & item : placed )
+    {
+        circle.append( item.second );
+    }
+
+    return circle;
+}
+
 QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchClass, std::int32_t p_framePitchClass )
 {
     // LA PLACE DE CHAQUE NOTE DANS LA ROUE, calculee AVANT d'etre rangee - et c'est une CORRECTION, demandee par Roger :
@@ -219,6 +319,10 @@ QVariantList describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchC
         description.insert( QStringLiteral( "isTonic" ), entry.isTonic );
         description.insert( QStringLiteral( "stepIndex" ), stepIndex );
         description.insert( QStringLiteral( "isCharacteristic" ), stepIndex == characteristicStep );
+
+        // SEPT DEGRES, dit dans chaque pastille comme pour les gammes : le degrade de l'ecran se divise par ce nombre, et
+        // il ne doit pas avoir a savoir ce qu'il dessine. Voir ModeCircle.qml.
+        description.insert( QStringLiteral( "degreeCount" ), static_cast<int>( domain::DEGREE_COUNT ) );
 
         // LA POSITION DANS LA ROUE : le rang de la note dans une suite de QUINTES partie du repere. Une quinte vaut sept
         // demi-tons, et sept est son propre inverse modulo douze (7 x 7 = 49 = 1 + 4 x 12), donc l'ordre des quintes

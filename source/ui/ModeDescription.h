@@ -22,7 +22,9 @@
 
 #include "domain/music/Mode.h"
 #include "domain/music/Phrase.h"
+#include "domain/music/Scale.h"
 
+#include <QString>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -57,6 +59,18 @@ namespace musichien::ui
 // la tonique dans cet arc. Voir domain::modeCircleNotes.
 // LE REPERE DE LA ROUE est une tonique, et il n'est pas toujours celle du mode dessine : quand deux modes s'enchainent
 // (une comparaison, un vamp), la roue garde le repere du PREMIER et dessine le second DEDANS. Voir describeModeCircle.
+// LE CERCLE D'UNE GAMME : la MEME forme que celui d'un mode - douze pastilles, celles de la gamme allumees, la tonique
+// marquee - mais rempli depuis une TABLE de degres, et non depuis une rotation du majeur.
+//
+// C'est tout l'interet de la separation : l'ecran n'a pas besoin de savoir si ce qu'il dessine est un mode ou une gamme.
+// Il recoit des pastilles, et il les peint.
+[[nodiscard]] QVariantList
+describeScaleCircle( domain::Scale p_scale, std::int32_t p_tonicPitchClass, std::int32_t p_framePitchClass );
+
+// Le nom FRANCAIS d'une gamme, celui que le joueur lit. Le domaine ne connait qu'un identifiant anglais et stable, et
+// c'est ici - dans l'ecran - que la langue du joueur entre.
+[[nodiscard]] QString describeScaleName( domain::Scale p_scale );
+
 [[nodiscard]] QVariantList
 describeModeCircle( domain::Mode p_mode, std::int32_t p_tonicPitchClass, std::int32_t p_framePitchClass );
 

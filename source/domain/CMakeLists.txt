@@ -28,6 +28,7 @@ musichienFunction_AddLibrary(domain
     # Clavier musical : la gamme majeure, et les sept modes obtenus par rotation de celle-ci
     music/Mode.h
     music/Mode.cpp
+    music/Scale.cpp
 
     # Le cercle des quintes : les armures, les relatives mineures, et la qualite des degres
     music/KeySignature.h

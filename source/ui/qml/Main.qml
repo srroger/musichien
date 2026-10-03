@@ -1156,6 +1156,19 @@ ApplicationWindow {
                         }
                     }
 
+                    // LA PAGE DES GAMMES : un mode a PART, dedie a ceux qui connaissent deja et veulent pratiquer. Elle ne
+                    // partage rien avec les jeux - pas de session, pas de vies, pas de journal - donc elle ne peut rien
+                    // leur faire. C'est ce qui a permis de l'ajouter sans toucher au reste.
+                    MenuButton {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        text: qsTr("Gammes")
+                        onClicked: {
+                            ExerciseController.playTapCue();
+                            scaleTrainingDialog.open();
+                        }
+                    }
+
                     MenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
@@ -3072,6 +3085,30 @@ ApplicationWindow {
     // Plein ecran, comme l'accordeur, et pour la meme raison : c'est une page qu'on LIT, pas un message qu'on acquitte.
     // La roue a besoin de la place pour que ses douze cases respirent, chacune portant trois informations.
     // =================================================================================================================
+    // LA PAGE DES GAMMES. Elle s'ouvre comme les autres pages de reference, et elle est PLEIN ECRAN parce qu'elle contient
+    // un cercle : un dessin de deux cent soixante pixels ne tient pas dans une popup.
+    Dialog {
+        id: scaleTrainingDialog
+
+        anchors.centerIn: parent
+        width: mainWindow.width
+        height: mainWindow.height
+        modal: true
+        padding: 6
+        title: qsTr("Les gammes")
+        // Le bouton de fermeture du style : la page n'a pas de « fin », elle a une SORTIE. C'est ce qui dit qu'on est en
+        // train de pratiquer et non de jouer une partie.
+        standardButtons: Dialog.Close
+        // LA SEANCE COMMENCE A L'OUVERTURE, et pas avant : une gamme posee par-dessus la page precedente serait une
+        // question qu'on n'a pas demandee, entendue a moitie.
+        onOpened: ScaleController.start()
+
+        ScaleScreen {
+            anchors.fill: parent
+        }
+
+    }
+
     Dialog {
         id: keyCircleDialog
 

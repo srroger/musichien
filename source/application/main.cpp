@@ -27,6 +27,7 @@
 #include "ui/MicrophoneController.h"
 #include "ui/ModePreviewController.h"
 #include "ui/RhythmController.h"
+#include "ui/ScaleTrainingController.h"
 #include "ui/StatisticsController.h"
 
 #include <QAudioDevice>
@@ -567,6 +568,17 @@ int main( int p_argumentCount, char * p_arguments[] )
                                   QML_MODULE_MINOR_VERSION,
                                   "ModeController",
                                   &modePreviewController );
+
+    // LA PAGE DES GAMMES : un mode A PART, qui ne partage rien avec les jeux - pas de session, pas de vies, pas de journal.
+    // C'est ce qui le rend inoffensif : il peut tomber sans rien casser autour de lui, et c'est exactement la raison pour
+    // laquelle il vit hors du moteur de questions.
+    musichien::ui::ScaleTrainingController scaleTrainingController{ notePlayer };
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "ScaleController",
+                                  &scaleTrainingController );
 
     // L'ecran du cercle des quintes : une page de REFERENCE, qui ne joue rien. Elle n'a donc meme pas besoin du
     // lecteur de notes - seulement du domaine, qui sait tout ce qu'elle affiche.

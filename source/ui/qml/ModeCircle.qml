@@ -35,6 +35,11 @@ Item {
     // LA TEINTE DIT LE DEGRE : du jaune de la tonique vers le vert du septieme, en suivant l'ORDRE DES DEGRES. C'est la
     // demande de Roger - « changer les couleurs de la note en degrade du jaune vers le vert [...] le degrade suivant
     // l'ordre des degres de la gamme, histoire d'avoir l'aspect reellement visuel du mode dans le cercle ».
+    // DU JAUNE (50 degres de teinte) VERS LE VERT (140), en traversant une teinte FRANCHE.
+    // La premiere version interpolait betement les deux couleurs de la palette, et elles sont CLAIRES toutes les deux :
+    // le milieu du degrade tombait donc sur un vert-jaune delave, et Roger l'a vu tout de suite - « le jaune vert le
+    // vert donne un truc bizarre, comme si le degrade etait trop leger ». Ce n'etait pas une impression : deux
+    // pastels melanges donnent un pastel, jamais une couleur.
 
     id: root
 
@@ -97,19 +102,14 @@ Item {
 
     // Le septieme est le dernier pas de l'echelle des teintes : la gamme se lit alors comme un degrade continu, et la
     // tonique garde le jaune qu'elle avait.
-    function degreeColour(p_stepIndex) {
-        // DU JAUNE (50 degres de teinte) VERS LE VERT (140), en traversant une teinte FRANCHE.
-        // La premiere version interpolait betement les deux couleurs de la palette, et elles sont CLAIRES toutes les deux :
-        // le milieu du degrade tombait donc sur un vert-jaune delave, et Roger l'a vu tout de suite - « le jaune vert le
-        // vert donne un truc bizarre, comme si le degrade etait trop leger ». Ce n'etait pas une impression : deux
-        // pastels melanges donnent un pastel, jamais une couleur.
-
+    function degreeColour(p_stepIndex, p_degreeCount) {
         if (p_stepIndex < 0)
             return "#6fd08a";
 
         // Ici la TEINTE bouge et la saturation ne bouge plus : meme quantite de jaune et de vert, mais une couleur qu'on
         // peut NOMMER - et sept pastilles qui se distinguent l'une de l'autre.
-        var ratio = Math.max(0, Math.min(1, p_stepIndex / 6));
+        var count = ((modelData !== undefined) && (modelData.degreeCount !== undefined)) ? modelData.degreeCount : 7;
+        var ratio = Math.max(0, Math.min(1, p_stepIndex / Math.max(2, count - 1)));
         return Qt.hsla(0.14 + (0.25 * ratio), 0.68, 0.56, 1);
     }
 
@@ -250,7 +250,7 @@ Item {
                 if (index === root.characteristicCircleIndex)
                     return "#ff7a8a";
 
-                return root.degreeColour(modelData.stepIndex);
+                return root.degreeColour(modelData.stepIndex, modelData.degreeCount);
             }
 
             x: (root.width / 2) + (Math.cos(angle) * root.radius) - (width / 2)

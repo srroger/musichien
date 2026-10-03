@@ -21,6 +21,7 @@
           l'afficher pendant la question serait donner la reponse.
         -->
         <file>qml/ModeCircle.qml</file>
+        <file>qml/ScaleScreen.qml</file>
         <!--
           The content files live at the root of the project, as docs/ARCHITECTURE.md requires, and the
           alias gives each one the runtime path it has on disk: ':/assets/content/...'. An alias rather
