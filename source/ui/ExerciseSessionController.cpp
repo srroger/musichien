@@ -126,6 +126,12 @@ constexpr int REVIEW_PERIOD_DAYS = 30;
 // reconnaisse son profil en la lisant. Au-dela, il ne lit plus, il survole - et une page qu'on survole n'explique rien.
 constexpr std::size_t REVIEW_OPENING_POINT_COUNT = 3;
 
+// Le silence entre ce que le joueur a joue et la reponse, sur une question d'accord ratee.
+//
+// Assez long pour que les deux accords soient DEUX accords, assez court pour qu'ils restent une seule phrase. Un souffle,
+// pas une pause : c'est ce qui separe « ce que j'ai cru » de « ce qui etait » sans les eloigner.
+constexpr std::chrono::milliseconds WRONG_CHORD_GAP{ 240 };
+
 // La qualite d'une frappe, dans la convention de l'ecran : 0 = Miss, 1 = Good, 2 = Perfect.
 //
 // La page Rythme parle deja cette langue, et la question de rythme doit parler la MEME : deux ecrans qui
@@ -2049,9 +2055,19 @@ void ExerciseSessionController::processAnswer( bool p_isCorrect )
     {
         if( !isRhythm )
         {
-            // A wrong answer is heard again IMMEDIATELY, and in its original form: there is something to
-            // catch up on, and the melody is what gives the second note its meaning.
-            playCurrentQuestion();
+            // UNE QUESTION D'ACCORD SE REJOUE EN DEUX TEMPS : ce que le joueur a joue, PUIS la reponse.
+            //
+            // Roger : « quand on clique sur un accord et qu'on se trompe, on re-entend directement le bon accord. Je
+            // changerais ca : entendre d'abord l'accord appuye, puis l'accord voulu. C'est moins perturbant. »
+            //
+            // Il a raison, et la raison est plus profonde que le confort : entendre la REPONSE avant sa propre erreur
+            // efface l'ECART entre les deux - et l'ecart est toute la lecon.
+            if( !playWrongChordThenAnswer() )
+            {
+                // A wrong answer is heard again IMMEDIATELY, and in its original form: there is something to
+                // catch up on, and the melody is what gives the second note its meaning.
+                playCurrentQuestion();
+            }
         }
 
         // And it is announced, so that the screen can answer with its BODY - the shake, and the
@@ -3647,9 +3663,9 @@ QString ExerciseSessionController::targetLabel( const domain::TargetStatistics &
         case domain::QuestionKind::ModeName:
             return describeMode( static_cast<domain::Mode>( p_target.target ) ).value( QStringLiteral( "name" ) ).toString();
 
-        case domain::QuestionKind::ModeColour:
-            return tr( "%1 · couleur" )
-              .arg( describeMode( static_cast<domain::Mode>( p_target.target ) ).value( QStringLiteral( "name" ) ).toString() );
+            // ModeColour n'a PLUS de cas : la comparaison de deux modes ne fabrique plus de cible (voir
+            // statisticsByTarget), donc cette page ne peut pas en recevoir une. Le `default` ci-dessous le dit mieux qu'un
+            // cas qui ne s'executerait jamais.
 
         case domain::QuestionKind::ModeVamp:
             return tr( "%1 · contexte" )
@@ -3936,6 +3952,33 @@ void ExerciseSessionController::playCurrentQuestionAsChord()
     const std::array<domain::Note, 2> notes{ rootNote, upperNote };
 
     m_notePlayer.playChord( notes );
+}
+
+bool ExerciseSessionController::playWrongChordThenAnswer()
+{
+    if( ( m_session == nullptr ) || !isChordQuestion() )
+    {
+        return false;
+    }
+
+    const std::optional<domain::ChordQuality> answer = m_session->lastChordAnswer();
+
+    if( !answer.has_value() )
+    {
+        // Le joueur n'a pas repondu : il a passe. Il n'y a donc pas d'accord « appuye » a lui faire entendre, et la
+        // reponse seule suffit - c'est exactement ce que playCurrentQuestion fait deja.
+        return false;
+    }
+
+    // La MEME tonique que la question, et la couleur que le joueur a CHOISIE : c'est ce qui rend l'ecart audible sur une
+    // seule note de depart. Deux toniques differentes feraient entendre deux accords etrangers l'un a l'autre, et il n'y
+    // aurait plus rien a comparer.
+    const domain::Chord played{ .quality = *answer,
+                                .rootMidiNumber = m_session->currentQuestion().chord.rootMidiNumber };
+
+    m_notePlayer.playChordThenChord( played.notes(), m_session->currentQuestion().chord.notes(), WRONG_CHORD_GAP );
+
+    return true;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

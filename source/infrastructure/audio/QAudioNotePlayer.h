@@ -55,6 +55,11 @@ public:
     // The sustained chord: the same notes, held for the given duration, so the beating between them can be counted.
     void playChordFor( std::span<const domain::Note> p_notes, std::chrono::milliseconds p_duration ) override;
 
+    // Ce que le joueur a joue, puis la reponse - dans UN SEUL rendu, voir le port pour la raison.
+    void playChordThenChord( std::span<const domain::Note> p_first,
+                             std::span<const domain::Note> p_second,
+                             std::chrono::milliseconds p_gap ) override;
+
     // Fait ENTENDRE un instrument : la gamme, un silence, puis l'accord, tous deux avec CE timbre et aucun autre.
     //
     // TOUT TIENT DANS UN SEUL TAMPON, et c'est la seule facon de faire : deux appels a playSamples se SUPERPOSENT, parce

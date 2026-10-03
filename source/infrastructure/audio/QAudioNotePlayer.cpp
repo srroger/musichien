@@ -481,6 +481,37 @@ void QAudioNotePlayer::playInstrumentPreview( std::span<const domain::Note> p_sc
     playSamples( preview );
 }
 
+void QAudioNotePlayer::playChordThenChord( std::span<const domain::Note> p_first,
+                                           std::span<const domain::Note> p_second,
+                                           std::chrono::milliseconds p_gap )
+{
+    ensureAudioOutputIsOpen();
+
+    if( !m_synthesizer.has_value() )
+    {
+        return;
+    }
+
+    // DEUX accords dans UN SEUL rendu, et c'est la seule facon : un nouveau son REMPLACE le precedent (voir playSamples),
+    // donc enchainer par deux appels ferait disparaitre le premier - celui que le joueur vient justement de jouer.
+    //
+    // Le silence entre les deux n'est pas un ornement : sans lui, les deux accords se suivraient sans couture et
+    // s'entendraient comme un seul accord qui bouge. C'est la respiration qui separe « ce que j'ai cru » de « ce qui
+    // etait ».
+    std::vector<float> pair = renderChordFor( p_first, noteDuration() );
+
+    const auto sampleRate = static_cast<std::size_t>( std::max( 1, m_audioFormat.sampleRate() ) );
+    const auto silenceSampleCount = static_cast<std::size_t>( sampleRate * p_gap.count() / 1000 );
+
+    pair.insert( pair.end(), silenceSampleCount, 0.0F );
+
+    const std::vector<float> answer = renderChordFor( p_second, noteDuration() );
+
+    pair.insert( pair.end(), answer.begin(), answer.end() );
+
+    playSamples( pair );
+}
+
 void QAudioNotePlayer::useInstruments( std::vector<domain::SampledInstrument> p_instruments,
                                        std::vector<domain::Waveform> p_waveforms )
 {

@@ -58,6 +58,32 @@ public:
         playChord( p_notes );
     }
 
+    // DEUX accords, l'un APRES l'autre, dans un seul rendu : le premier est ce que le joueur a joue, le second est la
+    // reponse.
+    //
+    // Roger, apres avoir joue une question d'accords : « quand on clique sur un accord et qu'on se trompe, on re-entend
+    // directement le bon accord. Je changerais ca : entendre d'abord l'accord appuye, PUIS l'accord voulu. C'est moins
+    // perturbant. »
+    //
+    // Il a raison, et la raison est plus profonde que le confort : entendre la REPONSE avant d'avoir entendu sa propre
+    // erreur efface l'ECART entre les deux - et cet ecart est toute la lecon. L'oreille doit pouvoir se dire « voila ce
+    // que j'ai cru, voila ce qui etait », dans cet ordre.
+    //
+    // UN SEUL APPEL, et non deux : un nouveau son REMPLACE le precedent (voir QAudioNotePlayer::playSamples), donc deux
+    // appels ne feraient entendre que le second - exactement ce qu'on cherche a corriger.
+    //
+    // Un corps par defaut, comme playChordFor : un adaptateur qui ne sait pas enchainer joue la REPONSE, qui est la
+    // partie a ne pas manquer.
+    virtual void playChordThenChord( std::span<const Note> p_first,
+                                     std::span<const Note> p_second,
+                                     std::chrono::milliseconds p_gap )
+    {
+        (void)p_first;
+        (void)p_gap;
+
+        playChord( p_second );
+    }
+
     // Fait ENTENDRE un instrument, pour qu'on puisse le CHOISIR : la gamme demandee, puis l'accord demande, avec CE
     // timbre et aucun autre.
     //

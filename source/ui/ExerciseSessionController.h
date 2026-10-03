@@ -1315,6 +1315,13 @@ private:
     // Plays the same two notes TOGETHER, whatever direction the question was asked in.
     void playCurrentQuestionAsChord();
 
+    // Ce que le joueur a JOUE, puis la reponse - et VRAI seulement si la paire a ete jouee.
+    //
+    // Faux quand il n'y a pas d'accord appuye a faire entendre (le joueur a passe) : l'appelant retombe alors sur
+    // playCurrentQuestion, qui joue la reponse seule. Un booleen plutot qu'un void, parce que « rien n'a ete joue » doit
+    // pouvoir se dire.
+    [[nodiscard]] bool playWrongChordThenAnswer();
+
     // Ecrit une ligne pour la question en cours, qui vient d'etre CONCLUE.
     //
     // L'horloge est lue ICI et nulle part ailleurs : le domaine recoit une date, il ne la demande jamais - c'est ce qui

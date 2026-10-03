@@ -1837,6 +1837,55 @@ TEST( ExerciseSessionControllerTest, a_wrong_answer_that_leaves_the_question_ope
     EXPECT_EQ( 2, log.records().front().attemptCount );
 }
 
+TEST( ExerciseSessionControllerTest, a_wrong_chord_is_heard_then_the_answer )
+{
+    // Roger : « quand on clique sur un accord et qu'on se trompe, on re-entend directement le bon accord. Je changerais
+    // ca : entendre d'abord l'accord appuye, PUIS l'accord voulu. C'est moins perturbant. »
+    //
+    // Et la raison est plus profonde que le confort : entendre la reponse avant sa propre erreur efface l'ECART entre les
+    // deux, et l'ecart est toute la lecon.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    domain::SessionSettings settings = chordOnlySettings();
+    settings.lives = std::nullopt;    // la question reste posee, donc la paire se joue
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startOrdinarySession();
+
+    const std::size_t chordsHeardBefore = notePlayer.playedChords().size();
+
+    const int playedQuality = wrongChordChoice( controller );
+
+    controller.answerChord( playedQuality );
+
+    // UNE seule paire, et non deux appels : un nouveau son REMPLACE le precedent, donc deux appels ne feraient entendre
+    // que le second - exactement ce qu'on corrige.
+    ASSERT_EQ( 1U, notePlayer.playedChordPairs().size() );
+
+    // Et la question n'est PAS rejouee par le chemin commun : c'est la paire qui a parle.
+    EXPECT_EQ( chordsHeardBefore, notePlayer.playedChords().size() );
+
+    const domain::NotePlayerFake::PlayedChordPair & pair = notePlayer.playedChordPairs().front();
+
+    // L'ORDRE est le sujet : ce que le joueur a joue d'abord, la reponse ensuite.
+    ASSERT_EQ( 3U, pair.first.size() );
+    ASSERT_EQ( 3U, pair.second.size() );
+
+    // Les deux accords partent de la MEME tonique : c'est ce qui rend l'ecart audible sur une seule note de depart, et
+    // deux toniques differentes ne seraient plus comparables.
+    EXPECT_EQ( pair.first.front().midiNumber(), pair.second.front().midiNumber() );
+
+    // ...et ils sont bien DIFFERENTS. Toute la liste, et pas une note isolee : majeur et mineur partagent leur quinte,
+    // donc comparer une seule note ne prouverait rien.
+    EXPECT_NE( pair.first, pair.second );
+
+    // Et le silence entre les deux existe, sans quoi ils s'entendraient comme un seul accord qui bouge.
+    EXPECT_GT( pair.gap.count(), 0 );
+}
+
 TEST( ExerciseSessionControllerTest, answering_twice_writes_one_line )
 {
     domain::NotePlayerFake notePlayer;

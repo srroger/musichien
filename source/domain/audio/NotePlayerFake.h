@@ -84,6 +84,26 @@ public:
                                                std::chrono::milliseconds{ 0 } } );
     }
 
+    // Ce que le joueur a joue, puis la reponse : les DEUX, dans cet ordre et gardes ENSEMBLE.
+    //
+    // L'ordre est tout ce qu'un test doit pouvoir verifier - c'est lui que Roger a demande de changer (« d'abord l'accord
+    // appuye, PUIS l'accord voulu ») - et deux listes separees ne le diraient pas.
+    struct PlayedChordPair
+    {
+        std::vector<Note> first;
+        std::vector<Note> second;
+        std::chrono::milliseconds gap{ 0 };
+    };
+
+    void playChordThenChord( std::span<const Note> p_first,
+                             std::span<const Note> p_second,
+                             std::chrono::milliseconds p_gap ) override
+    {
+        m_chordPairs.push_back( PlayedChordPair{ std::vector<Note>{ p_first.begin(), p_first.end() },
+                                                 std::vector<Note>{ p_second.begin(), p_second.end() },
+                                                 p_gap } );
+    }
+
     void playMelodyOverDrone( std::span<const Note> p_melody,
                               std::span<const Note> p_drone,
                               std::chrono::milliseconds p_noteDuration,
@@ -209,6 +229,8 @@ public:
     [[nodiscard]] const std::vector<PlayedGroup> & playedMelodies() const noexcept { return m_playedMelodies; }
     [[nodiscard]] const std::vector<PlayedGroup> & playedChords() const noexcept { return m_playedChords; }
 
+    [[nodiscard]] const std::vector<PlayedChordPair> & playedChordPairs() const noexcept { return m_chordPairs; }
+
     // Les appels « melodie sur bourdon », avec les deux voix : c'est ce qu'un test lit pour verifier que le bourdon
     // a bien ete demande EN MEME TEMPS que la melodie.
     [[nodiscard]] const std::vector<PlayedOverDrone> & melodiesOverDrones() const noexcept
@@ -280,6 +302,7 @@ public:
         m_playedNotes.clear();
         m_playedMelodies.clear();
         m_playedChords.clear();
+        m_chordPairs.clear();
         m_melodiesOverDrones.clear();
         m_phrasesOverDrones.clear();
         m_mistakeCueCount = 0;
@@ -304,6 +327,9 @@ private:
     std::vector<Note> m_playedNotes;
     std::vector<PlayedGroup> m_playedMelodies;
     std::vector<PlayedGroup> m_playedChords;
+
+    // Les paires « ce qu'il a joue, puis la reponse » - voir PlayedChordPair.
+    std::vector<PlayedChordPair> m_chordPairs;
     std::vector<PlayedOverDrone> m_melodiesOverDrones;
     std::vector<PlayedPhraseOverDrone> m_phrasesOverDrones;
     int m_mistakeCueCount{ 0 };
