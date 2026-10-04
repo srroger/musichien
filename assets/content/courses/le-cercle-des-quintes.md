@@ -89,7 +89,7 @@ quand on le répète : il **range le monde**.
 
 ## L'essai
 
-:: essai | demi_tons:7
+:: essai | intervalle
 
 C'est le moment de t'entraîner sur ce pas-là, et sur lui seul : **la quinte**, celle qui construit toute la carte.
 

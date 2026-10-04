@@ -69,7 +69,7 @@ Et tu devines la suite : cette fenêtre donne **sept** gammes différentes, une 
 
 ## L'essai
 
-:: essai | demi_tons:12
+:: essai | intervalle
 
 Remonte du do au do : c'est la gamme entière, en un seul geste. L'octave, encore elle — mais cette fois, tu sais
 **pourquoi** elle ferme.

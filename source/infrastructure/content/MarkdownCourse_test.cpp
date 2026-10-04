@@ -359,4 +359,87 @@ TEST( MarkdownCourseTest, a_circle_card_needs_nothing_at_all )
     EXPECT_TRUE( course->blocks.at( 0 ).caption.empty() );
 }
 
+// UN ACCORD SE NOMME EN FRANCAIS, et se traduit en rang - comme un mode.
+//
+// C'est la carte du chapitre de la couleur : le majeur et le mineur, entendus avant d'etre nommes. Le nom vient du
+// fichier, le RANG part vers le domaine.
+TEST( MarkdownCourseTest, a_chord_card_names_a_colour_in_french )
+{
+    const std::optional<musichien::domain::Course> course =
+      readCourse( ":: accord | mineur | do, mib, sol, ensemble\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Chord );
+
+    // LE MINEUR EST LE RANG 1, le majeur le rang 0 : l'ordre du domaine, du plus simple au plus riche.
+    EXPECT_EQ( course->blocks.at( 0 ).chordQuality, 1 );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "do, mib, sol, ensemble" );
+}
+
+// ET UN ACCORD INCONNU EST REFUSE : la faute coute une carte, jamais l'application.
+TEST( MarkdownCourseTest, a_chord_card_naming_an_unknown_quality_is_refused )
+{
+    const std::optional<musichien::domain::Course> course = readCourse( ":: accord | bizarre | un accord\n" );
+
+    EXPECT_FALSE( course.has_value() );
+}
+
+// L'ESSAI DIT SA FAMILLE, et sans mot c'est celle des intervalles.
+//
+// Roger, sur le chapitre de la couleur : un cours de modes doit ouvrir l'exercice des MODES, pas celui des intervalles.
+TEST( MarkdownCourseTest, an_essai_card_carries_the_family_to_open )
+{
+    const std::optional<musichien::domain::Course> intervalCourse = readCourse( ":: essai | intervalle\n" );
+
+    ASSERT_TRUE( intervalCourse.has_value() );
+    EXPECT_EQ( intervalCourse->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::TryExercise );
+    EXPECT_EQ( intervalCourse->blocks.at( 0 ).exerciseFamily, 0 );
+
+    const std::optional<musichien::domain::Course> chordCourse = readCourse( ":: essai | accord\n" );
+
+    ASSERT_TRUE( chordCourse.has_value() );
+    EXPECT_EQ( chordCourse->blocks.at( 0 ).exerciseFamily, 1 );
+
+    const std::optional<musichien::domain::Course> modeCourse = readCourse( ":: essai | mode\n" );
+
+    ASSERT_TRUE( modeCourse.has_value() );
+    EXPECT_EQ( modeCourse->blocks.at( 0 ).exerciseFamily, 2 );
+
+    // UN MOT INCONNU, ou pas de mot du tout : la famille des intervalles, le comportement d'origine.
+    const std::optional<musichien::domain::Course> bareCourse = readCourse( ":: essai\n" );
+
+    ASSERT_TRUE( bareCourse.has_value() );
+    EXPECT_EQ( bareCourse->blocks.at( 0 ).exerciseFamily, 0 );
+    EXPECT_TRUE( bareCourse->blocks.at( 0 ).exerciseTargets.empty() );
+}
+
+// ET LA LISTE DIT CE QU'ON OUVRE DEDANS - les modes, par exemple.
+//
+// C'est ce qui permet a une lecon de modes d'ouvrir 'ionien, eolien' sur une page, puis 'tous' sur la suivante, parce
+// qu'elle parle de la famille entiere.
+TEST( MarkdownCourseTest, an_essai_card_lists_what_it_opens )
+{
+    const std::optional<musichien::domain::Course> modesCourse = readCourse( ":: essai | mode | ionien, éolien\n" );
+
+    ASSERT_TRUE( modesCourse.has_value() );
+    ASSERT_EQ( modesCourse->blocks.at( 0 ).exerciseTargets.size(), 2U );
+    EXPECT_EQ( modesCourse->blocks.at( 0 ).exerciseTargets.at( 0 ), 1 );    // ionien
+    EXPECT_EQ( modesCourse->blocks.at( 0 ).exerciseTargets.at( 1 ), 4 );    // eolien
+
+    // 'tous' ouvre les SEPT modes, dans l'ordre de couleur du domaine.
+    const std::optional<musichien::domain::Course> allCourse = readCourse( ":: essai | mode | tous\n" );
+
+    ASSERT_TRUE( allCourse.has_value() );
+    EXPECT_EQ( allCourse->blocks.at( 0 ).exerciseTargets.size(), 7U );
+
+    const std::optional<musichien::domain::Course> chordsCourse = readCourse( ":: essai | accord | majeur, mineur\n" );
+
+    ASSERT_TRUE( chordsCourse.has_value() );
+    ASSERT_EQ( chordsCourse->blocks.at( 0 ).exerciseTargets.size(), 2U );
+    EXPECT_EQ( chordsCourse->blocks.at( 0 ).exerciseTargets.at( 0 ), 0 );    // majeur
+    EXPECT_EQ( chordsCourse->blocks.at( 0 ).exerciseTargets.at( 1 ), 1 );    // mineur
+}
+
 }    // namespace musichien::infrastructure

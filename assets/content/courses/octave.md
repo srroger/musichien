@@ -105,7 +105,7 @@ c'est l'intervalle.
 
 ## L'essai
 
-:: essai | demi_tons:12
+:: essai | intervalle
 
 Quand tu joues, tu ne vas pas deviner. Tu vas **reconnaître** — et l'octave est celle qui se reconnaît le plus
 vite de toutes.

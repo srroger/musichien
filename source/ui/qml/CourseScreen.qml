@@ -503,6 +503,38 @@ Item {
 
                         }
 
+                        // LA CARTE "L'ACCORD" : le jeu joue trois notes, et la tierce dit la couleur. C'est la carte du
+                        // chapitre de la couleur - le majeur et le mineur, entendus avant d'etre nommes.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "accord"
+                            implicitHeight: chordText.implicitHeight + 24
+                            radius: 10
+                            color: "#21351f"
+                            border.color: "#3f6a3a"
+                            border.width: 1
+
+                            Text {
+                                id: chordText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#cdeec6"
+                                font.pixelSize: 14
+                                text: qsTr("🎹  %1").arg(modelData.caption)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    CourseController.playChord(modelData.chordQuality);
+                                }
+                            }
+
+                        }
+
                         // La regle d'or veut que le jeu joue ce qu'il sait jouer ; cette carte sert a ce qu'il ne saura
                         // jamais produire - un orchestre, une interpretation. Et c'est le SYSTEME qui ouvre le lien, pas
                         // nous : un lecteur integre demanderait Qt WebEngine, 50 a 80 Mo, et annulerait tout le travail
@@ -587,7 +619,7 @@ Item {
                                 wrapMode: Text.WordWrap
                                 color: "#d8cdf4"
                                 font.pixelSize: 14
-                                text: qsTr("Essaie-le : l'exercice des intervalles")
+                                text: modelData.exerciseFamily === 1 ? qsTr("Essaie-le : l'exercice des accords") : modelData.exerciseFamily === 2 ? qsTr("Essaie-le : l'exercice des modes") : qsTr("Essaie-le : l'exercice des intervalles")
                             }
 
                             MouseArea {
@@ -596,12 +628,12 @@ Item {
                                     // ON NE FERME PAS L'ECOLE : l'ecran d'exercice est un calque declare PLUS BAS, donc il
                                     // passe par-dessus la page. Quitter la partie fait alors RETOMBER sur la lecon qu'on
                                     // etait en train de lire - ce que Roger attend, et non la page de garde.
-                                    // L'EXERCICE DE CE COURS, et non l'entrainement en general : la palette de la session
-                                    // est EXACTEMENT ce que la lecon vient d'enseigner - pour la tierce, la tierce
-                                    // majeure et la tierce mineure, et rien d'autre. Ni ce que le joueur connait, ni ses
-                                    // reglages ne s'y melangent.
+                                    // L'EXERCICE DE CE COURS, et non l'entrainement en general. Le mot de la carte dit la
+                                    // FAMILLE : intervalle, accord ou mode ; la LISTE dit ce qu'on ouvre dedans (les modes
+                                    // 'tous', par exemple). Pour les intervalles, la palette est EXACTEMENT les concepts
+                                    // du cours.
                                     ExerciseController.playTapCue();
-                                    ExerciseController.startTrainingSessionFromLesson(CourseController.currentConcepts);
+                                    ExerciseController.startTrainingSessionFromLesson(CourseController.currentConcepts, modelData.exerciseFamily, modelData.exerciseTargets);
                                 }
                             }
 

@@ -84,7 +84,7 @@ Les autres demanderont ta journée. Celui-ci, non.
 
 ## L'essai
 
-:: essai | demi_tons:7
+:: essai | intervalle
 
 Quand tu joues, tu ne vas pas deviner. Tu vas **reconnaître** — et c'est très différent.
 

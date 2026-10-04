@@ -111,7 +111,15 @@ struct CourseBlock
         // Roger : « on est capable de le fabriquer dans le code, on a meme une page dediee au cercle. » Il a raison, et
         // c'est le meme contrat que ':: essai' et ':: chante' : le cours dit l'INTENTION, et celui qui le porte sait ou
         // vit la page. Le domaine, lui, ne connait meme pas son nom.
-        Circle
+        Circle,
+
+        // ":: accord" - UN ACCORD, joue : trois notes (ou plus) dont la TIERCE dit la couleur.
+        //
+        // Roger, sur le chapitre de la couleur : les « deux premieres secondes de n'importe quelle musique » sont un
+        // ACCORD, et c'est ce que la lecon doit faire ENTENDRE avant de le nommer. Une carte a part et non un ':: jeu',
+        // parce qu'un accord n'est pas un intervalle : c'est un empilement dont la tierce decide l'humeur - clair ou
+        // sombre - et c'est exactement ce que le chapitre enseigne.
+        Chord
     };
 
     Kind kind{ Kind::Text };
@@ -161,6 +169,24 @@ struct CourseBlock
     // Le domaine ignore ce qu'il y a dedans, et il doit l'ignorer : un schema est de la mise en page, et la mise en
     // page vit dans l'interface. Ici, un nom - et rien d'autre.
     std::string schemaName;
+
+    // Kind::Chord - LA QUALITE de l'accord, dans l'ordre du domaine (majeur, mineur, ...).
+    //
+    // Un RANG, jamais un nom : le fichier ecrit 'majeur' et le lecteur le traduit, exactement comme ':: gamme'. Le
+    // domaine ne connait pas l'orthographe d'un contenu.
+    std::int32_t chordQuality{ 0 };
+
+    // Kind::TryExercise - QUELLE FAMILLE de questions ouvrir : 0 intervalles, 1 accords, 2 modes.
+    //
+    // Le chapitre de la couleur ne s'exerce pas sur des intervalles : un cours de modes doit ouvrir l'exercice des
+    // modes. Le rang EST celui de domain::QuestionFamily, et le domaine des cours n'a pas besoin d'en savoir plus.
+    std::int32_t exerciseFamily{ 0 };
+
+    // Kind::TryExercise - LA LISTE de ce qu'on ouvre, quand la famille en a besoin : les modes, les qualites d'accord.
+    //
+    // Vide : la session prend la palette du NIVEAU. Non vide : exactement ces rangs, et la palette ne bouge plus. C'est
+    // ce qui permet a une lecon de modes d'ouvrir 'ionien, eolien' sur une page, puis 'tous' sur la suivante.
+    std::vector<std::int32_t> exerciseTargets;
 };
 
 // UNE SECTION, c'est-a-dire un « ## » du fichier et ce qu'il introduit.

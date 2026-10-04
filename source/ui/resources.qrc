@@ -74,6 +74,17 @@
         <file alias="assets/content/courses/gamme-majeure-mineure.md">../../assets/content/courses/gamme-majeure-mineure.md</file>
         <file alias="assets/content/courses/le-majeur-et-le-mineur.md">../../assets/content/courses/le-majeur-et-le-mineur.md</file>
         <!--
+          Chapitre 4 : LA COULEUR. Lecon 7 (l'accord, clair ou sombre) et lecon 8 (les modes), avec leurs os a macher.
+
+          Ces deux lecons sont les premieres a ne PAS s'exercer sur des intervalles : un ':: essai | accord' ouvre
+          l'exercice des accords, un ':: essai | mode' celui des modes. Et la lecon 7 fait ENTENDRE un accord, ce
+          qu'aucune carte ne savait faire avant ':: accord' - la carte du chapitre.
+        -->
+        <file alias="assets/content/courses/l-accord-clair-ou-sombre.md">../../assets/content/courses/l-accord-clair-ou-sombre.md</file>
+        <file alias="assets/content/courses/pourquoi-trois-notes-suffisent.md">../../assets/content/courses/pourquoi-trois-notes-suffisent.md</file>
+        <file alias="assets/content/courses/les-modes-plus-clair-plus-obscur.md">../../assets/content/courses/les-modes-plus-clair-plus-obscur.md</file>
+        <file alias="assets/content/courses/l-echelle-des-bemols.md">../../assets/content/courses/l-echelle-des-bemols.md</file>
+        <!--
           Le glossaire. Un mot par entree, une definition d'UNE PHRASE : Roger veut un aide-memoire, pas un manuel.
           Meme motif que les autres contenus, alias compris - le chemin de ressource est celui du disque.
         -->

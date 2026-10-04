@@ -69,7 +69,7 @@ Tu verras : la tierce haute se trouve **facilement**. C'est la tierce basse qui 
 
 ## L'essai
 
-:: essai | demi_tons:4
+:: essai | intervalle
 
 Entraîne ton oreille sur **la tierce**, celle qui décide de tout : haute ou basse, claire ou sombre.
 

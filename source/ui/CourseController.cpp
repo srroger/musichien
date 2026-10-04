@@ -1,5 +1,6 @@
 #include "ui/CourseController.h"
 
+#include "domain/music/Chord.h"
 #include "domain/music/Interval.h"
 #include "domain/music/Mode.h"
 
@@ -56,6 +57,9 @@ constexpr const char * KIND_SCHEMA = "schema";
 // ":: cercle" - la PORTE vers la page de reference du cercle. Comme ':: essai', c'est une porte et non une donnee.
 constexpr const char * KIND_CIRCLE = "cercle";
 
+// ":: accord" - un ACCORD, joue : trois notes (ou plus) dont la tierce dit la couleur.
+constexpr const char * KIND_CHORD = "accord";
+
 // LA QUINTE, EN DEMI-TONS. Elle sert au bourdon ET a la chaine des quintes : une seule definition, donc pas deux
 // valeurs a tenir d'accord.
 constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
@@ -86,6 +90,8 @@ constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
             return KIND_SCALE;
         case domain::CourseBlock::Kind::Schema:
             return KIND_SCHEMA;
+        case domain::CourseBlock::Kind::Chord:
+            return KIND_CHORD;
         case domain::CourseBlock::Kind::Circle:
             return KIND_CIRCLE;
         case domain::CourseBlock::Kind::Text:
@@ -116,6 +122,19 @@ constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
     description.insert( QStringLiteral( "fifthCount" ), p_block.fifthCount );
     description.insert( QStringLiteral( "modeIndex" ), p_block.modeIndex );
     description.insert( QStringLiteral( "schemaName" ), QString::fromStdString( p_block.schemaName ) );
+    description.insert( QStringLiteral( "chordQuality" ), p_block.chordQuality );
+    description.insert( QStringLiteral( "exerciseFamily" ), p_block.exerciseFamily );
+
+    // La LISTE d'une carte ':: essai', en QVariantList : le QML la passe telle quelle. Absente pour toutes les autres
+    // cartes, et une liste vide pour un ':: essai' qui n'en porte pas - le QML lit la meme chose partout.
+    QVariantList targets;
+
+    for( const std::int32_t target : p_block.exerciseTargets )
+    {
+        targets.append( target );
+    }
+
+    description.insert( QStringLiteral( "exerciseTargets" ), targets );
 
     return description;
 }
@@ -564,6 +583,21 @@ void CourseController::playModeScale( int p_modeIndex )
     // qui articulerait autrement ferait entendre une autre musique que celle du banc.
     m_notePlayer.playMelodyOverDrone(
       scale, drone, std::chrono::milliseconds{ 500 }, std::chrono::milliseconds{ 80 } );
+}
+
+void CourseController::playChord( int p_quality )
+{
+    // UN ACCORD, JOUE. La tonique vient du jeu, comme partout ailleurs : deux lecons ne doivent pas faire entendre
+    // deux centres differents sans le dire. Le domaine construit les notes depuis la seule qualite - le cours n'ecrit
+    // jamais une note, il ecrit une COULEUR.
+    if( ( p_quality < 0 ) || std::cmp_greater_equal( p_quality, domain::CHORD_QUALITY_COUNT ) )
+    {
+        return;
+    }
+
+    const domain::Chord chord{ static_cast<domain::ChordQuality>( p_quality ), EXERCISE_ROOT_MIDI_NUMBER };
+
+    m_notePlayer.playChord( chord.notes() );
 }
 
 void CourseController::stopPlayback()

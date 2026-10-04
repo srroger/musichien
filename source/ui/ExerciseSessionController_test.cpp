@@ -1033,7 +1033,7 @@ TEST( ExerciseSessionControllerTest, a_lesson_essai_gives_exactly_the_concepts_i
     // pour autant - il ne contient QUE les concepts de la lecon, et c'est tout l'interet.
     controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Beginner ) );
 
-    controller.startTrainingSessionFromLesson( QVariantList{ 3, 4 } );
+    controller.startTrainingSessionFromLesson( QVariantList{ 3, 4 }, 0, QVariantList{} );
 
     std::vector<std::int32_t> played;
 
@@ -1063,7 +1063,7 @@ TEST( ExerciseSessionControllerTest, a_lesson_essai_ignores_duplicates_and_out_o
     controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Beginner ) );
 
     // 4 en double, et 99 au-dela de ce que le domaine supporte (deux octaves au plus).
-    controller.startTrainingSessionFromLesson( QVariantList{ 3, 4, 4, 99 } );
+    controller.startTrainingSessionFromLesson( QVariantList{ 3, 4, 4, 99 }, 0, QVariantList{} );
 
     std::vector<std::int32_t> played;
 

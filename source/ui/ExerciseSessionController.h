@@ -844,19 +844,22 @@ public:
 
     // OUVRIR L'ENTRAINEMENT SUR CE QU'UN COURS VIENT D'ENSEIGNER.
     //
-    // Les concepts du cours - des distances en demi-tons, jamais des noms - SONT la palette de l'exercice : rien
-    // d'autre n'entre. Un cours de la tierce ouvre donc un exercice ou les deux seules reponses possibles sont la
-    // tierce majeure et la tierce mineure. Ni ce que le joueur connait, ni ses reglages ne s'y melangent : c'est un
-    // exercice SUR LA LECON.
+    // p_family dit QUELLE famille de questions ouvrir (0 intervalles, 1 accords, 2 modes). p_concepts porte les distances
+    // que la lecon enseigne - pour les intervalles. p_targets porte la LISTE de la carte ':: essai' : les modes ou les
+    // qualites a ouvrir, quand la famille en a besoin ('ionien, eolien', puis 'tous').
+    //
+    // POUR LES INTERVALLES, les concepts SONT la palette de l'exercice : rien d'autre n'entre. Un cours de la tierce
+    // ouvre donc un exercice ou les deux seules reponses possibles sont la tierce majeure et la tierce mineure.
+    //
+    // POUR LES ACCORDS ET LES MODES, la palette est celle que la carte demande, et sans liste, celle du niveau.
     //
     // Roger, 04/10/2026 : « un exercice d'intervalle particulier pour le cours, avec seulement la tierce majeure et
     // mineure ». Un simple FOCUS D'ETUDE ne suffisait pas : le focus ne fait que PONDERER ce que la palette contient
     // deja (voir drawTarget), donc un cours de la tierce ouvrait une session SANS tierce. Cette version la donne, et
     // elle sert desormais TOUTES les lecons.
-    //
-    // Les concepts sont AUSSI ecrits dans le FOCUS D'ETUDE du profil : dans le JEU ORDINAIRE, ce qui a ete travaille
-    // reste tire plus souvent, meme apres la fermeture de l'application.
-    Q_INVOKABLE void startTrainingSessionFromLesson( const QVariantList & p_concepts );
+    Q_INVOKABLE void startTrainingSessionFromLesson( const QVariantList & p_concepts,
+                                                     int p_family,
+                                                     const QVariantList & p_targets );
 
     // REJOUER : relance le MEME mode. Un Entrainement rejoue son Entrainement, un Bilan son Bilan.
     //

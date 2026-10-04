@@ -137,6 +137,10 @@ public:
     // LA GAMME D'UN MODE, SUR LE BOURDON : la meme chose que le banc d'essai des modes, et volontairement.
     Q_INVOKABLE void playModeScale( int p_modeIndex );
 
+    // UN ACCORD, JOUE : la tonique du jeu, et les intervalles de sa qualite. C'est la carte ':: accord' du chapitre de
+    // la couleur - le majeur et le mineur, entendus avant d'etre nommes.
+    Q_INVOKABLE void playChord( int p_quality );
+
     Q_INVOKABLE void stopPlayback();
 
 signals:
