@@ -1705,8 +1705,15 @@ ApplicationWindow {
             // CHANTER UN INTERVALLE DEPUIS UN COURS : la page dit l'intention, et c'est ICI qu'on sait ou vit l'outil de
             // chant. La cible est posee AVANT d'ouvrir, sinon la page s'ouvrirait sur la question d'avant.
             onSingRequested: function(p_semitones) {
-                MicrophoneController.setSingingTarget(p_semitones);
+                // UN MIROIR, PAS UNE SESSION : le cours donne l'intervalle, et rien ne le change. Le cours le promet lui-
+                // meme a la page du geste : « aucun score : c'est un miroir, pas un juge ».
+                MicrophoneController.openSingingMirror(p_semitones);
                 singingDialog.open();
+            }
+            // OUVRIR UNE ANNEXE : c'est le MEME lecteur, un autre cours. L'ecole reste ouverte derriere, donc le retour
+            // ramene au cours d'ou l'on vient - ce que le bouton de sortie fait deja pour une lecon.
+            onAnnexeRequested: function(p_annexeName) {
+                CourseController.openAnnexe(p_annexeName);
             }
             // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
             onVisibleChanged: {
@@ -2530,8 +2537,11 @@ ApplicationWindow {
                     text: qsTr("Chanter")
                 }
 
+                // LE COMPTEUR N'EXISTE QUE DANS UNE SESSION. Un cours ouvre un MIROIR : il n'y a rien a compter, et
+                // afficher « Question 1 / 5 » promettrait une serie qui n'aura pas lieu.
                 Text {
                     Layout.fillWidth: true
+                    visible: !MicrophoneController.isSingingMirror
                     color: "#cbb8e8"
                     font.pixelSize: 14
                     text: qsTr("Question %1 / %2 · %3 juste(s)").arg(MicrophoneController.singingQuestionIndex).arg(MicrophoneController.singingTotalQuestions).arg(MicrophoneController.singingCorrectCount)
@@ -2619,8 +2629,12 @@ ApplicationWindow {
                     }
                 }
 
+                // « SUIVANT » N'EXISTE PAS DANS UN MIROIR, et ce n'etait pas qu'une question de gout : ce bouton tire un
+                // intervalle AU HASARD, donc il faisait quitter celui que le cours venait de faire entendre - sous les
+                // yeux du joueur, et sans qu'il ait rien demande.
                 Button {
                     Layout.fillWidth: true
+                    visible: !MicrophoneController.isSingingMirror
                     text: MicrophoneController.singingSessionOver ? qsTr("Recommencer") : qsTr("Suivant")
                     onClicked: MicrophoneController.singingSessionOver ? MicrophoneController.startSingingSession() : MicrophoneController.newSingingQuestion()
                 }

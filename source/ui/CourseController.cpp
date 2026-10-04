@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <iostream>
 #include <utility>
 
 namespace musichien::ui
@@ -138,6 +139,55 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
 
         m_library.append( entry );
     }
+
+    // UN RENVOI QUI NE MENE NULLE PART SE DIT AU DEMARRAGE, et non au clic.
+    //
+    // Le contrat veut qu'une carte « :: annexe » cite le TITRE de l'annexe ; ecrire le nom du fichier est l'erreur
+    // naturelle, et c'est celle que ce specimen a commise. Elle ne produit aucun plantage, aucune erreur de compilation,
+    // et meme pas une carte morte bien visible : juste une carte qui ne fait rien. Le journal de demarrage est donc le
+    // seul endroit ou elle se voit - et c'est le meme esprit que « Musichien: N courses read » : l'application dit ce
+    // qu'elle a compris, pas seulement ce qu'elle a lu.
+    for( const domain::Course & course : m_courses )
+    {
+        for( const domain::CourseBlock & block : course.blocks )
+        {
+            if( block.kind != domain::CourseBlock::Kind::Annexe )
+            {
+                continue;
+            }
+
+            const bool isResolved =
+              std::any_of( m_courses.begin(), m_courses.end(), [&block]( const domain::Course & p_candidate ) {
+                  return p_candidate.title == block.annexeName;
+              } );
+
+            if( !isResolved )
+            {
+                std::cerr << "Musichien: '" << course.title << "' points to an annexe named '" << block.annexeName
+                          << "', and no course carries that title.\n";
+            }
+        }
+    }
+}
+
+void CourseController::openAnnexe( QString p_name )
+{
+    // Le TITRE, compare sans tenir compte de la casse ni des espaces autour : un auteur ecrit ce qu'il veut, et une
+    // majuscule ne doit pas fermer une porte.
+    const QString wanted = p_name.trimmed();
+
+    for( std::size_t index = 0; index < m_courses.size(); ++index )
+    {
+        if( QString::fromStdString( m_courses.at( index ).title ).trimmed().compare( wanted, Qt::CaseInsensitive ) == 0 )
+        {
+            open( static_cast<int>( index ) );
+
+            return;
+        }
+    }
+
+    // Rien trouve : on ne fait rien, et c'est deliberé. Le constructeur a deja dit AU DEMARRAGE que ce renvoi ne mene
+    // nulle part - le joueur, lui, ne doit pas voir un message d'erreur a cause d'une faute de frappe dans un cours.
 }
 
 QVariantList CourseController::library() const

@@ -87,6 +87,10 @@ class MicrophoneController final : public QObject
     // 0 tant que rien n'a ete chante, 1 quand l'intervalle est juste, 2 quand il ne l'est pas.
     Q_PROPERTY( int sungVerdict READ sungVerdict NOTIFY sungIntervalChanged )
 
+    // LE MIROIR, PAR OPPOSITION A LA SESSION : l'intervalle est DONNE et ne change pas, il n'y a ni compteur de
+    // questions ni tirage au hasard. C'est ce qu'un cours demande quand il ecrit « :: chante ».
+    Q_PROPERTY( bool isSingingMirror READ isSingingMirror NOTIFY singingMirrorChanged )
+
     // L'ecart, en CENTS, entre l'intervalle chante et l'intervalle PARFAIT du temperament courant : zero quand il est
     // exactement celui du jeu, positif quand il a ete chante trop large, negatif quand il a ete chante trop etroit.
     //
@@ -176,6 +180,19 @@ public:
     // Starts a fresh session: the score returns to zero, and the first question is drawn.
     Q_INVOKABLE void startSingingSession();
 
+    // OUVRIR LE MIROIR SUR UN INTERVALLE DONNE : c'est ce que demande une carte « :: chante » d'un cours.
+    //
+    // Roger, sur le cours de la quinte juste : « on propose au joueur de chanter la quinte. Autant lui fournir l'outil
+    // pour qu'il verifie lui-meme s'il chante juste. » Et le cours le dit lui-meme : « aucun score : c'est un miroir,
+    // pas un juge ».
+    //
+    // Or la carte ouvrait la SESSION : son compteur de questions, et son bouton « Suivant » qui tire un intervalle AU
+    // HASARD - donc quitte celui que le cours venait de faire entendre, sous les yeux du joueur. Un miroir ne tire rien :
+    // il renvoie ce qu'on lui donne.
+    Q_INVOKABLE void openSingingMirror( int p_semitones );
+
+    [[nodiscard]] bool isSingingMirror() const { return m_isSingingMirror; }
+
     [[nodiscard]] int singingQuestionIndex() const { return m_singingQuestionIndex; }
     [[nodiscard]] int singingCorrectCount() const { return m_singingCorrectCount; }
     [[nodiscard]] int singingTotalQuestions() const { return m_singingTotalQuestions; }
@@ -213,6 +230,7 @@ signals:
     void detectedTuningStateChanged();
 
     void singingTargetChanged();
+    void singingMirrorChanged();
     void singingCaptureStateChanged();
     void sungIntervalChanged();
     void singingQuestionChanged();
@@ -254,6 +272,10 @@ private:
     std::mt19937 m_singingRandomEngine{ std::random_device{}() };
     int m_singingTargetSemitones{ 7 };
     bool m_isSingingCaptureActive{ false };
+
+    // Vrai quand l'ecran de chant a ete ouvert par une carte de cours : l'intervalle est donne, rien n'est compte, et
+    // rien n'est tire au hasard. Faux des l'ouverture d'une session de jeu.
+    bool m_isSingingMirror{ false };
     QElapsedTimer m_pitchClock;
     musichien::domain::NotePlayer * m_notePlayer{ nullptr };
 

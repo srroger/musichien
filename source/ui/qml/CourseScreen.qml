@@ -25,6 +25,9 @@ Item {
     // LA PAGE DEMANDE A CHANTER UN INTERVALLE. Elle dit l'intention, et celui qui la porte decide comment - c'est ce qui
     // lui permet d'ignorer ou vit l'outil de chant, et meme s'il y en a un.
     signal singRequested(int p_semitones)
+    // OUVRIR UNE ANNEXE : la carte « :: annexe » cite un nom, et c'est ICI qu'on sait ou vit le lecteur de cours. La
+    // page dit l'INTENTION, celui qui la porte decide - la meme regle que pour la carte de chant.
+    signal annexeRequested(string p_annexeName)
 
     anchors.fill: parent
 
@@ -327,6 +330,9 @@ Item {
                     // et ne donne pas le moyen de la verifier laisse le joueur deviner.
                     // La page dit l'INTENTION et celui qui la porte decide : c'est ce qui lui permet d'ignorer ou vit
                     // l'outil de chant, et meme s'il y en a un.
+                    // LA CARTE "POUR ALLER PLUS LOIN" : elle ouvre l'ANNEXE.
+                    // Une annexe n'est pas une autre sorte de contenu : c'est un cours range a la fin du catalogue,
+                    // et celui-ci se lit donc avec le MEME lecteur, la meme pagination et le meme retour.
 
                     model: CourseController.blocks
 
@@ -503,14 +509,16 @@ Item {
 
                         }
 
-                        // LA CARTE "POUR ALLER PLUS LOIN" : inerte pour l'instant, et elle le dit.
+                        // Elle etait INERTE, et elle le disait - « les Os a macher arrivent bientot » - alors que le
+                        // fichier existait deja : personne ne pouvait le lire. Un contenu ecrit et inaccessible est pire
+                        // qu'un contenu absent, parce qu'il donne l'impression d'un jeu casse.
                         Rectangle {
                             Layout.fillWidth: true
                             visible: modelData.kind === "annexe"
                             implicitHeight: annexeText.implicitHeight + 24
                             radius: 10
                             color: "#241a3d"
-                            border.color: "#3a2b5c"
+                            border.color: "#5a4a8f"
                             border.width: 1
 
                             Text {
@@ -519,9 +527,16 @@ Item {
                                 anchors.fill: parent
                                 anchors.margins: 12
                                 wrapMode: Text.WordWrap
-                                color: "#9d8dc0"
+                                color: "#cbb8e8"
                                 font.pixelSize: 13
-                                text: qsTr("🦴  Pour aller plus loin — les Os à mâcher arrivent bientôt")
+                                // Le titre vient DU COURS, tel que son auteur l'a ecrit : la carte n'invente rien, et ne
+                                // peut donc pas annoncer autre chose que ce qu'elle ouvre.
+                                text: qsTr("🦴  Pour aller plus loin — %1").arg(modelData.annexeName)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: courseScreen.annexeRequested(modelData.annexeName)
                             }
 
                         }

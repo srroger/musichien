@@ -274,4 +274,51 @@ TEST( CourseControllerTest, a_course_is_read_one_page_at_a_time )
     EXPECT_EQ( controller.sectionIndex(), 1 );
 }
 
+// LA CARTE « :: annexe » MENE QUELQUE PART. Le specimen citait le NOM DU FICHIER la ou le contrat demande le TITRE de
+// l'annexe, et personne ne pouvait le voir : la carte etait inerte, donc rien ne se plaignait. Ce test tient la porte
+// ouverte, et il nomme la facon d'entrer - le titre, tel que l'annexe le donne dans son propre en-tete.
+TEST( CourseControllerTest, an_annexe_card_opens_the_annexe_it_names )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course annexe = makeQuintCourse();
+    annexe.title = "Pourquoi la quinte sonne juste";
+    annexe.chapter = 0;
+
+    domain::Course lesson = makeQuintCourse();
+
+    domain::CourseBlock door;
+    door.kind = domain::CourseBlock::Kind::Annexe;
+    door.annexeName = "Pourquoi la quinte sonne juste";
+
+    lesson.blocks.push_back( door );
+
+    CourseController controller{ notePlayer, { lesson, annexe } };
+
+    ASSERT_FALSE( controller.isReading() );
+
+    controller.openAnnexe( QStringLiteral( "Pourquoi la quinte sonne juste" ) );
+
+    ASSERT_TRUE( controller.isReading() );
+    EXPECT_EQ( controller.title(), QString( "Pourquoi la quinte sonne juste" ) );
+}
+
+// LE NOM DU FICHIER N'OUVRE RIEN - et ce test porte l'erreur EXACTE que le specimen avait commise, pour qu'elle ne
+// revienne pas. Il ne doit pas planter pour autant : la faute est signalee au DEMARRAGE (voir le constructeur du
+// controleur), et le joueur ne doit jamais voir un message d'erreur a cause d'une faute de frappe dans un cours.
+TEST( CourseControllerTest, a_file_name_where_a_title_belongs_opens_nothing )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course annexe = makeQuintCourse();
+    annexe.title = "Pourquoi la quinte sonne juste";
+    annexe.chapter = 0;
+
+    CourseController controller{ notePlayer, { makeQuintCourse(), annexe } };
+
+    controller.openAnnexe( QStringLiteral( "pourquoi-la-quinte-sonne-juste" ) );
+
+    EXPECT_FALSE( controller.isReading() );
+}
+
 }    // namespace musichien::ui

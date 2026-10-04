@@ -74,7 +74,7 @@ on dit qu'une distance est juste quand il n'y a rien à en dire.
 
 ## Pour aller plus loin
 
-:: annexe | pourquoi-la-quinte-sonne-juste
+:: annexe | Pourquoi la quinte sonne juste
 
 ---
 

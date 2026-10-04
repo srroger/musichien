@@ -388,12 +388,43 @@ QString MicrophoneController::singingTargetLabel() const
 
 void MicrophoneController::startSingingSession()
 {
+    // LA SESSION N'EST PAS UN MIROIR. Elle compte ses questions et les tire au hasard - exactement ce qu'un cours ne veut
+    // pas. Une seule des deux choses a cours a la fois, et ouvrir une session ferme donc le miroir.
+    if( m_isSingingMirror )
+    {
+        m_isSingingMirror = false;
+
+        emit singingMirrorChanged();
+    }
+
     m_singingQuestionIndex = 0;
     m_singingCorrectCount = 0;
 
     emit singingQuestionChanged();
 
     newSingingQuestion();
+}
+
+void MicrophoneController::openSingingMirror( int p_semitones )
+{
+    setSingingTarget( p_semitones );
+
+    // La capture repart de zero : le miroir s'ouvre sur un essai neuf, et non sur les deux notes de la question
+    // precedente.
+    m_isSingingCaptureActive = false;
+
+    if( !m_isSingingMirror )
+    {
+        m_isSingingMirror = true;
+
+        emit singingMirrorChanged();
+    }
+
+    emit singingCaptureStateChanged();
+
+    // Le jeu est bati sur le micro : un miroir muet serait le pire des echecs - il ferait porter au joueur la faute d'un
+    // peripherique ferme.
+    ensureListening();
 }
 
 int MicrophoneController::sungVerdict() const

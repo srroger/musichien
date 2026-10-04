@@ -343,4 +343,52 @@ TEST( MicrophoneControllerTest, a_foreground_return_without_a_suspend_does_not_r
     EXPECT_TRUE( test.controller.isListening() );
 }
 
+// LE MIROIR D'UN COURS DONNE L'INTERVALLE, ET NE TIRE RIEN. Le cours de la quinte promet « aucun score : c'est un miroir,
+// pas un juge » - et la carte ouvrait pourtant une SESSION, dont le bouton « Suivant » tire un intervalle AU HASARD, donc
+// fait quitter celui que la page venait de faire entendre.
+TEST( MicrophoneControllerTest, a_singing_mirror_keeps_the_given_interval_and_counts_nothing )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    ASSERT_FALSE( test.controller.isSingingMirror() );
+
+    test.controller.openSingingMirror( 7 );
+
+    QCoreApplication::processEvents();
+
+    // L'intervalle est celui du COURS, et il y reste : c'est la seule chose qui distingue un miroir d'un jeu.
+    EXPECT_TRUE( test.controller.isSingingMirror() );
+    EXPECT_EQ( 7, test.controller.singingTargetSemitones() );
+
+    // Et le micro s'ouvre : un miroir muet serait le pire des echecs, il ferait porter au joueur la faute d'un
+    // peripherique ferme.
+    EXPECT_TRUE( test.controller.isListening() );
+    ASSERT_NE( test.detector, nullptr );
+
+    test.detector->hear( 440.0 );
+
+    EXPECT_EQ( test.controller.detectedNoteLabel(), QStringLiteral( "A4  440.0 Hz" ) );
+}
+
+// OUVRIR UNE SESSION FERME LE MIROIR. Les deux ne cohabitent pas : une session compte ses questions et les tire au
+// hasard, un miroir renvoie ce qu'on lui donne. Deux modes ouverts a la fois, et le cours promettrait une chose que
+// l'ecran contredirait.
+TEST( MicrophoneControllerTest, starting_a_session_leaves_the_mirror_behind )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    test.controller.openSingingMirror( 7 );
+    QCoreApplication::processEvents();
+
+    ASSERT_TRUE( test.controller.isSingingMirror() );
+
+    test.controller.startSingingSession();
+
+    EXPECT_FALSE( test.controller.isSingingMirror() );
+}
+
 }    // namespace musichien::ui

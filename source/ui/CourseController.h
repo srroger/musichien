@@ -88,6 +88,14 @@ public:
     // planter sur un clic de trop.
     Q_INVOKABLE void open( int p_index );
 
+    // OUVRIR UNE ANNEXE PAR SON NOM. Le nom est celui que le cours cite, et le contrat du domaine dit lequel : le TITRE
+    // de l'annexe, tel que son propre front matter le donne (voir CourseBlock::annexeName).
+    //
+    // Un nom qui ne correspond a rien ne fait RIEN : une carte morte vaut mieux qu'une page qui plante. Mais un renvoi
+    // qui ne mene nulle part se dit AU DEMARRAGE - le constructeur le signale, et c'est la seule facon de voir une
+    // faute de frappe qu'aucun compilateur ne peut voir.
+    Q_INVOKABLE void openAnnexe( QString p_name );
+
     Q_INVOKABLE void close();
 
     // CE QUE LE JEU SAIT JOUER, LE JEU LE JOUE : une carte ':: jeu' passe par ici, sans reseau et sans attente.
