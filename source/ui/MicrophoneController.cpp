@@ -235,18 +235,35 @@ void MicrophoneController::newSingingQuestion()
 
 double MicrophoneController::singingTargetStaffFraction() const
 {
-    const auto & reading = m_sungIntervalDetector.reading();
+    // LA NOTE QUE TU CHANTES MAINTENANT, TRANSPOSEE DE L'INTERVALLE.
+    //
+    // Roger a trouve la cause, et elle explique tout ce que je n'arrivais pas a expliquer : « pour que le fantome
+    // apparaisse il faut que le premier essai soit mauvais. Hors au deuxieme essai, je pense que le fantome se base sur
+    // la mauvaise note de depart - celle de la premiere ! »
+    //
+    // Il a raison. La fantome ne s'affiche qu'APRES un echec, et le detecteur garde alors en memoire les notes du premier
+    // essai : le joueur reprend une nouvelle premiere note, et la cible se placait depuis l'ANCIENNE. D'ou un decalage
+    // qu'aucun raisonnement sur le code ne pouvait expliquer, parce que la valeur etait juste - c'etait son ENTREE qui
+    // etait perimee.
+    //
+    // C'est donc la meme source que la BOULE, la hauteur entendue a l'instant : la fantome suit la voix, et se trouve
+    // toujours un intervalle au-dessus d'elle. Ce qui est exactement ce qu'il faut montrer a un chanteur.
+    //
+    // Le repli sur la premiere note du detecteur sert au seul cas ou rien n'est entendu : sans lui, la fantome
+    // sauterait a l'octave n'importe ou entre deux lectures du micro.
+    const std::int32_t fromMidi = ( m_detectedFrequencyHz > 0.0 )
+                                    ? static_cast<std::int32_t>( std::lround( m_detectedMidi ) )
+                                    : m_sungIntervalDetector.reading().firstMidiNumber;
 
-    const double fraction = domain::StaffPosition::fraction( reading.firstMidiNumber + m_singingTargetSemitones );
+    const double fraction = domain::StaffPosition::fraction( fromMidi + m_singingTargetSemitones );
 
-    // ⚠️ MESURE TEMPORAIRE. Quatre hypotheses sont mortes en lisant le code, et le telephone de Roger est branche :
-    // autant lire les VALEURS au lieu de raisonner dessus. Une ligne seulement quand la valeur change, sinon la sortie
-    // d'Android serait noyee.
+    // ⚠️ MESURE TEMPORAIRE, et elle reste une version de plus : le telephone de Roger est branche, et c'est ce journal qui
+    // confirmera le correctif au lieu de me faire croire qu'il l'est. Une ligne seulement quand la valeur change.
     if( fraction != m_lastLoggedGhostFraction )
     {
         m_lastLoggedGhostFraction = fraction;
 
-        std::cerr << "Musichien: FANTÔME " << fraction << " · depart " << reading.firstMidiNumber << " · cible "
+        std::cerr << "Musichien: FANTÔME " << fraction << " · depuis " << fromMidi << " · cible "
                   << m_singingTargetSemitones << " · boule " << m_detectedStaffFraction << '\n';
     }
 

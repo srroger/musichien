@@ -849,10 +849,9 @@ Item {
 
                 StaffBall {
                     Layout.preferredHeight: 120
-                    // LA BOULE FANTOME S'ALLUME DES LA PREMIERE ERREUR, et seulement a la DEUXIEME note : c'est le moment ou
-                    // le joueur a besoin de savoir ou poser sa voix, et pas avant - une aide qui arrive trop tot chante a
-                    // sa place.
-                    showGhost: ExerciseController.singingGhostIsVisible && MicrophoneController.hasFirstNote
+                    // LA BOULE FANTOME S'ALLUME DES LA PREMIERE ERREUR, et des que le joueur chante : elle part de sa voix,
+                    // donc elle n'a plus besoin d'attendre la fin d'une note pour savoir ou se placer.
+                    showGhost: ExerciseController.singingGhostIsVisible && MicrophoneController.detectedFrequencyHz > 0
                 }
 
                 // Roger : « est-ce qu'on pourrait aussi afficher la note en train d'etre jouee, exactement comme sur
