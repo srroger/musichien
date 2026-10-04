@@ -130,11 +130,15 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
     // ordre, et un index ne peut pas designer deux cours differents selon qui le lit.
     std::ranges::sort( m_courses, libraryOrder );
 
-    for( const domain::Course & course : m_courses )
+    for( std::size_t index = 0; index < m_courses.size(); ++index )
     {
+        const domain::Course & course = m_courses.at( index );
+
         QVariantMap entry;
 
-        entry.insert( QStringLiteral( "title" ), QString::fromStdString( course.title ) );
+        // LE NUMERO, DEVANT : « 1. La quinte juste ». Roger : « je mettrais bien un "1. La quinte juste" pour bien
+        // rappeler que c'est la quinte juste ».
+        entry.insert( QStringLiteral( "title" ), displayTitleFor( index ) );
         entry.insert( QStringLiteral( "subtitle" ), QString::fromStdString( course.subtitle ) );
         entry.insert( QStringLiteral( "chapter" ), course.chapter );
         entry.insert( QStringLiteral( "order" ), course.order );
@@ -181,6 +185,35 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
     }
 }
 
+QString CourseController::displayTitleFor( std::size_t p_index ) const
+{
+    const domain::Course & course = m_courses.at( p_index );
+
+    // UN OS A MACHER N'EST PAS NUMEROTE. Son chapitre vaut zero - c'est deja ce qui le range a la fin du catalogue - et
+    // lui coller un numero ferait croire qu'il est une lecon.
+    if( course.chapter <= 0 )
+    {
+        return QString::fromStdString( course.title );
+    }
+
+    // LE RANG PARMI LES COURS NUMEROTES, et non l'indice dans le catalogue : compter les annexes decalerait tous les
+    // numeros d'un coup.
+    //
+    // Le numero est CALCULE, jamais ecrit dans le fichier : un titre qui porterait son propre numero se desynchroniserait
+    // le jour ou deux lecons s'echangent. L'auteur ecrit le titre, et l'ordre du catalogue fait le reste.
+    std::size_t rank = 0;
+
+    for( std::size_t index = 0; index <= p_index; ++index )
+    {
+        if( m_courses.at( index ).chapter > 0 )
+        {
+            ++rank;
+        }
+    }
+
+    return QStringLiteral( "%1. %2" ).arg( rank ).arg( QString::fromStdString( course.title ) );
+}
+
 void CourseController::openAnnexe( const QString & p_name )
 {
     // Le TITRE, compare sans tenir compte de la casse ni des espaces autour : un auteur ecrit ce qu'il veut, et une
@@ -213,7 +246,9 @@ QString CourseController::title() const
         return {};
     }
 
-    return QString::fromStdString( m_courses.at( static_cast<std::size_t>( m_readingIndex ) ).title );
+    // LE MEME TITRE QUE DANS LE CATALOGUE, numero compris : la page d'une lecon et sa ligne dans la liste doivent dire la
+    // MEME chose, sinon on ne sait plus laquelle on vient d'ouvrir.
+    return displayTitleFor( static_cast<std::size_t>( m_readingIndex ) );
 }
 
 QString CourseController::subtitle() const

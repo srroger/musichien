@@ -121,6 +121,12 @@ signals:
 private:
     domain::NotePlayer & m_notePlayer;
 
+    // LE TITRE TEL QU'IL S'AFFICHE, NUMERO COMPRIS - « 1. La quinte juste ».
+    //
+    // Le numero vient du RANG dans le catalogue, jamais du fichier : un titre qui porterait son propre numero se
+    // desynchroniserait le jour ou deux lecons s'echangent. Un os a macher (chapitre zero) n'en porte pas.
+    [[nodiscard]] QString displayTitleFor( std::size_t p_index ) const;
+
     std::vector<domain::Course> m_courses;
 
     QVariantList m_library;
