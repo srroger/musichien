@@ -42,7 +42,7 @@ nom qui apparaît tant que la série reste **juste**.
 **Quatre notes — on ajoute la septième** — et l'accord se met à **réclamer** quelque chose. Ce n'est plus une couleur
 posée : c'est une tension, qui veut aller quelque part. C'est le chapitre des septièmes, et il vient plus loin.
 
-➜ Trois notes, c'est donc le **milieu exact** : assez pour colorer, pas assez pour tendre. La première couleur que la
+Trois notes, c'est donc le **milieu exact** : assez pour colorer, pas assez pour tendre. La première couleur que la
 musique ait eue, et celle que toute oreille reconnaît sans rien savoir.
 
 ## Et la tierce, encore elle

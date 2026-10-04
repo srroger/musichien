@@ -14,6 +14,7 @@
 //   * le bourdon      -> le bourdon du jeu, tenu
 //   * le cercle       -> le TOUR des quintes, la chaine repliee dans l'octave
 //   * les deux gammes -> la gamme majeure, sur le bourdon
+//   * la pente des modes -> un mode de la pente, joue sur le bourdon
 // =====================================================================================================================
 
 import Musichien
@@ -31,11 +32,12 @@ Item {
     // UN NOM QU'ON NE CONNAIT PAS NE DESSINE RIEN. C'est le contrat du contenu : une faute de frappe coute une
     // illustration, jamais la lecon - et surtout, elle n'affiche pas le dessin d'une AUTRE lecon, ce qui serait pire
     // que pas de dessin du tout.
-    readonly property bool draws: schemaName === "bourdon" || schemaName === "cercle" || schemaName === "deux-gammes"
+    readonly property bool draws: schemaName === "bourdon" || schemaName === "cercle" || schemaName === "deux-gammes" || schemaName === "pente-des-modes"
 
     // LA HAUTEUR SUIT LE DESSIN. Un cercle de douze noms a besoin de place pour respirer, deux rangees de sept cases
-    // non : sans ca, les trois premiers noms du cercle se chevaucheraient sur un telephone.
-    implicitHeight: schemaName === "cercle" ? 300 : 168
+    // non : sans ca, les trois premiers noms du cercle se chevaucheraient sur un telephone. La pente, elle, empile sept
+    // noms - il lui faut la hauteur des sept.
+    implicitHeight: schemaName === "cercle" ? 300 : schemaName === "pente-des-modes" ? 200 : 168
 
     Rectangle {
         id: schemaFrame
@@ -217,6 +219,35 @@ Item {
                 ctx.fillText(label, width / 2, top - 8);
             }
 
+            // LA PENTE DES MODES. Roger : « mets un peu plus de schéma ou d'image pour rendre ça plus vivant ». Sept
+            // barres empilées, de la plus CLAIRE en haut à la plus SOMBRE en bas : la couleur EST la donnée, et la
+            // barre RACCOURCIT à chaque cran, comme la lumière qui baisse. Les noms se lisent à droite, sur la pente.
+            function drawModeSlope(ctx) {
+                var modes = ["lydien", "ionien", "mixolydien", "dorien", "éolien", "phrygien", "locrien"];
+                // Du plus clair au plus sombre, et rien d'autre : le dessin dit la même chose que la leçon.
+                var colours = ["#fff3b0", "#ffe066", "#f0a03c", "#d06a3a", "#9c4f6b", "#6a4a92", "#3a2f66"];
+                var count = modes.length;
+                ctx.font = "10px sans-serif";
+                ctx.fillStyle = "#8a77ad";
+                ctx.fillText("la pente des modes", width / 2, 14);
+                var rowHeight = (height - 26) / count;
+                var maxBar = width * 0.52;
+                var barLeft = 10;
+                for (var i = 0; i < count; ++i) {
+                    var cy = 26 + (i * rowHeight) + (rowHeight / 2);
+                    // LA BARRE DESCEND : elle raccourcit a chaque cran.
+                    var barLength = maxBar * (1 - (0.5 * i / (count - 1)));
+                    ctx.fillStyle = colours[i];
+                    ctx.fillRect(barLeft, cy - (rowHeight * 0.3), barLength, rowHeight * 0.6);
+                    // LE NOM, a la pointe de sa barre : la ou la pente l'a porte.
+                    ctx.font = "bold 12px sans-serif";
+                    ctx.textAlign = "left";
+                    ctx.fillStyle = "#e7dff7";
+                    ctx.fillText(modes[i], barLeft + barLength + 8, cy);
+                }
+                ctx.textAlign = "center";
+            }
+
             anchors.fill: parent
             anchors.margins: 10
             onProgressChanged: requestPaint()
@@ -231,6 +262,8 @@ Item {
                     drawCircle(ctx);
                 else if (courseSchema.schemaName === "deux-gammes")
                     drawTwoScales(ctx);
+                else if (courseSchema.schemaName === "pente-des-modes")
+                    drawModeSlope(ctx);
                 else if (courseSchema.schemaName === "bourdon")
                     drawDrone(ctx);
             }
@@ -238,6 +271,10 @@ Item {
 
         // Taper un dessin, c'est l'ENTENDRE : chaque schema joue ce qu'il montre - la meme regle que la carte ':: jeu'.
         MouseArea {
+            // LE MILIEU DE LA PENTE : une couleur sombre mais qui avance, celle qu'on reconnait sans l'avoir
+            // apprise. Les sept modes SONT deja jouables un par un dans la lecon ; ici, le dessin en fait
+            // entendre une.
+
             anchors.fill: parent
             onClicked: {
                 ExerciseController.playTapCue();
@@ -245,6 +282,8 @@ Item {
                     CourseController.playFifthCycle(12);
                 else if (courseSchema.schemaName === "deux-gammes")
                     CourseController.playModeScale(1);
+                else if (courseSchema.schemaName === "pente-des-modes")
+                    CourseController.playModeScale(3);
                 else
                     CourseController.playDrone();
             }

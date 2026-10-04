@@ -46,6 +46,8 @@ Sept gammes, les mêmes sept pas du cercle — et un point de départ qui se dé
 
 Lis-la comme une **température**, pas comme une liste. Chaque cran vers le bas éteint **une note de plus** — et l'oreille n'entend pas un chiffre : elle entend la lumière baisser.
 
+:: schéma | pente-des-modes | les sept couleurs, du plus clair (en haut) au plus sombre (en bas)
+
 > C'est la **pente des modes** : le nom que ce jeu donne à cette descente. Tu n'as pas à la réciter — juste à la **reconnaître**, un cran à la fois.
 
 ## Une histoire très ancienne

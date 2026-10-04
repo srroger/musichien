@@ -236,11 +236,47 @@ Item {
 
         // LE COURS OUVERT. L'ordre des blocs est celui du FICHIER : c'est la donnee, pas une mise en page.
         Flickable {
+            // LE SWIPE. Roger : « je me demande si ce serait possible d'aller d'une page a une en swippant de gauche a
+            // droite au lieu d'appuyer sur le bouton ? »
+            // Pose DERRIERE le contenu (donc sous les cartes) : un glissement sur le TEXTE tourne la page, et les cartes
+            // cliquables gardent leur clic. Le defilement VERTICAL reste au Flickable - un doigt qui monte ou descend
+            // fait defiler le cours, jamais tourner la page.
+
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: CourseController.reading
             clip: true
             contentHeight: courseColumn.height
+            flickableDirection: Flickable.VerticalFlick
+
+            // Et c'est le Flickable qui TRANCHE : pour un geste vertical il reprend le glissement, donc ce MouseArea ne
+            // recoit pas de relachement et ne fait rien. Un glissement franchement HORIZONTAL, lui, reste ici - et
+            // tourne la page. Le pire cas est donc « le swipe ne marche pas », jamais « le defilement se casse ».
+            MouseArea {
+                id: swipeArea
+
+                property real pressX: 0
+                property real pressY: 0
+
+                anchors.fill: parent
+                enabled: !CourseController.showingWholeNote && CourseController.sectionCount > 1
+                onPressed: {
+                    swipeArea.pressX = mouse.x;
+                    swipeArea.pressY = mouse.y;
+                }
+                onReleased: {
+                    const dx = mouse.x - swipeArea.pressX;
+                    const dy = mouse.y - swipeArea.pressY;
+                    // IL FAUT VRAIMENT GLISSER, ET PLUTOT HORIZONTALEMENT : 70 px, et plus large que haut.
+                    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.5)
+                        return ;
+
+                    if (dx < 0)
+                        CourseController.nextSection();
+                    else
+                        CourseController.previousSection();
+                }
+            }
 
             ColumnLayout {
                 // LA NAVIGATION, AU BOUT DE LA PAGE.
