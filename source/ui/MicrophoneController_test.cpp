@@ -1,6 +1,7 @@
 #include "ui/MicrophoneController.h"
 
 #include "domain/audio/PitchDetector.h"
+#include "domain/music/StaffPosition.h"
 
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -389,6 +390,30 @@ TEST( MicrophoneControllerTest, starting_a_session_leaves_the_mirror_behind )
     test.controller.startSingingSession();
 
     EXPECT_FALSE( test.controller.isSingingMirror() );
+}
+
+// LE MIROIR MONTRE LA NOTE A ATTEINDRE AVANT QU'ON AIT CHANTE UNE SEULE NOTE.
+//
+// Roger : « la on ne fait pas de scoring, donc on peut carrement mettre le fantome qu'on vient de developper... on veut
+// juste guider l'utilisateur ». Et la cible est connue D'AVANCE - c'est meme ce qui rend la chose possible, et ce qui
+// distingue un miroir d'un exercice : l'exercice juge un ECART, donc il lui faut la note du joueur ; le miroir guide
+// vers une NOTE, donc il l'a deja.
+TEST( MicrophoneControllerTest, a_singing_mirror_shows_the_note_to_reach_before_a_single_note )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    test.controller.openSingingMirror( 7 );
+
+    QCoreApplication::processEvents();
+
+    // RIEN n'a ete chante : la fantome a pourtant une position, et c'est tout l'interet.
+    EXPECT_FALSE( test.controller.hasFirstNote() );
+
+    // La note a atteindre : un intervalle au-dessus de la tonique de reference. Sans reglage enregistre, c'est le do
+    // central (60) - la meme valeur que celle que playSingingTarget() fait entendre.
+    EXPECT_DOUBLE_EQ( test.controller.singingTargetStaffFraction(), domain::StaffPosition::fraction( 60 + 7 ) );
 }
 
 }    // namespace musichien::ui

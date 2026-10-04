@@ -270,29 +270,30 @@ void MicrophoneController::newSingingQuestion()
 
 double MicrophoneController::singingTargetStaffFraction() const
 {
-    // LA PREMIERE NOTE DE L'ESSAI EN COURS, TRANSPOSEE DE L'INTERVALLE - et rien de plus.
+    // OU TOMBE LA NOTE A ATTEINDRE - une seule question, deux reponses, selon ce qu'on demande au joueur.
     //
-    // Roger a trouve la cause, et elle explique tout ce que je n'arrivais pas a expliquer : « pour que le fantome
-    // apparaisse il faut que le premier essai soit mauvais. Hors au deuxieme essai, je pense que le fantome se base sur
-    // la note de la PREMIERE TENTATIVE »
+    // DANS UN EXERCICE, la question est l'INTERVALLE : le jeu juge l'ecart entre les DEUX notes chantees, donc la cible
+    // se pose un intervalle au-dessus de la PREMIERE NOTE DE L'ESSAI - celle que le joueur a lui-meme posee. C'est la
+    // valeur ENREGISTREE que Roger veut y voir : elle ne bouge plus pendant qu'il chante, donc la fantome est un repere
+    // stable et non un marteau. Le detecteur remet son reading a zero a chaque reponse (voir
+    // ExerciseSessionController::answerSung), donc elle repart de la note de l'essai en cours.
     //
-    // Il a raison. La fantome ne s'affiche qu'APRES un echec, et le detecteur garde alors en memoire les notes du premier
-    // essai : le joueur reprend une nouvelle premiere note, et la cible se placait depuis l'ANCIENNE. D'ou un decalage
-    // qu'aucun raisonnement sur le code ne pouvait expliquer, parce que la valeur etait juste - c'etait son ENTREE qui
-    // etait perimee.
-    //
-    // C'est donc la meme source que la BOULE, la hauteur entendue a l'instant : la fantome suit la voix, et se trouve
-    // toujours un intervalle au-dessus d'elle. Ce qui est exactement ce qu'il faut montrer a un chanteur.
-    //
-    // Le repli sur la premiere note du detecteur sert au seul cas ou rien n'est entendu : sans lui, la fantome
-    // sauterait a l'octave n'importe ou entre deux lectures du micro.
-    // LA PREMIERE NOTE DE L'ESSAI EN COURS, ET RIEN D'AUTRE : c'est la valeur ENREGISTREE que Roger veut voir. Elle ne
-    // bouge plus pendant qu'il chante, donc la fantome est un repere stable et non un marteau.
-    const std::int32_t fromMidi = m_sungIntervalDetector.reading().firstMidiNumber;
+    // DANS UN MIROIR, la question est la NOTE elle-meme : un cours ne juge rien, il guide. Et la note a atteindre est
+    // connue D'AVANCE - l'application sait quel intervalle elle demande au-dessus de quelle tonique. La cible est donc
+    // ABSOLUE, et la fantome dit ou aller AVANT la premiere note. Roger : « on connait la note a atteindre deja, et on
+    // veut juste guider l'utilisateur ».
+    const std::int32_t fromMidiNumber = m_isSingingMirror
+                                          ? ( singingRootMidiNumber() + m_singingTargetSemitones )
+                                          : ( m_sungIntervalDetector.reading().firstMidiNumber + m_singingTargetSemitones );
 
-    const double fraction = domain::StaffPosition::fraction( fromMidi + m_singingTargetSemitones );
+    return domain::StaffPosition::fraction( fromMidiNumber );
+}
 
-    return fraction;
+std::int32_t MicrophoneController::singingRootMidiNumber() const
+{
+    // La tonique sur laquelle la cible est construite : le reglage du joueur, et le do central a defaut. C'est la MEME
+    // source que playSingingTarget(), donc la fantome ne peut pas designer une autre note que celle qui vient d'etre jouee.
+    return ( m_preferences != nullptr ) ? m_preferences->storedTuningRoot().midiNumber() : 60;
 }
 
 void MicrophoneController::setSingingTarget( int p_semitones )
@@ -319,9 +320,8 @@ void MicrophoneController::playSingingTarget()
     }
 
     // La tonique de la cible est la note de reference du reglage : pour le tempere egal elle ne change rien, pour
-    // les autres elle donne son sens a l'intervalle. Meme source que l'accordeur, donc jamais en desaccord.
-    const std::int32_t rootMidi =
-      ( m_preferences != nullptr ) ? m_preferences->storedTuningRoot().midiNumber() : 60;
+    // les autres elle donne son sens a l'intervalle. Meme source que la fantome, donc jamais en desaccord.
+    const std::int32_t rootMidi = singingRootMidiNumber();
 
     const std::array<domain::Note, 2> notes{ domain::Note{ rootMidi },
                                              domain::Note{ rootMidi + m_singingTargetSemitones } };

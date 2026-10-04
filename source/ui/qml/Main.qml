@@ -112,6 +112,9 @@ ApplicationWindow {
     // premiere tentative - « l'arriere quitte completement l'appli » - et il avait raison de le signaler.
     // Le calque de l'ecran d'exercice est declare PLUS BAS dans ce fichier, et l'ordre est ce qui decide qui passe
     // devant : une partie lancee depuis une lecon s'affiche par-dessus l'Ecole, et non derriere elle.
+    // L'ECOLE DES CHIOTS : le vert NEON de l'etude.
+    // Roger : « je changerai la couleur du bouton, le marronasse, je suis pas hyper fan. L'ecole des chiots est un peu un
+    // training mode mais + cours. Du coup je mettrais une couleur proche du bleu des training mode, genre un vert neon. »
 
     id: mainWindow
 
@@ -135,6 +138,12 @@ ApplicationWindow {
     // et les deux se lisent d'un coup d'oeil sur la page de garde, sans une phrase de plus.
     readonly property color trainingColour: "#1c4a66"
     readonly property color trainingLabelColour: "#a6e7ff"
+    // Elle est donc prise DANS la famille du bleu d'entrainement - meme profondeur, meme clarte de libelle - et decalee
+    // vers le vert. C'est ce que la colorimetrie cyberpunk donne au calme et a l'apprentissage : le rouge et le magenta
+    // brûlent, le cyan et le vert refroidissent. Le libelle est le meme vert que la barre de tenue du chant, donc
+    // l'Ecole ne parle pas une langue que le jeu n'a pas deja.
+    readonly property color schoolColour: "#1a4a36"
+    readonly property color schoolLabelColour: "#9dffc4"
     // Et le duo des outils. Le metronome est FROID et le diapason CHAUD, et c'est ce qui les distingue : l'un donne le
     // temps, l'autre la justesse. Ce qui les relie, ce n'est pas la teinte mais le TRAITEMENT - le meme fond profond,
     // la meme icone en neon, la meme intensite. Un cyan et un magenta qui se repondent, sur la nuit violette : c'est
@@ -969,7 +978,7 @@ ApplicationWindow {
                     height: 58
                     font.pixelSize: 23
                     highlighted: true
-                    text: qsTr("▶ ARCADE")
+                    text: qsTr("ARCADE")
                     onClicked: ExerciseController.startSession()
                 }
 
@@ -1074,14 +1083,15 @@ ApplicationWindow {
                 }
 
                 // L'ECOLE DES CHIOTS : les cours. Ce n'est pas un jeu et ca ne paie pas - c'est un lieu ou l'on apprend,
-                // pose a la suite du Bilan. Meme famille de couleur que lui : la page d'etude, pas la page de jeu.
+                // pose a la suite du Bilan. Sa couleur le dit : le VERT NEON de l'etude, pris dans la famille du bleu
+                // d'entrainement - voir schoolColour - et non le rouge du jeu.
                 TintedMenuButton {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 46
-                    tintColour: mainWindow.questColour
-                    labelColour: mainWindow.questLabelColour
-                    text: qsTr("📖  L'École des Chiots")
+                    tintColour: mainWindow.schoolColour
+                    labelColour: mainWindow.schoolLabelColour
+                    text: qsTr("L'École des Chiots")
                     onClicked: {
                         // ON OUVRE TOUJOURS SUR LE CATALOGUE : une lecon laissee ouverte la derniere fois ne doit pas
                         // reprendre toute seule.
@@ -2519,14 +2529,25 @@ ApplicationWindow {
         }
 
         contentItem: ScrollView {
+            id: singingScroll
+
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
+                // LA LARGEUR VIENT DU VIEWPORT, ET NON DE « parent ».
+                // Roger : « il y a un petit bug d'affichage sur la largeur, la largeur de la fenetre n'est pas prise en
+                // entiere pour afficher la partition ». Il a raison, et la cause est un piege connu des ScrollView : avec
+                // la barre HORIZONTALE en AlwaysOff, le conteneur de contenu prend sa largeur IMPLICITE, et non celle du
+                // viewport. « parent.width » donnait donc la largeur du contenu - c'est-a-dire presque rien - et la
+                // portee se dessinait etroite.
+
                 id: singingColumn
 
-                width: parent.width
+                // availableWidth est la propriete faite pour ca : la largeur du viewport, moins les marges et les barres.
+                // Elle est donc juste que la barre horizontale soit visible ou non.
+                width: singingScroll.availableWidth
                 spacing: 10
 
                 Text {
@@ -2562,6 +2583,14 @@ ApplicationWindow {
 
                 // La boule sur la portee, pendant que le joueur chante.
                 StaffBall {
+                    // LA BOULE FANTOME DANS LE MIROIR, et c'est la que Roger l'a voulue : « la on ne fait pas de scoring,
+                    // donc on peut carrement mettre la fantome qu'on vient de developper... on veut juste guider
+                    // l'utilisateur ».
+
+                    // Un exercice juge, donc il ne montre la cible qu'apres une erreur. Un cours ne juge rien : il n'a
+                    // donc aucune raison d'attendre. Et la cible est connue D'AVANCE - voir singingTargetStaffFraction -
+                    // donc la fantome dit ou aller AVANT la premiere note.
+                    showGhost: MicrophoneController.isSingingMirror
                 }
 
                 // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
