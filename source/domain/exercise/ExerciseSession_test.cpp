@@ -1786,4 +1786,22 @@ TEST( ExerciseSessionTest, interval_successes_do_not_widen_the_chord_or_mode_pal
     EXPECT_EQ( session.modePalette().size(), modePaletteAtStart );
 }
 
+TEST( FamilyTallyTest, errors_are_the_attempts_that_did_not_succeed )
+{
+    // Roger, sur l'ecran de fin d'Arcade : « on voit 100 % partout, et ca n'a pas trop de sens ». Le taux est une
+    // tautologie ; le NOMBRE D'ERREURS, non - et c'est aussi le nombre de coeurs perdus.
+    FamilyTally tally;
+
+    tally.registerQuestion( QuestionFamily::Chord, true );
+    tally.registerQuestion( QuestionFamily::Chord, false );
+    tally.registerQuestion( QuestionFamily::Chord, false );
+
+    EXPECT_EQ( tally.errorsIn( QuestionFamily::Chord ), 2U );
+    EXPECT_EQ( tally.askedIn( QuestionFamily::Chord ), 3U );
+    EXPECT_EQ( tally.correctIn( QuestionFamily::Chord ), 1U );
+
+    // UNE FAMILLE A LAQUELLE ON N'A PAS JOUE N'A AUCUNE ERREUR, et c'est la verite : elle n'a rien coute.
+    EXPECT_EQ( tally.errorsIn( QuestionFamily::Mode ), 0U );
+}
+
 }    // namespace musichien::domain

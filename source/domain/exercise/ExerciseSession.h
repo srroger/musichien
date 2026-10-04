@@ -202,6 +202,22 @@ struct FamilyTally
     [[nodiscard]] std::size_t askedIn( QuestionFamily p_family ) const noexcept;
     [[nodiscard]] std::size_t correctIn( QuestionFamily p_family ) const noexcept;
 
+    // LES ERREURS, c'est-a-dire les tentatives qui n'ont pas abouti.
+    //
+    // Roger, en lisant l'ecran de fin d'une Arcade : « on ecrit les pourcentages de reussite des questions, et on voit du
+    // coup 100 % partout. Mais ca n'a pas trop de sens, car forcement s'il arrive a la fin il aura du 100 % partout. »
+    //
+    // Il a raison, et c'est une TAUTOLOGIE : une Arcade se termine quand ses questions sont conclues, donc un pourcentage
+    // de reussite y vaut toujours cent. Le chiffre est juste et il n'apprend rien.
+    //
+    // Ce que le joueur se demande en sortant, c'est OU il a perdu. Et comme le dosage de l'Arcade est FIXE - dix
+    // intervalles, huit accords, sept modes - les trois nombres d'erreurs se comparent directement, ce qu'un pourcentage
+    // ne faisait pas.
+    [[nodiscard]] std::size_t errorsIn( QuestionFamily p_family ) const noexcept
+    {
+        return askedIn( p_family ) - correctIn( p_family );
+    }
+
     // Reussite de cette famille, en pour cent entiers. ZERO quand rien n'a ete demande, et c'est honnete : une famille
     // a laquelle on n'a pas joue n'a pas de taux, et un ecran qui afficherait « 0 % » mentirait sur un absent.
     [[nodiscard]] std::size_t successPercentIn( QuestionFamily p_family ) const noexcept;

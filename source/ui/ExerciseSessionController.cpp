@@ -1048,6 +1048,10 @@ QVariantList ExerciseSessionController::familyResults() const
         result.insert( QStringLiteral( "correct" ), static_cast<int>( tally.correctIn( family ) ) );
         result.insert( QStringLiteral( "percent" ), static_cast<int>( tally.successPercentIn( family ) ) );
 
+        // LE NOMBRE QUI APPREND QUELQUE CHOSE. Le pourcentage reste calcule, parce qu'un autre ecran peut en avoir
+        // besoin, mais l'ecran de fin d'Arcade montre celui-ci : voir FamilyTally::errorsIn.
+        result.insert( QStringLiteral( "errors" ), static_cast<int>( tally.errorsIn( family ) ) );
+
         results.append( result );
     }
 

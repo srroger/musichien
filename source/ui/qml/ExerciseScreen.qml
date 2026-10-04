@@ -1529,6 +1529,8 @@ Item {
 
             // LE BILAN DE L'ARCADE : ce qu'aucun autre mode ne montre, parce qu'aucun autre mode ne le gagne.
             ColumnLayout {
+                // LES TROIS FAMILLES, ET CE QU'ELLES ONT COUTE.
+
                 Layout.fillWidth: true
                 visible: ExerciseController.sessionGrantsExperience
                 spacing: 6
@@ -1566,8 +1568,11 @@ Item {
                     text: ExerciseController.arcadeMultiplierPercent > 100 ? qsTr("+%1 XP  ·  x%2").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned)).arg(ExerciseController.arcadeMultiplierPercent / 100) : qsTr("+%1 XP").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned))
                 }
 
-                // LES TROIS FAMILLES : demandees, reussies, et le taux. C'est la ou le joueur voit ce que la partie a
-                // vraiment mesure.
+                // Roger : « on ecrit les pourcentages de reussite, et on voit 100 % partout. Mais ca n'a pas trop de sens,
+                // car forcement s'il arrive a la fin il aura du 100 % partout. » Il a raison, et l'indicateur etait
+                // structurellement muet : le taux ne descend QUE si l'on joue mal, et si l'on joue mal la partie s'arrete
+                // avant la fin - donc la ligne ne s'affiche meme pas. Ce qu'on montre desormais, c'est ce que la partie a
+                // COUTE : le nombre d'erreurs, qui est aussi le nombre de coeurs perdus.
                 Repeater {
                     model: ExerciseController.sessionGrantsExperience ? ExerciseController.familyResults() : []
 
@@ -1585,18 +1590,13 @@ Item {
                         }
 
                         Text {
-                            color: "#8a77ad"
-                            font.pixelSize: 13
-                            text: qsTr("%1 / %2").arg(modelData.correct).arg(modelData.asked)
-                        }
-
-                        Text {
-                            Layout.preferredWidth: 46
                             horizontalAlignment: Text.AlignRight
-                            color: modelData.percent < 50 ? "#ff8fb0" : "#8ef2b0"
+                            color: modelData.errors === 0 ? "#8ef2b0" : "#ff8fb0"
                             font.pixelSize: 14
                             font.bold: true
-                            text: qsTr("%1 %").arg(exerciseScreen.rewardValue(modelData.percent))
+                            // La forme plurielle de Qt, et pas un « (s) » ecrit a la main : c'est ce qui permet a une
+                            // traduction de dire « 0 erreur » et « 1 erreur » comme sa langue le demande.
+                            text: modelData.errors === 0 ? qsTr("aucune erreur") : qsTr("%n erreur(s)", "", modelData.errors)
                         }
 
                     }
