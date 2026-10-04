@@ -396,6 +396,8 @@ Item {
                     // l'image demenage.
                     // LA CARTE "SERIE" : le jeu joue la serie harmonique, et l'ecran la nomme.
                     // LA CARTE "BOURDON" : le jeu TIENT un centre, et l'ecran le nomme.
+                    // LA CARTE "CYCLE" : le cercle des quintes se PARCOURT.
+                    // LA CARTE "GAMME" : la gamme d'un mode, jouee sur le bourdon.
 
                     model: CourseController.blocks
 
@@ -711,6 +713,70 @@ Item {
                                 onClicked: {
                                     ExerciseController.playTapCue();
                                     CourseController.playDrone();
+                                }
+                            }
+
+                        }
+
+                        // Rien de dessine, et c'est volontaire : ce qui compte ici, c'est de l'ENTENDRE revenir sur ses
+                        // pas. Une roue a l'ecran attirerait l'oeil sur autre chose que le son.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "cycle"
+                            implicitHeight: cycleText.implicitHeight + 24
+                            radius: 10
+                            color: "#2b2350"
+                            border.color: "#5a4a8f"
+                            border.width: 1
+
+                            Text {
+                                id: cycleText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#d8cdf4"
+                                font.pixelSize: 14
+                                text: qsTr("🎹  %1").arg(modelData.caption)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    CourseController.playFifthCycle(modelData.fifthCount);
+                                }
+                            }
+
+                        }
+
+                        // C'est la carte qui rend les couleurs audibles. Sans bourdon, sept notes sont sept notes ;
+                        // avec lui, elles sont une COULEUR - et c'est la meme formule que le banc d'essai des modes.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "gamme"
+                            implicitHeight: scaleText.implicitHeight + 24
+                            radius: 10
+                            color: "#21351f"
+                            border.color: "#3f6a3a"
+                            border.width: 1
+
+                            Text {
+                                id: scaleText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#cdeec6"
+                                font.pixelSize: 14
+                                text: qsTr("🎼  %1").arg(modelData.caption)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    CourseController.playModeScale(modelData.modeIndex);
                                 }
                             }
 

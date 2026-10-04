@@ -279,4 +279,46 @@ TEST( MarkdownCourseTest, a_drone_card_needs_only_a_caption )
     EXPECT_EQ( course->blocks.at( 0 ).caption, "le bourdon du jeu : le do, et sa quinte" );
 }
 
+// ":: cycle" PORTE UN NOMBRE DE QUINTES, ":: gamme" PORTE UN MODE NOMME EN FRANCAIS - et le mode se traduit en rang.
+//
+// Le rang est celui du domaine : lydien, ionien, mixolydien, dorien, eolien, phrygien, locrien. Ce n'est PAS l'ordre
+// alphabetique, et c'est justement pour ca que la traduction vit ici : un fichier de cours ecrit « ionien », et le code
+// sait ou ca se range. Un contenu ne doit jamais connaitre l'ordre interne d'une enumeration.
+TEST( MarkdownCourseTest, a_cycle_card_carries_its_count_and_a_scale_card_its_mode )
+{
+    const std::optional<musichien::domain::Course> cycleCourse =
+      readCourse( ":: cycle | 7 | sept quintes d'affilee\n" );
+
+    ASSERT_TRUE( cycleCourse.has_value() );
+    ASSERT_EQ( cycleCourse->blocks.size(), 1U );
+
+    EXPECT_EQ( cycleCourse->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::FifthCycle );
+    EXPECT_EQ( cycleCourse->blocks.at( 0 ).fifthCount, 7 );
+    EXPECT_EQ( cycleCourse->blocks.at( 0 ).caption, "sept quintes d'affilee" );
+
+    const std::optional<musichien::domain::Course> scaleCourse =
+      readCourse( ":: gamme | ionien | la gamme de do\n" );
+
+    ASSERT_TRUE( scaleCourse.has_value() );
+    ASSERT_EQ( scaleCourse->blocks.size(), 1U );
+
+    EXPECT_EQ( scaleCourse->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::ModeScale );
+
+    // LE IONIEN EST LE RANG 1, PAS LE RANG 0 : le rang zero est le lydien, qui est le plus CLAIR des sept. Un cours qui
+    // demanderait le majeur et entendrait le lydien ne s'en apercevrait pas tout de suite - et c'est exactement le genre
+    // d'erreur qu'un test attrape.
+    EXPECT_EQ( scaleCourse->blocks.at( 0 ).modeIndex, 1 );
+}
+
+// ET UN MODE INCONNU EST REFUSE : le cours continue, une carte manque.
+//
+// Ici il ne restait RIEN d'autre, donc c'est le COURS entier qui tombe - et c'est voulu : une faute de frappe ne fait
+// jamais tomber l'application, mais elle ne laisse pas non plus une page vide dans le catalogue.
+TEST( MarkdownCourseTest, a_scale_card_naming_an_unknown_mode_is_refused )
+{
+    const std::optional<musichien::domain::Course> course = readCourse( ":: gamme | dorique | la gamme\n" );
+
+    EXPECT_FALSE( course.has_value() );
+}
+
 }    // namespace musichien::infrastructure

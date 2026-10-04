@@ -56,6 +56,16 @@
         -->
         <file alias="assets/content/courses/le-centre.md">../../assets/content/courses/le-centre.md</file>
         <!--
+          Lecon 4 : Le cercle des quintes, et son os a macher. Lecon 5 : les sept pas, et le sien.
+
+          Chacune porte sa propre annexe, et le renvoi se verifie AU DEMARRAGE : un cours qui pointe une annexe
+          inexistante le dit tout de suite, au lieu de laisser une carte morte dans la page.
+        -->
+        <file alias="assets/content/courses/le-cercle-des-quintes.md">../../assets/content/courses/le-cercle-des-quintes.md</file>
+        <file alias="assets/content/courses/le-cercle-mode-demploi.md">../../assets/content/courses/le-cercle-mode-demploi.md</file>
+        <file alias="assets/content/courses/les-sept-pas.md">../../assets/content/courses/les-sept-pas.md</file>
+        <file alias="assets/content/courses/pourquoi-sept-notes.md">../../assets/content/courses/pourquoi-sept-notes.md</file>
+        <!--
           Le glossaire. Un mot par entree, une definition d'UNE PHRASE : Roger veut un aide-memoire, pas un manuel.
           Meme motif que les autres contenus, alias compris - le chemin de ressource est celui du disque.
         -->

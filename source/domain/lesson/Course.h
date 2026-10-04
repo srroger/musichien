@@ -77,7 +77,20 @@ struct CourseBlock
         // C'est LE BOURDON DU JEU, la formule exacte des questions de couleur : la tonique et sa quinte, sans tierce,
         // donc un centre qui ne colore rien lui-meme. Le chapitre du centre ne peut pas s'enseigner sans lui - un
         // centre qui n'est pas TENU ne s'entend pas.
-        Drone
+        Drone,
+
+        // ":: cycle" - LA CHAINE DES QUINTES, entendue.
+        //
+        // C'est le cercle qui se PARCOURT : on monte de quinte en quinte, et chaque note est ramenee dans l'octave de
+        // depart. Sans ce repli, la douzieme quinte serait sept octaves plus haut et l'oreille n'entendrait qu'une
+        // fuse et pas un cercle.
+        FifthCycle,
+
+        // ":: gamme" - LA GAMME D'UN MODE, jouee sur le bourdon.
+        //
+        // La meme chose que le banc d'essai des modes, et c'est deliberer : un cours qui ferait entendre une couleur
+        // autrement que le jeu apprendrait a reconnaitre un son qui n'existe pas a l'ecran.
+        ModeScale
     };
 
     Kind kind{ Kind::Text };
@@ -112,6 +125,15 @@ struct CourseBlock
     // Le chemin est construit par l'ecran, a partir d'un dossier unique : un cours n'ecrit jamais 'qrc:/...', parce
     // qu'un chemin dans un fichier de contenu est un chemin qui se casse le jour ou l'image demenage.
     std::string imageName;
+
+    // Kind::FifthCycle - COMBIEN DE QUINTES on enchain e, a partir de la tonique.
+    //
+    // Douze pour faire le tour complet, sept pour montrer d'ou vient une gamme : c'est le MEME geste, arrete plus tot.
+    std::int32_t fifthCount{ 12 };
+
+    // Kind::ModeScale - QUEL MODE, dans l'ordre des couleurs du domaine (lydien, ionien, mixolydien, dorien, eolien,
+    // phrygien, locrien). L'index, et non un nom : le nom se traduit et se reecrit, un rang ne bouge pas.
+    std::int32_t modeIndex{ 0 };
 };
 
 // UNE SECTION, c'est-a-dire un « ## » du fichier et ce qu'il introduit.

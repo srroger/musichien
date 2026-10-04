@@ -119,6 +119,15 @@ public:
     // pas s'enseigner sans lui : un centre qu'on ne TIENT pas ne s'entend pas.
     Q_INVOKABLE void playDrone();
 
+    // LE CERCLE DES QUINTES, PARCOURU : p_fifthCount quintes enchainees, chaque note ramenee dans l'octave de depart.
+    //
+    // Sept montrent d'ou vient une gamme ; douze font le tour. Le repli dans l'octave est ce qui transforme une fusee
+    // montante en CERCLE.
+    Q_INVOKABLE void playFifthCycle( int p_fifthCount );
+
+    // LA GAMME D'UN MODE, SUR LE BOURDON : la meme chose que le banc d'essai des modes, et volontairement.
+    Q_INVOKABLE void playModeScale( int p_modeIndex );
+
     Q_INVOKABLE void stopPlayback();
 
 signals:

@@ -1,6 +1,7 @@
 #include "ui/CourseController.h"
 
 #include "domain/music/Interval.h"
+#include "domain/music/Mode.h"
 
 #include <algorithm>
 #include <array>
@@ -42,6 +43,16 @@ constexpr const char * KIND_SERIES = "serie";
 // ":: bourdon" - le bourdon du jeu, tenu : la tonique et sa quinte, sans tierce.
 constexpr const char * KIND_DRONE = "bourdon";
 
+// ":: cycle" - la chaine des quintes, parcourue.
+constexpr const char * KIND_CYCLE = "cycle";
+
+// ":: gamme" - la gamme d'un mode, sur le bourdon.
+constexpr const char * KIND_SCALE = "gamme";
+
+// LA QUINTE, EN DEMI-TONS. Elle sert au bourdon ET a la chaine des quintes : une seule definition, donc pas deux
+// valeurs a tenir d'accord.
+constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
+
 [[nodiscard]] const char * kindName( domain::CourseBlock::Kind p_kind ) noexcept
 {
     switch( p_kind )
@@ -62,6 +73,10 @@ constexpr const char * KIND_DRONE = "bourdon";
             return KIND_SERIES;
         case domain::CourseBlock::Kind::Drone:
             return KIND_DRONE;
+        case domain::CourseBlock::Kind::FifthCycle:
+            return KIND_CYCLE;
+        case domain::CourseBlock::Kind::ModeScale:
+            return KIND_SCALE;
         case domain::CourseBlock::Kind::Text:
         default:
             return KIND_TEXT;
@@ -87,6 +102,8 @@ constexpr const char * KIND_DRONE = "bourdon";
     description.insert( QStringLiteral( "listenFor" ), QString::fromStdString( p_block.listenFor ) );
     description.insert( QStringLiteral( "annexeName" ), QString::fromStdString( p_block.annexeName ) );
     description.insert( QStringLiteral( "imageName" ), QString::fromStdString( p_block.imageName ) );
+    description.insert( QStringLiteral( "fifthCount" ), p_block.fifthCount );
+    description.insert( QStringLiteral( "modeIndex" ), p_block.modeIndex );
 
     return description;
 }
@@ -457,13 +474,65 @@ void CourseController::playDrone()
     //
     // Meme note de depart que partout ailleurs dans les cours (le do du milieu), pour que deux lecons ne fassent pas
     // entendre deux centres differents sans le dire.
-    static constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
     static constexpr std::chrono::milliseconds DRONE_DURATION{ 5000 };
 
     const std::array<domain::Note, 2> drone{ domain::Note{ EXERCISE_ROOT_MIDI_NUMBER },
                                              domain::Note{ EXERCISE_ROOT_MIDI_NUMBER + FIFTH_IN_SEMITONES } };
 
     m_notePlayer.playChordFor( drone, DRONE_DURATION );
+}
+
+void CourseController::playFifthCycle( int p_fifthCount )
+{
+    // LE CERCLE DES QUINTES, ENTENDU : on monte de quinte en quinte, et CHAQUE NOTE EST RAMENEE dans l'octave de depart.
+    //
+    // Ce repli est tout : sans lui, la douzieme quinte serait sept octaves plus haut et l'oreille n'entendrait qu'une
+    // fusee. Repliee, la suite revient a son point de depart - et c'est LA, exactement la, que le cercle se dessine.
+    //
+    // Sept quintes montrent d'ou vient une gamme ; douze font le tour complet. C'est le meme geste, arrete plus tot.
+    if( p_fifthCount <= 0 )
+    {
+        return;
+    }
+
+    const auto count = static_cast<std::size_t>( p_fifthCount );
+
+    std::vector<domain::Note> cycle;
+    cycle.reserve( count );
+
+    for( std::size_t index = 0; index < count; ++index )
+    {
+        const auto steps = static_cast<std::int32_t>( index ) * FIFTH_IN_SEMITONES;
+
+        cycle.emplace_back( EXERCISE_ROOT_MIDI_NUMBER + ( steps % domain::SEMITONES_PER_OCTAVE ) );
+    }
+
+    m_notePlayer.playMelody( cycle, MELODIC_GAP );
+}
+
+void CourseController::playModeScale( int p_modeIndex )
+{
+    // LA GAMME D'UN MODE, SUR LE BOURDON - exactement ce que fait le banc d'essai des modes.
+    //
+    // LE BOURDON EST CE QUI REND LA COULEUR AUDIBLE : sans lui, sept notes sont sept notes ; avec lui, elles sont une
+    // COULEUR. Et c'est la meme formule que partout ailleurs - la tonique et sa quinte, sans tierce.
+    if( ( p_modeIndex < 0 ) || std::cmp_greater_equal( p_modeIndex, domain::MODE_COUNT ) )
+    {
+        return;
+    }
+
+    const auto mode = static_cast<domain::Mode>( p_modeIndex );
+
+    const std::vector<domain::Note> scale =
+      domain::modeScaleUpAndDown( domain::Note{ EXERCISE_ROOT_MIDI_NUMBER }, mode );
+
+    const std::array<domain::Note, 2> drone{ domain::Note{ EXERCISE_ROOT_MIDI_NUMBER },
+                                             domain::Note{ EXERCISE_ROOT_MIDI_NUMBER + FIFTH_IN_SEMITONES } };
+
+    // Meme articulation que le banc d'essai : une demi-seconde par pas, et un silence plus court que la note. Un cours
+    // qui articulerait autrement ferait entendre une autre musique que celle du banc.
+    m_notePlayer.playMelodyOverDrone(
+      scale, drone, std::chrono::milliseconds{ 500 }, std::chrono::milliseconds{ 80 } );
 }
 
 void CourseController::stopPlayback()

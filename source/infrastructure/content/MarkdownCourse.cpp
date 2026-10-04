@@ -1,5 +1,6 @@
 #include "infrastructure/content/MarkdownCourse.h"
 
+#include <array>
 #include <charconv>
 #include <iostream>
 #include <string>
@@ -90,6 +91,39 @@ namespace
     }
 
     return fields;
+}
+
+// LES NOMS DE MODES, EN FRANCAIS, ET DANS L'ORDRE DES COULEURS DU DOMAINE.
+//
+// L'ordre n'est PAS alphabetique, et il n'est pas negociable : c'est celui de Mode.cpp - lydien, ionien, mixolydien,
+// dorien, eolien, phrygien, locrien - c'est-a-dire du plus clair au plus sombre. C'est l'ordre de la phrase
+// mnemotechnique de Roger, et un fichier de cours qui ecrit 'ionien' doit tomber sur le rang 1, pas sur le rang 3.
+//
+// Le nom vient du fichier de contenu, le RANG part vers le domaine : un contenu ne connait jamais l'ordre interne
+// d'une enumeration, il dit ce qu'il veut dire et le code sait ou ca se range.
+[[nodiscard]] std::optional<std::int32_t> modeRankFrom( std::string_view p_name )
+{
+    static constexpr std::array<std::string_view, 7> MODE_NAMES{
+      "lydien",
+      "ionien",
+      "mixolydien",
+      "dorien",
+      "éolien",
+      "phrygien",
+      "locrien",
+    };
+
+    const std::string_view wanted = trim( p_name );
+
+    for( std::size_t index = 0; index < MODE_NAMES.size(); ++index )
+    {
+        if( wanted == MODE_NAMES.at( index ) )
+        {
+            return static_cast<std::int32_t>( index );
+        }
+    }
+
+    return std::nullopt;
 }
 
 // LA DISTANCE SE LIT DANS LA VALEUR, PAS DANS SON ORTHOGRAPHE.
@@ -343,6 +377,67 @@ void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Co
 
         block.kind = domain::CourseBlock::Kind::Drone;
         block.caption = fields[1];
+
+        return block;
+    }
+
+    // ":: cycle | 7 | ce qu'on entend"
+    //
+    // La chaine des quintes, entendue : on monte de quinte en quinte, et chaque note est ramenee dans l'octave de
+    // depart. Douze fait le tour complet ; sept s'arrete a la gamme, et c'est le meme geste.
+    if( keyword == "cycle" )
+    {
+        if( fields.size() < 3 )
+        {
+            std::cerr << "Musichien: a ':: cycle' card needs a count and a caption: "
+                         ":: cycle | 7 | ce qu'on entend. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        const std::optional<std::int32_t> count = semitonesFromField( fields[1] );
+
+        if( !count.has_value() || *count <= 0 )
+        {
+            std::cerr << "Musichien: a ':: cycle' card has no usable count. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::FifthCycle;
+        block.fifthCount = *count;
+        block.caption = fields[2];
+
+        return block;
+    }
+
+    // ":: gamme | ionien | ce qu'on entend"
+    //
+    // La gamme d'un mode, sur le bourdon. Le mode est nomme EN FRANCAIS, comme le reste du contenu, et traduit en rang
+    // ici : un fichier de cours ne doit pas connaitre l'ordre interne d'une enumeration.
+    if( keyword == "gamme" )
+    {
+        if( fields.size() < 3 )
+        {
+            std::cerr << "Musichien: a ':: gamme' card needs a mode and a caption: "
+                         ":: gamme | ionien | ce qu'on entend. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        const std::optional<std::int32_t> mode = modeRankFrom( fields[1] );
+
+        if( !mode.has_value() )
+        {
+            std::cerr << "Musichien: a ':: gamme' card names a mode the game does not know: '" << fields[1]
+                      << "'. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::ModeScale;
+        block.modeIndex = *mode;
+        block.caption = fields[2];
 
         return block;
     }
