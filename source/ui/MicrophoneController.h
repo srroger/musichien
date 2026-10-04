@@ -63,6 +63,17 @@ class MicrophoneController final : public QObject
     // La detection, elle, est la meme dans les deux cas : deux notes tenues, et l'ecart entre elles.
     Q_PROPERTY( int singingTargetSemitones READ singingTargetSemitones NOTIFY singingTargetChanged )
     Q_PROPERTY( QString singingTargetLabel READ singingTargetLabel NOTIFY singingTargetChanged )
+
+    // OU TOMBE LA NOTE A CHANTER SUR LA PORTEE, pour y poser la boule fantome.
+    //
+    // Roger a trouve la solution, et elle est plus juste que ce que je cherchais : « tu n'as pas besoin de connaitre la
+    // distance, tu as juste a connaitre la note que tu devrais jouer et l'afficher comme si tu l'avais chantee, et tout
+    // le process fera le travail pour bien positionner la boule. »
+    //
+    // C'est donc la MEME fonction du domaine que la boule detectee - domain::StaffPosition::fraction - nourrie de la note
+    // ATTENDUE au lieu de la note entendue. Une seule regle de portee, aucune distance a recalculer, et le Do tombe au
+    // meme endroit quelle que soit son octave : le fantome du Sol attendu tombe donc la ou tombe le Sol.
+    Q_PROPERTY( double singingTargetStaffFraction READ singingTargetStaffFraction NOTIFY singingTargetChanged )
     Q_PROPERTY( bool isSingingCaptureActive READ isSingingCaptureActive NOTIFY singingCaptureStateChanged )
     Q_PROPERTY( bool hasSungInterval READ hasSungInterval NOTIFY sungIntervalChanged )
     Q_PROPERTY( int sungSemitones READ sungSemitones NOTIFY sungIntervalChanged )
@@ -156,6 +167,8 @@ public:
 
     [[nodiscard]] int singingTargetSemitones() const { return m_singingTargetSemitones; }
     [[nodiscard]] QString singingTargetLabel() const;
+
+    [[nodiscard]] double singingTargetStaffFraction() const;
     [[nodiscard]] bool isSingingCaptureActive() const { return m_isSingingCaptureActive; }
     [[nodiscard]] bool hasSungInterval() const { return m_sungIntervalDetector.reading().hasInterval(); }
     [[nodiscard]] int sungSemitones() const { return m_sungIntervalDetector.reading().semitones(); }

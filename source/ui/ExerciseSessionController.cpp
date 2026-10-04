@@ -573,6 +573,21 @@ bool ExerciseSessionController::wasLastAnswerCorrect() const noexcept
     return ( m_session != nullptr ) && m_session->wasLastAnswerCorrect();
 }
 
+bool ExerciseSessionController::isSingingGhostVisible() const noexcept
+{
+    if( m_session == nullptr )
+    {
+        return false;
+    }
+
+    const auto & question = m_session->currentQuestion();
+
+    // UNE QUESTION CHANTEE, ET DEJA MANQUEE UNE FOIS. La deuxieme note est la ou le fantome se montre, et c'est l'ecran
+    // qui pose cette seconde condition (MicrophoneController.hasFirstNote) : le modele dit ce que la QUESTION a deja
+    // coute, l'ecran dit ou en est le geste.
+    return ( question.kind == domain::QuestionKind::Sing ) && ( question.wrongAttemptCount >= 1 );
+}
+
 bool ExerciseSessionController::isHelpAvailable() const noexcept
 {
     return ( m_session != nullptr ) && m_session->isHelpAvailable();

@@ -11,12 +11,20 @@ import QtQuick
 import QtQuick.Layouts
 
 Item {
+    // LA BOULE FANTOME : ou le joueur DEVRAIT chanter, quand on le lui montre.
+    // Roger : « affiche une boule fantome de l'endroit ou devrait etre joue le prochain chant ». Elle est CREUSE et non
+    // pleine - c'est une place a prendre, pas une note deja chantee - et doree, comme tout ce qui aide dans ce jeu.
+    // LA BOULE FANTOME, SOUS LA VRAIE : elle montre ou la note suivante DEVRAIT tomber.
+
     id: staffBall
 
     // Le signe de l'octave : un + ou un - a cote de la boule, quand la note REELLE n'est pas dans l'octave que la
     // boule dessine. Faux par defaut, et c'est delibere : sur une portee de jeu, ce signe n'apprendrait rien au
     // joueur et lui ferait croire qu'il chante faux d'une octave. Il est reserve a l'accordeur.
     property bool showOctaveShift: false
+    // Eteinte par defaut, et pour une raison : ce composant sert aussi a l'accordeur et au banc de chant, ou il n'y a
+    // rien a attendre. C'est la question d'exercice qui l'allume, et elle seule.
+    property bool showGhost: false
     // La geometrie de la portee, et rien d'autre. La cle de sol est PLUS HAUTE que la portee - sept interlignes
     // contre quatre - donc c'est elle qui donne sa hauteur au composant : la portee est posee dans la partie basse,
     // et l'espace au-dessus lui appartient. Un composant qui n'aurait reserve que la portee aurait vu sa cle deborder
@@ -89,6 +97,22 @@ Item {
             color: "#5c4a80"
         }
 
+    }
+
+    // Elle est creuse, pale et SANS inertie - elle ne glisse pas, elle ATTEND. Sa position vient de la meme fonction du
+    // domaine que la boule detectee, appliquee a la note a chanter : c'est le principe de Roger, et il n'y a donc aucune
+    // distance a recalculer, ni une deuxieme regle de portee a tenir a jour.
+    Rectangle {
+        width: 22
+        height: 22
+        radius: 11
+        visible: staffBall.showGhost
+        color: "transparent"
+        border.width: 2
+        border.color: "#ffd479"
+        opacity: 0.8
+        x: parent.width / 2 - width / 2
+        y: staffBall.ballY(MicrophoneController.singingTargetStaffFraction) - height / 2
     }
 
     Rectangle {

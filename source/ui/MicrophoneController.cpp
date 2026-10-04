@@ -232,6 +232,17 @@ void MicrophoneController::newSingingQuestion()
     emit sungIntervalChanged();
 }
 
+double MicrophoneController::singingTargetStaffFraction() const
+{
+    // LA MEME NOTE QUE playSingingTarget JOUE, ET LA MEME FONCTION QUE LA BOULE DETECTEE.
+    //
+    // La tonique vient de la MEME source que l'accordeur : une seule note de reference dans tout le jeu, donc jamais de
+    // desaccord entre ce qu'on entend et ce qu'on voit.
+    const std::int32_t rootMidi = ( m_preferences != nullptr ) ? m_preferences->storedTuningRoot().midiNumber() : 60;
+
+    return domain::StaffPosition::fraction( rootMidi + m_singingTargetSemitones );
+}
+
 void MicrophoneController::setSingingTarget( int p_semitones )
 {
     m_singingTargetSemitones = p_semitones;

@@ -88,6 +88,18 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( int lastSungCentsOffset READ lastSungCentsOffset NOTIFY sessionChanged )
     Q_PROPERTY( bool isHelpAvailable READ isHelpAvailable NOTIFY sessionChanged )
 
+    // LA BOULE FANTOME DU CHANT : elle s'allume des la PREMIERE erreur sur une question chantee.
+    //
+    // Roger : « pour le chant, je pense qu'on pourrait donner une aide au joueur qui se trompe une fois. C'est a la
+    // deuxieme note, affiche une boule fantome de l'endroit ou devrait etre joue le prochain chant. »
+    //
+    // UNE erreur, et non deux : l'aide generale du jeu attend deux echecs (voir isHelpAvailable), mais un chant rate se
+    // corrige tout de suite - le joueur sait qu'il a chante faux des qu'il s'entend. Attendre la deuxieme le laisserait
+    // echouer une fois de plus pour rien, et c'est justement l'erreur qu'on veut lui epargner.
+    Q_PROPERTY( bool singingGhostIsVisible READ isSingingGhostVisible NOTIFY questionChanged )
+
+    [[nodiscard]] bool isSingingGhostVisible() const noexcept;
+
     // Ce que la question en cours demande : 0 pour nommer un intervalle, 1 pour dire dans quel sens il a ete joue.
     // C'est ce que l'ecran lit pour savoir s'il montre le cercle ou les deux boutons monte/descend.
     Q_PROPERTY( int questionKind READ questionKind NOTIFY questionChanged )

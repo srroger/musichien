@@ -839,6 +839,10 @@ Item {
 
                 StaffBall {
                     Layout.preferredHeight: 120
+                    // LA BOULE FANTOME S'ALLUME DES LA PREMIERE ERREUR, et seulement a la DEUXIEME note : c'est le moment ou
+                    // le joueur a besoin de savoir ou poser sa voix, et pas avant - une aide qui arrive trop tot chante a
+                    // sa place.
+                    showGhost: ExerciseController.singingGhostIsVisible && MicrophoneController.hasFirstNote
                 }
 
                 // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
