@@ -62,6 +62,31 @@ else
 fi
 
 # ---------------------------------------------------------------------------------------------------------------------
+# QML: a comment that swallows the line after it
+#
+# THE ONE TRAP NEITHER qmlformat NOR qmllint REPORTS. When qmlformat - or a careless edit - joins a comment and the code
+# that followed it onto ONE line, everything from the first '//' onwards becomes a comment: the object silently stops
+# existing. No tool complains. qmllint sees a comment, and so does the compiler, so the check passes and the bug ships.
+#
+# Both costs were paid for real: a course card that invited the player to sing and had NO BUTTON to press, and an
+# exercise screen that showed the singing interface on EVERY question because its 'visible:' guard had been swallowed.
+#
+# The signature is simple: a QML line that is long AND carries a comment. A long binding line has no '//' in it, and a
+# commented line is short. Both at once is always the accident.
+# ---------------------------------------------------------------------------------------------------------------------
+echo "--- QML: collapsed comment lines --------------------------------------------------------------"
+
+COLLAPSED="$(find source -type f -name '*.qml' -exec awk 'length($0) > 200 && /\/\// { printf "%s:%d (%d chars)\n", FILENAME, NR, length($0) }' {} +)"
+
+if [ -z "${COLLAPSED}" ]; then
+    echo "  OK - no comment swallows the code after it"
+else
+    printf '%s\n' "${COLLAPSED}"
+    echo "  FAILED - a comment and code share one line: everything after '//' is lost"
+    FAILURE_COUNT=$((FAILURE_COUNT + 1))
+fi
+
+# ---------------------------------------------------------------------------------------------------------------------
 # clang-tidy
 #
 # It needs a configured build directory to know how to compile each file. The compile_commands.json

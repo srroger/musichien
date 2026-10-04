@@ -826,12 +826,26 @@ Item {
             // Le chant : quand la question le demande, la grille s'efface et il ne reste qu'a chanter. La portee, la
             // boule et la barre de stabilite sont le composant partage avec l'accordeur ; seule la cible change.
             ColumnLayout {
-                // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
+                Layout.fillWidth: true
+                // LA GARDE ETAIT LE BUG, ALORS ELLE RESTE ECRITE. Sans cette ligne, le bloc de chant s'affichait sur TOUTES
+                // les questions : Roger a vu l'interface de chant posee AU-DESSUS de la grille des intervalles, sur une
+                // question qui n'avait rien a chanter. Un ecran d'exercice montre UNE reponse a la fois - monter/descendre
+                // (1), le chant (2), le rythme (3), le cercle des quintes (0) - et chaque bloc porte donc sa condition.
+                visible: ExerciseController.questionKind === 2
+                spacing: 10
+                // Le micro suit l'ecran qui s'en sert : il s'ouvre quand la question se chante, et se referme quand elle se
+                // tait. Un exercice passe la plupart de son temps sans chant, et un micro ouvert pour rien vide la batterie.
+                onVisibleChanged: visible ? MicrophoneController.ensureListening() : MicrophoneController.stopTest()
 
+                // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
+                //
+                // La consigne « chante... » n'est PAS repetee ici : elle vit en haut de l'ecran, avec les autres consignes,
+                // ou le joueur la lit deja. Deux fois la meme phrase, c'est une de trop.
                 StaffBall {
                     Layout.preferredHeight: 120
-                    // LA BOULE FANTOME S'ALLUME DES LA PREMIERE ERREUR, et des que le joueur chante : elle part de sa voix,
-                    // donc elle n'a plus besoin d'attendre la fin d'une note pour savoir ou se placer.
+                    // LA BOULE FANTOME : elle se pose sur la PREMIERE NOTE ENREGISTREE de l'essai, transposee de l'intervalle
+                    // demande. Elle ne bouge plus pendant qu'on chante - c'est un repere, pas un marteau. Roger l'a dit
+                    // exactement comme ca : « afficher le fantome a partir de la valeur enregistree et c'est tout ».
                     showGhost: ExerciseController.singingGhostIsVisible && MicrophoneController.hasFirstNote
                 }
 
@@ -848,10 +862,6 @@ Item {
                     font.pixelSize: 13
                     text: qsTr("%1  ·  %2 cents").arg(MicrophoneController.detectedNoteLabel).arg(Math.round(MicrophoneController.detectedCents))
                 }
-
-                // Quatre hypotheses sont mortes en lisant le code, et je refuse d'en tenter une cinquieme a l'aveugle.
-                // Ces quatre nombres disent TOUT : la position calculee de la fantome, la position reelle de la boule,
-                // la note de depart retenue (0 = aucune), et la cible demandee. Roger les lit, et la cause est finie.
 
                 // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
                 Rectangle {

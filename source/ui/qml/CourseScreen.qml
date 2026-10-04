@@ -465,7 +465,46 @@ Item {
 
                         }
 
-                        // LA CARTE "CHANTE-LE" : elle ouvre l'OUTIL DE CHANT sur cet intervalle.                        //                        // Roger, sur le cours de la quinte juste : « on propose au joueur de chanter la quinte. Autant lui                        // fournir l'outil pour qu'il verifie lui-meme s'il chante juste. » Un cours qui demande une chose                        // et ne donne pas le moyen de la verifier laisse le joueur deviner.                        //                        // La page dit l'INTENTION et celui qui la porte decide : c'est ce qui lui permet d'ignorer ou                        // vit l'outil de chant, et meme s'il y en a un.                        Rectangle {                            Layout.fillWidth: true                            visible: modelData.kind === "sing"                            implicitHeight: singText.implicitHeight + 24                            radius: 10                            color: "#2b2350"                            border.color: "#7a5cc0"                            border.width: 1                            Text {                                id: singText                                anchors.fill: parent                                anchors.margins: 12                                wrapMode: Text.WordWrap                                color: "#d8cdf4"                                font.pixelSize: 14                                text: modelData.caption !== "" ? modelData.caption : qsTr("Chante-le, et verifie d'un coup d'oeil")                            }                            MouseArea {                                anchors.fill: parent                                onClicked: courseScreen.singRequested(modelData.semitones)                            }                        }
+                        // LA CARTE "CHANTE-LE" : elle ouvre l'OUTIL DE CHANT sur cet intervalle.
+                        //
+                        // Roger, sur le cours de la quinte juste : « on propose au joueur de chanter la quinte. Autant lui
+                        // fournir l'outil pour qu'il verifie lui-meme s'il chante juste. » Un cours qui demande une chose
+                        // et ne donne pas le moyen de la verifier laisse le joueur deviner.
+                        //
+                        // La page dit l'INTENTION et celui qui la porte decide : c'est ce qui lui permet d'ignorer ou vit
+                        // l'outil de chant, et meme s'il y en a un.
+                        //
+                        // ⚠️ CETTE CARTE A ETE LIVREE MORTE. Elle a tenu sur UNE seule ligne, commentaires et code
+                        // melanges : tout ce qui suit le premier « // » appartient au commentaire, donc le Rectangle
+                        // n'existait pas. Roger lisait « chante le sol » sans avoir un seul bouton pour le faire. Une
+                        // ligne avalee par un commentaire ne fait echouer aucun outil : ni le compilateur, ni qmllint,
+                        // qui ne voit qu'un commentaire. C'est POURQUOI ce fichier se relit a l'oeil apres formatage.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "sing"
+                            implicitHeight: singText.implicitHeight + 24
+                            radius: 10
+                            color: "#2b2350"
+                            border.color: "#7a5cc0"
+                            border.width: 1
+
+                            Text {
+                                id: singText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#d8cdf4"
+                                font.pixelSize: 14
+                                text: modelData.caption !== "" ? modelData.caption : qsTr("Chante-le, et verifie d'un coup d'oeil")
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: courseScreen.singRequested(modelData.semitones)
+                            }
+
+                        }
                         // LA CARTE "POUR ALLER PLUS LOIN" : inerte pour l'instant, et elle le dit.
                         Rectangle {
                             Layout.fillWidth: true
