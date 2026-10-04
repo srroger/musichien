@@ -16,8 +16,32 @@ concepts: 7
 **Douze notes.** Pas une de plus, pas une de moins : tu as fait le tour.
 
 Ce n'est pas un hasard, et ce n'est pas une règle qu'on t'impose : c'est ce qui arrive quand on range les douze
-notes de la musique **de quinte en quinte**, en ramenant chacune dans la même octave. Cette ronde porte un nom —
-le **cercle des quintes** — et c'est **la carte** de tout ce qui suit.
+notes de la musique **de quinte en quinte**, en ramenant chacune dans la même octave.
+
+:: schéma | cercle | le cercle des quintes — les douze tonalités autour, leur armure dedans, un pas de quinte à chaque case
+
+**Voilà la carte.** Douze cases, et entre deux voisines il y a **toujours** une quinte juste — la même que celle de
+la leçon 1. Tiens-la devant toi et fais-en le tour : à chaque pas la musique s'éloigne d'une altération, et au
+douzième tu es revenu **au do**.
+
+Tape le dessin : tu vas l'**entendre** faire le tour.
+
+## C'est la carte du jeu aussi
+
+Une chose à dire tout de suite, parce que tout ce qui suit en dépend : **Musichien est construit sur ce cercle.**
+
+- la **grille de réponse** des intervalles est disposée **en cercle** — la même forme, pas une liste ;
+- le jeu te fait entendre un **centre** avec ses voisines par **quintes**, parce que c'est le pas le plus court entre
+  deux notes qui s'accordent ;
+- et l'**ordre dans lequel les intervalles t'arrivent** commence par l'octave, puis par **la quinte** : les deux
+  piliers de cette carte.
+
+Ce n'est pas une décoration d'écran. C'est le même objet que celui des musiciens — celui qui range les tonalités,
+les gammes et les accords depuis trois siècles — et le jeu s'en sert **pour de vrai**.
+
+Tu peux l'ouvrir en grand quand tu veux : c'est la page de référence du jeu, et elle est à toi.
+
+:: cercle
 
 ## Pourquoi c'est la carte
 

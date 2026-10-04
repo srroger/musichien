@@ -1792,6 +1792,9 @@ ApplicationWindow {
             onAnnexeRequested: function(p_annexeName) {
                 CourseController.openAnnexe(p_annexeName);
             }
+            // OUVRIR LE CERCLE DES QUINTES : la page de reference du jeu, en plein ecran. Le cours l'annonce, Main.qml
+            // sait ou elle vit, et l'Ecole reste ouverte derriere - le retour ramene donc a la lecon.
+            onCircleRequested: keyCircleDialog.open()
             // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
             onVisibleChanged: {
                 if (!visible && !mainWindow.schoolIsOpen)

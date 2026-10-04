@@ -53,6 +53,9 @@ constexpr const char * KIND_SCALE = "gamme";
 // pas qu'il y a un dessin.
 constexpr const char * KIND_SCHEMA = "schema";
 
+// ":: cercle" - la PORTE vers la page de reference du cercle. Comme ':: essai', c'est une porte et non une donnee.
+constexpr const char * KIND_CIRCLE = "cercle";
+
 // LA QUINTE, EN DEMI-TONS. Elle sert au bourdon ET a la chaine des quintes : une seule definition, donc pas deux
 // valeurs a tenir d'accord.
 constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
@@ -83,6 +86,8 @@ constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
             return KIND_SCALE;
         case domain::CourseBlock::Kind::Schema:
             return KIND_SCHEMA;
+        case domain::CourseBlock::Kind::Circle:
+            return KIND_CIRCLE;
         case domain::CourseBlock::Kind::Text:
         default:
             return KIND_TEXT;

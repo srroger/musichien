@@ -104,7 +104,14 @@ struct CourseBlock
         // n'importe quelle taille d'ecran, sans un octet de plus dans l'APK.
         //
         // Comme pour l'image, le domaine ne sait PAS ce qui est dessine : il porte un nom, et l'ecran decide.
-        Schema
+        Schema,
+
+        // ":: cercle" - OUVRIR LE CERCLE DES QUINTES, la page de reference du jeu.
+        //
+        // Roger : « on est capable de le fabriquer dans le code, on a meme une page dediee au cercle. » Il a raison, et
+        // c'est le meme contrat que ':: essai' et ':: chante' : le cours dit l'INTENTION, et celui qui le porte sait ou
+        // vit la page. Le domaine, lui, ne connait meme pas son nom.
+        Circle
     };
 
     Kind kind{ Kind::Text };

@@ -26,6 +26,7 @@
           L'Ecole des Chiots. La page est un ecran SEPARE, comme ScaleScreen : Main.qml fait deja quatre mille cinq cents
           lignes, et rien de neuf ne s'y ajoute au-dela du bouton qui l'ouvre.
         -->
+        <file>qml/CourseSchema.qml</file>
         <file>qml/CourseScreen.qml</file>
         <!--
           LE GLOSSAIRE : un dictionnaire, et rien d'autre. La page est un ecran SEPARE et non un mode du lecteur de
@@ -78,6 +79,11 @@
           Le nom du fichier est cite par le cours SANS dossier ni extension : c'est l'ecran qui sait ou elles vivent.
         -->
         <file alias="assets/content/images/pythagore-forgerons.png">../../assets/content/images/pythagore-forgerons.png</file>
+        <!--
+          Roger a depose une VRAIE illustration : « Le Joueur de Cornemuse » d'Abraham Bloemaert, XVIIe siecle. Un
+          .jpg, donc : le nom du fichier porte son extension, et l'ecran la respecte au lieu d'imposer '.png'.
+        -->
+        <file alias="assets/content/images/cornemuse.jpg">../../assets/content/images/cornemuse.jpg</file>
         <!--
           The content files live at the root of the project, as docs/ARCHITECTURE.md requires, and the
           alias gives each one the runtime path it has on disk: ':/assets/content/...'. An alias rather

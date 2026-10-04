@@ -464,6 +464,22 @@ void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Co
         return block;
     }
 
+    // ":: cercle" ou ":: cercle | ce que le bouton annonce"
+    //
+    // Une PORTE, comme ':: essai' et ':: chante' : elle n'ouvre rien elle-meme, elle dit qu'on veut ouvrir le cercle.
+    // La legende est donc facultative - le bouton a un nom par defaut, et il n'a pas besoin d'etre repete.
+    if( keyword == "cercle" )
+    {
+        block.kind = domain::CourseBlock::Kind::Circle;
+
+        if( fields.size() > 1 )
+        {
+            block.caption = fields[1];
+        }
+
+        return block;
+    }
+
     // ":: chante | demi_tons:7 | ce qu'on demande de chanter"
     //
     // Meme forme que ':: essai', et la meme distance : ce que ce genre ajoute, ce n'est pas une donnee, c'est une PORTE -

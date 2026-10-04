@@ -346,4 +346,17 @@ TEST( MarkdownCourseTest, a_schema_card_without_a_caption_is_refused )
     EXPECT_FALSE( course.has_value() );
 }
 
+// UNE PORTE PEUT NE RIEN DIRE. ':: cercle' ouvre la page du cercle, et la legende est FACULTATIVE : le bouton a un nom
+// par defaut, et un cours qui n'a rien de mieux a dire n'a pas a le repeter.
+TEST( MarkdownCourseTest, a_circle_card_needs_nothing_at_all )
+{
+    const std::optional<musichien::domain::Course> course = readCourse( ":: cercle\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Circle );
+    EXPECT_TRUE( course->blocks.at( 0 ).caption.empty() );
+}
+
 }    // namespace musichien::infrastructure

@@ -38,6 +38,19 @@ Item {
     // OUVRIR UNE ANNEXE : la carte « :: annexe » cite un nom, et c'est ICI qu'on sait ou vit le lecteur de cours. La
     // page dit l'INTENTION, celui qui la porte decide - la meme regle que pour la carte de chant.
     signal annexeRequested(string p_annexeName)
+    // OUVRIR LE CERCLE : la page de reference du jeu. La page dit l'intention, celui qui la porte decide - la meme regle
+    // que pour l'annexe et pour le chant.
+    signal circleRequested()
+
+    // L'IMAGE DEVIENT UNE ADRESSE ICI, ET NULLE PART AILLEURS. Un cours ecrit un NOM ; c'est l'ecran qui sait ou vivent
+    // les images. Et un nom qui porte deja son extension est respecte tel quel - sinon le .jpg que Roger a depose pour
+    // la cornemuse ne s'afficherait jamais, et le telephone ne le dirait pas plus qu'une image distante.
+    function imageSourceFor(fileName) {
+        if (fileName.indexOf(".") >= 0)
+            return "qrc:/assets/content/images/" + fileName;
+
+        return "qrc:/assets/content/images/" + fileName + ".png";
+    }
 
     anchors.fill: parent
 
@@ -412,6 +425,40 @@ Item {
                         Layout.fillWidth: true
                         spacing: 6
 
+                        // OUVRIR LE CERCLE. Roger : « on est capable de le fabriquer dans le code, on a meme une page
+                        // dediee au cercle. » Alors on l'ouvre - et le cours n'a pas besoin de savoir ou elle vit.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "cercle"
+                            implicitHeight: circleText.implicitHeight + 24
+                            radius: 10
+                            color: "#241a3d"
+                            border.color: "#5a4a8f"
+                            border.width: 1
+
+                            Text {
+                                id: circleText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#cbb8e8"
+                                font.pixelSize: 13
+                                // La legende est FACULTATIVE : le bouton a un nom par defaut, et un cours qui n'a rien de
+                                // mieux a dire n'a pas a le repeter.
+                                text: modelData.caption !== "" ? qsTr("🎡  %1").arg(modelData.caption) : qsTr("🎡  Ouvrir le cercle des quintes")
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    courseScreen.circleRequested();
+                                }
+                            }
+
+                        }
+
                         // UN PARAGRAPHE DE MARKDOWN : Qt le rend, nous ne le composons pas.
                         Text {
                             Layout.preferredWidth: 0
@@ -642,7 +689,7 @@ Item {
                                 // Une hauteur MAXIMALE : sans elle, une image haute mangerait trois pages de defilement.
                                 // PreserveAspectFit garde les proportions, donc rien n'est deforme.
                                 Layout.preferredHeight: 380
-                                source: "qrc:/assets/content/images/" + modelData.imageName + ".png"
+                                source: courseScreen.imageSourceFor(modelData.imageName)
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
                                 smooth: true
@@ -729,131 +776,13 @@ Item {
                         // plus dans l'APK. Le point qui avance fait la difference entre un dessin et un schema - sans
                         // lui, on voit une courbe ; avec lui, on voit une melodie qui RENTRE chez elle.
                         ColumnLayout {
-                            id: schemaCard
-
                             Layout.fillWidth: true
                             visible: modelData.kind === "schema"
                             spacing: 6
 
-                            Rectangle {
+                            CourseSchema {
                                 Layout.fillWidth: true
-                                // UN NOM DE DESSIN, ET UN SEUL POUR L'INSTANT. Un nom inconnu n'affiche donc pas le
-                                // mauvais dessin : il n'affiche rien, et la legende reste. Le jour ou il y en aura un
-                                // deuxieme, c'est ici qu'il se declarera.
-                                visible: modelData.schemaName === "bourdon"
-                                // Une hauteur donnee : un dessin n'a pas de taille naturelle, et sans elle il n'aurait
-                                // aucune hauteur du tout.
-                                Layout.preferredHeight: 168
-                                radius: 10
-                                color: "#1b1533"
-                                border.color: "#3d3268"
-                                border.width: 1
-                                clip: true
-
-                                Canvas {
-                                    id: droneSchema
-
-                                    // OU EN EST LA MELODIE, de 0 a 1. Elle repart de zero a chaque tour, parce que c'est
-                                    // le RETOUR qu'on regarde - pas le dessin.
-                                    property real progress: 0
-
-                                    // LE CHEMIN, en un seul endroit : le trace ET le point l'utilisent. Deux formules
-                                    // decrivant le meme chemin finiraient par ne plus decrire le meme chemin.
-                                    function pointAt(t, x0, y0, x1, y1, x2, y2, x3, y3) {
-                                        var u = 1 - t;
-                                        return {
-                                            "x": u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
-                                            "y": u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3
-                                        };
-                                    }
-
-                                    function melodyAt(t) {
-                                        var tonicY = height - 30;
-                                        var top = 12;
-                                        if (t < 0.5)
-                                            return pointAt(t * 2, 0, tonicY, width * 0.18, top, width * 0.3, top + 8, width * 0.42, height * 0.46);
-
-                                        return pointAt((t - 0.5) * 2, width * 0.42, height * 0.46, width * 0.56, top, width * 0.74, top + 24, width, tonicY);
-                                    }
-
-                                    anchors.fill: parent
-                                    anchors.margins: 12
-                                    onProgressChanged: requestPaint()
-                                    onWidthChanged: requestPaint()
-                                    onHeightChanged: requestPaint()
-                                    onPaint: {
-                                        var ctx = getContext("2d");
-                                        ctx.clearRect(0, 0, width, height);
-                                        var tonicY = height - 30;
-                                        var fifthY = tonicY - 22;
-                                        // LE BOURDON : deux traits TENUS, d'un bord a l'autre. Ils ne commencent pas et ne
-                                        // finissent pas - c'est exactement ce qu'ils ont a dire.
-                                        ctx.strokeStyle = "#7b68b8";
-                                        ctx.lineWidth = 4;
-                                        ctx.beginPath();
-                                        ctx.moveTo(0, tonicY);
-                                        ctx.lineTo(width, tonicY);
-                                        ctx.stroke();
-                                        ctx.strokeStyle = "#57498c";
-                                        ctx.lineWidth = 2;
-                                        ctx.beginPath();
-                                        ctx.moveTo(0, fifthY);
-                                        ctx.lineTo(width, fifthY);
-                                        ctx.stroke();
-                                        // LA MELODIE : elle part DE la tonique, monte, derive - et revient s'y poser.
-                                        ctx.strokeStyle = "#cdeec6";
-                                        ctx.lineWidth = 2.5;
-                                        ctx.beginPath();
-                                        for (var step = 0; step <= 64; ++step) {
-                                            var point = melodyAt(step / 64);
-                                            if (step === 0)
-                                                ctx.moveTo(point.x, point.y);
-                                            else
-                                                ctx.lineTo(point.x, point.y);
-                                        }
-                                        ctx.stroke();
-                                        // LE POINT. Sans lui on voit une courbe ; avec lui, on voit une melodie qui avance
-                                        // et qui rentre chez elle.
-                                        var here = melodyAt(progress);
-                                        ctx.fillStyle = "#ffffff";
-                                        ctx.beginPath();
-                                        ctx.arc(here.x, here.y, 5, 0, 2 * Math.PI);
-                                        ctx.fill();
-                                    }
-
-                                    SequentialAnimation {
-                                        // Elle tourne quand elle se VOIT, et pas avant : un dessin sur une autre page
-                                        // n'a personne a qui montrer son mouvement.
-                                        running: droneSchema.visible
-                                        loops: Animation.Infinite
-
-                                        NumberAnimation {
-                                            target: droneSchema
-                                            property: "progress"
-                                            from: 0
-                                            to: 1
-                                            duration: 2600
-                                            easing.type: Easing.InOutSine
-                                        }
-
-                                        // Elle se POSE, et on la laisse se poser : c'est la fin d'une phrase, et une phrase
-                                        // qui repart aussitot ne s'entend pas finir.
-                                        PauseAnimation {
-                                            duration: 900
-                                        }
-
-                                    }
-
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: {
-                                        ExerciseController.playTapCue();
-                                        CourseController.playDrone();
-                                    }
-                                }
-
+                                schemaName: modelData.schemaName
                             }
 
                             Text {

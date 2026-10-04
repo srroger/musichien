@@ -1,5 +1,5 @@
 ---
-titre: Le centre
+titre: Le centre (tonique)
 sous-titre: Pourquoi la musique revient toujours quelque part
 chapitre: 2
 ordre: 1
@@ -58,6 +58,8 @@ est la cornemuse.
 Un sac, un tuyau pour la mélodie, et **des bourdons** qui ne s'arrêtent jamais. La cornemuse écossaise en a trois :
 deux à l'octave, un à l'octave d'en dessous — et tous les trois sur **la tonique**. Le son ne respire pas, ne reprend
 pas, ne s'interrompt pas : c'est ce qui lui donne cette voix qu'on reconnaît entre mille.
+
+:: image | cornemuse.jpg | « Le Joueur de cornemuse » — Abraham Bloemaert, XVIIe siècle
 
 :: schéma | bourdon | le principe de tout bourdon : deux notes tenues, et une mélodie qui revient s'y poser
 

@@ -28,6 +28,11 @@ Le cercle se lit dans les deux sens, et c'est ce qui le rend utile :
 La **même distance**, et deux directions. C'est pour ça que les musiciens disent « monter vers les dièses » et
 « descendre vers les bémols » — ils ne parlent pas d'une altitude, ils parlent d'un **côté du cercle**.
 
+Et voici le cercle **entier**, celui qu'on garde sous les yeux : les douze tonalités, et leur **armure** à
+l'intérieur. C'est le tableau que tout musicien finit par connaître par cœur, et ce jeu te le donne à voir.
+
+:: schéma | cercle | le cercle entier — les douze tonalités, et leur armure à l'intérieur
+
 ## Ce que le cercle range
 
 Tout. Les gammes, les modes, les accords, les tonalités — chacune est **un endroit** ou **un morceau** du cercle.

@@ -45,6 +45,10 @@ Compare les deux listes.
 
 **Une seule note change** — le **fa**. Le voilà, l'écart entre les deux.
 
+Mais une ligne de mots ne fait pas **voir** cet écart. Deux rangées alignées, si — et l'œil le trouve tout seul :
+
+:: schéma | deux-gammes | la même fenêtre avec deux centres : une seule case d'écart, et c'est tout le sujet
+
 Et voici la chose étonnante : **c'est la même fenêtre de sept notes sur le cercle**. Sept quintes d'affilée, toujours.
 Ce qui change, c'est **sur quelle note tu te poses** :
 
