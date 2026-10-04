@@ -1044,6 +1044,11 @@ QVariantList ExerciseSessionController::familyResults() const
 
         QVariantMap result;
         result.insert( QStringLiteral( "name" ), QString::fromUtf8( FAMILY_NAMES.at( index ).data() ) );
+
+        // L'INDICE DE LA FAMILLE, en plus de son nom : un ecran qui veut reagir a « la famille qui a le plus coute »
+        // compare alors un NOMBRE, et non une chaine francaise ecrite a la main des deux cotes. Le jour ou l'ordre des
+        // familles change, rien ne se casse en silence.
+        result.insert( QStringLiteral( "family" ), static_cast<int>( family ) );
         result.insert( QStringLiteral( "asked" ), static_cast<int>( tally.askedIn( family ) ) );
         result.insert( QStringLiteral( "correct" ), static_cast<int>( tally.correctIn( family ) ) );
         result.insert( QStringLiteral( "percent" ), static_cast<int>( tally.successPercentIn( family ) ) );

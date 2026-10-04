@@ -46,6 +46,13 @@ Item {
     // bruitage ou melodie ou accord de victoire ». Et il l'assume pour ce que c'est : « c'est juste un bruitage pour
     // rendre le jeu moins austere, et faire appel a des biais cognitifs d'addiction, comme dans les machines a sous ».
     // LE TIC : un minuteur plutot qu'un appel par image.
+    // Le nombre AFFICHE, a un instant donne du compte : la valeur finale, multipliee par l'avancement. Arrondi, parce
+    // qu'un compteur montre des entiers - et c'est l'arrondi qui fait le dechiffrement rapide qu'on vient chercher.
+    // LE CONSEIL DE SORTIE, choisi d'apres la famille qui a le plus COUTE.
+    // Roger : « a la fin du mode arcade, en fonction de la ou il y a le plus d'erreur, je lui mettrai une phrase
+    // supplementaire speciale [...] 2-3 phrases dans le genre, qui tourneraient de maniere aleatoire en fonction de la
+    // famille la plus ratee. Et si tout est parfait, un "Wow, tu peux clairement envisager de passer a l'etape
+    // suivante !" »
 
     id: exerciseScreen
 
@@ -78,8 +85,35 @@ Item {
     readonly property var answeredChordData: ExerciseController.answeredChord
     readonly property bool hasAnsweredChord: answeredChordData !== undefined && answeredChordData.name !== undefined
 
-    // Le nombre AFFICHE, a un instant donne du compte : la valeur finale, multipliee par l'avancement. Arrondi, parce
-    // qu'un compteur montre des entiers - et c'est l'arrondi qui fait le dechiffrement rapide qu'on vient chercher.
+    // La comparaison porte sur un INDICE et non sur un nom : le jour ou l'ordre des familles change, rien ne se casse en
+    // silence. Et le tirage est au hasard PARMI les phrases de la famille concernee : deux parties qui ratent les memes
+    // modes ne disent pas exactement la meme chose.
+    function closingAdvice() {
+        var results = ExerciseController.familyResults();
+        if (results.length === 0)
+            return "";
+
+        var worst = results[0];
+        var totalErrors = 0;
+        for (var i = 0; i < results.length; ++i) {
+            totalErrors += results[i].errors;
+            if (results[i].errors > worst.errors)
+                worst = results[i];
+
+        }
+        if (totalErrors === 0)
+            return qsTr("Wow ! Tu peux clairement envisager de passer à l'étape suivante.");
+
+        var lines;
+        if (worst.family === 0)
+            lines = [qsTr("Les intervalles t'ont coûté cher : l'École des Chiots t'apprend à les reconnaître."), qsTr("Un tour dans « Intervalles », à l'entraînement, et ils rentreront tout seuls.")];
+        else if (worst.family === 1)
+            lines = [qsTr("Les accords t'ont résisté : l'arbre des accords, dans ton profil, les montre tous."), qsTr("Essaie la famille « Accords » à l'entraînement : là, se tromper ne coûte rien.")];
+        else
+            lines = [qsTr("Les modes t'ont résisté : l'École des Chiots dit ce qu'ils sont et comment les entendre."), qsTr("Un entraînement « Modes » t'aidera plus que dix Arcades.")];
+        return lines[Math.floor(Math.random() * lines.length)];
+    }
+
     function rewardValue(p_final) {
         return Math.round(p_final * rewardCountUp);
     }
@@ -1359,6 +1393,9 @@ Item {
                     visible: !ExerciseController.isModeColourQuestion
 
                     Repeater {
+                        // LA LARGEUR, LA POLICE ET LES MARGES VONT ENSEMBLE, et c'est le NOM qui commande.
+                        // UN DEGRADE PLUS CLAIR, PARCE QUE LE PLUS SOMBRE ETAIT PRESQUE NOIR.
+
                         model: ExerciseController.modeChoices
 
                         delegate: Button {
@@ -1366,13 +1403,24 @@ Item {
                             readonly property bool isBright: modelData.brightness > 0.5
                             readonly property bool wasHeard: ExerciseController.heardMode.index !== undefined && modelData.index === ExerciseController.heardMode.index
 
-                            width: 104
+                            // Roger : « le Mixolydien n'est pas ecrit en entier, on a des ... ». Un bouton de 104 pour une
+                            // police de 14 laisse environ 72 points au texte - le style garde seize points de marge de
+                            // chaque cote - et « Mixolydien » en demande quatre-vingts. Les trois valeurs sont donc
+                            // reglees ENSEMBLE, sinon le prochain nom long les fera mentir de nouveau.
+                            width: 118
                             height: 48
+                            leftPadding: 4
+                            rightPadding: 4
                             text: modelData.name
-                            font.pixelSize: 14
+                            font.pixelSize: 12
                             enabled: ExerciseController.isAsking
                             highlighted: wasHeard
-                            Material.background: Qt.rgba(0.18 + (0.62 * modelData.brightness), 0.14 + (0.56 * modelData.brightness), 0.3 + (0.48 * modelData.brightness), 1)
+                            // Roger : « la couleur des boutons des modes, on m'a dit que c'est pas bien visible avec les
+                            // couleurs sombres. Il faudrait peut-etre un degrade plus flachy et plus visible. » L'ancien
+                            // degrade partait de (0,18 ; 0,14 ; 0,30) - un violet si profond qu'on ne lisait plus rien.
+                            // Le plancher est remonte et l'amplitude elargie : le mode le plus sombre reste un violet
+                            // franc, et le plus clair tire vers le rose.
+                            Material.background: Qt.rgba(0.3 + (0.7 * modelData.brightness), 0.2 + (0.62 * modelData.brightness), 0.55 + (0.45 * modelData.brightness), 1)
                             Material.foreground: isBright ? "#1d1033" : "#ffffff"
                             onClicked: ExerciseController.answerModeName(modelData.index)
                         }
@@ -1575,6 +1623,19 @@ Item {
                 // COUTE : le nombre d'erreurs, qui est aussi le nombre de coeurs perdus.
                 Repeater {
                     model: ExerciseController.sessionGrantsExperience ? ExerciseController.familyResults() : []
+
+                    // LE MOT DE LA FIN, sous les trois familles.
+                    Text {
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
+                        Layout.fillWidth: true
+                        Layout.topMargin: 10
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        color: "#ffd479"
+                        font.pixelSize: 14
+                        text: ExerciseController.sessionGrantsExperience ? exerciseScreen.closingAdvice() : ""
+                    }
 
                     delegate: RowLayout {
                         required property var modelData
