@@ -87,6 +87,52 @@ else
 fi
 
 # ---------------------------------------------------------------------------------------------------------------------
+# JSON: a content file that does not parse costs EVERYTHING, not just the line that broke it
+#
+# Every content bank is read with nlohmann::json::parse(..., allow_exceptions = false), and a discarded document makes
+# the reader return an EMPTY book. So one stray character - a '//' comment, a trailing comma, a missing quote - does not
+# cost the line it sits on: it costs the WHOLE file.
+#
+# It happened for real: six anecdotes were added with two '//' comment lines, the JSON stopped parsing, and the 885
+# other anecdotes would have gone with them on every fresh build.
+#
+# NOTHING ELSE CATCHES IT. The C++ compiles, the tests pass (they read their own fixtures), and the application merely
+# prints how many entries it read - a number that is easy not to look at. JSON has no comments, and no tool here was
+# saying so.
+# ---------------------------------------------------------------------------------------------------------------------
+echo "--- JSON: content files parse ----------------------------------------------------------------"
+
+if command -v python3 >/dev/null 2>&1; then
+
+    JSON_FAILURES="$(python3 - <<'PYEOF'
+import json
+import pathlib
+
+failures = []
+
+for path in sorted(pathlib.Path("assets/content").rglob("*.json")):
+    try:
+        json.loads(path.read_text(encoding="utf-8"))
+    except Exception as error:
+        failures.append(f"{path}: {error}")
+
+print("\n".join(failures))
+PYEOF
+)"
+
+    if [ -z "${JSON_FAILURES}" ]; then
+        echo "  OK - every content JSON parses"
+    else
+        printf '%s\n' "${JSON_FAILURES}"
+        echo "  FAILED - a content file does not parse, and its WHOLE bank would be empty"
+        FAILURE_COUNT=$((FAILURE_COUNT + 1))
+    fi
+
+else
+    echo "  python3 not found: skipped"
+fi
+
+# ---------------------------------------------------------------------------------------------------------------------
 # clang-tidy
 #
 # It needs a configured build directory to know how to compile each file. The compile_commands.json
