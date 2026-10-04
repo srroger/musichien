@@ -97,6 +97,27 @@
         <file alias="assets/content/courses/le-meme-accord-autrement-pose.md">../../assets/content/courses/le-meme-accord-autrement-pose.md</file>
         <file alias="assets/content/courses/pourquoi-l-ordre-des-notes-change-le-son.md">../../assets/content/courses/pourquoi-l-ordre-des-notes-change-le-son.md</file>
         <!--
+          Chapitre 6 : LA GRAMMAIRE. Les intervalles nommes un par un - quarte, secondes, sixtes, septiemes, triton,
+          unisson. Chacun a deja ete ENTENDU dans les chapitres precedents ; ici, il recoit son nom.
+        -->
+        <file alias="assets/content/courses/la-quarte.md">../../assets/content/courses/la-quarte.md</file>
+        <file alias="assets/content/courses/les-secondes.md">../../assets/content/courses/les-secondes.md</file>
+        <file alias="assets/content/courses/les-sixtes.md">../../assets/content/courses/les-sixtes.md</file>
+        <file alias="assets/content/courses/les-septiemes.md">../../assets/content/courses/les-septiemes.md</file>
+        <file alias="assets/content/courses/le-triton.md">../../assets/content/courses/le-triton.md</file>
+        <file alias="assets/content/courses/l-unisson.md">../../assets/content/courses/l-unisson.md</file>
+        <!--
+          Chapitre 7 : LES MODES, UN PAR UN. Sept cours particuliers - la couleur, l'usage, les cliches, le ressenti -
+          dans l'ordre de couleur du domaine, du plus clair au plus sombre.
+        -->
+        <file alias="assets/content/courses/le-lydien.md">../../assets/content/courses/le-lydien.md</file>
+        <file alias="assets/content/courses/l-ionien.md">../../assets/content/courses/l-ionien.md</file>
+        <file alias="assets/content/courses/le-mixolydien.md">../../assets/content/courses/le-mixolydien.md</file>
+        <file alias="assets/content/courses/le-dorien.md">../../assets/content/courses/le-dorien.md</file>
+        <file alias="assets/content/courses/l-eolien.md">../../assets/content/courses/l-eolien.md</file>
+        <file alias="assets/content/courses/le-phrygien.md">../../assets/content/courses/le-phrygien.md</file>
+        <file alias="assets/content/courses/le-locrien.md">../../assets/content/courses/le-locrien.md</file>
+        <!--
           Le glossaire. Un mot par entree, une definition d'UNE PHRASE : Roger veut un aide-memoire, pas un manuel.
           Meme motif que les autres contenus, alias compris - le chemin de ressource est celui du disque.
         -->
