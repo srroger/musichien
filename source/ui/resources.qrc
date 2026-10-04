@@ -67,6 +67,13 @@
         <file alias="assets/content/courses/les-sept-pas.md">../../assets/content/courses/les-sept-pas.md</file>
         <file alias="assets/content/courses/pourquoi-sept-notes.md">../../assets/content/courses/pourquoi-sept-notes.md</file>
         <!--
+          Lecon 6 : Gamme majeure, gamme mineure, et son os a macher. Elle reste sur le MEME centre et fait entendre la
+          meme note de depart, claire puis sombre : c'est la tierce qui decide, et le relatif (do majeur / la mineur) est
+          l'image qui relie les deux.
+        -->
+        <file alias="assets/content/courses/gamme-majeure-mineure.md">../../assets/content/courses/gamme-majeure-mineure.md</file>
+        <file alias="assets/content/courses/le-majeur-et-le-mineur.md">../../assets/content/courses/le-majeur-et-le-mineur.md</file>
+        <!--
           Le glossaire. Un mot par entree, une definition d'UNE PHRASE : Roger veut un aide-memoire, pas un manuel.
           Meme motif que les autres contenus, alias compris - le chemin de ressource est celui du disque.
         -->

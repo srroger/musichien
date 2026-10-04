@@ -1012,6 +1012,71 @@ TEST( ExerciseSessionControllerTest, the_god_mode_plays_the_perimeter_the_player
     EXPECT_LT( controller.choices().size(), levelChoiceCount );
 }
 
+// UN ESSAI DE COURS OUVRE UNE SESSION QUI CONTIENT CE QUE LE COURS ENSEIGNE.
+//
+// Roger, 04/10/2026 : « il faut cabler les intervalles pour acceder a la tierce. Actuellement ca ouvre le jeu avec octave
+// et quinte juste. » C'est le defaut que ce test verrouille : la donnee `concepts` d'un cours etait LUE et rangee, mais
+// jamais consommee - donc un cours de la tierce ouvrait une session sans tierce.
+//
+// Le temoin est la grille de reponse, comme pour le GodMode : elle contient exactement les intervalles en jeu, donc elle
+// dit ce que la partie pose vraiment.
+TEST( ExerciseSessionControllerTest, a_lesson_essai_gives_exactly_the_concepts_it_teaches )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    storeNamedIntervalOnlyShares( levelStore );
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    // Un DEBUTANT : sa palette de depart est l'octave et la quinte. L'exercice de la lecon de la tierce ne les joue PAS
+    // pour autant - il ne contient QUE les concepts de la lecon, et c'est tout l'interet.
+    controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Beginner ) );
+
+    controller.startTrainingSessionFromLesson( QVariantList{ 3, 4 } );
+
+    std::vector<std::int32_t> played;
+
+    for( const QVariant & choice : controller.choices() )
+    {
+        played.push_back( choice.toMap().value( QStringLiteral( "semitones" ) ).toInt() );
+    }
+
+    std::ranges::sort( played );
+
+    EXPECT_EQ( ( std::vector<std::int32_t>{ 3, 4 } ), played );
+}
+
+// Un concept en DOUBLE n'entre qu'une fois, et une distance HORS bornes est ignoree.
+//
+// Le contrat des contenus promet qu'une faute coute un cours, jamais l'application : une distance que le domaine ne
+// connait pas (au-dela de deux octaves) ne doit donc pas faire planter la page.
+TEST( ExerciseSessionControllerTest, a_lesson_essai_ignores_duplicates_and_out_of_range_concepts )
+{
+    domain::NotePlayerFake notePlayer;
+    domain::PlayerPreferencesFake levelStore;
+
+    storeNamedIntervalOnlyShares( levelStore );
+
+    ExerciseSessionController controller{ notePlayer, {}, {}, {}, {}, &levelStore };
+
+    controller.choosePlayerLevel( static_cast<int>( domain::PlayerLevel::Beginner ) );
+
+    // 4 en double, et 99 au-dela de ce que le domaine supporte (deux octaves au plus).
+    controller.startTrainingSessionFromLesson( QVariantList{ 3, 4, 4, 99 } );
+
+    std::vector<std::int32_t> played;
+
+    for( const QVariant & choice : controller.choices() )
+    {
+        played.push_back( choice.toMap().value( QStringLiteral( "semitones" ) ).toInt() );
+    }
+
+    std::ranges::sort( played );
+
+    EXPECT_EQ( ( std::vector<std::int32_t>{ 3, 4 } ), played );
+}
+
 TEST( ExerciseSessionControllerTest, the_god_mode_refuses_a_perimeter_that_could_not_ask )
 {
     // « Au moins deux » : avec UN seul choix, la reponse serait toujours la meme, et le joueur repondrait juste sans

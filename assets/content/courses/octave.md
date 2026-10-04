@@ -3,7 +3,7 @@ titre: L'octave
 sous-titre: La même note, deux fois
 chapitre: 1
 ordre: 2
-concepts: 12
+concepts: 0, 7, 12
 ---
 
 

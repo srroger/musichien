@@ -359,4 +359,27 @@ TEST( CourseControllerTest, a_lesson_carries_its_rank_and_an_annexe_carries_none
                QString( "Pourquoi la quinte sonne juste" ) );
 }
 
+// LES CONCEPTS D'UN COURS SONT DONNES A L'ESSAI, EN DISTANCES.
+//
+// Le domaine les portait deja, ils etaient LUS mais jamais consommes : c'est ce que la carte « :: essai » passe au
+// controleur d'entrainement, pour ouvrir une session qui contient ce que la lecon vient d'enseigner. La page ne les
+// fournit qu'une fois un cours ouvert, comme le reste.
+TEST( CourseControllerTest, a_course_gives_its_concepts_as_distances )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course course = makeQuintCourse();
+    course.concepts = { 3, 4 };
+
+    CourseController controller{ notePlayer, { course } };
+
+    EXPECT_TRUE( controller.currentConcepts().isEmpty() );
+
+    controller.open( 0 );
+
+    ASSERT_EQ( controller.currentConcepts().size(), 2 );
+    EXPECT_EQ( controller.currentConcepts().at( 0 ).toInt(), 3 );
+    EXPECT_EQ( controller.currentConcepts().at( 1 ).toInt(), 4 );
+}
+
 }    // namespace musichien::ui

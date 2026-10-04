@@ -52,6 +52,13 @@ public:
     Q_PROPERTY( QString subtitle READ subtitle NOTIFY courseChanged )
     Q_PROPERTY( QVariantList blocks READ blocks NOTIFY courseChanged )
 
+    // LES CONCEPTS DU COURS OUVERT, en distances - ce que la carte « :: essai » met dans la palette du joueur.
+    //
+    // Le domaine les portait deja (Course::concepts), ils etaient LUS mais jamais consommes. C'est le lien que
+    // Course.h annoncait - « what this lesson teaches, as distances in semitones » - et il sert desormais : l'essai
+    // ouvre un entrainement dont la palette contient exactement ce que la lecon enseigne.
+    Q_PROPERTY( QVariantList currentConcepts READ currentConcepts NOTIFY courseChanged )
+
     [[nodiscard]] bool isReading() const noexcept { return m_readingIndex >= 0; }
 
     [[nodiscard]] QString title() const;
@@ -59,6 +66,8 @@ public:
     [[nodiscard]] QString subtitle() const;
 
     [[nodiscard]] QVariantList blocks() const;
+
+    [[nodiscard]] QVariantList currentConcepts() const;
 
     // LA PAGE OU L'ON SE TROUVE, ET COMBIEN IL Y EN A.
     //

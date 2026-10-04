@@ -3,7 +3,7 @@ titre: La quinte juste
 sous-titre: Deux notes qui n'ont rien à se prouver
 chapitre: 1
 ordre: 1
-concepts: 7
+concepts: 0, 7
 ---
 
 

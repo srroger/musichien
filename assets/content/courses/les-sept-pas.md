@@ -3,7 +3,7 @@ titre: Les sept pas
 sous-titre: D'où vient une gamme
 chapitre: 3
 ordre: 1
-concepts: 12
+concepts: 7, 12
 ---
 
 

@@ -295,6 +295,25 @@ QString CourseController::subtitle() const
     return QString::fromStdString( m_courses.at( static_cast<std::size_t>( m_readingIndex ) ).subtitle );
 }
 
+QVariantList CourseController::currentConcepts() const
+{
+    QVariantList concepts;
+
+    if( m_readingIndex < 0 )
+    {
+        return concepts;
+    }
+
+    // Les distances telles quelles, dans l'ordre du fichier. Le domaine les a lues comme des DEMI-TONS, jamais comme des
+    // noms - et c'est ce que le controleur d'entrainement attend de son cote.
+    for( const std::int32_t semitones : m_courses.at( static_cast<std::size_t>( m_readingIndex ) ).concepts )
+    {
+        concepts.append( semitones );
+    }
+
+    return concepts;
+}
+
 QVariantList CourseController::blocks() const
 {
     QVariantList blockList;

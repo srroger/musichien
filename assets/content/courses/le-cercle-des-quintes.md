@@ -3,7 +3,7 @@ titre: Le cercle des quintes
 sous-titre: La carte de toute la musique
 chapitre: 2
 ordre: 2
-concepts: 7
+concepts: 7, 12
 ---
 
 

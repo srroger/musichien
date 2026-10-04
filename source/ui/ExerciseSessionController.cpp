@@ -1318,30 +1318,90 @@ void ExerciseSessionController::startTrainingSession( int p_family )
     beginSession( std::move( settings ) );
 }
 
-void ExerciseSessionController::startTrainingSessionFromLesson( int p_semitones )
+void ExerciseSessionController::startTrainingSessionFromLesson( const QVariantList & p_concepts )
 {
-    // LE COURS CHANGE LES QUESTIONS SUIVANTES, ET RIEN DE PLUS.
+    // ON PART DE CE QUE LE COURS ENSEIGNE, ET RIEN D'AUTRE.
     //
-    // Roger a choisi la version qui ne triche pas : « le concept devient PRIORITAIRE en revision : biais du tirage vers
-    // ce que tu viens d'etudier (sans elargir la palette) ». Un cours ne fait donc pas APPRENDRE un intervalle - il le
-    // met en avant. L'intervalle entre dans la palette le jour ou le joueur le reconnait a l'oreille, comme les autres,
-    // et c'est la palette adaptative qui en decide.
+    // Roger, 04/10/2026 : « il faut cabler les intervalles pour acceder a la tierce. Actuellement ca ouvre le jeu avec
+    // octave et quinte juste. » Il avait raison, et la cause etait une regle mal placee : l'ancien mecanisme posait un
+    // FOCUS D'ETUDE, mais le focus ne fait que PONDERER ce que la palette contient deja (voir drawTarget). Un cours de
+    // la tierce ouvrait donc une session SANS tierce - la donnee etait bien lue, elle ne servait a rien.
     //
-    // Le focus REMPLACE le precedent, il ne s'y ajoute pas : « ce que tu viens d'etudier » est le dernier cours lu, et
-    // accumuler ferait d'un joueur curieux un joueur dont toutes les questions viennent de ses lectures.
+    // LA VERSION PRECISE : la session recoit une palette FIGEE qui est celle du joueur AUGMENTEE des concepts de la
+    // lecon. Pas de bruit, rien que la lecon ne parle pas - le joueur travaille ce qu'il vient de lire, a cote de ce
+    // qu'il connait deja.
     //
-    // Et il est ECRIT dans le profil : une lecon lue le soir doit encore orienter les questions du lendemain. Sans cette
-    // ecriture, le mecanisme ne durerait pas plus longtemps que la session qu'il vient d'ouvrir.
-    m_studyFocus.assign( 1, p_semitones );
+    // FIGEE (paletteIsFixed), et c'est le MEME mecanisme que le GodMode : il evite le piege de widenPalette, qui
+    // RECONSTRUIT la palette depuis le debut de l'ordre d'apprentissage - une palette sur mesure y perdrait ses
+    // concepts des le premier succes.
+    leaveReviewMode();
+
+    m_gameMode = domain::GameMode::Training;
+
+    // La famille est RETENUE : « Rejouer » rejoue le meme Entrainement.
+    m_lastTrainingFamily = 0;
+
+    const domain::PlayerLevel level = m_playerLevel.value_or( domain::PlayerLevel::Beginner );
+
+    domain::SessionSettings settings = domain::trainingSettingsFor( level, domain::QuestionFamily::Interval );
+
+    // Les concepts, en distances. Un contenu qui n'en porte aucun ne fabrique PAS de session : une carte morte vaut
+    // mieux qu'une page qui plante, et le contrat des contenus dit qu'une faute coute un cours, jamais l'application.
+    std::vector<std::int32_t> concepts;
+    concepts.reserve( static_cast<std::size_t>( p_concepts.size() ) );
+
+    for( const QVariant & entry : p_concepts )
+    {
+        bool isNumber = false;
+        const int semitones = entry.toInt( &isNumber );
+
+        if( isNumber && ( semitones >= 0 ) && ( semitones <= domain::MAXIMUM_INTERVAL_SEMITONES ) )
+        {
+            concepts.push_back( semitones );
+        }
+    }
+
+    if( concepts.empty() )
+    {
+        return;
+    }
+
+    // LE FOCUS D'ETUDE, comme avant : ce que le joueur vient de lire est tire PLUS SOUVENT dans le JEU ORDINAIRE. Et il
+    // est ECRIT dans le profil, donc il survit a la fermeture de l'application - une lecon lue le soir oriente les
+    // questions du lendemain.
+    m_studyFocus = concepts;
 
     if( m_levelStore != nullptr )
     {
         m_levelStore->storeStudyFocus( m_studyFocus );
     }
 
-    // L'entrainement de la famille des INTERVALLES s'ouvre : c'est celui que le cours vient de preparer. Un cours de
-    // modes ou d'accords ouvrira la sienne le jour ou ses cartes existeront - la famille est deja un parametre.
-    startTrainingSession( 0 );
+    settings.studyFocus = m_studyFocus;
+
+    // LA PALETTE : EXACTEMENT les concepts de la lecon, et RIEN de plus.
+    //
+    // Roger, 04/10/2026 : « un exercice d'intervalle particulier pour le cours, avec SEULEMENT la tierce majeure et
+    // mineure ». L'exercice ne se melange donc NI a ce que le joueur connait, NI a ses reglages : c'est un exercice SUR
+    // LA LECON, ou chaque reponse possible est un intervalle que la lecon vient de nommer. Rien d'autre n'entre.
+    std::vector<domain::Interval> palette;
+    palette.reserve( concepts.size() );
+
+    for( const std::int32_t semitones : concepts )
+    {
+        const domain::Interval interval = domain::intervalFromSemitones( semitones );
+
+        if( std::ranges::find( palette, interval ) == palette.end() )
+        {
+            palette.push_back( interval );
+        }
+    }
+
+    // FIGEE (paletteIsFixed), le mecanisme du GodMode : la palette ne doit surtout pas S'ELARGIR vers les intervalles
+    // du niveau, qui n'ont rien a faire dans un exercice sur la lecon.
+    settings.intervalPalette = std::move( palette );
+    settings.paletteIsFixed = true;
+
+    beginSession( std::move( settings ) );
 }
 
 void ExerciseSessionController::restartSession()
