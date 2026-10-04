@@ -1011,6 +1011,12 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
 
     ++m_consecutiveErrors;
 
+    // UNE ERREUR, MEME SI LA QUESTION RESTE OUVERTE.
+    //
+    // La question n'est pas conclue - le joueur va la reprendre - mais il s'est deja trompe, et l'ecran de fin doit le
+    // savoir. C'est la seule chose que ce compteur a de plus que `asked` : voir FamilyTally::missed.
+    m_familyTally.registerMiss( familyOf( m_currentQuestion.kind ) );
+
     // ET L'ERREUR NE REMET A ZERO QUE SA FAMILLE.
     //
     // C'est la meme regle que la montee, vue de l'autre cote : se tromper sur un mode ne doit pas annuler ce qu'on vient
@@ -1336,6 +1342,11 @@ void FamilyTally::registerQuestion( QuestionFamily p_family, bool p_wasCorrect )
     {
         ++correct.at( index );
     }
+}
+
+void FamilyTally::registerMiss( QuestionFamily p_family ) noexcept
+{
+    ++missed.at( static_cast<std::size_t>( p_family ) );
 }
 
 std::size_t FamilyTally::askedIn( QuestionFamily p_family ) const noexcept

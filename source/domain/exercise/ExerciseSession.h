@@ -197,25 +197,33 @@ struct FamilyTally
     std::array<std::size_t, QUESTION_FAMILY_COUNT> asked{};
     std::array<std::size_t, QUESTION_FAMILY_COUNT> correct{};
 
+    // LES ERREURS, comptees a CHAQUE reponse fausse - pas a chaque question perdue.
+    //
+    // C'est ce que le premier jet n'avait pas compris, et il a fallu que Roger joue pour le voir : « a la fin je vois
+    // aucune erreur alors que j'ai eu des erreurs ». Le raccourci paraissait si evident - erreurs = demandees moins
+    // reussies - qu'il n'a pas ete verifie. Or 'asked' compte les questions CONCLUES : une reponse fausse qui laisse des
+    // vies n'y figure pas, puisque la question se represente et finit par etre conclue JUSTE. Le compte rendait donc
+    // zero pour une partie ou l'on s'etait trompe dix fois, et un test ne l'aurait pas vu : il comptait registre, pas
+    // partie.
+    //
+    // Ce tableau est donc tenu separement, et il n'y a rien de plus a comprendre : une erreur, un cran.
+    std::array<std::size_t, QUESTION_FAMILY_COUNT> missed{};
+
     void registerQuestion( QuestionFamily p_family, bool p_wasCorrect ) noexcept;
+
+    // Une reponse fausse, meme si la question reste ouverte. C'est elle que lit l'ecran de fin d'Arcade.
+    void registerMiss( QuestionFamily p_family ) noexcept;
 
     [[nodiscard]] std::size_t askedIn( QuestionFamily p_family ) const noexcept;
     [[nodiscard]] std::size_t correctIn( QuestionFamily p_family ) const noexcept;
 
-    // LES ERREURS, c'est-a-dire les tentatives qui n'ont pas abouti.
+    // Les erreurs de cette famille : le nombre de fois ou le joueur s'est trompe.
     //
-    // Roger, en lisant l'ecran de fin d'une Arcade : « on ecrit les pourcentages de reussite des questions, et on voit du
-    // coup 100 % partout. Mais ca n'a pas trop de sens, car forcement s'il arrive a la fin il aura du 100 % partout. »
-    //
-    // Il a raison, et c'est une TAUTOLOGIE : une Arcade se termine quand ses questions sont conclues, donc un pourcentage
-    // de reussite y vaut toujours cent. Le chiffre est juste et il n'apprend rien.
-    //
-    // Ce que le joueur se demande en sortant, c'est OU il a perdu. Et comme le dosage de l'Arcade est FIXE - dix
-    // intervalles, huit accords, sept modes - les trois nombres d'erreurs se comparent directement, ce qu'un pourcentage
-    // ne faisait pas.
+    // C'est aussi le nombre de coeurs qu'elle a coutes, puisqu'une erreur coute un coeur - et comme le dosage d'une
+    // Arcade est fixe, dix, huit, sept, les trois nombres se comparent directement.
     [[nodiscard]] std::size_t errorsIn( QuestionFamily p_family ) const noexcept
     {
-        return askedIn( p_family ) - correctIn( p_family );
+        return missed.at( static_cast<std::size_t>( p_family ) );
     }
 
     // Reussite de cette famille, en pour cent entiers. ZERO quand rien n'a ete demande, et c'est honnete : une famille
