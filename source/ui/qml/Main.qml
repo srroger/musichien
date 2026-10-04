@@ -738,6 +738,12 @@ ApplicationWindow {
             contentWidth: availableWidth
 
             ColumnLayout {
+                // LA LARGEUR DE LA COLONNE EST CELLE DU VIEWPORT, explicitement.
+                // Sans cette ligne, le ColumnLayout prend sa largeur IMPLICITE - celle de son enfant le plus large - et
+                // une rangee de trois boutons plus large que les autres se retrouvait centree sur une colonne plus
+                // etroite qu'elle, donc rognee d'un cote. C'est le defaut que Roger a souleve : « les boutons qui sont 3
+                // sur une ligne depassent tres legerement en largeur... on le voit tres rapidement qu'un cote est coupe.
+                // C'est un defaut present depuis l'origine. »
                 // --------------------------------------------------------------------------------------------
                 // The three shortcuts
                 // They are presets of the bench below: the quickest way to check that the sound comes
@@ -1023,6 +1029,7 @@ ApplicationWindow {
 
                     TintedMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
                         tintColour: mainWindow.trainingColour
                         labelColour: mainWindow.trainingLabelColour
@@ -1032,6 +1039,7 @@ ApplicationWindow {
 
                     TintedMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
                         tintColour: mainWindow.trainingColour
                         labelColour: mainWindow.trainingLabelColour
@@ -1041,6 +1049,7 @@ ApplicationWindow {
 
                     TintedMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
                         tintColour: mainWindow.trainingColour
                         labelColour: mainWindow.trainingLabelColour
@@ -1131,19 +1140,32 @@ ApplicationWindow {
                 // s'ouvre a cote.
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: mainWindow.buttonWidth
+                    // LA RANGEE PREND LA LARGEUR DE LA PAGE, moins une petite marge - et JAMAIS moins que ce que ses
+                    // boutons demandent, parce que chacun d'eux peut se retracter (voir « Layout.minimumWidth: 0 »).
+                    // C'est ce qui garantit qu'aucune bordure ne se retrouve coupee, quelle que soit la largeur du
+                    // telephone.
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 12
+                    Layout.rightMargin: 12
                     spacing: 8
 
                     NeonMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
+                        // UN CRAN PLUS PETIT QUE LES GRANDS BOUTONS, et c'est justifie : Roger le dit lui-meme, « ces 3
+                        // types de jeux sont vraiment des sous-modes de l'arcade ». Trois mots en capitales partagent
+                        // ici une largeur de telephone - un cran de moins, et ils tiennent tous.
+                        labelSize: 14
                         text: qsTr("Mode infini")
                         onClicked: ExerciseController.startInfiniteSession()
                     }
 
                     NeonMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
+                        labelSize: 14
                         text: qsTr("Chanter")
                         onClicked: {
                             MicrophoneController.startSingingSession();
@@ -1153,7 +1175,9 @@ ApplicationWindow {
 
                     NeonMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
+                        labelSize: 14
                         text: qsTr("Survie")
                         onClicked: ExerciseController.startSurvivalSession()
                     }
@@ -4555,18 +4579,28 @@ ApplicationWindow {
     // Ce qu'on perd, et il faut le dire : le fond Material porte aussi l'effet d'encre au toucher. Un cadre transparent
     // n'en a pas. Sur trois petits boutons qui ouvrent une page, le trait fixe dit plus que l'ondulation.
     component NeonMenuButton: MenuButton {
+        // Le fond, et la taille du mot : les deux memes reglages que le bouton teinte, pour que les rangees se
+        // ressemblent la ou elles doivent se ressembler.
+
         id: neonButton
 
+        // LE FOND, JUSTEMENT. Roger : « oui je comprends le fait que le fond transparent rend le bouton moins envie de
+        // cliquer. peut etre un fond moins rose et moins flashy (mais pas le marron d'avant) en gardant la bordure +
+        // neon ». Ni rose, ni marron : un violet profond de la meme famille que la page, juste assez clair pour qu'on
+        // voie une surface a toucher.
+        property color surfaceColour: "#2e1c52"
+        property int labelSize: 15
         readonly property color neonBorderColour: Material.accent
         // Le libelle est le meme neon, ECLAIRCI : assez clair pour se lire sur le violet profond de la page, assez lie
         // pour que l'oeil voie qu'il appartient a la meme famille que le trait.
         readonly property color neonLabelColour: Qt.lighter(neonButton.neonBorderColour, 1.9)
 
-        Material.background: "transparent"
+        font.pixelSize: neonButton.labelSize
+        Material.background: neonButton.surfaceColour
         Material.foreground: neonButton.neonLabelColour
 
         background: Rectangle {
-            color: "transparent"
+            color: neonButton.surfaceColour
             radius: 5
             border.width: 2
             border.color: neonButton.neonBorderColour

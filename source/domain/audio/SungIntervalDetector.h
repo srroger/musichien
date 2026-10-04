@@ -80,13 +80,17 @@ private:
     //     stabiliser que le jeu me la compte. C'est un peu frustrant. »
     //   * 1200 : la duree plus longue, qui FORCE le chanteur a poser sa voix. Roger l'a trouvee « toujours un peu dure » -
     //     et une barre qui se remplit trop lentement decourage celui qu'elle est censee aider.
-    //   * 1000 : entre les deux, et c'est le reglage actuel. Assez long pour ignorer un tremblement, une respiration ou un
-    //     glissement - une note tenue une seconde est une note VOULUE ; assez court pour qu'un debutant voie sa barre se
-    //     remplir PENDANT qu'il chante.
+    //   * 1000 : le milieu, essaye apres coup. Roger : « la tenue de la note est encore un peu longue peut etre 900ms ce
+    //     serai bien. Apres la ca va quand meme c'est du pinaillage. Je prefere que la note soit bien tenu plutot que
+    //     sans faire expres. »
+    //   * 900 : le reglage actuel. Sa phrase dit tout ce qu'il faut retenir : ce nombre se pousse d'un cote ou de
+    //     l'autre a quelques centaines de millisecondes pres, et le cote ou il vaut mieux se tromper est celui de la
+    //     note BIEN TENUE. Un dixieme de trop coute une respiration ; un dixieme de moins fait compter une note que le
+    //     chanteur n'a pas voulue.
     //
     // La barre REPART de zero des que la note bouge, donc ce nombre est ce que le chanteur regarde vraiment : il se regle
     // a son souffle, jamais a une theorie du signal.
-    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 1000;
+    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 900;
 
     // Combien de temps de silence fait une REPRISE.
     //
