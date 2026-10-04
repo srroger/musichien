@@ -285,6 +285,49 @@ void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Co
         return block;
     }
 
+    // ":: image | nom-du-fichier | ce que l'image montre"
+    //
+    // LE NOM, ET JAMAIS UNE ADRESSE : l'application n'a pas la permission d'acces au reseau, donc une image distante ne
+    // s'afficherait pas - et le telephone ne le dirait pas non plus. Le fichier voyage avec le binaire.
+    //
+    // Le deuxieme champ est le nom SANS dossier ni extension : c'est l'ecran qui sait ou vivent les images, et un cours
+    // qui ecrirait 'qrc:/assets/...' casserait le jour ou elles demenagent.
+    if( keyword == "image" )
+    {
+        if( fields.size() < 3 )
+        {
+            std::cerr << "Musichien: an ':: image' card needs a file name and a caption: "
+                         ":: image | nom-du-fichier | ce que l'image montre. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::Image;
+        block.imageName = fields[1];
+        block.caption = fields[2];
+
+        return block;
+    }
+
+    // ":: serie | ce qu'on entend"
+    //
+    // La serie harmonique d'une note, en montant : le jeu la joue, et c'est la demonstration du chapitre de la quinte -
+    // le sol est DEJA dans le do, et on l'entend y etre.
+    if( keyword == "serie" )
+    {
+        if( fields.size() < 2 )
+        {
+            std::cerr << "Musichien: a ':: serie' card needs a caption. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::HarmonicSeries;
+        block.caption = fields[1];
+
+        return block;
+    }
+
     // ":: chante | demi_tons:7 | ce qu'on demande de chanter"
     //
     // Meme forme que ':: essai', et la meme distance : ce que ce genre ajoute, ce n'est pas une donnee, c'est une PORTE -

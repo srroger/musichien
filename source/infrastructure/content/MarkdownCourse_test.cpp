@@ -229,4 +229,40 @@ TEST( MarkdownCourseTest, a_singing_card_carries_its_distance )
     EXPECT_EQ( course->blocks.at( 0 ).caption, "Chante le sol" );
 }
 
+// ":: image" PORTE UN NOM DE FICHIER, JAMAIS UNE ADRESSE - et c'est une regle, pas un gout.
+//
+// L'application n'a pas la permission d'acces au reseau : c'est la charte du projet. Une image venue d'une adresse ne
+// s'afficherait donc pas, et le telephone ne le dirait pas non plus - juste un trou dans la page, que personne ne sait
+// expliquer. L'image voyage avec le binaire, comme les cours et les indices.
+//
+// Le nom est celui du fichier, SANS dossier ni extension : le chemin se construit a l'ecran, la ou l'on sait ou vivent
+// les images. Un cours qui ecrirait « qrc:/... » casserait le jour ou elles demenagent.
+TEST( MarkdownCourseTest, an_image_card_carries_a_file_name_and_its_caption )
+{
+    const std::optional<musichien::domain::Course> course =
+      readCourse( ":: image | pythagore-forgerons | Pythagore et les forgerons\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Image );
+    EXPECT_EQ( course->blocks.at( 0 ).imageName, "pythagore-forgerons" );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "Pythagore et les forgerons" );
+}
+
+// ":: serie" N'A BESOIN QUE D'UNE LEGENDE. Ce qu'elle joue ne se parametre pas : c'est LA serie harmonique, toujours la
+// meme, et un cours n'a pas a choisir jusqu'a quel rang. Six rangs, parce que le septieme est faux - et cette decision
+// appartient au jeu, pas au fichier de contenu.
+TEST( MarkdownCourseTest, a_series_card_needs_only_a_caption )
+{
+    const std::optional<musichien::domain::Course> course =
+      readCourse( ":: serie | ecoute la serie harmonique d'un do\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::HarmonicSeries );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "ecoute la serie harmonique d'un do" );
+}
+
 }    // namespace musichien::infrastructure

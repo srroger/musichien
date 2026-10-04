@@ -104,6 +104,15 @@ public:
     // fois serait deux occasions de se tromper.
     Q_INVOKABLE void playInterval( int p_semitones, int p_direction );
 
+    // LA SERIE HARMONIQUE D'UNE NOTE, du fondamental au sixieme rang.
+    //
+    // Roger, sur l'os a macher de la quinte : « je mettrais bien un bouton qui joue les notes dont on parle ». Tout ce
+    // chapitre repose sur cette serie, et l'ENTENDRE vaut mieux que la lire dans un tableau.
+    //
+    // Six rangs et pas sept : le septieme est faux, et il n'a rien a faire dans une demonstration dont le sujet est que
+    // l'oreille reconnait les autres.
+    Q_INVOKABLE void playHarmonicSeries();
+
     Q_INVOKABLE void stopPlayback();
 
 signals:

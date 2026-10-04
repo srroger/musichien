@@ -33,6 +33,12 @@ constexpr const char * KIND_TRY = "try";
 constexpr const char * KIND_SING = "sing";
 constexpr const char * KIND_ANNEXE = "annexe";
 
+// ":: image" - une illustration du propos. Le QML dessine l'image, puis sa legende : rien de plus.
+constexpr const char * KIND_IMAGE = "image";
+
+// ":: serie" - la serie harmonique d'une note, jouee. Le jeu la joue, l'ecran la nomme.
+constexpr const char * KIND_SERIES = "serie";
+
 [[nodiscard]] const char * kindName( domain::CourseBlock::Kind p_kind ) noexcept
 {
     switch( p_kind )
@@ -47,6 +53,10 @@ constexpr const char * KIND_ANNEXE = "annexe";
             return KIND_SING;
         case domain::CourseBlock::Kind::Annexe:
             return KIND_ANNEXE;
+        case domain::CourseBlock::Kind::Image:
+            return KIND_IMAGE;
+        case domain::CourseBlock::Kind::HarmonicSeries:
+            return KIND_SERIES;
         case domain::CourseBlock::Kind::Text:
         default:
             return KIND_TEXT;
@@ -71,6 +81,7 @@ constexpr const char * KIND_ANNEXE = "annexe";
     description.insert( QStringLiteral( "cardTitle" ), QString::fromStdString( p_block.title ) );
     description.insert( QStringLiteral( "listenFor" ), QString::fromStdString( p_block.listenFor ) );
     description.insert( QStringLiteral( "annexeName" ), QString::fromStdString( p_block.annexeName ) );
+    description.insert( QStringLiteral( "imageName" ), QString::fromStdString( p_block.imageName ) );
 
     return description;
 }
@@ -364,6 +375,36 @@ void CourseController::playInterval( int p_semitones, int p_direction )
     {
         m_notePlayer.playMelody( notes, MELODIC_GAP );
     }
+}
+
+void CourseController::playHarmonicSeries()
+{
+    // LES PREMIERS RANGS DE LA SERIE HARMONIQUE D'UN DO, joues l'un apres l'autre.
+    //
+    // Les rangs, en demi-tons au-dessus du fondamental :
+    //   1.  0  do   le fondamental, celui qu'on croit entendre seul
+    //   2. 12  do   l'octave
+    //   3. 19  sol  LA QUINTE - celle qui nous occupe, et deja presente dans le do
+    //   4. 24  do
+    //   5. 28  mi   la tierce majeure, plus haut donc plus faible : c'est de la que vient sa couleur
+    //   6. 31  sol
+    //
+    // ON S'ARRETE AU SIXIEME, et ce n'est pas une commodite : le septieme rang est FAUX - ni la, ni si bemol - et il
+    // jetterait le doute sur une demonstration dont le sujet est justement que l'oreille reconnait tous les autres.
+    //
+    // EN MELODIE, l'une apres l'autre, et jamais empilees : un accord dirait « ces notes vont ensemble », alors que ce
+    // qu'on veut montrer est que le sol ARRIVE dans le do - il y etait deja.
+    static constexpr std::array<std::int32_t, 6> HARMONIC_SEMITONES{ 0, 12, 19, 24, 28, 31 };
+
+    std::vector<domain::Note> notes;
+    notes.reserve( HARMONIC_SEMITONES.size() );
+
+    for( const std::int32_t semitones : HARMONIC_SEMITONES )
+    {
+        notes.emplace_back( EXERCISE_ROOT_MIDI_NUMBER + semitones );
+    }
+
+    m_notePlayer.playMelody( notes, MELODIC_GAP );
 }
 
 void CourseController::stopPlayback()

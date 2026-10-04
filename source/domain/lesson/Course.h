@@ -57,7 +57,20 @@ struct CourseBlock
         SingInterval,
 
         // ":: annexe" - the way to the long annexe.
-        Annexe
+        Annexe,
+
+        // ":: image" - UNE ILLUSTRATION DU PROPOS, prise dans les ressources du jeu.
+        //
+        // Jamais une adresse : l'application n'a PAS la permission d'acces au reseau - c'est la charte du projet - donc
+        // une image distante ne s'afficherait tout simplement pas, et le telephone ne le dirait pas. L'image voyage
+        // avec le binaire, comme les cours et les indices.
+        Image,
+
+        // ":: serie" - LES PREMIERS HARMONIQUES D'UNE NOTE, joues l'un apres l'autre.
+        //
+        // Une carte a part et non un ':: jeu' : ce n'est pas un intervalle, c'est une EMPILEMENT - et c'est ce que le
+        // chapitre de la quinte demande d'entendre. Le jeu joue ce qu'il sait jouer ; il sait jouer ca.
+        HarmonicSeries
     };
 
     Kind kind{ Kind::Text };
@@ -86,6 +99,12 @@ struct CourseBlock
 
     // Kind::Annexe - the name of the annexe, as that file's own front matter gives it.
     std::string annexeName;
+
+    // Kind::Image - LE NOM DU FICHIER, sans chemin et sans dossier.
+    //
+    // Le chemin est construit par l'ecran, a partir d'un dossier unique : un cours n'ecrit jamais 'qrc:/...', parce
+    // qu'un chemin dans un fichier de contenu est un chemin qui se casse le jour ou l'image demenage.
+    std::string imageName;
 };
 
 // UNE SECTION, c'est-a-dire un « ## » du fichier et ce qu'il introduit.

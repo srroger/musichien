@@ -390,6 +390,11 @@ Item {
                     // LA CARTE "POUR ALLER PLUS LOIN" : elle ouvre l'ANNEXE.
                     // Une annexe n'est pas une autre sorte de contenu : c'est un cours range a la fin du catalogue,
                     // et celui-ci se lit donc avec le MEME lecteur, la meme pagination et le meme retour.
+                    // LA CARTE "IMAGE" : une gravure, et sa legende.
+                    // L'ADRESSE SE CONSTRUIT ICI, a partir d'un nom et d'un dossier unique. Un cours n'ecrit jamais
+                    // « qrc:/... » : un chemin dans un fichier de contenu est un chemin qui se casse le jour ou
+                    // l'image demenage.
+                    // LA CARTE "SERIE" : le jeu joue la serie harmonique, et l'ecran la nomme.
 
                     model: CourseController.blocks
 
@@ -609,6 +614,69 @@ Item {
                                 onClicked: {
                                     ExerciseController.playTapCue();
                                     courseScreen.annexeRequested(modelData.annexeName);
+                                }
+                            }
+
+                        }
+
+                        // Et l'image est EMBARQUEE, jamais distante : l'application n'a pas la permission d'acces au
+                        // reseau - c'est la charte du projet - donc une image venant d'une adresse ne s'afficherait pas,
+                        // et le telephone ne le dirait pas.
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "image"
+                            spacing: 6
+
+                            Image {
+                                Layout.fillWidth: true
+                                // Une hauteur MAXIMALE : sans elle, une image haute mangerait trois pages de defilement.
+                                // PreserveAspectFit garde les proportions, donc rien n'est deforme.
+                                Layout.preferredHeight: 380
+                                source: "qrc:/assets/content/images/" + modelData.imageName + ".png"
+                                fillMode: Image.PreserveAspectFit
+                                asynchronous: true
+                                smooth: true
+                            }
+
+                            Text {
+                                Layout.preferredWidth: 0
+                                Layout.minimumWidth: 0
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                color: "#8a77ad"
+                                font.pixelSize: 12
+                                text: modelData.caption
+                            }
+
+                        }
+
+                        // C'est la carte qui rend le chapitre audible. « La quinte est DANS la note » se lit en trois
+                        // secondes et se croit sur parole ; l'entendre, c'est autre chose.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "serie"
+                            implicitHeight: seriesText.implicitHeight + 24
+                            radius: 10
+                            color: "#21351f"
+                            border.color: "#3f6a3a"
+                            border.width: 1
+
+                            Text {
+                                id: seriesText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#cdeec6"
+                                font.pixelSize: 14
+                                text: qsTr("🎼  %1").arg(modelData.caption)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    CourseController.playHarmonicSeries();
                                 }
                             }
 
