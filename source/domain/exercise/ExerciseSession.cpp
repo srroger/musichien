@@ -13,6 +13,14 @@ namespace musichien::domain
 namespace
 {
 
+// COMBIEN DE FOIS PLUS SOUVENT UN INTERVALLE ETUDIE EST TIRE.
+//
+// Quatre, et ce n'est pas un reglage : c'est le seul chiffre du mecanisme, et il se discute ici plutot que dans un
+// fichier. Assez haut pour que le joueur REMARQUE que la lecon qu'il vient de lire sert a quelque chose - a la moitie
+// des questions, on ne verrait qu'un hasard. Assez bas pour que la session ne devienne pas une redite du cours : le
+// reste de la palette garde ses chances, et une entree non etudiee reste toujours atteignable.
+constexpr double STUDIED_DRAW_WEIGHT = 4.0;
+
 // La cellule d'une question rythmique.
 //
 // L'index vient du domaine lui-meme, donc il est valide. Le garde-fou est la pour qu'une liste de cellules qui
@@ -327,11 +335,36 @@ IntervalDirection ExerciseSession::drawDirection()
 
 Interval ExerciseSession::drawTarget()
 {
-    // Every interval of the palette has the same chance, including the newest one. Weighting the draw
-    // towards what the player struggles with would be a better exercise and a worse game: it would
-    // make the session feel like it is picking on them, and the adaptive palette already does the work
-    // of keeping the questions at the right level.
-    std::uniform_int_distribution<std::size_t> distribution{ 0, m_palette.size() - 1 };
+    // CE QUE LE JOUEUR VIENT D'ETUDIER EST TIRE PLUS SOUVENT - et ce n'est PAS ce que ce fichier refusait autrefois.
+    //
+    // La version precedente refusait de ponderer vers ce que le joueur RATE, et elle avait raison : « insister sur tes
+    // faiblesses » fait sentir une session qui s'acharne, et la palette adaptative fait deja le travail de garder les
+    // questions au bon niveau.
+    //
+    // Le FOCUS D'ETUDE est l'inverse. Il ne dit pas « tu es mauvais ici » - il dit « tu viens de lire une lecon sur
+    // ca ». C'est une CONTINUITE avec ce que le joueur vient de faire, pas une punition : un joueur qui ferme une lecon
+    // sur la quinte juste et tombe sur la quinte juste ne se dit pas qu'on l'attaque, il se dit que la lecon servait a
+    // quelque chose.
+    //
+    // ET LE FOCUS N'ELARGIT JAMAIS LA PALETTE : un concept absent de la palette est simplement ignore ci-dessous. Le
+    // poids change la FREQUENCE, jamais l'ensemble des reponses possibles - donc un joueur ne peut pas tomber sur un
+    // intervalle qu'on ne lui a pas enseigne.
+    std::vector<double> weights;
+    weights.reserve( m_palette.size() );
+
+    for( const Interval & interval : m_palette )
+    {
+        const bool isStudied = std::find( m_settings.studyFocus.begin(),
+                                          m_settings.studyFocus.end(),
+                                          interval.semitones() )
+                               != m_settings.studyFocus.end();
+
+        weights.push_back( isStudied ? STUDIED_DRAW_WEIGHT : 1.0 );
+    }
+
+    // discrete_distribution et non uniforme : c'est ce qui permet de peser SANS retirer personne du tirage. Une entree
+    // non etudiee garde son poids de 1, donc elle reste parfaitement atteignable - elle est seulement moins frequente.
+    std::discrete_distribution<std::size_t> distribution{ weights.begin(), weights.end() };
 
     return m_palette.at( distribution( m_randomEngine ) );
 }

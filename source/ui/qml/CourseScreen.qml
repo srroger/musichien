@@ -471,7 +471,10 @@ Item {
                                     // ON NE FERME PAS L'ECOLE : l'ecran d'exercice est un calque declare PLUS BAS, donc il
                                     // passe par-dessus la page. Quitter la partie fait alors RETOMBER sur la lecon qu'on
                                     // etait en train de lire - ce que Roger attend, et non la page de garde.
-                                    ExerciseController.startTrainingSession(0);
+                                    // L'ENTRAINEMENT DE CE COURS, et non l'entrainement en general : l'intervalle que la
+                                    // lecon vient d'enseigner est mis en avant dans les questions qui suivent, sans jamais
+                                    // elargir la palette du joueur. C'est ce qui fait qu'une lecon change quelque chose.
+                                    ExerciseController.startTrainingSessionFromLesson(modelData.semitones);
                                 }
                             }
 

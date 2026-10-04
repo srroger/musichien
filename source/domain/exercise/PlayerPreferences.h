@@ -151,6 +151,18 @@ public:
 
     virtual void storeTuningRoot( Note p_root ) = 0;
 
+    // CE QUE LE JOUEUR VIENT D'ETUDIER DANS UN COURS, en distances.
+    //
+    // Persiste, et c'est tout l'interet : une lecon lue le soir doit encore orienter les questions du LENDEMAIN. Un
+    // focus qui ne survit pas a une fermeture de l'application ne serait pas un plan de revision, seulement une session
+    // un peu differente - et c'est exactement la promesse que la note 29 faisait au joueur.
+    //
+    // La liste peut etre vide, et c'est le cas normal d'un joueur qui n'a rien lu : il joue alors exactement comme avant
+    // que ce mecanisme existe.
+    [[nodiscard]] virtual std::vector<std::int32_t> storedStudyFocus() const = 0;
+
+    virtual void storeStudyFocus( std::vector<std::int32_t> p_focus ) = 0;
+
     // The A4 diapason, in hertz. 440 is the modern reference, but whole families of instruments are built sharper on
     // purpose - wind instruments, to sound brighter - and a tuner that cannot follow them is a tuner that only tunes
     // pianos. Stored as a plain number.
@@ -326,6 +338,10 @@ public:
 
     void storeTuningRoot( Note p_root ) override { m_tuningRoot = p_root; }
 
+    [[nodiscard]] std::vector<std::int32_t> storedStudyFocus() const override { return m_studyFocus; }
+
+    void storeStudyFocus( std::vector<std::int32_t> p_focus ) override { m_studyFocus = std::move( p_focus ); }
+
     [[nodiscard]] double storedReferencePitch() const override { return m_referencePitch; }
 
     void storeReferencePitch( double p_hertz ) override { m_referencePitch = p_hertz; }
@@ -447,6 +463,10 @@ private:
     std::int64_t m_perfectBilanCount{ 0 };
     std::int64_t m_bilanSuccessStreak{ 0 };
     std::int64_t m_longestBilanSuccessStreak{ 0 };
+
+    // Ce que le joueur vient d'etudier dans un cours. VIDE par defaut, comme sur un profil neuf : les tests d'avant ce
+    // mecanisme jouent donc exactement ce qu'ils jouaient.
+    std::vector<std::int32_t> m_studyFocus;
 };
 
 }    // namespace musichien::domain

@@ -1,9 +1,13 @@
 #include "infrastructure/preferences/QSettingsPlayerPreferences.h"
 
 #include <QSettings>
+#include <QString>
+#include <QStringList>
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <vector>
 
 namespace musichien::infrastructure
 {
@@ -42,6 +46,13 @@ constexpr const char * TUNING_ROOT_KEY = "player/tuning-root";
 
 // The A4 diapason, in hertz.
 constexpr const char * REFERENCE_PITCH_KEY = "player/reference-pitch";
+
+// CE QUE LE JOUEUR VIENT D'ETUDIER DANS UN COURS, en distances.
+//
+// Une LISTE de nombres, comme les instruments : le fichier de reglages reste lisible, et une valeur ajoutee ne peut pas
+// decaler les autres. Une entree illisible est IGNOREE plutot que refusee en bloc - une seule valeur abimee ne doit pas
+// effacer le focus entier.
+constexpr const char * STUDY_FOCUS_KEY = "player/study-focus";
 
 // How many questions in a hundred ask the player to SING, the rest asking him to name the interval.
 constexpr const char * SING_QUESTION_SHARE_KEY = "player/sing-question-share";
@@ -366,6 +377,48 @@ void QSettingsPlayerPreferences::storeTuningRoot( domain::Note p_root )
     QSettings settings;
 
     settings.setValue( TUNING_ROOT_KEY, p_root.midiNumber() );
+}
+
+std::vector<std::int32_t> QSettingsPlayerPreferences::storedStudyFocus() const
+{
+    // UNE ENTREE ILLISIBLE EST IGNOREE, pas fatale : le fichier de reglages est un fichier qu'un joueur curieux peut
+    // ouvrir, et une seule valeur abimee ne doit pas effacer tout ce qu'il a etudie.
+    //
+    // Une distance hors du domaine ne gene pas davantage : le tirage l'ignore simplement, puisqu'elle ne correspond a
+    // aucune entree de la palette. La validation vit donc la ou elle a un sens - dans drawTarget() - et non ici, ou il
+    // faudrait la refaire a chaque changement du domaine.
+    const QStringList stored = QSettings{}.value( STUDY_FOCUS_KEY, QStringList{} ).toStringList();
+
+    std::vector<std::int32_t> focus;
+    focus.reserve( static_cast<std::size_t>( stored.size() ) );
+
+    for( const QString & entry : stored )
+    {
+        bool isNumber = false;
+        const int semitones = entry.toInt( &isNumber );
+
+        if( isNumber && ( semitones >= 0 ) )
+        {
+            focus.push_back( semitones );
+        }
+    }
+
+    return focus;
+}
+
+void QSettingsPlayerPreferences::storeStudyFocus( std::vector<std::int32_t> p_focus )
+{
+    QStringList stored;
+    stored.reserve( static_cast<qsizetype>( p_focus.size() ) );
+
+    for( const std::int32_t semitones : p_focus )
+    {
+        stored << QString::number( semitones );
+    }
+
+    QSettings settings;
+
+    settings.setValue( STUDY_FOCUS_KEY, stored );
 }
 
 double QSettingsPlayerPreferences::storedReferencePitch() const

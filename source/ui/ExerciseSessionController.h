@@ -842,6 +842,15 @@ public:
     // compte dans les statistiques - c'est ce qui nourrit le Bilan - mais ne rapporte rien.
     Q_INVOKABLE void startTrainingSession( int p_family );
 
+    // OUVRIR L'ENTRAINEMENT SUR CE QU'UN COURS VIENT D'ENSEIGNER.
+    //
+    // L'intervalle entre dans le FOCUS D'ETUDE : il est alors tire plus souvent, sans jamais elargir la palette du
+    // joueur. C'est la promesse de la note 29 - « lire un cours change la revision du lendemain » - dans la version que
+    // Roger a choisie le 04/10/2026, celle qui ne triche pas avec sa progression.
+    //
+    // Le focus est ecrit dans le profil : il survit donc a la fermeture de l'application.
+    Q_INVOKABLE void startTrainingSessionFromLesson( int p_semitones );
+
     // REJOUER : relance le MEME mode. Un Entrainement rejoue son Entrainement, un Bilan son Bilan.
     //
     // Le bouton « Rejouer » de l'ecran de fin appelait l'Arcade quoi qu'il arrive - ce qui transformait silencieusement un
@@ -1469,6 +1478,13 @@ private:
 
     // La famille du dernier Entrainement, pour que « Rejouer » rejoue le MEME.
     int m_lastTrainingFamily{ 0 };
+
+    // CE QUE LE JOUEUR VIENT D'ETUDIER DANS UN COURS, en distances.
+    //
+    // Lu dans le profil au demarrage, ecrit quand une carte « :: essai » ouvre un entrainement. Il est pose sur les
+    // reglages de TOUT entrainement : le mecanisme vaut donc aussi pour « Rejouer », ce qui est exactement ce qu'un
+    // joueur attend d'un bouton qui rejoue la meme partie.
+    std::vector<std::int32_t> m_studyFocus;
 
     // Le multiplicateur de la derniere Arcade, en pour cent, FIGE au moment ou elle s'est conclue.
     int m_lastArcadeMultiplierPercent{ 100 };

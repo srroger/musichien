@@ -1830,4 +1830,88 @@ TEST( ExerciseSessionTest, a_wrong_answer_counts_even_when_lives_remain )
     EXPECT_EQ( session.familyTally().askedIn( QuestionFamily::Interval ), 0U );
 }
 
+// CE QUE LE JOUEUR VIENT D'ETUDIER EST TIRE PLUS SOUVENT.
+//
+// Roger, 04/10/2026 : « le concept devient PRIORITAIRE en revision : biais du tirage vers ce que tu viens d'etudier ».
+// C'est une CONTINUITE avec la lecon qu'il vient de lire, et non un acharnement sur ses faiblesses - ce que ce fichier
+// refusait autrefois, et a juste titre.
+//
+// Le test compare DEUX tirages sur la MEME graine : l'un avec un focus, l'autre sans. Aucune supposition n'est donc
+// faite sur la composition de la palette ni sur l'ordre d'apprentissage - seulement sur le fait que le focus rend
+// l'intervalle plus frequent.
+TEST( ExerciseSessionTest, a_studied_interval_is_asked_more_often )
+{
+    constexpr std::size_t QUESTION_COUNT = 300;
+
+    SessionSettings studied = intervalOnlySettings();
+    studied.questionCount = QUESTION_COUNT;
+
+    // Une palette de six intervalles : le focus pese alors 4 contre 1 sur un ensemble assez large pour que l'effet se
+    // voie. Sur une palette de deux, le poids ne pourrait PAS doubler la frequence - il la multiplierait par 1,6 - et une
+    // assertion qui dependrait de la taille de la palette serait un test qui casse au premier reglage.
+    studied.startingPaletteSize = 6;
+
+    // La palette ne bouge pas de la partie : ce test parle du TIRAGE, et une palette qui s'elargit en chemin melangerait
+    // les deux effets.
+    studied.successesBeforeWidening = QUESTION_COUNT * 10;
+    studied.studyFocus = { 7 };
+
+    SessionSettings plain = studied;
+    plain.studyFocus.clear();
+
+    const auto countSevenths = []( const SessionSettings & p_settings ) {
+        ExerciseSession session{ TEST_SEED, p_settings };
+
+        std::size_t count = 0;
+
+        for( std::size_t index = 0; index < QUESTION_COUNT; ++index )
+        {
+            count += ( session.currentQuestion().target.semitones() == 7 ) ? 1 : 0;
+
+            answerCorrectly( session );
+            session.advance();
+        }
+
+        return count;
+    };
+
+    const std::size_t withFocus = countSevenths( studied );
+    const std::size_t withoutFocus = countSevenths( plain );
+
+    // LE FOCUS REND L'INTERVALLE PLUS FREQUENT, ET NETTEMENT. Ce qu'on verifie est un ORDRE DE GRANDEUR, jamais un compte
+    // exact : un tirage reste un tirage, et un test qui epinglerait un nombre precis casserait au premier changement de
+    // graine. Un quart de plus suffit a dire « plus souvent » sans jamais dire « toujours ».
+    EXPECT_GT( withFocus, withoutFocus ) << "avec focus : " << withFocus << ", sans focus : " << withoutFocus;
+    EXPECT_GT( withFocus * 4, withoutFocus * 5 ) << "avec focus : " << withFocus << ", sans focus : " << withoutFocus;
+}
+
+// ET LE FOCUS N'ELARGIT JAMAIS LA PALETTE - la seconde moitie de la phrase de Roger, et la plus importante des deux.
+//
+// Un cours ne fait pas APPRENDRE un intervalle : il le met en avant. L'intervalle entre dans la palette le jour ou le
+// joueur le reconnait a l'oreille, comme les autres. Sans ce garde-fou, lire une lecon sur la septieme majeure ferait
+// tomber un debutant sur une septieme majeure - c'est-a-dire sur une question qu'on ne lui a pas enseignee.
+TEST( ExerciseSessionTest, a_studied_interval_outside_the_palette_is_never_asked )
+{
+    constexpr std::int32_t NOT_IN_THE_STARTING_PALETTE = 11;
+
+    SessionSettings settings = intervalOnlySettings();
+    settings.questionCount = 100;
+
+    // La palette ne bouge pas : sans cela, l'intervalle finirait par y entrer par la PORTE NORMALE, et le test ne
+    // dirait plus rien sur le focus.
+    settings.successesBeforeWidening = 1000;
+    settings.studyFocus = { NOT_IN_THE_STARTING_PALETTE };
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    for( std::size_t index = 0; index < 100; ++index )
+    {
+        EXPECT_NE( NOT_IN_THE_STARTING_PALETTE, session.currentQuestion().target.semitones() )
+          << "un intervalle hors palette a ete pose parce qu'une lecon le citait";
+
+        answerCorrectly( session );
+        session.advance();
+    }
+}
+
 }    // namespace musichien::domain

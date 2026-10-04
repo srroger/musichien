@@ -270,6 +270,19 @@ struct SessionSettings
     // How many intervals the player starts with, out of the learning order.
     std::size_t startingPaletteSize{ 2 };
 
+    // CE QUE LE JOUEUR VIENT D'ETUDIER DANS UN COURS, en distances.
+    //
+    // Roger, 04/10/2026 : « le concept devient PRIORITAIRE en revision : biais du tirage vers ce que tu viens
+    // d'etudier (sans elargir la palette) ».
+    //
+    // LA PALETTE DIT CE QU'IL SAIT, LE FOCUS DIT CE QU'IL VIENT DE TRAVAILLER. Toute la difference est la : un concept
+    // absent de la palette est IGNORE par le tirage, jamais ajoute a la palette. Un intervalle ne s'apprend pas parce
+    // qu'on a lu une page sur lui - il s'apprend en le reconnaissant a l'oreille, et c'est la palette adaptative qui
+    // decide quand il entre.
+    //
+    // Vide par defaut : un joueur qui n'a rien lu joue exactement comme avant ce mecanisme.
+    std::vector<std::int32_t> studyFocus;
+
     // The largest grid offered. The grid is min(palette, this value): it grows with the palette until
     // it reaches this size, and stops there. Beyond it the palette keeps growing, so new intervals
     // appear inside a grid that stays readable.

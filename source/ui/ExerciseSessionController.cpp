@@ -273,6 +273,11 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
     if( m_levelStore != nullptr )
     {
         m_playerLevel = m_levelStore->storedLevel();
+
+        // CE QUE LE JOUEUR A LU DANS UN COURS : lu ici, une fois, comme le reste du profil. C'est ce qui fait qu'une
+        // lecon lue le soir oriente encore les questions du lendemain - un focus qui ne survit pas a la fermeture de
+        // l'application ne serait qu'une session un peu differente.
+        m_studyFocus = m_levelStore->storedStudyFocus();
     }
 
     if( m_playerLevel.has_value() )
@@ -1303,7 +1308,40 @@ void ExerciseSessionController::startTrainingSession( int p_family )
     // des raisons d'etre du GodMode - « pour ceux qui veulent juste tester le jeu et ne pas y etre regulier ».
     const auto family = static_cast<domain::QuestionFamily>( m_lastTrainingFamily );
 
-    beginSession( domain::trainingSettingsFor( m_playerLevel.value_or( domain::PlayerLevel::Beginner ), family ) );
+    domain::SessionSettings settings =
+      domain::trainingSettingsFor( m_playerLevel.value_or( domain::PlayerLevel::Beginner ), family );
+
+    // CE QUE LE JOUEUR VIENT D'ETUDIER EST MIS EN AVANT, sans jamais elargir sa palette. Le reglage est pose ICI, au seul
+    // endroit par lequel tout entrainement passe : « Rejouer » reprend donc le meme focus que la partie qu'il rejoue.
+    settings.studyFocus = m_studyFocus;
+
+    beginSession( std::move( settings ) );
+}
+
+void ExerciseSessionController::startTrainingSessionFromLesson( int p_semitones )
+{
+    // LE COURS CHANGE LES QUESTIONS SUIVANTES, ET RIEN DE PLUS.
+    //
+    // Roger a choisi la version qui ne triche pas : « le concept devient PRIORITAIRE en revision : biais du tirage vers
+    // ce que tu viens d'etudier (sans elargir la palette) ». Un cours ne fait donc pas APPRENDRE un intervalle - il le
+    // met en avant. L'intervalle entre dans la palette le jour ou le joueur le reconnait a l'oreille, comme les autres,
+    // et c'est la palette adaptative qui en decide.
+    //
+    // Le focus REMPLACE le precedent, il ne s'y ajoute pas : « ce que tu viens d'etudier » est le dernier cours lu, et
+    // accumuler ferait d'un joueur curieux un joueur dont toutes les questions viennent de ses lectures.
+    //
+    // Et il est ECRIT dans le profil : une lecon lue le soir doit encore orienter les questions du lendemain. Sans cette
+    // ecriture, le mecanisme ne durerait pas plus longtemps que la session qu'il vient d'ouvrir.
+    m_studyFocus.assign( 1, p_semitones );
+
+    if( m_levelStore != nullptr )
+    {
+        m_levelStore->storeStudyFocus( m_studyFocus );
+    }
+
+    // L'entrainement de la famille des INTERVALLES s'ouvre : c'est celui que le cours vient de preparer. Un cours de
+    // modes ou d'accords ouvrira la sienne le jour ou ses cartes existeront - la famille est deja un parametre.
+    startTrainingSession( 0 );
 }
 
 void ExerciseSessionController::restartSession()
