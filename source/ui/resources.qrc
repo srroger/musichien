@@ -118,6 +118,14 @@
         <file alias="assets/content/courses/le-phrygien.md">../../assets/content/courses/le-phrygien.md</file>
         <file alias="assets/content/courses/le-locrien.md">../../assets/content/courses/le-locrien.md</file>
         <!--
+          Chapitre 8 : LES AUTRES PILIERS. Le rythme (le pilier qui n'est pas la hauteur), les temperaments (le comma,
+          et pourquoi la meme distance peut sonner faux), et les intervalles composes (les memes couleurs, une octave
+          plus haut).
+        -->
+        <file alias="assets/content/courses/le-rythme.md">../../assets/content/courses/le-rythme.md</file>
+        <file alias="assets/content/courses/les-temperaments.md">../../assets/content/courses/les-temperaments.md</file>
+        <file alias="assets/content/courses/les-intervalles-composes.md">../../assets/content/courses/les-intervalles-composes.md</file>
+        <!--
           Le glossaire. Un mot par entree, une definition d'UNE PHRASE : Roger veut un aide-memoire, pas un manuel.
           Meme motif que les autres contenus, alias compris - le chemin de ressource est celui du disque.
         -->
