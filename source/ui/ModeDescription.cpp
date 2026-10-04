@@ -64,6 +64,52 @@ QVariantMap describeMode( domain::Mode p_mode )
     description.insert( QStringLiteral( "characteristic" ), QString::fromUtf8( MODE_CHARACTERISTICS.at( index ) ) );
     description.insert( QStringLiteral( "brightness" ), brightness );
 
+    // LES DEGRES DU MODE, ECRITS COMME UN MUSICIEN LES LIT : « 1 2 3 4 5 6 7b ».
+    //
+    // Roger, sur le boss : « j'ecrirai dans la ligne juste en dessous, les notes qu'il y a dedans en degre [...] ecrit avec
+    // les memes couleurs de degrade que les boutons, et le rouge pour la note caracteristique. Histoire d'avoir un repere
+    // pour l'utilisateur. »
+    //
+    // C'est un RAPPEL DU MODE VRAI, jamais de celui que la question joue modifie : le boss fait entendre une note
+    // etrangere, et c'est justement ce qu'on veut que le joueur puisse comparer a ce qu'il sait du mode.
+    //
+    // L'ALTERATION vient de la comparaison avec la gamme MAJEURE - la reference du projet, la meme partout - et la note
+    // caracteristique vient du DOMAINE, jamais d'un calcul refait ici. Deux copies de cette regle finiraient par se
+    // contredire, et le joueur verrait une note mise en avant que la phrase ne joue pas davantage que les autres.
+    QVariantList degrees;
+
+    const std::array<std::int32_t, domain::DEGREE_COUNT> offsets = domain::modeDegreeOffsets( p_mode );
+    const std::int32_t characteristic = domain::modeCharacteristicDegree( p_mode );
+
+    for( std::size_t index = 0; index < domain::DEGREE_COUNT; ++index )
+    {
+        const std::int32_t offset = offsets.at( index );
+        const std::int32_t majorOffset = domain::MAJOR_SCALE_DEGREE_OFFSETS.at( index );
+
+        QString label = QString::number( index + 1 );
+
+        if( offset < majorOffset )
+        {
+            label += QString::fromUtf8( "♭" );
+        }
+        else if( offset > majorOffset )
+        {
+            label += QString::fromUtf8( "♯" );
+        }
+
+        QVariantMap degree;
+        degree.insert( QStringLiteral( "label" ), label );
+        degree.insert( QStringLiteral( "index" ), static_cast<int>( index ) );
+
+        // ZERO veut dire « aucune » - l'ionien et l'eolien sont les deux references, et ne se demontrent pas par une note.
+        degree.insert( QStringLiteral( "isCharacteristic" ),
+                       ( characteristic != 0 ) && ( characteristic == static_cast<std::int32_t>( index ) + 1 ) );
+
+        degrees.append( degree );
+    }
+
+    description.insert( QStringLiteral( "degrees" ), degrees );
+
     return description;
 }
 

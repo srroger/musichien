@@ -100,6 +100,7 @@ if(MUSICHIEN_BUILD_TESTING)
         RhythmController_test.cpp
         IntervalPlaybackController_test.cpp
         ModePreviewController_test.cpp
+        ModeDescription_test.cpp
         CourseController_test.cpp
         ExerciseScreen_test.cpp
         MainScreen_test.cpp
