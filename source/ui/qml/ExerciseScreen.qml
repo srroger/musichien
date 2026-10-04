@@ -46,6 +46,13 @@ Item {
     // bruitage ou melodie ou accord de victoire ». Et il l'assume pour ce que c'est : « c'est juste un bruitage pour
     // rendre le jeu moins austere, et faire appel a des biais cognitifs d'addiction, comme dans les machines a sous ».
     // LE TIC : un minuteur plutot qu'un appel par image.
+    // Le nombre AFFICHE, a un instant donne du compte : la valeur finale, multipliee par l'avancement. Arrondi, parce
+    // qu'un compteur montre des entiers - et c'est l'arrondi qui fait le dechiffrement rapide qu'on vient chercher.
+    // LE CONSEIL DE SORTIE, choisi d'apres la famille qui a le plus COUTE.
+    // Roger : « a la fin du mode arcade, en fonction de la ou il y a le plus d'erreur, je lui mettrai une phrase
+    // supplementaire speciale [...] 2-3 phrases dans le genre, qui tourneraient de maniere aleatoire en fonction de la
+    // famille la plus ratee. Et si tout est parfait, un "Wow, tu peux clairement envisager de passer a l'etape
+    // suivante !" »
 
     id: exerciseScreen
 
@@ -78,8 +85,35 @@ Item {
     readonly property var answeredChordData: ExerciseController.answeredChord
     readonly property bool hasAnsweredChord: answeredChordData !== undefined && answeredChordData.name !== undefined
 
-    // Le nombre AFFICHE, a un instant donne du compte : la valeur finale, multipliee par l'avancement. Arrondi, parce
-    // qu'un compteur montre des entiers - et c'est l'arrondi qui fait le dechiffrement rapide qu'on vient chercher.
+    // La comparaison porte sur un INDICE et non sur un nom : le jour ou l'ordre des familles change, rien ne se casse en
+    // silence. Et le tirage est au hasard PARMI les phrases de la famille concernee : deux parties qui ratent les memes
+    // modes ne disent pas exactement la meme chose.
+    function closingAdvice() {
+        var results = ExerciseController.familyResults();
+        if (results.length === 0)
+            return "";
+
+        var worst = results[0];
+        var totalErrors = 0;
+        for (var i = 0; i < results.length; ++i) {
+            totalErrors += results[i].errors;
+            if (results[i].errors > worst.errors)
+                worst = results[i];
+
+        }
+        if (totalErrors === 0)
+            return qsTr("Wow ! Tu peux clairement envisager de passer à l'étape suivante.");
+
+        var lines;
+        if (worst.family === 0)
+            lines = [qsTr("Les intervalles t'ont coûté cher : l'École des Chiots t'apprend à les reconnaître."), qsTr("Un tour dans « Intervalles », à l'entraînement, et ils rentreront tout seuls.")];
+        else if (worst.family === 1)
+            lines = [qsTr("Les accords t'ont résisté : l'arbre des accords, dans ton profil, les montre tous."), qsTr("Essaie la famille « Accords » à l'entraînement : là, se tromper ne coûte rien.")];
+        else
+            lines = [qsTr("Les modes t'ont résisté : l'École des Chiots dit ce qu'ils sont et comment les entendre."), qsTr("Un entraînement « Modes » t'aidera plus que dix Arcades.")];
+        return lines[Math.floor(Math.random() * lines.length)];
+    }
+
     function rewardValue(p_final) {
         return Math.round(p_final * rewardCountUp);
     }
@@ -616,6 +650,10 @@ Item {
                     // Le BILAN : son mot, sous le verdict. Vide hors bilan, et ce n'est pas un detail - un ecran qui parle
                     // pour ne rien dire devient un ecran qu'on n'ecoute plus, et le silence est ce qui donne du poids aux
                     // mots qui restent (voir encouragementText, cote controleeur).
+                    // LES DEGRES DU MODE, SOUS SON NOM.
+                    // Roger : « j'ecrirai dans la ligne juste en dessous, les notes qu'il y a dedans en degre [...] ecrit
+                    // avec les memes couleurs de degrade que les boutons, et le rouge pour la note caracteristique.
+                    // Histoire d'avoir un repere pour l'utilisateur. »
 
                     id: promptColumn
 
@@ -676,6 +714,13 @@ Item {
                             if (ExerciseController.isForeignNoteQuestion)
                                 return qsTr("Sept notes montent en %1 sur le bourdon : l'une n'appartient pas à la gamme. Laquelle ?").arg(ExerciseController.heardMode.name);
 
+                            // LE CHANT A SA PROPRE CONSIGNE, et il la fallait : il retombait sur le generique « Ecoute
+                            // bien… », que Roger a vu a l'ecran pendant une question chantee. Or on ne lui demande pas
+                            // d'ecouter mais de CHANTER - et un joueur qui lit « ecoute bien » attend un son qui ne
+                            // vient pas.
+                            if (ExerciseController.questionKind === 2)
+                                return qsTr("Chante deux notes : %1. La seconde est celle que le jeu attend.").arg(MicrophoneController.singingTargetLabel);
+
                             if (ExerciseController.isModeColourQuestion)
                                 return qsTr("Écoute les deux modes : le second est-il plus clair, plus obscur, ou pareil ?");
 
@@ -686,6 +731,46 @@ Item {
                         }
                         color: "#cbb8e8"
                         font.pixelSize: 17
+                    }
+
+                    // C'EST LE MODE VRAI, jamais celui que la question joue modifie : c'est un RAPPEL, pour que le joueur
+                    // puisse comparer ce qu'il entend a ce qu'il sait du mode. Et la teinte est prise a la MEME source que
+                    // les boutons de modes - la clarte du mode - pour que les deux se repondent d'un coup d'oeil.
+                    Row {
+                        // La couleur sort de la meme formule que les boutons de modes : une seule teinte a maintenir, et
+                        // le mode le plus clair reste le plus clair partout.
+                        readonly property color badgeColour: Qt.rgba(0.3 + (0.7 * ExerciseController.heardMode.brightness), 0.2 + (0.62 * ExerciseController.heardMode.brightness), 0.55 + (0.45 * ExerciseController.heardMode.brightness), 1)
+
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 5
+                        visible: ExerciseController.isForeignNoteQuestion
+
+                        Repeater {
+                            model: ExerciseController.isForeignNoteQuestion ? ExerciseController.heardMode.degrees : []
+
+                            delegate: Rectangle {
+                                required property var modelData
+
+                                width: 32
+                                height: 30
+                                radius: 6
+                                // LE ROUGE DE LA NOTE CARACTERISTIQUE : c'est celle qui donne au mode sa couleur, et
+                                // c'est celle qu'un joueur doit apprendre a entendre. Le domaine la designe - elle n'est
+                                // JAMAIS recalculee ici, sinon deux copies finiraient par se contredire.
+                                color: modelData.isCharacteristic ? "#d43a3a" : parent.badgeColour
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    color: "#ffffff"
+                                    font.pixelSize: 14
+                                    font.bold: modelData.isCharacteristic
+                                    text: modelData.label
+                                }
+
+                            }
+
+                        }
+
                     }
 
                 }
@@ -741,26 +826,41 @@ Item {
             // Le chant : quand la question le demande, la grille s'efface et il ne reste qu'a chanter. La portee, la
             // boule et la barre de stabilite sont le composant partage avec l'accordeur ; seule la cible change.
             ColumnLayout {
+                // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
+
                 Layout.fillWidth: true
+                // LA GARDE ETAIT LE BUG, ALORS ELLE RESTE ECRITE. Sans cette ligne, le bloc de chant s'affichait sur TOUTES
+                // les questions : Roger a vu l'interface de chant posee AU-DESSUS de la grille des intervalles, sur une
+                // question qui n'avait rien a chanter. Un ecran d'exercice montre UNE reponse a la fois - monter/descendre
+                // (1), le chant (2), le rythme (3), le cercle des quintes (0) - et chaque bloc porte donc sa condition.
                 visible: ExerciseController.questionKind === 2
                 spacing: 10
-                // Le micro suit l'ecran qui s'en sert : il s'ouvre quand la question se chante, et se referme quand
-                // elle se tait. Un exercice passe la plupart de son temps sans chant, et un micro ouvert pour rien
-                // vide la batterie.
+                // Le micro suit l'ecran qui s'en sert : il s'ouvre quand la question se chante, et se referme quand elle se
+                // tait. Un exercice passe la plupart de son temps sans chant, et un micro ouvert pour rien vide la batterie.
                 onVisibleChanged: visible ? MicrophoneController.ensureListening() : MicrophoneController.stopTest()
 
+                // La consigne « chante... » n'est PAS repetee ici : elle vit en haut de l'ecran, avec les autres consignes,
+                // ou le joueur la lit deja. Deux fois la meme phrase, c'est une de trop.
+                StaffBall {
+                    Layout.preferredHeight: 120
+                    // LA BOULE FANTOME : elle se pose sur la PREMIERE NOTE ENREGISTREE de l'essai, transposee de l'intervalle
+                    // demande. Elle ne bouge plus pendant qu'on chante - c'est un repere, pas un marteau. Roger l'a dit
+                    // exactement comme ca : « afficher le fantome a partir de la valeur enregistree et c'est tout ».
+                    showGhost: ExerciseController.singingGhostIsVisible && MicrophoneController.hasFirstNote
+                }
+
+                // Roger : « est-ce qu'on pourrait aussi afficher la note en train d'etre jouee, exactement comme sur
+                // l'accordeur ? Ca me permettrait de deboguer la vraie valeur affichee. » Et il a raison d'ajouter que ce
+                // n'est pas une triche : savoir QUELLE note on vient de chanter ne dit pas de combien on s'est trompe.
+                // L'ecart en cents, lui, est deja ce que le jeu juge - le montrer ne donne donc aucune reponse, il rend
+                // la mesure lisible.
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    color: "#ffffff"
-                    font.pixelSize: 22
-                    font.bold: true
-                    wrapMode: Text.WordWrap
-                    text: qsTr("Chante : %1").arg(MicrophoneController.singingTargetLabel)
-                }
-
-                StaffBall {
-                    Layout.preferredHeight: 120
+                    visible: MicrophoneController.detectedFrequencyHz > 0
+                    color: "#8a77ad"
+                    font.pixelSize: 13
+                    text: qsTr("%1  ·  %2 cents").arg(MicrophoneController.detectedNoteLabel).arg(Math.round(MicrophoneController.detectedCents))
                 }
 
                 // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
@@ -1359,6 +1459,9 @@ Item {
                     visible: !ExerciseController.isModeColourQuestion
 
                     Repeater {
+                        // LA LARGEUR, LA POLICE ET LES MARGES VONT ENSEMBLE, et c'est le NOM qui commande.
+                        // UN DEGRADE PLUS CLAIR, PARCE QUE LE PLUS SOMBRE ETAIT PRESQUE NOIR.
+
                         model: ExerciseController.modeChoices
 
                         delegate: Button {
@@ -1366,13 +1469,24 @@ Item {
                             readonly property bool isBright: modelData.brightness > 0.5
                             readonly property bool wasHeard: ExerciseController.heardMode.index !== undefined && modelData.index === ExerciseController.heardMode.index
 
-                            width: 104
+                            // Roger : « le Mixolydien n'est pas ecrit en entier, on a des ... ». Un bouton de 104 pour une
+                            // police de 14 laisse environ 72 points au texte - le style garde seize points de marge de
+                            // chaque cote - et « Mixolydien » en demande quatre-vingts. Les trois valeurs sont donc
+                            // reglees ENSEMBLE, sinon le prochain nom long les fera mentir de nouveau.
+                            width: 118
                             height: 48
+                            leftPadding: 4
+                            rightPadding: 4
                             text: modelData.name
-                            font.pixelSize: 14
+                            font.pixelSize: 12
                             enabled: ExerciseController.isAsking
                             highlighted: wasHeard
-                            Material.background: Qt.rgba(0.18 + (0.62 * modelData.brightness), 0.14 + (0.56 * modelData.brightness), 0.3 + (0.48 * modelData.brightness), 1)
+                            // Roger : « la couleur des boutons des modes, on m'a dit que c'est pas bien visible avec les
+                            // couleurs sombres. Il faudrait peut-etre un degrade plus flachy et plus visible. » L'ancien
+                            // degrade partait de (0,18 ; 0,14 ; 0,30) - un violet si profond qu'on ne lisait plus rien.
+                            // Le plancher est remonte et l'amplitude elargie : le mode le plus sombre reste un violet
+                            // franc, et le plus clair tire vers le rose.
+                            Material.background: Qt.rgba(0.3 + (0.7 * modelData.brightness), 0.2 + (0.62 * modelData.brightness), 0.55 + (0.45 * modelData.brightness), 1)
                             Material.foreground: isBright ? "#1d1033" : "#ffffff"
                             onClicked: ExerciseController.answerModeName(modelData.index)
                         }
@@ -1529,6 +1643,8 @@ Item {
 
             // LE BILAN DE L'ARCADE : ce qu'aucun autre mode ne montre, parce qu'aucun autre mode ne le gagne.
             ColumnLayout {
+                // LES TROIS FAMILLES, ET CE QU'ELLES ONT COUTE.
+
                 Layout.fillWidth: true
                 visible: ExerciseController.sessionGrantsExperience
                 spacing: 6
@@ -1566,10 +1682,26 @@ Item {
                     text: ExerciseController.arcadeMultiplierPercent > 100 ? qsTr("+%1 XP  ·  x%2").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned)).arg(ExerciseController.arcadeMultiplierPercent / 100) : qsTr("+%1 XP").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned))
                 }
 
-                // LES TROIS FAMILLES : demandees, reussies, et le taux. C'est la ou le joueur voit ce que la partie a
-                // vraiment mesure.
+                // Roger : « on ecrit les pourcentages de reussite, et on voit 100 % partout. Mais ca n'a pas trop de sens,
+                // car forcement s'il arrive a la fin il aura du 100 % partout. » Il a raison, et l'indicateur etait
+                // structurellement muet : le taux ne descend QUE si l'on joue mal, et si l'on joue mal la partie s'arrete
+                // avant la fin - donc la ligne ne s'affiche meme pas. Ce qu'on montre desormais, c'est ce que la partie a
+                // COUTE : le nombre d'erreurs, qui est aussi le nombre de coeurs perdus.
                 Repeater {
                     model: ExerciseController.sessionGrantsExperience ? ExerciseController.familyResults() : []
+
+                    // LE MOT DE LA FIN, sous les trois familles.
+                    Text {
+                        Layout.preferredWidth: 0
+                        Layout.minimumWidth: 0
+                        Layout.fillWidth: true
+                        Layout.topMargin: 10
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        color: "#ffd479"
+                        font.pixelSize: 14
+                        text: ExerciseController.sessionGrantsExperience ? exerciseScreen.closingAdvice() : ""
+                    }
 
                     delegate: RowLayout {
                         required property var modelData
@@ -1585,18 +1717,13 @@ Item {
                         }
 
                         Text {
-                            color: "#8a77ad"
-                            font.pixelSize: 13
-                            text: qsTr("%1 / %2").arg(modelData.correct).arg(modelData.asked)
-                        }
-
-                        Text {
-                            Layout.preferredWidth: 46
                             horizontalAlignment: Text.AlignRight
-                            color: modelData.percent < 50 ? "#ff8fb0" : "#8ef2b0"
+                            color: modelData.errors === 0 ? "#8ef2b0" : "#ff8fb0"
                             font.pixelSize: 14
                             font.bold: true
-                            text: qsTr("%1 %").arg(exerciseScreen.rewardValue(modelData.percent))
+                            // La forme plurielle de Qt, et pas un « (s) » ecrit a la main : c'est ce qui permet a une
+                            // traduction de dire « 0 erreur » et « 1 erreur » comme sa langue le demande.
+                            text: modelData.errors === 0 ? qsTr("Parfait !") : qsTr("%n erreur(s)", "", modelData.errors)
                         }
 
                     }

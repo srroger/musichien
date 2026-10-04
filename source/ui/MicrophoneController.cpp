@@ -16,6 +16,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <iostream>
 #include <optional>
 #include <utility>
 
@@ -170,6 +171,11 @@ void MicrophoneController::selectDevice( int p_deviceIndex )
 
 void MicrophoneController::startTest()
 {
+    openDetector();
+}
+
+void MicrophoneController::openDetector()
+{
     // The microphone is a RUNTIME permission on Android; on the desktop it is always granted and the callback fires
     // immediately. Asking here, at the moment of use, is the whole point: never at launch, never for nothing.
     QCoreApplication::instance()->requestPermission( QMicrophonePermission{}, [this]( const QPermission & p_permission ) {
@@ -188,6 +194,36 @@ void MicrophoneController::startTest()
             emit isListeningChanged();
         }
     } );
+}
+
+void MicrophoneController::handleApplicationSuspended()
+{
+    // L'INTENTION est notee AVANT de fermer quoi que ce soit : si l'ecran voulait ecouter, il voudra encore ecouter au
+    // retour, et c'est ce drapeau qui le dira.
+    m_reopenAfterSuspend = m_isListening;
+
+    if( m_detector )
+    {
+        m_detector->stop();
+    }
+
+    // m_isListening n'est PAS mis a faux, et c'est deliberé : il dit ce que l'ECRAN demande, pas l'etat du peripherique.
+    // Confondre les deux est exactement ce qui laissait le jeu muet - m_isListening restait vrai sur un peripherique que
+    // la plateforme avait repris, donc ensureListening() ne rouvrait plus rien.
+}
+
+void MicrophoneController::handleApplicationResumed()
+{
+    const bool mustReopen = std::exchange( m_reopenAfterSuspend, false );
+
+    // Rien n'a ete ferme ici : sur un ordinateur de bureau, perdre le focus n'arrete pas le micro, et le relancer ferait
+    // un clic a chaque retour de fenetre.
+    if( !mustReopen || !m_isListening )
+    {
+        return;
+    }
+
+    openDetector();
 }
 
 void MicrophoneController::stopTest()
@@ -232,6 +268,38 @@ void MicrophoneController::newSingingQuestion()
     emit sungIntervalChanged();
 }
 
+double MicrophoneController::singingTargetStaffFraction() const
+{
+    // OU TOMBE LA NOTE A ATTEINDRE : un intervalle au-dessus de la PREMIERE NOTE QUE LE JOUEUR A CHANTEE.
+    //
+    // LA VERSION RELATIVE, ET PAS LA VERSION ABSOLUE. J'ai d'abord pose la fantome sur la note THEORIQUE - la tonique du
+    // reglage, plus l'intervalle - parce que l'application la connait d'avance. Roger l'a vue a l'ecran et a tranche :
+    // « je prefere la version relative. Imposer une premiere note, surtout a la voix est complique. Surtout pour un
+    // debutant et via un son de piano. La tu montres un premier fantome de la vraie note. mieux vaut l'eviter pour
+    // l'utilisateur. »
+    //
+    // Il a raison, et la raison est plus profonde qu'un gout : la tonique se JOUE, elle ne se CHANTE pas. Un debutant qui
+    // n'est pas encore sur la tonique verrait une cible qui ne correspond a rien de ce qu'il entend dans sa tete. Le guide
+    // se pose donc sur la note qu'il a REELLEMENT chantee, et il vaut pour n'importe quelle note de depart - chantee
+    // juste ou non.
+    //
+    // La valeur est ENREGISTREE : elle ne bouge plus pendant qu'il chante, donc la fantome est un repere stable et non un
+    // marteau. Le detecteur remet son reading a zero a chaque reponse (voir ExerciseSessionController::answerSung), donc
+    // elle repart de la note de l'essai en cours. Sans premiere note, elle vaut l'intervalle seul - un non-sens musical,
+    // et c'est pourquoi l'ecran ne l'affiche pas tant que le joueur n'a rien pose (voir Main.qml).
+    const std::int32_t fromMidiNumber =
+      m_sungIntervalDetector.reading().firstMidiNumber + m_singingTargetSemitones;
+
+    return domain::StaffPosition::fraction( fromMidiNumber );
+}
+
+std::int32_t MicrophoneController::singingRootMidiNumber() const
+{
+    // La tonique sur laquelle la cible est construite : le reglage du joueur, et le do central a defaut. C'est la MEME
+    // source que playSingingTarget(), donc la fantome ne peut pas designer une autre note que celle qui vient d'etre jouee.
+    return ( m_preferences != nullptr ) ? m_preferences->storedTuningRoot().midiNumber() : 60;
+}
+
 void MicrophoneController::setSingingTarget( int p_semitones )
 {
     m_singingTargetSemitones = p_semitones;
@@ -239,6 +307,13 @@ void MicrophoneController::setSingingTarget( int p_semitones )
 
     emit singingTargetChanged();
     emit sungIntervalChanged();
+
+    // LA BOULE FANTOME DEPEND DE DEUX CHOSES, DONC ELLE ECOUTE LES DEUX.
+    //
+    // Sa position suit la hauteur entendue et se decale de l'intervalle : changer la CIBLE la deplace aussi. Ce signal
+    // est emis par la mise a jour de la hauteur, et le rappeler ici evite que la fantome attende la lecture suivante du
+    // micro pour se replacer - un demi-temps de retard, exactement ce que Roger voyait.
+    emit detectedStaffFractionChanged();
 }
 
 void MicrophoneController::playSingingTarget()
@@ -249,9 +324,8 @@ void MicrophoneController::playSingingTarget()
     }
 
     // La tonique de la cible est la note de reference du reglage : pour le tempere egal elle ne change rien, pour
-    // les autres elle donne son sens a l'intervalle. Meme source que l'accordeur, donc jamais en desaccord.
-    const std::int32_t rootMidi =
-      ( m_preferences != nullptr ) ? m_preferences->storedTuningRoot().midiNumber() : 60;
+    // les autres elle donne son sens a l'intervalle. Meme source que la fantome, donc jamais en desaccord.
+    const std::int32_t rootMidi = singingRootMidiNumber();
 
     const std::array<domain::Note, 2> notes{ domain::Note{ rootMidi },
                                              domain::Note{ rootMidi + m_singingTargetSemitones } };
@@ -318,12 +392,43 @@ QString MicrophoneController::singingTargetLabel() const
 
 void MicrophoneController::startSingingSession()
 {
+    // LA SESSION N'EST PAS UN MIROIR. Elle compte ses questions et les tire au hasard - exactement ce qu'un cours ne veut
+    // pas. Une seule des deux choses a cours a la fois, et ouvrir une session ferme donc le miroir.
+    if( m_isSingingMirror )
+    {
+        m_isSingingMirror = false;
+
+        emit singingMirrorChanged();
+    }
+
     m_singingQuestionIndex = 0;
     m_singingCorrectCount = 0;
 
     emit singingQuestionChanged();
 
     newSingingQuestion();
+}
+
+void MicrophoneController::openSingingMirror( int p_semitones )
+{
+    setSingingTarget( p_semitones );
+
+    // La capture repart de zero : le miroir s'ouvre sur un essai neuf, et non sur les deux notes de la question
+    // precedente.
+    m_isSingingCaptureActive = false;
+
+    if( !m_isSingingMirror )
+    {
+        m_isSingingMirror = true;
+
+        emit singingMirrorChanged();
+    }
+
+    emit singingCaptureStateChanged();
+
+    // Le jeu est bati sur le micro : un miroir muet serait le pire des echecs - il ferait porter au joueur la faute d'un
+    // peripherique ferme.
+    ensureListening();
 }
 
 int MicrophoneController::sungVerdict() const

@@ -102,9 +102,17 @@ inline constexpr std::int32_t ARCADE_STARTING_LIVES = 10;
 // Les intervalles et les accords portent DRAWN_TARGET - le plan decide combien, le tirage decide lesquels. Les modes
 // disent leur GENRE (couleur, vamp, nom), et la note etrangere ferme la marche.
 //
+// LES PARTS DU JOUEUR DECIDENT LE GENRE DES QUESTIONS D'INTERVALLE, et c'est une CORRECTION : le plan inscrivait
+// QuestionKind::NamedInterval en dur pour les dix, donc le chant ne pouvait pas sortir quelle que soit la part reglee -
+// et rien ne le signalait. Roger l'a trouve en jouant : « je ne tombe plus sur le jeu du chant ». Le plan dit COMBIEN de
+// chaque famille ; sous quelle forme, c'est le joueur qui l'a demande.
+//
+// Le dosage reste intact : dix intervalles restent dix intervalles, jamais un accord glisse au milieu. Le tirage ne
+// choisit donc qu'ENTRE les genres de la famille.
+//
 // Le seed est FOURNI, jamais tire ici : le domaine ne possede aucune source d'entropie, et c'est ce qui rend le plan
 // reproductible - donc testable.
-[[nodiscard]] std::vector<QuestionTarget> arcadePlan( std::uint32_t p_seed );
+[[nodiscard]] std::vector<QuestionTarget> arcadePlan( std::uint32_t p_seed, const SessionSettings & p_settings );
 
 // Les reglages d'une Arcade pour un joueur de ce niveau : sa palette, son echelle d'aide, et le plan ci-dessus.
 //

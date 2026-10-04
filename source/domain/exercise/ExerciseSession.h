@@ -197,10 +197,34 @@ struct FamilyTally
     std::array<std::size_t, QUESTION_FAMILY_COUNT> asked{};
     std::array<std::size_t, QUESTION_FAMILY_COUNT> correct{};
 
+    // LES ERREURS, comptees a CHAQUE reponse fausse - pas a chaque question perdue.
+    //
+    // C'est ce que le premier jet n'avait pas compris, et il a fallu que Roger joue pour le voir : « a la fin je vois
+    // aucune erreur alors que j'ai eu des erreurs ». Le raccourci paraissait si evident - erreurs = demandees moins
+    // reussies - qu'il n'a pas ete verifie. Or 'asked' compte les questions CONCLUES : une reponse fausse qui laisse des
+    // vies n'y figure pas, puisque la question se represente et finit par etre conclue JUSTE. Le compte rendait donc
+    // zero pour une partie ou l'on s'etait trompe dix fois, et un test ne l'aurait pas vu : il comptait registre, pas
+    // partie.
+    //
+    // Ce tableau est donc tenu separement, et il n'y a rien de plus a comprendre : une erreur, un cran.
+    std::array<std::size_t, QUESTION_FAMILY_COUNT> missed{};
+
     void registerQuestion( QuestionFamily p_family, bool p_wasCorrect ) noexcept;
+
+    // Une reponse fausse, meme si la question reste ouverte. C'est elle que lit l'ecran de fin d'Arcade.
+    void registerMiss( QuestionFamily p_family ) noexcept;
 
     [[nodiscard]] std::size_t askedIn( QuestionFamily p_family ) const noexcept;
     [[nodiscard]] std::size_t correctIn( QuestionFamily p_family ) const noexcept;
+
+    // Les erreurs de cette famille : le nombre de fois ou le joueur s'est trompe.
+    //
+    // C'est aussi le nombre de coeurs qu'elle a coutes, puisqu'une erreur coute un coeur - et comme le dosage d'une
+    // Arcade est fixe, dix, huit, sept, les trois nombres se comparent directement.
+    [[nodiscard]] std::size_t errorsIn( QuestionFamily p_family ) const noexcept
+    {
+        return missed.at( static_cast<std::size_t>( p_family ) );
+    }
 
     // Reussite de cette famille, en pour cent entiers. ZERO quand rien n'a ete demande, et c'est honnete : une famille
     // a laquelle on n'a pas joue n'a pas de taux, et un ecran qui afficherait « 0 % » mentirait sur un absent.
@@ -245,6 +269,19 @@ struct SessionSettings
 
     // How many intervals the player starts with, out of the learning order.
     std::size_t startingPaletteSize{ 2 };
+
+    // CE QUE LE JOUEUR VIENT D'ETUDIER DANS UN COURS, en distances.
+    //
+    // Roger, 04/10/2026 : « le concept devient PRIORITAIRE en revision : biais du tirage vers ce que tu viens
+    // d'etudier (sans elargir la palette) ».
+    //
+    // LA PALETTE DIT CE QU'IL SAIT, LE FOCUS DIT CE QU'IL VIENT DE TRAVAILLER. Toute la difference est la : un concept
+    // absent de la palette est IGNORE par le tirage, jamais ajoute a la palette. Un intervalle ne s'apprend pas parce
+    // qu'on a lu une page sur lui - il s'apprend en le reconnaissant a l'oreille, et c'est la palette adaptative qui
+    // decide quand il entre.
+    //
+    // Vide par defaut : un joueur qui n'a rien lu joue exactement comme avant ce mecanisme.
+    std::vector<std::int32_t> studyFocus;
 
     // The largest grid offered. The grid is min(palette, this value): it grows with the palette until
     // it reaches this size, and stops there. Beyond it the palette keeps growing, so new intervals
@@ -861,9 +898,14 @@ private:
     // reussites - exactement comme la palette d'intervalles, et pour la meme raison : une couleur a la fois.
     std::vector<ChordQuality> m_chordPalette;
 
-    // Les modes que le joueur a rencontres : un PREFIXE de modeLearningOrder(), elargi par les MEMES reussites que le
-    // reste. Une seule progression a tenir, plutot que trois compteurs dont l'un finirait par mentir.
+    // Les modes que le joueur a rencontres : un PREFIXE de modeLearningOrder().
     std::vector<Mode> m_modePalette;
+
+    // LES SERIES, UNE PAR FAMILLE : c'est ce qui fait grandir les trois palettes, chacune sur SES reussites.
+    //
+    // Une serie par famille plutot qu'une seule, et le commentaire qui refusait ce choix a ete paye par une soiree de
+    // test chez Roger : « arrive aux accords, on n'a pas 2 accords a trouver mais deja 4 ». Voir registerAnswer.
+    std::array<std::int32_t, QUESTION_FAMILY_COUNT> m_familyStreaks{};
 
     // Le livre des phrases modales, s'il a ete donne. C'est lui qui fait entendre un mode en MELODIE plutot qu'en gamme.
     const PhraseBook * m_phraseBook{ nullptr };

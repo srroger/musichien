@@ -88,15 +88,33 @@ TEST( GameModeTest, every_question_kind_has_one_family )
     EXPECT_EQ( QuestionFamily::Mode, familyOf( QuestionKind::ForeignNote ) );
 }
 
+[[nodiscard]] std::size_t countOfFamily( const std::vector<QuestionTarget> & p_plan, QuestionFamily p_family )
+{
+    return static_cast<std::size_t>(
+      std::count_if( p_plan.begin(), p_plan.end(), [p_family]( const QuestionTarget & p_target ) {
+          return familyOf( p_target.kind ) == p_family;
+      } ) );
+}
+
 // Le plan d'Arcade tient le DOSAGE qu'il promet : dix, huit, sept - et vingt-cinq en tout.
+//
+// ET LE DOSAGE SE COMPTE PAR FAMILLE, PAS PAR GENRE.
+//
+// Le test verifiait « dix fois NamedInterval » - il figeait le GENRE alors qu'il voulait compter les QUESTIONS, et c'est
+// ce qui a laisse passer le bug que Roger a trouve : le plan inscrivait le genre en dur, le chant ne sortait plus, et le
+// test disait « tout va bien » puisqu'il demandait exactement ce que le code faisait de travers.
 TEST( GameModeTest, the_arcade_asks_the_dose_it_promises )
 {
+    const SessionSettings settings;
+
     for( std::uint32_t seed = 0; seed < 20; ++seed )
     {
-        const std::vector<QuestionTarget> plan = arcadePlan( seed );
+        const std::vector<QuestionTarget> plan = arcadePlan( seed, settings );
 
         EXPECT_EQ( ARCADE_QUESTION_COUNT, plan.size() );
-        EXPECT_EQ( ARCADE_INTERVAL_QUESTION_COUNT, countOfKind( plan, QuestionKind::NamedInterval ) );
+
+        // DIX QUESTIONS D'INTERVALLE - quelle que soit leur forme, et c'est tout ce que le plan promet.
+        EXPECT_EQ( ARCADE_INTERVAL_QUESTION_COUNT, countOfFamily( plan, QuestionFamily::Interval ) );
         EXPECT_EQ( ARCADE_CHORD_QUESTION_COUNT, countOfKind( plan, QuestionKind::Chord ) );
 
         // Les sept questions de mode, decomposees : deux couleurs, deux vamps, deux noms, une note etrangere.
@@ -107,12 +125,34 @@ TEST( GameModeTest, the_arcade_asks_the_dose_it_promises )
     }
 }
 
+// LE CHANT REVIENT DANS L'ARCADE QUAND LE JOUEUR LE DEMANDE.
+//
+// Roger, en jouant : « je ne tombe plus sur le jeu du chant ». Le plan inscrivait QuestionKind::NamedInterval EN DUR pour
+// ses dix questions d'intervalle, donc la part de chant ne pouvait rien y changer - et rien ne le signalait.
+TEST( GameModeTest, the_arcade_sings_when_the_player_asks_for_singing )
+{
+    SessionSettings settings;
+    settings.namedIntervalQuestionShare = 0;
+    settings.singQuestionShare = 100;
+    settings.directionQuestionShare = 0;
+
+    const std::vector<QuestionTarget> plan = arcadePlan( 20261003, settings );
+
+    // TOUTES les questions d'intervalle sont chantees, et le dosage est intact.
+    EXPECT_EQ( ARCADE_INTERVAL_QUESTION_COUNT, countOfKind( plan, QuestionKind::Sing ) );
+    EXPECT_EQ( ARCADE_INTERVAL_QUESTION_COUNT, countOfFamily( plan, QuestionFamily::Interval ) );
+
+    // ET LE CHANT NE DEBORDE PAS DE SA FAMILLE : aucun accord, aucun mode n'est devenu chantant.
+    EXPECT_EQ( ARCADE_CHORD_QUESTION_COUNT, countOfKind( plan, QuestionKind::Chord ) );
+    EXPECT_EQ( 1U, countOfKind( plan, QuestionKind::ForeignNote ) );
+}
+
 // LE BOSS : la note etrangere ferme TOUJOURS la marche, et elle n'apparait qu'une fois.
 TEST( GameModeTest, the_foreign_note_is_always_the_last_question )
 {
     for( std::uint32_t seed = 0; seed < 20; ++seed )
     {
-        const std::vector<QuestionTarget> plan = arcadePlan( seed );
+        const std::vector<QuestionTarget> plan = arcadePlan( seed, SessionSettings{} );
 
         ASSERT_FALSE( plan.empty() );
         EXPECT_EQ( QuestionKind::ForeignNote, plan.back().kind );
@@ -123,7 +163,7 @@ TEST( GameModeTest, the_foreign_note_is_always_the_last_question )
 // Le plan ne decide que le GENRE : les intervalles et les accords portent DRAWN_TARGET, donc la cible reste au tirage.
 TEST( GameModeTest, the_arcade_plan_only_decides_the_kind )
 {
-    const std::vector<QuestionTarget> plan = arcadePlan( 7 );
+    const std::vector<QuestionTarget> plan = arcadePlan( 7, SessionSettings{} );
 
     for( const QuestionTarget & target : plan )
     {

@@ -204,4 +204,121 @@ TEST( CourseControllerTest, a_descending_card_really_descends )
     EXPECT_GT( notePlayer.playedMelodies().back().notes.at( 0 ), notePlayer.playedMelodies().back().notes.at( 1 ) );
 }
 
+TEST( CourseControllerTest, an_annexe_is_told_apart_from_a_course )
+{
+    // Roger : « je mettrais bien les os a macher d'une autre couleur que les cours ». La difference n'est PAS inventee
+    // ici : un cours est NUMEROTE (chapitre et ordre), une annexe ne l'est pas - son en-tete porte une 'famille' a la
+    // place. Aucun champ nouveau, donc, et aucun fichier a reviser pour obtenir la distinction.
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course annexe = makeQuintCourse();
+    annexe.title = "Pourquoi la quinte sonne juste";
+    annexe.chapter = 0;
+
+    // L'ANNEXE EST DONNEE EN PREMIER, EXPRES : c'est le TRI qui doit remettre le cours devant, et l'ordre alphabetique
+    // aurait fait le contraire (« Pourquoi la quinte... » avant « La quinte juste »).
+    const CourseController controller{ notePlayer, { annexe, makeQuintCourse() } };
+
+    ASSERT_EQ( controller.library().size(), 2 );
+
+    EXPECT_EQ( controller.library().at( 0 ).toMap().value( QStringLiteral( "title" ) ).toString(),
+               QString( "La quinte juste" ) );
+    EXPECT_FALSE( controller.library().at( 0 ).toMap().value( QStringLiteral( "isAnnexe" ) ).toBool() );
+    EXPECT_TRUE( controller.library().at( 1 ).toMap().value( QStringLiteral( "isAnnexe" ) ).toBool() );
+}
+
+TEST( CourseControllerTest, a_course_is_read_one_page_at_a_time )
+{
+    // Roger : « je verrais plus ca comme plusieurs pages par chapitre », et a la fin « la note complete pour s'y referer ».
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course course = makeQuintCourse();
+
+    domain::CourseSection first;
+    first.title = "Premiere page";
+    first.blocks = { course.blocks.at( 0 ) };
+
+    domain::CourseSection second;
+    second.title = "Deuxieme page";
+    second.blocks = { course.blocks.at( 1 ) };
+
+    course.sections = { first, second };
+
+    CourseController controller{ notePlayer, { course } };
+
+    controller.open( 0 );
+
+    // On commence a la premiere page, et on ne voit QUE ses blocs.
+    EXPECT_EQ( controller.sectionCount(), 2 );
+    EXPECT_EQ( controller.sectionIndex(), 0 );
+    EXPECT_EQ( controller.sectionTitle(), QString( "Premiere page" ) );
+    ASSERT_EQ( controller.blocks().size(), 1U );
+    EXPECT_EQ( controller.blocks().at( 0 ).toMap().value( QStringLiteral( "kind" ) ).toString(), QString( "text" ) );
+
+    controller.nextSection();
+
+    EXPECT_EQ( controller.sectionIndex(), 1 );
+    ASSERT_EQ( controller.blocks().size(), 1U );
+    EXPECT_EQ( controller.blocks().at( 0 ).toMap().value( QStringLiteral( "kind" ) ).toString(), QString( "play" ) );
+
+    // ON NE DEBORDE PAS : la derniere page reste la derniere. C'est l'ecran qui propose la note complete.
+    controller.nextSection();
+    EXPECT_EQ( controller.sectionIndex(), 1 );
+
+    // ET LA NOTE COMPLETE REND TOUT, dans l'ordre du fichier, et sans titre de page.
+    controller.setShowingWholeNote( true );
+    EXPECT_EQ( controller.blocks().size(), 3 );
+    EXPECT_TRUE( controller.sectionTitle().isEmpty() );
+
+    controller.setShowingWholeNote( false );
+    EXPECT_EQ( controller.sectionIndex(), 1 );
+}
+
+// LA CARTE « :: annexe » MENE QUELQUE PART. Le specimen citait le NOM DU FICHIER la ou le contrat demande le TITRE de
+// l'annexe, et personne ne pouvait le voir : la carte etait inerte, donc rien ne se plaignait. Ce test tient la porte
+// ouverte, et il nomme la facon d'entrer - le titre, tel que l'annexe le donne dans son propre en-tete.
+TEST( CourseControllerTest, an_annexe_card_opens_the_annexe_it_names )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course annexe = makeQuintCourse();
+    annexe.title = "Pourquoi la quinte sonne juste";
+    annexe.chapter = 0;
+
+    domain::Course lesson = makeQuintCourse();
+
+    domain::CourseBlock door;
+    door.kind = domain::CourseBlock::Kind::Annexe;
+    door.annexeName = "Pourquoi la quinte sonne juste";
+
+    lesson.blocks.push_back( door );
+
+    CourseController controller{ notePlayer, { lesson, annexe } };
+
+    ASSERT_FALSE( controller.isReading() );
+
+    controller.openAnnexe( QStringLiteral( "Pourquoi la quinte sonne juste" ) );
+
+    ASSERT_TRUE( controller.isReading() );
+    EXPECT_EQ( controller.title(), QString( "Pourquoi la quinte sonne juste" ) );
+}
+
+// LE NOM DU FICHIER N'OUVRE RIEN - et ce test porte l'erreur EXACTE que le specimen avait commise, pour qu'elle ne
+// revienne pas. Il ne doit pas planter pour autant : la faute est signalee au DEMARRAGE (voir le constructeur du
+// controleur), et le joueur ne doit jamais voir un message d'erreur a cause d'une faute de frappe dans un cours.
+TEST( CourseControllerTest, a_file_name_where_a_title_belongs_opens_nothing )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course annexe = makeQuintCourse();
+    annexe.title = "Pourquoi la quinte sonne juste";
+    annexe.chapter = 0;
+
+    CourseController controller{ notePlayer, { makeQuintCourse(), annexe } };
+
+    controller.openAnnexe( QStringLiteral( "pourquoi-la-quinte-sonne-juste" ) );
+
+    EXPECT_FALSE( controller.isReading() );
+}
+
 }    // namespace musichien::ui

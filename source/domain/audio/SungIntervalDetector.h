@@ -70,15 +70,27 @@ public:
     }
 
 private:
-    // How long a note must be held before it counts as the note the singer MEANT. Long on purpose: a wobble, a breath
-    // or a slide never reads as a note - the voice gets the time it needs, and the result feels smooth rather than
-    // twitchy.
+    // COMBIEN DE TEMPS UNE NOTE DOIT TENIR AVANT DE COMPTER.
     //
-    // SEVEN HUNDRED AND FIFTY, and not a whole second. Roger relayed what the singers told him: "c'etait dur d'arriver
-    // au bout de la progress bar". A second was chosen for smoothness, but the bar is what the singer actually watches,
-    // and it RESTARTS at zero the moment the note moves - so the second did not buy smoothness, it bought despair.
-    // Three quarters of a second still outlasts a wobble, and the bar can now be filled by an honest voice.
-    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 750;
+    // L'HISTOIRE DE CE CHIFFRE EST UNE HISTOIRE D'ALLER-RETOUR, et elle merite d'etre ecrite en entier plutot que
+    // reecrite a chaque fois : c'est le seul nombre du chant qui se regle au SOUFFLE du joueur, et il a deja bouge trois
+    // fois.
+    //
+    //   * 750 : choisi pour que la barre se remplisse vite. Roger, en chantant : « ma voix n'a pas le temps de se
+    //     stabiliser que le jeu me la compte. C'est un peu frustrant. »
+    //   * 1200 : la duree plus longue, qui FORCE le chanteur a poser sa voix. Roger l'a trouvee « toujours un peu dure » -
+    //     et une barre qui se remplit trop lentement decourage celui qu'elle est censee aider.
+    //   * 1000 : le milieu, essaye apres coup. Roger : « la tenue de la note est encore un peu longue peut etre 900ms ce
+    //     serai bien. Apres la ca va quand meme c'est du pinaillage. Je prefere que la note soit bien tenu plutot que
+    //     sans faire expres. »
+    //   * 900 : le reglage actuel. Sa phrase dit tout ce qu'il faut retenir : ce nombre se pousse d'un cote ou de
+    //     l'autre a quelques centaines de millisecondes pres, et le cote ou il vaut mieux se tromper est celui de la
+    //     note BIEN TENUE. Un dixieme de trop coute une respiration ; un dixieme de moins fait compter une note que le
+    //     chanteur n'a pas voulue.
+    //
+    // La barre REPART de zero des que la note bouge, donc ce nombre est ce que le chanteur regarde vraiment : il se regle
+    // a son souffle, jamais a une theorie du signal.
+    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 900;
 
     // Combien de temps de silence fait une REPRISE.
     //

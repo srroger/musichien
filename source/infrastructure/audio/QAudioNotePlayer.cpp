@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <format>
+#include <iostream>
 #include <iterator>
 #include <utility>
 

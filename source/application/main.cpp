@@ -8,6 +8,7 @@
 #include "infrastructure/audio/QAudioNotePlayer.h"
 #include "infrastructure/audio/QAudioPitchDetector.h"
 #include "infrastructure/content/JsonAnecdoteBook.h"
+#include "infrastructure/content/JsonGlossary.h"
 #include "infrastructure/content/JsonHintBook.h"
 #include "infrastructure/content/JsonPhraseBook.h"
 #include "infrastructure/content/JsonTunerGuide.h"
@@ -24,6 +25,7 @@
 #include "musichienBuildId.h"
 #include "ui/CourseController.h"
 #include "ui/ExerciseSessionController.h"
+#include "ui/GlossaryController.h"
 #include "ui/IntervalPlaybackController.h"
 #include "ui/KeyCircleController.h"
 #include "ui/MicrophoneController.h"
@@ -78,6 +80,8 @@ constexpr const char * INTERVAL_HINTS_RESOURCE = ":/assets/content/interval-hint
 constexpr const char * ANECDOTES_RESOURCE = ":/assets/content/anecdotes.json";
 
 constexpr const char * TUNER_GUIDE_RESOURCE = ":/assets/content/tuner.json";
+
+constexpr const char * GLOSSARY_RESOURCE = ":/assets/content/glossaire.json";
 
 // Les phrases modales : ce que l'oreille de Roger a garde a l'atelier, et rien de plus. Le fichier porte des DEGRES,
 // une tonique et un tempo - jamais d'audio - et c'est le moteur du jeu qui les rejoue.
@@ -182,6 +186,31 @@ constexpr const char * COURSES_RESOURCE_DIRECTORY = ":/assets/content/courses";
     std::cerr << "Musichien: " << book.count() << " anecdotes read\n";
 
     return book;
+}
+
+// Le glossaire, meme contrat que tout le reste : un fichier manquant ou casse coute le glossaire, jamais l'application.
+[[nodiscard]] std::vector<musichien::domain::GlossaryEntry> loadGlossary()
+{
+    QFile contentFile{ QString::fromUtf8( GLOSSARY_RESOURCE ) };
+
+    if( !contentFile.open( QIODevice::ReadOnly ) )
+    {
+        std::cerr << "Musichien: the glossary is missing from the resources.\n";
+
+        return {};
+    }
+
+    const QByteArray content = contentFile.readAll();
+
+    std::vector<musichien::domain::GlossaryEntry> entries = musichien::infrastructure::readGlossary(
+      std::string_view{ content.constData(), static_cast<std::size_t>( content.size() ) } );
+
+    // LA MEME PHRASE QUE PARTOUT AILLEURS, et pour la meme raison : c'est la preuve la plus courte que le fichier a bien
+    // suivi jusqu'au binaire. Un glossaire a ZERO mot ne se verrait qu'en ouvrant la page - et encore, il ressemblerait a
+    // une page vide, pas a une erreur.
+    std::cerr << "Musichien: " << entries.size() << " glossary words read\n";
+
+    return entries;
 }
 
 // Les phrases modales, du meme contrat que tout le reste : un fichier manquant ou casse coute les phrases, jamais
@@ -645,6 +674,19 @@ int main( int p_argumentCount, char * p_arguments[] )
                                   "CourseController",
                                   &courseController );
 
+    // LE GLOSSAIRE : une page de LECTURE, sans session, sans vies, sans journal.
+    //
+    // Il ne partage donc RIEN avec le moteur de questions - c'est ce qui le rend inoffensif, et c'est pourquoi il vit
+    // dans un ecran a part. L'ordre des mots est calcule par le controleur : le fichier peut les ranger n'importe
+    // comment, et si un auteur ajoute un mot a la fin, il se place tout seul.
+    musichien::ui::GlossaryController glossaryController{ loadGlossary() };
+
+    qmlRegisterSingletonInstance( QML_MODULE_NAME,
+                                  QML_MODULE_MAJOR_VERSION,
+                                  QML_MODULE_MINOR_VERSION,
+                                  "GlossaryController",
+                                  &glossaryController );
+
     // L'ecran du cercle des quintes : une page de REFERENCE, qui ne joue rien. Elle n'a donc meme pas besoin du
     // lecteur de notes - seulement du domaine, qui sait tout ce qu'elle affiche.
     musichien::ui::KeyCircleController keyCircleController;
@@ -749,6 +791,29 @@ int main( int p_argumentCount, char * p_arguments[] )
 
     // La session peut poser des questions CHANTEES : elle a besoin du micro pour les juger.
     exerciseController.setMicrophoneController( &microphoneController );
+
+    // LE MEME CYCLE DE VIE, POUR LE MICRO - et c'est un jeu MUET que ce branchement repare.
+    //
+    // La sortie audio se refermait deja a l'arriere-plan (plus haut, et c'etait un crash). L'ENTREE, elle, n'etait
+    // fermee par personne : Android reprend le microphone des que l'application s'efface, le controleur continuait
+    // pourtant de croire qu'il ecoutait, et le retour donnait un accordeur, un chant et un exercice MUETS - jusqu'a ce
+    // qu'on quitte l'ecran et qu'on y revienne, ce qui rouvrait le peripherique par accident.
+    //
+    // Roger : « c'est ce qui empeche de jouer aujourd'hui ». Le micro est l'instrument du jeu : il se reprend, comme la
+    // sortie, et pour la meme raison.
+    QObject::connect( qApp,
+                      &QGuiApplication::applicationStateChanged,
+                      qApp,
+                      [&microphoneController]( Qt::ApplicationState p_state ) {
+                          if( p_state == Qt::ApplicationSuspended )
+                          {
+                              microphoneController.handleApplicationSuspended();
+                          }
+                          else if( p_state == Qt::ApplicationActive )
+                          {
+                              microphoneController.handleApplicationResumed();
+                          }
+                      } );
 
     // Ce que le joueur VEUT entendre. Le filtrage se fait ICI, dans la couche de cablage, ce qui evite a l'adaptateur
     // audio de connaitre les preferences - et il se refait a chaque changement, donc decocher le saxo s'entend des la
@@ -864,7 +929,18 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Bonjour. Un arpège montant de do, sol, do : une quinte et une octave, aucune tierce, donc rien
     // à comprendre - seulement quelque chose qui monte et qui flotte. Au piano, et très discret : c'est
     // la moitié du reproche qui était juste.
-    notePlayer.playGreeting();
+    //
+    // MAIS APRES LA PAGE, ET NON AVANT. Roger entendait sa PREMIERE NOTE puis le silence : « un peu comme si
+    // l'affichage de la page de garde cassait la musique d'intro ». C'est exactement ca - ouvrir les peripheriques
+    // audio, ce que fait la page qui s'installe, coupe ce qui joue deja - et sa conclusion est la bonne.
+    //
+    // Le decalage est SON idee, et c'est la plus simple qui soit : on laisse la page prendre la main, PUIS on souhaite la
+    // bienvenue. Meme arpege, meme volume, huit cents millisecondes plus tard - et le son n'a plus rien a interrompre.
+    //
+    // Le lecteur n'est PAS un QObject - c'est un adaptateur du domaine, et il n'a aucune raison de l'etre - donc le
+    // minuteur n'a pas de contexte a surveiller. La capture par reference est sure ici : les objets de main() vivent
+    // jusqu'a la fin de la boucle d'evenements, et le minuteur meurt avec elle.
+    QTimer::singleShot( 800, [&notePlayer]() { notePlayer.playGreeting(); } );
 
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,

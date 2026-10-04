@@ -13,6 +13,14 @@ namespace musichien::domain
 namespace
 {
 
+// COMBIEN DE FOIS PLUS SOUVENT UN INTERVALLE ETUDIE EST TIRE.
+//
+// Quatre, et ce n'est pas un reglage : c'est le seul chiffre du mecanisme, et il se discute ici plutot que dans un
+// fichier. Assez haut pour que le joueur REMARQUE que la lecon qu'il vient de lire sert a quelque chose - a la moitie
+// des questions, on ne verrait qu'un hasard. Assez bas pour que la session ne devienne pas une redite du cours : le
+// reste de la palette garde ses chances, et une entree non etudiee reste toujours atteignable.
+constexpr double STUDIED_DRAW_WEIGHT = 4.0;
+
 // La cellule d'une question rythmique.
 //
 // L'index vient du domaine lui-meme, donc il est valide. Le garde-fou est la pour qu'une liste de cellules qui
@@ -327,11 +335,34 @@ IntervalDirection ExerciseSession::drawDirection()
 
 Interval ExerciseSession::drawTarget()
 {
-    // Every interval of the palette has the same chance, including the newest one. Weighting the draw
-    // towards what the player struggles with would be a better exercise and a worse game: it would
-    // make the session feel like it is picking on them, and the adaptive palette already does the work
-    // of keeping the questions at the right level.
-    std::uniform_int_distribution<std::size_t> distribution{ 0, m_palette.size() - 1 };
+    // CE QUE LE JOUEUR VIENT D'ETUDIER EST TIRE PLUS SOUVENT - et ce n'est PAS ce que ce fichier refusait autrefois.
+    //
+    // La version precedente refusait de ponderer vers ce que le joueur RATE, et elle avait raison : « insister sur tes
+    // faiblesses » fait sentir une session qui s'acharne, et la palette adaptative fait deja le travail de garder les
+    // questions au bon niveau.
+    //
+    // Le FOCUS D'ETUDE est l'inverse. Il ne dit pas « tu es mauvais ici » - il dit « tu viens de lire une lecon sur
+    // ca ». C'est une CONTINUITE avec ce que le joueur vient de faire, pas une punition : un joueur qui ferme une lecon
+    // sur la quinte juste et tombe sur la quinte juste ne se dit pas qu'on l'attaque, il se dit que la lecon servait a
+    // quelque chose.
+    //
+    // ET LE FOCUS N'ELARGIT JAMAIS LA PALETTE : un concept absent de la palette est simplement ignore ci-dessous. Le
+    // poids change la FREQUENCE, jamais l'ensemble des reponses possibles - donc un joueur ne peut pas tomber sur un
+    // intervalle qu'on ne lui a pas enseigne.
+    std::vector<double> weights;
+    weights.reserve( m_palette.size() );
+
+    for( const Interval & interval : m_palette )
+    {
+        const bool isStudied = std::ranges::find( m_settings.studyFocus, interval.semitones() )
+                               != m_settings.studyFocus.end();
+
+        weights.push_back( isStudied ? STUDIED_DRAW_WEIGHT : 1.0 );
+    }
+
+    // discrete_distribution et non uniforme : c'est ce qui permet de peser SANS retirer personne du tirage. Une entree
+    // non etudiee garde son poids de 1, donc elle reste parfaitement atteignable - elle est seulement moins frequente.
+    std::discrete_distribution<std::size_t> distribution{ weights.begin(), weights.end() };
 
     return m_palette.at( distribution( m_randomEngine ) );
 }
@@ -967,19 +998,39 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
         // simple comparison, is what makes this happen at every step: without it the condition would
         // stay true for ever after the third success, and the palette would grow on every single
         // correct answer.
+        // UNE PROGRESSION PAR FAMILLE, ET SEULEMENT CELLE QU'ON VIENT DE JOUER.
+        //
+        // Roger, apres avoir fait tester le jeu a des amis : « arrive aux accords, on n'a pas 2 accords a trouver mais deja
+        // 4 ; et aux modes c'est pire, on n'a pas 2 modes mais 6. Pour rappel, le joueur est toujours debutant. »
+        //
+        // La cause etait ici, et c'etait un CHOIX ecrit noir sur blanc : les trois palettes s'elargissaient sur les MEMES
+        // reussites - la serie de la session, toutes familles confondues. Dix questions d'intervalle faisaient donc monter
+        // les accords et les modes sans qu'une seule question d'accord ait ete posee. Trois compteurs semblaient plus
+        // fragiles qu'un seul ; c'est l'inverse, et c'est le telephone qui a tranche.
         const auto wideningPeriod = static_cast<std::int32_t>( m_settings.successesBeforeWidening );
 
-        if( ( wideningPeriod > 0 ) && ( m_score.streak() % wideningPeriod == 0 ) )
+        const QuestionFamily family = familyOf( m_currentQuestion.kind );
+
+        std::int32_t & familyStreak = m_familyStreaks.at( static_cast<std::size_t>( family ) );
+
+        ++familyStreak;
+
+        if( ( wideningPeriod > 0 ) && ( familyStreak % wideningPeriod == 0 ) )
         {
-            widenPalette();
-
-            // Les accords s'elargissent sur les MEMES reussites : une seule progression a tenir, plutot que deux
-            // compteurs dont l'un finirait par mentir. Une couleur de plus tous les trois succes, comme un intervalle.
-            widenChordPalette();
-
-            // Et les modes aussi, pour la meme raison exactement : le pilier harmonie avance sur les reussites de la
-            // session en cours, sans compteur a lui.
-            widenModePalette();
+            // UNE SEULE PALETTE GRANDIT : celle de la famille qu'on vient de reussir. Le commutateur couvre les trois cas
+            // sans defaut, pour qu'une famille ajoutee demain fasse echouer la compilation plutot que de rester muette.
+            switch( family )
+            {
+                case QuestionFamily::Interval:
+                    widenPalette();
+                    break;
+                case QuestionFamily::Chord:
+                    widenChordPalette();
+                    break;
+                case QuestionFamily::Mode:
+                    widenModePalette();
+                    break;
+            }
         }
 
         m_state = SessionState::Feedback;
@@ -990,6 +1041,19 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
     ++m_currentQuestion.wrongAttemptCount;
 
     ++m_consecutiveErrors;
+
+    // UNE ERREUR, MEME SI LA QUESTION RESTE OUVERTE.
+    //
+    // La question n'est pas conclue - le joueur va la reprendre - mais il s'est deja trompe, et l'ecran de fin doit le
+    // savoir. C'est la seule chose que ce compteur a de plus que `asked` : voir FamilyTally::missed.
+    m_familyTally.registerMiss( familyOf( m_currentQuestion.kind ) );
+
+    // ET L'ERREUR NE REMET A ZERO QUE SA FAMILLE.
+    //
+    // C'est la meme regle que la montee, vue de l'autre cote : se tromper sur un mode ne doit pas annuler ce qu'on vient
+    // de comprendre sur les accords. Sans cela, une seule erreur ferait reculer trois progressions - et le joueur
+    // paierait pour une chose qu'il n'a pas ratee.
+    m_familyStreaks.at( static_cast<std::size_t>( familyOf( m_currentQuestion.kind ) ) ) = 0;
 
     if( ( m_consecutiveErrors >= 2 ) && ( m_currentQuestion.kind == QuestionKind::NamedInterval )
         && ( m_currentQuestion.direction != IntervalDirection::Harmonic ) )
@@ -1309,6 +1373,11 @@ void FamilyTally::registerQuestion( QuestionFamily p_family, bool p_wasCorrect )
     {
         ++correct.at( index );
     }
+}
+
+void FamilyTally::registerMiss( QuestionFamily p_family ) noexcept
+{
+    ++missed.at( static_cast<std::size_t>( p_family ) );
 }
 
 std::size_t FamilyTally::askedIn( QuestionFamily p_family ) const noexcept

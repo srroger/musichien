@@ -66,6 +66,56 @@ void capPaletteAtNextLevel( SessionSettings & p_settings, PlayerLevel p_level ) 
     p_settings.maximumModeCount = nextLevel.startingModeCount;
 }
 
+// LE GENRE D'UNE QUESTION D'INTERVALLE, TIRE DES PARTS DU JOUEUR.
+//
+// Meme mecanique que drawKind - le tirage se fait sur la SOMME des parts, jamais sur cent - mais RESTREINT aux trois
+// genres de la famille : c'est ce qui empeche le plan d'une Arcade de glisser un accord au milieu de ses dix intervalles.
+[[nodiscard]] QuestionKind drawIntervalKind( const SessionSettings & p_settings, std::mt19937 & p_engine )
+{
+    struct IntervalKind
+    {
+        std::int32_t share{ 0 };
+        QuestionKind kind{ QuestionKind::NamedInterval };
+    };
+
+    const std::array<IntervalKind, 3> kinds{
+      IntervalKind{ .share = p_settings.namedIntervalQuestionShare, .kind = QuestionKind::NamedInterval },
+      IntervalKind{ .share = p_settings.singQuestionShare, .kind = QuestionKind::Sing },
+      IntervalKind{ .share = p_settings.directionQuestionShare, .kind = QuestionKind::Direction } };
+
+    std::int32_t total = 0;
+
+    for( const IntervalKind & entry : kinds )
+    {
+        total += std::max( 0, entry.share );
+    }
+
+    // TOUTES LES PARTS A ZERO : on ne peut pas ne rien poser du tout, et nommer est le geste le plus ancien du jeu. C'est
+    // le meme repli que drawKind, et pour la meme raison.
+    if( total <= 0 )
+    {
+        return QuestionKind::NamedInterval;
+    }
+
+    std::uniform_int_distribution<std::int32_t> distribution{ 0, total - 1 };
+
+    std::int32_t draw = distribution( p_engine );
+
+    for( const IntervalKind & entry : kinds )
+    {
+        const std::int32_t share = std::max( 0, entry.share );
+
+        if( draw < share )
+        {
+            return entry.kind;
+        }
+
+        draw -= share;
+    }
+
+    return QuestionKind::NamedInterval;
+}
+
 }    // namespace
 
 double arcadeMultiplier( std::int32_t p_livesLost ) noexcept
@@ -99,16 +149,20 @@ std::int32_t arcadeExperience( std::int32_t p_baseExperience,
     return static_cast<std::int32_t>( std::lround( multiplied * completion ) );
 }
 
-std::vector<QuestionTarget> arcadePlan( std::uint32_t p_seed )
+std::vector<QuestionTarget> arcadePlan( std::uint32_t p_seed, const SessionSettings & p_settings )
 {
     std::vector<QuestionTarget> plan;
     plan.reserve( ARCADE_QUESTION_COUNT );
 
+    // UN SEUL moteur pour tout le plan, seme par l'appelant : le plan reste donc reproductible, donc testable.
+    std::mt19937 engine{ p_seed };
+
     // Les INTERVALLES ouvrent la partie : c'est le geste le plus ancien et le plus sur du jeu, et commencer par lui met
-    // le joueur en confiance avant les couleurs. Le plan dit COMBIEN, le tirage dit LESQUELS.
+    // le joueur en confiance avant les couleurs. Le plan dit COMBIEN, les parts du joueur disent SOUS QUELLE FORME.
     for( std::size_t index = 0; index < ARCADE_INTERVAL_QUESTION_COUNT; ++index )
     {
-        plan.push_back( QuestionTarget{ QuestionKind::NamedInterval, DRAWN_TARGET, IntervalDirection::Ascending } );
+        plan.push_back(
+          QuestionTarget{ drawIntervalKind( p_settings, engine ), DRAWN_TARGET, IntervalDirection::Ascending } );
     }
 
     // Les ACCORDS ensuite : plusieurs notes a la fois, apres une seule.
@@ -128,7 +182,6 @@ std::vector<QuestionTarget> arcadePlan( std::uint32_t p_seed )
       QuestionTarget{ QuestionKind::ModeName, DRAWN_TARGET, IntervalDirection::Ascending },
     };
 
-    std::mt19937 engine{ p_seed };
     std::shuffle( modeQuestions.begin(), modeQuestions.end(), engine );
 
     plan.insert( plan.end(), modeQuestions.begin(), modeQuestions.end() );
@@ -147,7 +200,7 @@ SessionSettings arcadeSettingsFor( PlayerLevel p_level, std::uint32_t p_seed, st
     settings.questionCount = ARCADE_QUESTION_COUNT;
     // Le nombre de coeurs vient du REGLAGE, jamais d'une constante : c'est le raccourci que Roger a demande.
     settings.lives = std::max( 1, p_startingLives );
-    settings.plannedQuestions = arcadePlan( p_seed );
+    settings.plannedQuestions = arcadePlan( p_seed, settings );
 
     // LE PLAFOND : une Arcade part de son niveau, monte vers le suivant, et s'y arrete. Voir capPaletteAtNextLevel.
     capPaletteAtNextLevel( settings, p_level );

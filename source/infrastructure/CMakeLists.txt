@@ -22,6 +22,9 @@ musichienFunction_AddLibrary(infrastructure
     content/JsonHintBook.cpp
     content/JsonAnecdoteBook.h
     content/JsonAnecdoteBook.cpp
+    # Le glossaire : un mot par entree, une ligne par definition. Meme contrat que les autres lecteurs de contenu.
+    content/JsonGlossary.h
+    content/JsonGlossary.cpp
     content/JsonTunerGuide.h
     content/JsonTunerGuide.cpp
 

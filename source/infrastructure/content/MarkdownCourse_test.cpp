@@ -184,4 +184,85 @@ TEST( MarkdownCourseTest, an_unknown_directive_is_skipped )
     EXPECT_EQ( course->blocks[0].markdown, "Un paragraphe." );
 }
 
+TEST( MarkdownCourseTest, a_level_two_heading_opens_a_page )
+{
+    // ROGER : « je verrais plus ca comme plusieurs pages par chapitre ». Les pages ne sont pas inventees : ce sont les
+    // « ## » du fichier, et le lecteur les separes en gardant AUSSI la liste plate - c'est elle que lit le « voir la note
+    // complete », et les deux sortent du meme passage, donc elles ne peuvent pas diverger.
+    constexpr std::string_view CONTENT = "Un chapeau.\n\n"
+                                         "## Premiere page\n\n"
+                                         "Du texte.\n\n"
+                                         ":: essai | demi_tons:7\n\n"
+                                         "## Deuxieme page\n\n"
+                                         "Encore du texte.\n";
+
+    const std::optional<musichien::domain::Course> course = readCourse( CONTENT );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->sections.size(), 3U );
+
+    // Le CHAPEAU n'a pas de titre, et c'est voulu : c'est ce qui precede le premier « ## ».
+    EXPECT_EQ( course->sections.at( 0 ).title, "" );
+    EXPECT_EQ( course->sections.at( 1 ).title, "Premiere page" );
+    EXPECT_EQ( course->sections.at( 2 ).title, "Deuxieme page" );
+
+    // La deuxieme page porte DEUX blocs, et ils sont bien a elle : le titre ne les a pas avales.
+    ASSERT_EQ( course->sections.at( 1 ).blocks.size(), 2U );
+    EXPECT_EQ( course->sections.at( 1 ).blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Text );
+    EXPECT_EQ( course->sections.at( 1 ).blocks.at( 1 ).kind, musichien::domain::CourseBlock::Kind::TryExercise );
+
+    // ET LA LISTE PLATE EST INTACTE : quatre blocs, dans l'ordre du fichier, titres exclus.
+    EXPECT_EQ( course->blocks.size(), 4U );
+}
+
+TEST( MarkdownCourseTest, a_singing_card_carries_its_distance )
+{
+    // « :: chante » est une PORTE, et non une donnee : elle ne porte qu'une distance, et l'ecran decide ou elle mene.
+    // C'est ce qui permettra de deplacer l'outil de chant sans toucher un seul cours.
+    const std::optional<musichien::domain::Course> course = readCourse( ":: chante | demi_tons:7 | Chante le sol\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::SingInterval );
+    EXPECT_EQ( course->blocks.at( 0 ).semitones, 7 );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "Chante le sol" );
+}
+
+// ":: image" PORTE UN NOM DE FICHIER, JAMAIS UNE ADRESSE - et c'est une regle, pas un gout.
+//
+// L'application n'a pas la permission d'acces au reseau : c'est la charte du projet. Une image venue d'une adresse ne
+// s'afficherait donc pas, et le telephone ne le dirait pas non plus - juste un trou dans la page, que personne ne sait
+// expliquer. L'image voyage avec le binaire, comme les cours et les indices.
+//
+// Le nom est celui du fichier, SANS dossier ni extension : le chemin se construit a l'ecran, la ou l'on sait ou vivent
+// les images. Un cours qui ecrirait « qrc:/... » casserait le jour ou elles demenagent.
+TEST( MarkdownCourseTest, an_image_card_carries_a_file_name_and_its_caption )
+{
+    const std::optional<musichien::domain::Course> course =
+      readCourse( ":: image | pythagore-forgerons | Pythagore et les forgerons\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Image );
+    EXPECT_EQ( course->blocks.at( 0 ).imageName, "pythagore-forgerons" );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "Pythagore et les forgerons" );
+}
+
+// ":: serie" N'A BESOIN QUE D'UNE LEGENDE. Ce qu'elle joue ne se parametre pas : c'est LA serie harmonique, toujours la
+// meme, et un cours n'a pas a choisir jusqu'a quel rang. Six rangs, parce que le septieme est faux - et cette decision
+// appartient au jeu, pas au fichier de contenu.
+TEST( MarkdownCourseTest, a_series_card_needs_only_a_caption )
+{
+    const std::optional<musichien::domain::Course> course =
+      readCourse( ":: serie | ecoute la serie harmonique d'un do\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::HarmonicSeries );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "ecoute la serie harmonique d'un do" );
+}
+
 }    // namespace musichien::infrastructure

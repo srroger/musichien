@@ -88,6 +88,18 @@ class ExerciseSessionController final : public QObject
     Q_PROPERTY( int lastSungCentsOffset READ lastSungCentsOffset NOTIFY sessionChanged )
     Q_PROPERTY( bool isHelpAvailable READ isHelpAvailable NOTIFY sessionChanged )
 
+    // LA BOULE FANTOME DU CHANT : elle s'allume des la PREMIERE erreur sur une question chantee.
+    //
+    // Roger : « pour le chant, je pense qu'on pourrait donner une aide au joueur qui se trompe une fois. C'est a la
+    // deuxieme note, affiche une boule fantome de l'endroit ou devrait etre joue le prochain chant. »
+    //
+    // UNE erreur, et non deux : l'aide generale du jeu attend deux echecs (voir isHelpAvailable), mais un chant rate se
+    // corrige tout de suite - le joueur sait qu'il a chante faux des qu'il s'entend. Attendre la deuxieme le laisserait
+    // echouer une fois de plus pour rien, et c'est justement l'erreur qu'on veut lui epargner.
+    Q_PROPERTY( bool singingGhostIsVisible READ isSingingGhostVisible NOTIFY questionChanged )
+
+    [[nodiscard]] bool isSingingGhostVisible() const noexcept;
+
     // Ce que la question en cours demande : 0 pour nommer un intervalle, 1 pour dire dans quel sens il a ete joue.
     // C'est ce que l'ecran lit pour savoir s'il montre le cercle ou les deux boutons monte/descend.
     Q_PROPERTY( int questionKind READ questionKind NOTIFY questionChanged )
@@ -830,6 +842,15 @@ public:
     // compte dans les statistiques - c'est ce qui nourrit le Bilan - mais ne rapporte rien.
     Q_INVOKABLE void startTrainingSession( int p_family );
 
+    // OUVRIR L'ENTRAINEMENT SUR CE QU'UN COURS VIENT D'ENSEIGNER.
+    //
+    // L'intervalle entre dans le FOCUS D'ETUDE : il est alors tire plus souvent, sans jamais elargir la palette du
+    // joueur. C'est la promesse de la note 29 - « lire un cours change la revision du lendemain » - dans la version que
+    // Roger a choisie le 04/10/2026, celle qui ne triche pas avec sa progression.
+    //
+    // Le focus est ecrit dans le profil : il survit donc a la fermeture de l'application.
+    Q_INVOKABLE void startTrainingSessionFromLesson( int p_semitones );
+
     // REJOUER : relance le MEME mode. Un Entrainement rejoue son Entrainement, un Bilan son Bilan.
     //
     // Le bouton « Rejouer » de l'ecran de fin appelait l'Arcade quoi qu'il arrive - ce qui transformait silencieusement un
@@ -1457,6 +1478,13 @@ private:
 
     // La famille du dernier Entrainement, pour que « Rejouer » rejoue le MEME.
     int m_lastTrainingFamily{ 0 };
+
+    // CE QUE LE JOUEUR VIENT D'ETUDIER DANS UN COURS, en distances.
+    //
+    // Lu dans le profil au demarrage, ecrit quand une carte « :: essai » ouvre un entrainement. Il est pose sur les
+    // reglages de TOUT entrainement : le mecanisme vaut donc aussi pour « Rejouer », ce qui est exactement ce qu'un
+    // joueur attend d'un bouton qui rejoue la meme partie.
+    std::vector<std::int32_t> m_studyFocus;
 
     // Le multiplicateur de la derniere Arcade, en pour cent, FIGE au moment ou elle s'est conclue.
     int m_lastArcadeMultiplierPercent{ 100 };

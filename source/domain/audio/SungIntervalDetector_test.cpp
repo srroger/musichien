@@ -114,8 +114,8 @@ TEST( SungIntervalDetectorTest, a_just_fifth_measures_seven_hundred_cents )
 {
     SungIntervalDetector detector;
 
-    hold( detector, frequencyOf( 69 ), 1500 );    // La 4
-    hold( detector, frequencyOf( 76 ), 1500 );    // Mi 5
+    hold( detector, frequencyOf( 69 ), 2600 );    // La 4
+    hold( detector, frequencyOf( 76 ), 2600 );    // Mi 5
 
     ASSERT_TRUE( detector.reading().hasInterval() );
     EXPECT_EQ( 7, detector.reading().semitones() );
@@ -130,8 +130,8 @@ TEST( SungIntervalDetectorTest, a_widened_fifth_says_by_how_much )
     // change pas - c'est bien une quinte - et c'est pourtant toute la difference pour celui qui s'accorde.
     const double widened = frequencyOf( 76 ) * std::pow( 2.0, 20.0 / 1200.0 );
 
-    hold( detector, frequencyOf( 69 ), 1500 );
-    hold( detector, widened, 1500 );
+    hold( detector, frequencyOf( 69 ), 2600 );
+    hold( detector, widened, 2600 );
 
     ASSERT_TRUE( detector.reading().hasInterval() );
     EXPECT_EQ( 7, detector.reading().semitones() );
@@ -142,8 +142,8 @@ TEST( SungIntervalDetectorTest, a_falling_interval_measures_negative )
 {
     SungIntervalDetector detector;
 
-    hold( detector, frequencyOf( 76 ), 1500 );
-    hold( detector, frequencyOf( 69 ), 1500 );
+    hold( detector, frequencyOf( 76 ), 2600 );
+    hold( detector, frequencyOf( 69 ), 2600 );
 
     ASSERT_TRUE( detector.reading().hasInterval() );
     EXPECT_EQ( -7, detector.reading().semitones() );

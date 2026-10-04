@@ -51,6 +51,8 @@ notes ne s'ajoutent pas, elles **se superposent** — la même fréquence se ret
 Vérifie : `3f` (le sol, rang 3 du do) et `2f` (le sol, rang 2 du sol) tombent **exactement** sur la
 même fréquence. Deux notes, une fréquence partagée. Le son se soude.
 
+:: serie | écoute la série harmonique d'un do — le sol arrive tout seul, et tu n'as rien ajouté
+
 ## Et la tierce, alors ?
 
 Regarde le rang 5. Le **mi** apparaît aussi — mais **plus haut** dans la série, donc **plus
@@ -75,6 +77,13 @@ souvent.
 La légende veut que Pythagore ait trouvé ça dans une forge, en écoutant des marteaux de poids
 différents. (La musique y a gagné une explication ; les historiens, des doutes.) Le nom est resté :
 on parle d'**accord pythagoricien**, et c'est lui qui a régi la musique pendant mille ans.
+
+:: image | pythagore-forgerons | Pythagore et les forgerons — gravure de Franchino Gaffurio, Theorica musicae, 1492
+
+> L'image est là pour ce qu'elle dit sans un mot : les marteaux ont des **poids différents**, et c'est
+> en les écoutant tomber que la légende fait naître la première théorie musicale de l'Occident.
+>
+> *Gravure de 1492, domaine public — Bibliothèque nationale de France (Gallica).*
 
 ## Là où ça se complique — et où on s'arrête
 

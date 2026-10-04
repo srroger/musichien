@@ -78,6 +78,10 @@ public:
 
     void storeTuningRoot( domain::Note p_root ) override;
 
+    [[nodiscard]] std::vector<std::int32_t> storedStudyFocus() const override;
+
+    void storeStudyFocus( std::vector<std::int32_t> p_focus ) override;
+
     [[nodiscard]] double storedReferencePitch() const override;
 
     void storeReferencePitch( double p_hertz ) override;

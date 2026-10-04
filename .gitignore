@@ -75,6 +75,12 @@ coverage/
 *.swo
 *~
 
+# LES FICHIERS DE SWAP DES EDITEURS, et ceux de Kate en particulier.
+#
+# Ils vivent A COTE du fichier edite, donc au milieu du contenu : un `git add -A assets` les ramasse sans prevenir.
+# C'est arrive - un `.anecdotes.json.kate-swp` est entre dans le depot, et un fichier de travail n'y a rien a faire.
+*.kate-swp
+
 # ---------------------------------------------------------------------------------------------------------------------
 # AI collaboration rules
 #

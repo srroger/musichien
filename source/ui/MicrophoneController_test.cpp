@@ -266,4 +266,154 @@ TEST( MicrophoneControllerTest, silence_is_a_dash_and_not_a_note )
     EXPECT_EQ( test.controller.detectedNoteLabel(), QStringLiteral( "\u2014" ) );
 }
 
+// LE MICRO SE REPREND AU RETOUR DE L'APPLICATION. C'est le bug qui empechait de jouer : Android rend le peripherique des
+// que l'application s'efface, et personne ne le redemandait. Quitter l'ecran puis y revenir le rouvrait par ACCIDENT - ce
+// qui donnait l'impression d'un jeu capricieux plutot que d'un micro repris par la plateforme.
+TEST( MicrophoneControllerTest, the_microphone_is_taken_back_when_the_application_returns )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    test.start();
+
+    ASSERT_TRUE( test.controller.isListening() );
+    ASSERT_NE( test.detector, nullptr );
+
+    const int startsBefore = test.detector->startCount();
+
+    // L'application s'efface : Android reprend le micro, et on ferme proprement derriere lui.
+    test.controller.handleApplicationSuspended();
+
+    // Le retour : le peripherique doit etre ROUVERT, sans que personne n'ait touche a l'ecran.
+    test.controller.handleApplicationResumed();
+
+    QCoreApplication::processEvents();
+
+    EXPECT_TRUE( test.controller.isListening() );
+    EXPECT_EQ( test.detector->startCount(), startsBefore + 1 );
+
+    // Et il ENTEND vraiment : un peripherique rouvert mais muet ne vaudrait pas mieux qu'un peripherique ferme.
+    test.detector->hear( 440.0 );
+
+    EXPECT_EQ( test.controller.detectedNoteLabel(), QStringLiteral( "A4  440.0 Hz" ) );
+}
+
+// RIEN A ROUVRIR QUAND PERSONNE N'ECOUTAIT. Le retour au premier plan n'allume pas le micro tout seul : ouvrir un
+// peripherique que l'ecran n'a pas demande vide la batterie, et poserait une boule sur un ecran qui n'en veut pas.
+//
+// C'est aussi ce qui protege l'ordinateur de bureau, ou l'arriere-plan n'existe pas vraiment : l'etat « actif » y revient
+// a chaque regain de FOCUS, et relancer le peripherique a cet instant ferait cliquer l'accordeur pour rien.
+TEST( MicrophoneControllerTest, returning_to_the_foreground_opens_nothing_when_nobody_was_listening )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    test.controller.handleApplicationSuspended();
+    test.controller.handleApplicationResumed();
+
+    QCoreApplication::processEvents();
+
+    EXPECT_FALSE( test.controller.isListening() );
+    EXPECT_EQ( test.detector, nullptr );
+}
+
+// UN ALLER-RETOUR QUI N'A RIEN FERME NE ROUVRE RIEN. C'est le cas du bureau, et il merite son propre test : « actif »
+// revient a chaque fois que la fenetre reprend le focus, et un micro relance a chaque clic hors de la fenetre
+// s'entendrait - un clic dans le casque, a chaque fois.
+TEST( MicrophoneControllerTest, a_foreground_return_without_a_suspend_does_not_restart_the_microphone )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    test.start();
+
+    ASSERT_TRUE( test.controller.isListening() );
+
+    const int startsBefore = test.detector->startCount();
+
+    // Pas de handleApplicationSuspended() : l'application n'a jamais quitte le premier plan.
+    test.controller.handleApplicationResumed();
+
+    QCoreApplication::processEvents();
+
+    EXPECT_EQ( test.detector->startCount(), startsBefore );
+    EXPECT_TRUE( test.controller.isListening() );
+}
+
+// LE MIROIR D'UN COURS DONNE L'INTERVALLE, ET NE TIRE RIEN. Le cours de la quinte promet « aucun score : c'est un miroir,
+// pas un juge » - et la carte ouvrait pourtant une SESSION, dont le bouton « Suivant » tire un intervalle AU HASARD, donc
+// fait quitter celui que la page venait de faire entendre.
+TEST( MicrophoneControllerTest, a_singing_mirror_keeps_the_given_interval_and_counts_nothing )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    ASSERT_FALSE( test.controller.isSingingMirror() );
+
+    test.controller.openSingingMirror( 7 );
+
+    QCoreApplication::processEvents();
+
+    // L'intervalle est celui du COURS, et il y reste : c'est la seule chose qui distingue un miroir d'un jeu.
+    EXPECT_TRUE( test.controller.isSingingMirror() );
+    EXPECT_EQ( 7, test.controller.singingTargetSemitones() );
+
+    // Et le micro s'ouvre : un miroir muet serait le pire des echecs, il ferait porter au joueur la faute d'un
+    // peripherique ferme.
+    EXPECT_TRUE( test.controller.isListening() );
+    ASSERT_NE( test.detector, nullptr );
+
+    test.detector->hear( 440.0 );
+
+    EXPECT_EQ( test.controller.detectedNoteLabel(), QStringLiteral( "A4  440.0 Hz" ) );
+}
+
+// OUVRIR UNE SESSION FERME LE MIROIR. Les deux ne cohabitent pas : une session compte ses questions et les tire au
+// hasard, un miroir renvoie ce qu'on lui donne. Deux modes ouverts a la fois, et le cours promettrait une chose que
+// l'ecran contredirait.
+TEST( MicrophoneControllerTest, starting_a_session_leaves_the_mirror_behind )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    test.controller.openSingingMirror( 7 );
+    QCoreApplication::processEvents();
+
+    ASSERT_TRUE( test.controller.isSingingMirror() );
+
+    test.controller.startSingingSession();
+
+    EXPECT_FALSE( test.controller.isSingingMirror() );
+}
+
+// LA FANTOME D'UN MIROIR SE POSE COMME CELLE D'UN EXERCICE - une seule regle, deux usages.
+//
+// J'avais d'abord pose la cible d'un miroir sur la note THEORIQUE (tonique + intervalle), parce que l'application la
+// connait d'avance. Roger l'a vue a l'ecran et a tranche : « je prefere la version relative. Imposer une premiere note,
+// surtout a la voix est complique. Surtout pour un debutant et via un son de piano. »
+//
+// La raison est plus profonde qu'un gout : la tonique se JOUE, elle ne se CHANTE pas. Ce test tient donc la regle qui
+// en decoule - le miroir n'a PAS de position a lui, et rien ne doit jamais le faire diverger de l'exercice.
+TEST( MicrophoneControllerTest, a_mirror_places_the_ghost_exactly_like_an_exercise )
+{
+    (void)application();
+
+    MicrophoneUnderTest test;
+
+    test.controller.setSingingTarget( 7 );
+
+    const double exerciseFraction = test.controller.singingTargetStaffFraction();
+
+    test.controller.openSingingMirror( 7 );
+
+    QCoreApplication::processEvents();
+
+    EXPECT_DOUBLE_EQ( test.controller.singingTargetStaffFraction(), exerciseFraction );
+}
+
 }    // namespace musichien::ui

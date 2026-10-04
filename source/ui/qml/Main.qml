@@ -101,6 +101,30 @@ ApplicationWindow {
     // traversait DEUX crans d'un coup - la lecon ET l'Ecole - et on retombait sur la page de garde. Un calque laisse le
     // retour a la fenetre, et c'est elle qui decide (voir onClosing, plus haut).
     // LA CONFIRMATION AVANT DE QUITTER UNE PARTIE.
+    // LA REGLE MAINTENANT, ET ELLE VAUT PARTOUT : le retour REMONTE D'UN CRAN DANS L'APPLICATION, et ne quitte jamais
+    // sans demander. Une lecon remonte a la liste, la liste remonte a la garde, et une partie en cours demande
+    // confirmation.
+    // =================================================================================================================
+    // REMONTER D'UN CRAN, EN UN SEUL ENDROIT.
+    // LE BOUTON RETOUR D'ANDROID ARRIVE ICI.
+    // Qt 6 ne le livre PAS comme une fermeture de fenetre, mais comme une TOUCHE. Et quand aucun element focalise ne la
+    // prend, c'est ANDROID qui termine l'activite : l'application se ferme. C'est exactement ce que Roger a vu apres ma
+    // premiere tentative - « l'arriere quitte completement l'appli » - et il avait raison de le signaler.
+    // Le calque de l'ecran d'exercice est declare PLUS BAS dans ce fichier, et l'ordre est ce qui decide qui passe
+    // devant : une partie lancee depuis une lecon s'affiche par-dessus l'Ecole, et non derriere elle.
+    // L'ECOLE DES CHIOTS : le vert NEON de l'etude.
+    // Roger : « je changerai la couleur du bouton, le marronasse, je suis pas hyper fan. L'ecole des chiots est un peu un
+    // training mode mais + cours. Du coup je mettrais une couleur proche du bleu des training mode, genre un vert neon. »
+    // LE BOUTON NEON : une BORDURE allumee, et un fond transparent.
+    // Roger, sur la rangee « Mode infini / Chanter / Survie » : « je n'aime pas vraiment cette couleur marron. Tu pourrais
+    // peut etre completement passer en mode neon, bordure neon rose rouge comme le bouton arcade, et le reste transparent.
+    // Avec le texte a l'interieur d'une couleur visible. »
+    // LA COULEUR VIENT DU MEME ENDROIT QUE L'ARCADE - l'accent du style Material, celui qui remplit deja le grand bouton -
+    // et elle n'est donc pas recopiee ici. Deux valeurs ecrites a la main finiraient par diverger, et « la meme que
+    // l'Arcade » est precisement ce qui est demande.
+    // UN COMPOSANT A PART ENTIERE, et non une option de TintedMenuButton : le bouton teinte est valide par Roger tel qu'il
+    // est, et lui ajouter un mode aurait change SON fond a lui. Deux habillages, deux composants - le jour ou l'un bouge,
+    // l'autre ne bronche pas.
 
     id: mainWindow
 
@@ -124,6 +148,12 @@ ApplicationWindow {
     // et les deux se lisent d'un coup d'oeil sur la page de garde, sans une phrase de plus.
     readonly property color trainingColour: "#1c4a66"
     readonly property color trainingLabelColour: "#a6e7ff"
+    // Elle est donc prise DANS la famille du bleu d'entrainement - meme profondeur, meme clarte de libelle - et decalee
+    // vers le vert. C'est ce que la colorimetrie cyberpunk donne au calme et a l'apprentissage : le rouge et le magenta
+    // brûlent, le cyan et le vert refroidissent. Le libelle est le meme vert que la barre de tenue du chant, donc
+    // l'Ecole ne parle pas une langue que le jeu n'a pas deja.
+    readonly property color schoolColour: "#1a4a36"
+    readonly property color schoolLabelColour: "#9dffc4"
     // Et le duo des outils. Le metronome est FROID et le diapason CHAUD, et c'est ce qui les distingue : l'un donne le
     // temps, l'autre la justesse. Ce qui les relie, ce n'est pas la teinte mais le TRAITEMENT - le meme fond profond,
     // la meme icone en neon, la meme intensite. Un cyan et un magenta qui se repondent, sur la nuit violette : c'est
@@ -145,6 +175,9 @@ ApplicationWindow {
     // Dialogue : c'est ce qui permet au bouton retour d'Android de remonter d'un cran dans l'Ecole au lieu de traverser
     // le dialogue et de ramener a la garde.
     property bool schoolIsOpen: false
+    // LE GLOSSAIRE EST OUVERT. Une page a part, comme l'Ecole : elle se pose par-dessus la garde, elle se ferme par son
+    // bouton ou par le Retour du telephone, et rien d'autre ne change.
+    property bool glossaryIsOpen: false
 
     function kindColour(index) {
         return kindColours[index % kindColours.length];
@@ -232,6 +265,33 @@ ApplicationWindow {
         return qsTr("%1 octaves plus haut").arg(p_octaveSpan);
     }
 
+    // Le bouton retour d'Android, le bouton de sortie de l'Ecole, et la fermeture de la fenetre menent tous ici : une
+    // seule regle, et trois portes. Elle rend VRAI si elle a consomme le geste, et FAUX quand il n'y a plus rien a
+    // remonter - c'est alors la sortie de l'application, et elle est demandee.
+    function goBackOneStep() {
+        // UNE PARTIE EN COURS D'ABORD : elle passe AVANT l'Ecole, parce qu'elle est ce qui se voit. C'est l'ordre de
+        // lecture de l'ecran, pas une preference - sans lui, le retour fermerait la lecon cachee derriere la partie.
+        if (ExerciseController.running) {
+            leaveGameDialog.open();
+            return true;
+        }
+        if (glossaryIsOpen) {
+            // LE GLOSSAIRE PASSE AVANT L'ECOLE : il est declare APRES elle, donc il est devant. Une seule regle, et
+            // elle se lit dans l'ordre du fichier plutot que dans une liste de priorites a tenir a jour.
+            glossaryIsOpen = false;
+            return true;
+        }
+        if (schoolIsOpen) {
+            // D'UNE LECON, on remonte a la LISTE : c'est ce que le geste veut dire.
+            if (CourseController.reading)
+                CourseController.close();
+            else
+                schoolIsOpen = false;
+            return true;
+        }
+        return false;
+    }
+
     // The colour of the window itself, not of any item inside it. On Android this is what shows through a system bar
     // while the first frame paints, and it must match the top of the gradient rather than flash white.
     color: "#1b1035"
@@ -242,30 +302,82 @@ ApplicationWindow {
     minimumHeight: 480
     visible: true
     title: qsTr("Musichien")
-    // LA REGLE MAINTENANT, ET ELLE VAUT PARTOUT : le retour REMONTE D'UN CRAN DANS L'APPLICATION, et ne quitte jamais
-    // sans demander. Une lecon remonte a la liste, la liste remonte a la garde, et une partie en cours demande
-    // confirmation.
-    // =================================================================================================================
+    // LA FERMETURE DE LA FENETRE : le chemin que Qt emprunte quand le retour a ete recu proprement. On refuse de fermer
+    // si l'application sait encore remonter d'un cran.
     onClosing: function(close) {
-        // DANS L'ECOLE : on remonte d'un cran, toujours, et jamais hors de l'application.
-        if (mainWindow.schoolIsOpen) {
+        if (mainWindow.goBackOneStep()) {
             close.accepted = false;
-            if (CourseController.reading)
-                CourseController.close();
-            else
-                mainWindow.schoolIsOpen = false;
-            return ;
-        }
-        // UNE PARTIE EN COURS : on ne sort pas d'une partie sur une touche qu'on a pu frôler. Roger : « pour les jeux,
-        // je preferais quand meme une popup ». Elle propose la page de garde, pas la sortie de l'application.
-        if (ExerciseController.running) {
-            close.accepted = false;
-            leaveGameDialog.open();
             return ;
         }
         // Sinon la sortie est demandee et on la laisse faire - en coupant le son au passage : un flux audio laisse
         // ouvert sur un telephone est une batterie qui se vide.
         IntervalController.stopPlayback();
+    }
+
+    // Ce capteur est plein ecran, sans enfant, et SANS gestion de souris : il ne dessine rien et ne mange aucun tap. Il
+    // n'existe que pour garder le focus et prendre la touche, afin que le retour remonte dans l'application au lieu d'en
+    // sortir.
+    Item {
+        // Le focus se perd des qu'un dialogue s'ouvre puis se ferme. Sans cela, la touche suivante repart a Android et
+        // ferme l'application - le bug reviendrait une fois sur deux, ce qui est le pire des bugs.
+        // ON NE REPREND LE FOCUS QUE QUAND ON A QUELQUE CHOSE A EN FAIRE.
+        // C'est ici qu'etait le bug que Roger a trouve : « quand j'appuie sur le bouton arriere, rien ne se passe » sur les
+        // pages de reference. Ce capteur reprenait le focus chaque fois qu'il le perdait - donc il le reprenait AU
+        // DIALOGUE qui venait de l'obtenir. La page ne recevait jamais la touche, et le capteur la consommait pour ne rien
+        // faire : l'ecran restait immobile.
+
+        id: backKeyCatcher
+
+        anchors.fill: parent
+        // DERRIERE tout le reste : il ne doit rien masquer.
+        z: -1
+        focus: true
+        // Il ne garde donc le focus que la ou il sert : dans l'Ecole, et pendant une partie. Partout ailleurs - la page de
+        // garde, les pages de reference - il le laisse a qui le prend, et la touche Retour retrouve son sens ordinaire :
+        // fermer la page ouverte, ou quitter l'application depuis la garde.
+        onActiveFocusChanged: {
+            if (!activeFocus && (mainWindow.schoolIsOpen || mainWindow.glossaryIsOpen || ExerciseController.running))
+                forceActiveFocus();
+
+        }
+        Keys.onReleased: function(event) {
+            if (event.key !== Qt.Key_Back)
+                return ;
+
+            // La touche est PRISE quoi qu'il arrive : c'est ce qui empeche Android de fermer l'application. Reste a
+            // savoir quoi en faire, et c'est la regle commune qui decide.
+            event.accepted = true;
+            mainWindow.goBackOneStep();
+        }
+
+        // ET IL LE PREND AU MOMENT OU IL DEVIENT UTILE. Le focus ne se perd pas toujours AVANT : un capteur qui
+        // attendrait une perte de focus pour s'installer ne s'installerait jamais au premier coup.
+        Connections {
+            function onSchoolIsOpenChanged() {
+                if (mainWindow.schoolIsOpen)
+                    backKeyCatcher.forceActiveFocus();
+
+            }
+
+            function onGlossaryIsOpenChanged() {
+                if (mainWindow.glossaryIsOpen)
+                    backKeyCatcher.forceActiveFocus();
+
+            }
+
+            target: mainWindow
+        }
+
+        Connections {
+            function onRunningChanged() {
+                if (ExerciseController.running)
+                    backKeyCatcher.forceActiveFocus();
+
+            }
+
+            target: ExerciseController
+        }
+
     }
 
     // Elle vit ICI, a la racine, et non dans le composant DarkComboBox : un composant inline n'accepte pas d'objet
@@ -617,6 +729,11 @@ ApplicationWindow {
         // building the project, this is the game.
         // LA PAGE D'OUVERTURE DU BILAN : elle dit au joueur CE QUE L'APP SAIT DE LUI avant de l'interroger - ses points
         // forts, ses points faibles - et a quoi le bilan sert.
+        // The passage is a CROSS FADE rather than a switch, and it is short: Material motion asks for a change that
+        // is felt without being watched - 220 ms is the length of a breath, and the eye reads the arrival instead of
+        // the cut. The screen is only invisible once the fade is over, so it never eats a tap.
+        // L'ECOLE DES CHIOTS, FRERE DE L'ECRAN D'EXERCICE.
+        // LE GLOSSAIRE, FRERE DE L'ECOLE ET DECLARE APRES ELLE.
 
         anchors.fill: parent
 
@@ -637,6 +754,12 @@ ApplicationWindow {
             contentWidth: availableWidth
 
             ColumnLayout {
+                // LA LARGEUR DE LA COLONNE EST CELLE DU VIEWPORT, explicitement.
+                // Sans cette ligne, le ColumnLayout prend sa largeur IMPLICITE - celle de son enfant le plus large - et
+                // une rangee de trois boutons plus large que les autres se retrouvait centree sur une colonne plus
+                // etroite qu'elle, donc rognee d'un cote. C'est le defaut que Roger a souleve : « les boutons qui sont 3
+                // sur une ligne depassent tres legerement en largeur... on le voit tres rapidement qu'un cote est coupe.
+                // C'est un defaut present depuis l'origine. »
                 // --------------------------------------------------------------------------------------------
                 // The three shortcuts
                 // They are presets of the bench below: the quickest way to check that the sound comes
@@ -673,6 +796,11 @@ ApplicationWindow {
                 // vient donc du bouton qui la porte, ce qui est exactement ce qu'on veut.
                 // LA DIFFICULTE, ET LA FLECHE QUI DIT QU'ON PEUT MONTER.
                 // L'ENTRAINEMENT : trois familles, dix questions chacune, et aucune experience.
+                // LES TROIS VARIANTES DU JEU : ni fond, ni gris - une BORDURE allumee, et rien dedans.
+                // LE GLOSSAIRE : les mots du jeu, comme un dictionnaire.
+                // Roger, 04/10/2026 : « je veux que ca fasse vraiment liste de dico [...] Normalement on devrait savoir
+                // utiliser un dictionnaire. » Meme famille de couleur que l'Ecole, et ce n'est pas une coincidence : c'est
+                // la meme matiere - on y LIT, on n'y joue pas.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -887,7 +1015,7 @@ ApplicationWindow {
                     height: 58
                     font.pixelSize: 23
                     highlighted: true
-                    text: qsTr("▶ ARCADE")
+                    text: qsTr("ARCADE")
                     onClicked: ExerciseController.startSession()
                 }
 
@@ -921,6 +1049,7 @@ ApplicationWindow {
 
                     TintedMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
                         tintColour: mainWindow.trainingColour
                         labelColour: mainWindow.trainingLabelColour
@@ -930,6 +1059,7 @@ ApplicationWindow {
 
                     TintedMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
                         tintColour: mainWindow.trainingColour
                         labelColour: mainWindow.trainingLabelColour
@@ -939,6 +1069,7 @@ ApplicationWindow {
 
                     TintedMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
                         tintColour: mainWindow.trainingColour
                         labelColour: mainWindow.trainingLabelColour
@@ -992,14 +1123,15 @@ ApplicationWindow {
                 }
 
                 // L'ECOLE DES CHIOTS : les cours. Ce n'est pas un jeu et ca ne paie pas - c'est un lieu ou l'on apprend,
-                // pose a la suite du Bilan. Meme famille de couleur que lui : la page d'etude, pas la page de jeu.
+                // pose a la suite du Bilan. Sa couleur le dit : le VERT NEON de l'etude, pris dans la famille du bleu
+                // d'entrainement - voir schoolColour - et non le rouge du jeu.
                 TintedMenuButton {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     height: 46
-                    tintColour: mainWindow.questColour
-                    labelColour: mainWindow.questLabelColour
-                    text: qsTr("📖  L'École des Chiots")
+                    tintColour: mainWindow.schoolColour
+                    labelColour: mainWindow.schoolLabelColour
+                    text: qsTr("L'École des Chiots")
                     onClicked: {
                         // ON OUVRE TOUJOURS SUR LE CATALOGUE : une lecon laissee ouverte la derniere fois ne doit pas
                         // reprendre toute seule.
@@ -1021,25 +1153,52 @@ ApplicationWindow {
                     text: qsTr("Des leçons courtes, avec des exemples à écouter.")
                 }
 
-                RowLayout {
+                // ET LE POISSON ROUGE, voulu par Roger. Il dit la verite : un glossaire sert a ceux qui oublient.
+                TintedMenuButton {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 46
+                    tintColour: mainWindow.schoolColour
+                    labelColour: mainWindow.schoolLabelColour
+                    text: qsTr("🐟  Le Glossaire")
+                    onClicked: {
+                        mainWindow.glossaryIsOpen = true;
+                    }
+                }
+
+                // Roger : « je n'aime pas vraiment cette couleur marron pour les modes infini, chanter et survie. Tu
+                // pourrais peut-etre completement passer en mode neon, bordure neon rose rouge comme le bouton arcade, et
+                // le reste transparent. » Elles cessent donc d'etre des variantes du rouge eteint : elles deviennent des
+                // CADRES, et la page se lit d'un coup d'oeil - le plein pour ce qui se joue, le trait pour ce qui
+                // s'ouvre a cote.
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    // LA RANGEE PREND LA LARGEUR DE LA PAGE, moins une petite marge - et JAMAIS moins que ce que ses
+                    // boutons demandent, parce que chacun d'eux peut se retracter (voir « Layout.minimumWidth: 0 »).
+                    // C'est ce qui garantit qu'aucune bordure ne se retrouve coupee, quelle que soit la largeur du
+                    // telephone.
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 12
+                    Layout.rightMargin: 12
                     spacing: 8
 
-                    TintedMenuButton {
+                    NeonMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
-                        tintColour: mainWindow.questColour
-                        labelColour: mainWindow.questLabelColour
+                        // UN CRAN PLUS PETIT QUE LES GRANDS BOUTONS, et c'est justifie : Roger le dit lui-meme, « ces 3
+                        // types de jeux sont vraiment des sous-modes de l'arcade ». Trois mots en capitales partagent
+                        // ici une largeur de telephone - un cran de moins, et ils tiennent tous.
+                        labelSize: 14
                         text: qsTr("Mode infini")
                         onClicked: ExerciseController.startInfiniteSession()
                     }
 
-                    TintedMenuButton {
+                    NeonMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
-                        tintColour: mainWindow.questColour
-                        labelColour: mainWindow.questLabelColour
+                        labelSize: 14
                         text: qsTr("Chanter")
                         onClicked: {
                             MicrophoneController.startSingingSession();
@@ -1047,11 +1206,11 @@ ApplicationWindow {
                         }
                     }
 
-                    TintedMenuButton {
+                    NeonMenuButton {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Layout.preferredHeight: 46
-                        tintColour: mainWindow.questColour
-                        labelColour: mainWindow.questLabelColour
+                        labelSize: 14
                         text: qsTr("Survie")
                         onClicked: ExerciseController.startSurvivalSession()
                     }
@@ -1604,12 +1763,80 @@ ApplicationWindow {
 
         }
 
-        // The passage is a CROSS FADE rather than a switch, and it is short: Material motion asks for a change that
-        // is felt without being watched - 220 ms is the length of a breath, and the eye reads the arrival instead of
-        // the cut. The screen is only invisible once the fade is over, so it never eats a tap.
+        // C'EST CE QUI MANQUAIT, et il a fallu deux essais. Le premier : l'Ecole etait declaree APRES l'ecran
+        // d'exercice, donc devant lui - le jeu se lancait invisible, et Roger n'entendait que le son. Le second : je
+        // lui ai donne un z superieur, en croyant que cela suffirait. Non - l'ecran d'exercice est IMBRIQUE dans un
+        // conteneur, et z n'ordonne que des FRERES. Les voici donc freres pour de vrai, et l'ordre de declaration
+        // redevient ce qu'il n'aurait jamais du cesser d'etre.
+        CourseScreen {
+            id: courseScreen
+
+            anchors.fill: parent
+            opacity: (mainWindow.schoolIsOpen && !ExerciseController.running) ? 1 : 0
+            visible: opacity > 0
+            // Pendant la fonte, le calque est encore visible : le desactiver evite qu'il avale un tap destine a la garde.
+            enabled: mainWindow.schoolIsOpen
+            // LE BOUTON DE SORTIE SUIT LA MEME REGLE QUE LE RETOUR DU TELEPHONE : depuis une lecon, on remonte a la
+            // liste ; depuis la liste, on sort de l'Ecole.
+            onCloseRequested: mainWindow.goBackOneStep()
+            // CHANTER UN INTERVALLE DEPUIS UN COURS : la page dit l'intention, et c'est ICI qu'on sait ou vit l'outil de
+            // chant. La cible est posee AVANT d'ouvrir, sinon la page s'ouvrirait sur la question d'avant.
+            onSingRequested: function(p_semitones) {
+                // UN MIROIR, PAS UNE SESSION : le cours donne l'intervalle, et rien ne le change. Le cours le promet lui-
+                // meme a la page du geste : « aucun score : c'est un miroir, pas un juge ».
+                MicrophoneController.openSingingMirror(p_semitones);
+                singingDialog.open();
+            }
+            // OUVRIR UNE ANNEXE : c'est le MEME lecteur, un autre cours. L'ecole reste ouverte derriere, donc le retour
+            // ramene au cours d'ou l'on vient - ce que le bouton de sortie fait deja pour une lecon.
+            onAnnexeRequested: function(p_annexeName) {
+                CourseController.openAnnexe(p_annexeName);
+            }
+            // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
+            onVisibleChanged: {
+                if (!visible && !mainWindow.schoolIsOpen)
+                    CourseController.close();
+
+            }
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 150
+                }
+
+            }
+
+        }
+
+        // Les deux pages se ressemblent - on y lit, on n'y joue pas - et le dernier declare passe devant : c'est ce
+        // qu'on veut d'une page qu'on vient d'ouvrir. C'est aussi ce que dit la danse du Retour, deux fonctions plus
+        // haut, et les deux se lisent dans le meme ordre.
+        GlossaryScreen {
+            id: glossaryScreen
+
+            anchors.fill: parent
+            opacity: (mainWindow.glossaryIsOpen && !ExerciseController.running) ? 1 : 0
+            visible: opacity > 0
+            // Pendant la fonte, le calque est encore visible : le desactiver evite qu'il avale un tap destine a la garde.
+            enabled: mainWindow.glossaryIsOpen
+            onCloseRequested: mainWindow.goBackOneStep()
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 150
+                }
+
+            }
+
+        }
+
         ExerciseScreen {
             id: exerciseScreen
 
+            // AU-DESSUS DE TOUT, y compris de l'Ecole : une partie lancee depuis une lecon doit se VOIR. C'est un nombre
+            // plutot qu'un deplacement de bloc, et c'est volontaire : l'ordre de declaration redevient juste du jour ou le
+            // fichier sera decoupe, et personne n'aura a se souvenir de l'ordre des enfants.
+            z: 2
             anchors.fill: parent
             visible: opacity > 0
             opacity: ExerciseController.running ? 1 : 0
@@ -2391,14 +2618,25 @@ ApplicationWindow {
         }
 
         contentItem: ScrollView {
+            id: singingScroll
+
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
+                // LA LARGEUR VIENT DU VIEWPORT, ET NON DE « parent ».
+                // Roger : « il y a un petit bug d'affichage sur la largeur, la largeur de la fenetre n'est pas prise en
+                // entiere pour afficher la partition ». Il a raison, et la cause est un piege connu des ScrollView : avec
+                // la barre HORIZONTALE en AlwaysOff, le conteneur de contenu prend sa largeur IMPLICITE, et non celle du
+                // viewport. « parent.width » donnait donc la largeur du contenu - c'est-a-dire presque rien - et la
+                // portee se dessinait etroite.
+
                 id: singingColumn
 
-                width: parent.width
+                // availableWidth est la propriete faite pour ca : la largeur du viewport, moins les marges et les barres.
+                // Elle est donc juste que la barre horizontale soit visible ou non.
+                width: singingScroll.availableWidth
                 spacing: 10
 
                 Text {
@@ -2409,8 +2647,11 @@ ApplicationWindow {
                     text: qsTr("Chanter")
                 }
 
+                // LE COMPTEUR N'EXISTE QUE DANS UNE SESSION. Un cours ouvre un MIROIR : il n'y a rien a compter, et
+                // afficher « Question 1 / 5 » promettrait une serie qui n'aura pas lieu.
                 Text {
                     Layout.fillWidth: true
+                    visible: !MicrophoneController.isSingingMirror
                     color: "#cbb8e8"
                     font.pixelSize: 14
                     text: qsTr("Question %1 / %2 · %3 juste(s)").arg(MicrophoneController.singingQuestionIndex).arg(MicrophoneController.singingTotalQuestions).arg(MicrophoneController.singingCorrectCount)
@@ -2431,6 +2672,15 @@ ApplicationWindow {
 
                 // La boule sur la portee, pendant que le joueur chante.
                 StaffBall {
+                    // LA BOULE FANTOME DANS LE MIROIR, et c'est la que Roger l'a voulue : « la on ne fait pas de scoring,
+                    // donc on peut carrement mettre la fantome qu'on vient de developper... on veut juste guider
+                    // l'utilisateur ».
+
+                    // ELLE ATTEND LA PREMIERE NOTE DU JOUEUR, comme dans un exercice - et c'est Roger qui l'a tranche,
+                    // apres l'avoir vue se poser d'avance sur la note theorique : « je prefere la version relative.
+                    // Imposer une premiere note, surtout a la voix est complique. » Un guide se pose sur la note qui a
+                    // ETE chantee ; avant, il n'y a rien a guider.
+                    showGhost: MicrophoneController.isSingingMirror && MicrophoneController.hasFirstNote
                 }
 
                 // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
@@ -2498,8 +2748,12 @@ ApplicationWindow {
                     }
                 }
 
+                // « SUIVANT » N'EXISTE PAS DANS UN MIROIR, et ce n'etait pas qu'une question de gout : ce bouton tire un
+                // intervalle AU HASARD, donc il faisait quitter celui que le cours venait de faire entendre - sous les
+                // yeux du joueur, et sans qu'il ait rien demande.
                 Button {
                     Layout.fillWidth: true
+                    visible: !MicrophoneController.isSingingMirror
                     text: MicrophoneController.singingSessionOver ? qsTr("Recommencer") : qsTr("Suivant")
                     onClicked: MicrophoneController.singingSessionOver ? MicrophoneController.startSingingSession() : MicrophoneController.newSingingQuestion()
                 }
@@ -3199,67 +3453,6 @@ ApplicationWindow {
 
             }
 
-        }
-
-    }
-
-    // Le calque de l'ecran d'exercice est declare PLUS BAS dans ce fichier, et l'ordre est ce qui decide qui passe
-    // devant : une partie lancee depuis une lecon s'affiche par-dessus l'Ecole, et non derriere elle.
-    CourseScreen {
-        id: courseScreen
-
-        anchors.fill: parent
-        opacity: mainWindow.schoolIsOpen ? 1 : 0
-        visible: opacity > 0
-        // Pendant la fonte, le calque est encore visible : le desactiver evite qu'il avale un tap destine a la garde.
-        enabled: mainWindow.schoolIsOpen
-        // LE BOUTON DE SORTIE SUIT LA MEME REGLE QUE LE RETOUR DU TELEPHONE, et c'est voulu : le geste et le bouton ne
-        // peuvent pas se contredire. Depuis une lecon, on remonte a la liste ; depuis la liste, on sort de l'Ecole.
-        onCloseRequested: {
-            if (CourseController.reading)
-                CourseController.close();
-            else
-                mainWindow.schoolIsOpen = false;
-        }
-        // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
-        onVisibleChanged: {
-            if (!visible) {
-                CourseController.close();
-            }
-        }
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 150
-            }
-
-        }
-
-    }
-
-    // Roger l'a demandee explicitement pour les jeux : le retour du telephone, qu'on peut frôler sans le vouloir, ne doit
-    // pas jeter une partie en cours. « Je me suis fait beaucoup avoir. »
-    Dialog {
-        // LA QUESTION EST LE TITRE, ET IL N'Y A PAS DE CONTENU LIBRE.
-
-        id: leaveGameDialog
-
-        anchors.centerIn: parent
-        // C'est une lecon, pas une preference. Un contenu de dialogue se dimensionne sur la largeur IMPLICITE de son
-        // texte, c'est-a-dire celle de sa plus longue ligne : preferred et minimum a zero n'y changent rien tant qu'un
-        // QQuickPopupItem reste maitre du calcul, et le test de l'ecran a vu 477 points pour une vue de 352. Un titre
-        // court, deux boutons standards, et rien d'autre : le dialogue tient alors tout seul dans l'ecran.
-        title: qsTr("Revenir à la page principale ?")
-        modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        // Ok ARRETE la partie et laisse le joueur sur la page de garde - c'est ce qu'il demande, et non fermer
-        // l'application. L'ecran d'exercice disparait de lui-meme, puisqu'il ne s'affiche que si une partie tourne.
-        onAccepted: ExerciseController.stopSession()
-
-        // Le fond du dialogue lui-meme, et pas seulement celui de la page : le style garde sa feuille blanche, et cette
-        // application est sombre.
-        background: Rectangle {
-            color: "#1d1033"
         }
 
     }
@@ -4167,6 +4360,100 @@ ApplicationWindow {
 
     }
 
+    Dialog {
+        id: leaveGameDialog
+
+        anchors.centerIn: parent
+        width: mainWindow.width
+        height: mainWindow.height
+        modal: true
+        padding: 0
+        onAccepted: ExerciseController.stopSession()
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: mainWindow.width - 80
+            spacing: 18
+
+            Text {
+                Layout.preferredWidth: 0
+                Layout.minimumWidth: 0
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                color: "#f2ecff"
+                font.pixelSize: 16
+                text: qsTr("Revenir à la page principale ?")
+            }
+
+            Text {
+                Layout.preferredWidth: 0
+                Layout.minimumWidth: 0
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                color: "#8a77ad"
+                font.pixelSize: 13
+                text: qsTr("La partie en cours sera perdue.")
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                spacing: 10
+
+                Rectangle {
+                    Layout.preferredWidth: 120
+                    Layout.preferredHeight: 44
+                    radius: 10
+                    color: "#6a4fa8"
+
+                    Text {
+                        anchors.centerIn: parent
+                        color: "#ffffff"
+                        font.pixelSize: 15
+                        text: qsTr("Revenir")
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            leaveGameDialog.close();
+                            ExerciseController.stopSession();
+                        }
+                    }
+
+                }
+
+                Rectangle {
+                    Layout.preferredWidth: 120
+                    Layout.preferredHeight: 44
+                    radius: 10
+                    color: "#2a1a4a"
+
+                    Text {
+                        anchors.centerIn: parent
+                        color: "#cbbde8"
+                        font.pixelSize: 15
+                        text: qsTr("Continuer")
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: leaveGameDialog.close()
+                    }
+
+                }
+
+            }
+
+        }
+
+        background: Rectangle {
+            color: "#1d1033"
+        }
+
+    }
+
     // Trois familles, et un seul composant : trois copies auraient fini par diverger, et la quatrieme famille - le jour ou
     // une question de plus existera - se branchera en trois lignes.
     component GodModeFamilySection: ColumnLayout {
@@ -4342,6 +4629,38 @@ ApplicationWindow {
         font.pixelSize: tintedButton.labelSize
         Material.background: tintedButton.tintColour
         Material.foreground: tintedButton.labelColour
+    }
+
+    // Ce qu'on perd, et il faut le dire : le fond Material porte aussi l'effet d'encre au toucher. Un cadre transparent
+    // n'en a pas. Sur trois petits boutons qui ouvrent une page, le trait fixe dit plus que l'ondulation.
+    component NeonMenuButton: MenuButton {
+        // Le fond, et la taille du mot : les deux memes reglages que le bouton teinte, pour que les rangees se
+        // ressemblent la ou elles doivent se ressembler.
+
+        id: neonButton
+
+        // LE FOND, JUSTEMENT. Roger : « oui je comprends le fait que le fond transparent rend le bouton moins envie de
+        // cliquer. peut etre un fond moins rose et moins flashy (mais pas le marron d'avant) en gardant la bordure +
+        // neon ». Ni rose, ni marron : un violet profond de la meme famille que la page, juste assez clair pour qu'on
+        // voie une surface a toucher.
+        property color surfaceColour: "#2e1c52"
+        property int labelSize: 15
+        readonly property color neonBorderColour: Material.accent
+        // Le libelle est le meme neon, ECLAIRCI : assez clair pour se lire sur le violet profond de la page, assez lie
+        // pour que l'oeil voie qu'il appartient a la meme famille que le trait.
+        readonly property color neonLabelColour: Qt.lighter(neonButton.neonBorderColour, 1.9)
+
+        font.pixelSize: neonButton.labelSize
+        Material.background: neonButton.surfaceColour
+        Material.foreground: neonButton.neonLabelColour
+
+        background: Rectangle {
+            color: neonButton.surfaceColour
+            radius: 5
+            border.width: 2
+            border.color: neonButton.neonBorderColour
+        }
+
     }
 
     // Un grand chiffre, avec ce qu'il veut dire. Trois par page suffisent : au-dela, on ne lit plus, on survole.

@@ -63,12 +63,33 @@ class MicrophoneController final : public QObject
     // La detection, elle, est la meme dans les deux cas : deux notes tenues, et l'ecart entre elles.
     Q_PROPERTY( int singingTargetSemitones READ singingTargetSemitones NOTIFY singingTargetChanged )
     Q_PROPERTY( QString singingTargetLabel READ singingTargetLabel NOTIFY singingTargetChanged )
+
+    // OU TOMBE LA NOTE A CHANTER SUR LA PORTEE, pour y poser la boule fantome.
+    //
+    // LA VALEUR ENREGISTREE, ET RIEN D'AUTRE. Roger a fini de mettre le doigt dessus : « il faut vraiment se baser sur la
+    // note jouee la premiere fois, afficher le fantome a partir de la valeur enregistree et c'est tout. Et penser a bien
+    // rafraichir derriere. »
+    //
+    // Deux erreurs successives m'ont mene ici, et elles disent tout ce qu'il faut retenir :
+    //   * la premiere version lisait bien la note enregistree, mais ecoutait singingTargetChanged - un signal qui ne part
+    //     qu'une fois par question. La position se calculait donc AVANT la premiere note et restait figee ;
+    //   * la seconde suivait la hauteur entendue a l'instant, ce que Roger a immediatement ressenti : « le fantome suit
+    //     tout le temps la voix. Trop de refresh. »
+    //
+    // Elle ecoute donc sungIntervalChanged - l'ecran se rafraichit quand le detecteur parle, et la valeur lue, elle, est
+    // celle de la PREMIERE note de l'essai en cours. Le detecteur remet son reading a zero a chaque reponse (voir
+    // ExerciseSessionController::answerSung), donc la fantome repart de la bonne note a chaque tentative.
+    Q_PROPERTY( double singingTargetStaffFraction READ singingTargetStaffFraction NOTIFY sungIntervalChanged )
     Q_PROPERTY( bool isSingingCaptureActive READ isSingingCaptureActive NOTIFY singingCaptureStateChanged )
     Q_PROPERTY( bool hasSungInterval READ hasSungInterval NOTIFY sungIntervalChanged )
     Q_PROPERTY( int sungSemitones READ sungSemitones NOTIFY sungIntervalChanged )
 
     // 0 tant que rien n'a ete chante, 1 quand l'intervalle est juste, 2 quand il ne l'est pas.
     Q_PROPERTY( int sungVerdict READ sungVerdict NOTIFY sungIntervalChanged )
+
+    // LE MIROIR, PAR OPPOSITION A LA SESSION : l'intervalle est DONNE et ne change pas, il n'y a ni compteur de
+    // questions ni tirage au hasard. C'est ce qu'un cours demande quand il ecrit « :: chante ».
+    Q_PROPERTY( bool isSingingMirror READ isSingingMirror NOTIFY singingMirrorChanged )
 
     // L'ecart, en CENTS, entre l'intervalle chante et l'intervalle PARFAIT du temperament courant : zero quand il est
     // exactement celui du jeu, positif quand il a ete chante trop large, negatif quand il a ete chante trop etroit.
@@ -130,6 +151,23 @@ public:
     // relancerait pour rien le peripherique, ce qui s'entendrait sous la forme d'un clic.
     Q_INVOKABLE void ensureListening();
 
+    // --- Le cycle de vie de l'application ---------------------------------------------------------------------------
+
+    // L'application part en arriere-plan. Android REPREND le microphone a cet instant : le garder ouvert ne le garde pas
+    // vivant, et le flux qui subsiste ecrirait dans un peripherique deja detruit. On ferme donc proprement - mais on
+    // RETIENT qu'on voulait ecouter.
+    //
+    // C'est ce « retenir » qui manquait, et c'est lui qui privait le jeu de son micro : m_isListening restait a VRAI sur
+    // un peripherique mort, donc ensureListening() ne faisait plus rien au retour, et il fallait quitter l'ecran puis y
+    // revenir pour retrouver l'ecoute - par accident. Roger : « ca empeche de jouer aujourd'hui ».
+    void handleApplicationSuspended();
+
+    // L'application revient au premier plan : on rouvre le micro si l'ecran le demandait avant de partir.
+    //
+    // Le test se fait sur ce qui a ete ferme ICI, et non sur l'etat de la plateforme : sur un ordinateur de bureau rien
+    // ne se ferme, et rouvrir le peripherique au moindre regain de focus ferait cliquer l'accordeur pour rien.
+    void handleApplicationResumed();
+
     // --- La question chantee -----------------------------------------------------------------------------------------
 
     // Draws a new interval to sing. Called when the page opens, and after every answer.
@@ -141,6 +179,19 @@ public:
 
     // Starts a fresh session: the score returns to zero, and the first question is drawn.
     Q_INVOKABLE void startSingingSession();
+
+    // OUVRIR LE MIROIR SUR UN INTERVALLE DONNE : c'est ce que demande une carte « :: chante » d'un cours.
+    //
+    // Roger, sur le cours de la quinte juste : « on propose au joueur de chanter la quinte. Autant lui fournir l'outil
+    // pour qu'il verifie lui-meme s'il chante juste. » Et le cours le dit lui-meme : « aucun score : c'est un miroir,
+    // pas un juge ».
+    //
+    // Or la carte ouvrait la SESSION : son compteur de questions, et son bouton « Suivant » qui tire un intervalle AU
+    // HASARD - donc quitte celui que le cours venait de faire entendre, sous les yeux du joueur. Un miroir ne tire rien :
+    // il renvoie ce qu'on lui donne.
+    Q_INVOKABLE void openSingingMirror( int p_semitones );
+
+    [[nodiscard]] bool isSingingMirror() const { return m_isSingingMirror; }
 
     [[nodiscard]] int singingQuestionIndex() const { return m_singingQuestionIndex; }
     [[nodiscard]] int singingCorrectCount() const { return m_singingCorrectCount; }
@@ -156,6 +207,8 @@ public:
 
     [[nodiscard]] int singingTargetSemitones() const { return m_singingTargetSemitones; }
     [[nodiscard]] QString singingTargetLabel() const;
+
+    [[nodiscard]] double singingTargetStaffFraction() const;
     [[nodiscard]] bool isSingingCaptureActive() const { return m_isSingingCaptureActive; }
     [[nodiscard]] bool hasSungInterval() const { return m_sungIntervalDetector.reading().hasInterval(); }
     [[nodiscard]] int sungSemitones() const { return m_sungIntervalDetector.reading().semitones(); }
@@ -177,6 +230,7 @@ signals:
     void detectedTuningStateChanged();
 
     void singingTargetChanged();
+    void singingMirrorChanged();
     void singingCaptureStateChanged();
     void sungIntervalChanged();
     void singingQuestionChanged();
@@ -184,6 +238,18 @@ signals:
 private:
     void onPitch( float p_frequencyHz );
     void ensureDetector();
+
+    // La tonique sur laquelle la CIBLE JOUEE est construite : le reglage du joueur, et le do central a defaut. Une seule
+    // definition, pour que la note entendue et l'intervalle qu'elle annonce ne puissent pas se desaccorder.
+    [[nodiscard]] std::int32_t singingRootMidiNumber() const;
+
+    // Ouvre le peripherique, permission comprise. Extrait de startTest() pour que le RETOUR de l'application emprunte
+    // exactement le meme chemin : un chemin de reprise ecrit a part finirait par diverger de celui du premier usage.
+    void openDetector();
+
+    // Vrai quand le peripherique a ete ferme par un passage en arriere-plan, et qu'il reste donc a rouvrir au retour.
+    // C'est le drapeau qui distingue « le micro a ete rendu » de « le micro n'a jamais ete demande ».
+    bool m_reopenAfterSuspend{ false };
 
     QStringList m_deviceNames;
     DetectorFactory m_factory;
@@ -194,6 +260,11 @@ private:
     double m_detectedPitchRatio{ 0.0 };
     double m_detectedMidi{ 0.0 };
     double m_detectedStaffFraction{ 0.5 };
+
+    // ⚠️ MESURE TEMPORAIRE : la derniere valeur de fantome ECRITE dans le journal, pour n'y ecrire que quand elle
+    // change. Sans ce garde-fou, une valeur relue a chaque image noierait la sortie - et le journal d'Android est deja
+    // bavard. Elle part avec la ligne affichee, des que la cause est comprise.
+    mutable double m_lastLoggedGhostFraction{ -1.0 };
     int m_detectedOctaveShift{ 0 };
     double m_detectedCents{ 0.0 };
     int m_detectedTuningState{ 0 };
@@ -205,6 +276,10 @@ private:
     std::mt19937 m_singingRandomEngine{ std::random_device{}() };
     int m_singingTargetSemitones{ 7 };
     bool m_isSingingCaptureActive{ false };
+
+    // Vrai quand l'ecran de chant a ete ouvert par une carte de cours : l'intervalle est donne, rien n'est compte, et
+    // rien n'est tire au hasard. Faux des l'ouverture d'une session de jeu.
+    bool m_isSingingMirror{ false };
     QElapsedTimer m_pitchClock;
     musichien::domain::NotePlayer * m_notePlayer{ nullptr };
 

@@ -49,8 +49,28 @@ struct CourseBlock
         // ":: essai" - the button that starts the matching exercise.
         TryExercise,
 
+        // ":: chante" - the button that OPENS THE SINGING TOOL on this interval.
+        //
+        // Roger, sur le cours de la quinte juste : « on propose au joueur de chanter la quinte. Autant lui fournir l'outil
+        // pour qu'il verifie lui-meme s'il chante juste. » Un cours qui demande une chose et ne donne pas le moyen de la
+        // verifier est un cours qui laisse le joueur deviner - et c'est le seul endroit du jeu ou la voix sert.
+        SingInterval,
+
         // ":: annexe" - the way to the long annexe.
-        Annexe
+        Annexe,
+
+        // ":: image" - UNE ILLUSTRATION DU PROPOS, prise dans les ressources du jeu.
+        //
+        // Jamais une adresse : l'application n'a PAS la permission d'acces au reseau - c'est la charte du projet - donc
+        // une image distante ne s'afficherait tout simplement pas, et le telephone ne le dirait pas. L'image voyage
+        // avec le binaire, comme les cours et les indices.
+        Image,
+
+        // ":: serie" - LES PREMIERS HARMONIQUES D'UNE NOTE, joues l'un apres l'autre.
+        //
+        // Une carte a part et non un ':: jeu' : ce n'est pas un intervalle, c'est une EMPILEMENT - et c'est ce que le
+        // chapitre de la quinte demande d'entendre. Le jeu joue ce qu'il sait jouer ; il sait jouer ca.
+        HarmonicSeries
     };
 
     Kind kind{ Kind::Text };
@@ -79,6 +99,29 @@ struct CourseBlock
 
     // Kind::Annexe - the name of the annexe, as that file's own front matter gives it.
     std::string annexeName;
+
+    // Kind::Image - LE NOM DU FICHIER, sans chemin et sans dossier.
+    //
+    // Le chemin est construit par l'ecran, a partir d'un dossier unique : un cours n'ecrit jamais 'qrc:/...', parce
+    // qu'un chemin dans un fichier de contenu est un chemin qui se casse le jour ou l'image demenage.
+    std::string imageName;
+};
+
+// UNE SECTION, c'est-a-dire un « ## » du fichier et ce qu'il introduit.
+//
+// Roger : « je trouve que le cours en forme de grosse note qui descend, c'est bien mais un peu lourd. Je verrais plus ca
+// comme plusieurs pages par chapitre : "Deux notes et rien entre elles", "L'ecoute"... Et a la fin, on verrait la note
+// complete pour s'y referer. »
+//
+// Il a raison, et la structure est DEJA dans les fichiers : les titres de niveau 2 sont exactement les pages qu'il
+// decrit - mon propre specimen en a sept. Les aplatir pour tout afficher d'un bloc, c'etait jeter une decoupe que
+// l'auteur avait deja faite.
+struct CourseSection
+{
+    // Le titre du « ## », sans les diese. VIDE pour ce qui precede le premier titre : un chapeau, s'il y en a un.
+    std::string title;
+
+    std::vector<CourseBlock> blocks;
 };
 
 // A lesson, ready to be shown.
@@ -96,7 +139,12 @@ struct Course
     // exercise it belongs to - and feed the review plan - without knowing anything about either.
     std::vector<std::int32_t> concepts;
 
-    // The lesson itself, in order.
+    // La lecon, dans l'ordre, decoupee en pages.
+    std::vector<CourseSection> sections;
+
+    // LES MEMES BLOCS, A PLAT. Les deux existent, et c'est un choix assume : la page lit les SECTIONS, et le « voir la
+    // note complete » lit la liste plate. Les deux sortent du MEME passage de lecture, donc elles ne peuvent pas
+    // diverger - mais les recalculer l'une depuis l'autre a chaque affichage couterait une copie pour rien.
     std::vector<CourseBlock> blocks;
 
     [[nodiscard]] bool isEmpty() const noexcept { return blocks.empty(); }

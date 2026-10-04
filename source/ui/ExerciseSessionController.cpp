@@ -273,6 +273,11 @@ ExerciseSessionController::ExerciseSessionController( domain::NotePlayer & p_not
     if( m_levelStore != nullptr )
     {
         m_playerLevel = m_levelStore->storedLevel();
+
+        // CE QUE LE JOUEUR A LU DANS UN COURS : lu ici, une fois, comme le reste du profil. C'est ce qui fait qu'une
+        // lecon lue le soir oriente encore les questions du lendemain - un focus qui ne survit pas a la fermeture de
+        // l'application ne serait qu'une session un peu differente.
+        m_studyFocus = m_levelStore->storedStudyFocus();
     }
 
     if( m_playerLevel.has_value() )
@@ -571,6 +576,21 @@ bool ExerciseSessionController::isFeedbackVisible() const noexcept
 bool ExerciseSessionController::wasLastAnswerCorrect() const noexcept
 {
     return ( m_session != nullptr ) && m_session->wasLastAnswerCorrect();
+}
+
+bool ExerciseSessionController::isSingingGhostVisible() const noexcept
+{
+    if( m_session == nullptr )
+    {
+        return false;
+    }
+
+    const auto & question = m_session->currentQuestion();
+
+    // UNE QUESTION CHANTEE, ET DEJA MANQUEE UNE FOIS. La deuxieme note est la ou le fantome se montre, et c'est l'ecran
+    // qui pose cette seconde condition (MicrophoneController.hasFirstNote) : le modele dit ce que la QUESTION a deja
+    // coute, l'ecran dit ou en est le geste.
+    return ( question.kind == domain::QuestionKind::Sing ) && ( question.wrongAttemptCount >= 1 );
 }
 
 bool ExerciseSessionController::isHelpAvailable() const noexcept
@@ -1044,9 +1064,18 @@ QVariantList ExerciseSessionController::familyResults() const
 
         QVariantMap result;
         result.insert( QStringLiteral( "name" ), QString::fromUtf8( FAMILY_NAMES.at( index ).data() ) );
+
+        // L'INDICE DE LA FAMILLE, en plus de son nom : un ecran qui veut reagir a « la famille qui a le plus coute »
+        // compare alors un NOMBRE, et non une chaine francaise ecrite a la main des deux cotes. Le jour ou l'ordre des
+        // familles change, rien ne se casse en silence.
+        result.insert( QStringLiteral( "family" ), static_cast<int>( family ) );
         result.insert( QStringLiteral( "asked" ), static_cast<int>( tally.askedIn( family ) ) );
         result.insert( QStringLiteral( "correct" ), static_cast<int>( tally.correctIn( family ) ) );
         result.insert( QStringLiteral( "percent" ), static_cast<int>( tally.successPercentIn( family ) ) );
+
+        // LE NOMBRE QUI APPREND QUELQUE CHOSE. Le pourcentage reste calcule, parce qu'un autre ecran peut en avoir
+        // besoin, mais l'ecran de fin d'Arcade montre celui-ci : voir FamilyTally::errorsIn.
+        result.insert( QStringLiteral( "errors" ), static_cast<int>( tally.errorsIn( family ) ) );
 
         results.append( result );
     }
@@ -1279,7 +1308,40 @@ void ExerciseSessionController::startTrainingSession( int p_family )
     // des raisons d'etre du GodMode - « pour ceux qui veulent juste tester le jeu et ne pas y etre regulier ».
     const auto family = static_cast<domain::QuestionFamily>( m_lastTrainingFamily );
 
-    beginSession( domain::trainingSettingsFor( m_playerLevel.value_or( domain::PlayerLevel::Beginner ), family ) );
+    domain::SessionSettings settings =
+      domain::trainingSettingsFor( m_playerLevel.value_or( domain::PlayerLevel::Beginner ), family );
+
+    // CE QUE LE JOUEUR VIENT D'ETUDIER EST MIS EN AVANT, sans jamais elargir sa palette. Le reglage est pose ICI, au seul
+    // endroit par lequel tout entrainement passe : « Rejouer » reprend donc le meme focus que la partie qu'il rejoue.
+    settings.studyFocus = m_studyFocus;
+
+    beginSession( std::move( settings ) );
+}
+
+void ExerciseSessionController::startTrainingSessionFromLesson( int p_semitones )
+{
+    // LE COURS CHANGE LES QUESTIONS SUIVANTES, ET RIEN DE PLUS.
+    //
+    // Roger a choisi la version qui ne triche pas : « le concept devient PRIORITAIRE en revision : biais du tirage vers
+    // ce que tu viens d'etudier (sans elargir la palette) ». Un cours ne fait donc pas APPRENDRE un intervalle - il le
+    // met en avant. L'intervalle entre dans la palette le jour ou le joueur le reconnait a l'oreille, comme les autres,
+    // et c'est la palette adaptative qui en decide.
+    //
+    // Le focus REMPLACE le precedent, il ne s'y ajoute pas : « ce que tu viens d'etudier » est le dernier cours lu, et
+    // accumuler ferait d'un joueur curieux un joueur dont toutes les questions viennent de ses lectures.
+    //
+    // Et il est ECRIT dans le profil : une lecon lue le soir doit encore orienter les questions du lendemain. Sans cette
+    // ecriture, le mecanisme ne durerait pas plus longtemps que la session qu'il vient d'ouvrir.
+    m_studyFocus.assign( 1, p_semitones );
+
+    if( m_levelStore != nullptr )
+    {
+        m_levelStore->storeStudyFocus( m_studyFocus );
+    }
+
+    // L'entrainement de la famille des INTERVALLES s'ouvre : c'est celui que le cours vient de preparer. Un cours de
+    // modes ou d'accords ouvrira la sienne le jour ou ses cartes existeront - la famille est deja un parametre.
+    startTrainingSession( 0 );
 }
 
 void ExerciseSessionController::restartSession()
