@@ -820,6 +820,7 @@ Item {
             // boule et la barre de stabilite sont le composant partage avec l'accordeur ; seule la cible change.
             ColumnLayout {
                 // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
+                // ⚠️ LIGNE DE MESURE TEMPORAIRE - a retirer des que la boule fantome est comprise.
 
                 Layout.fillWidth: true
                 visible: ExerciseController.questionKind === 2
@@ -859,6 +860,17 @@ Item {
                     color: "#8a77ad"
                     font.pixelSize: 13
                     text: qsTr("%1  ·  %2 cents").arg(MicrophoneController.detectedNoteLabel).arg(Math.round(MicrophoneController.detectedCents))
+                }
+
+                // Quatre hypotheses sont mortes en lisant le code, et je refuse d'en tenter une cinquieme a l'aveugle.
+                // Ces quatre nombres disent TOUT : la position calculee de la fantome, la position reelle de la boule,
+                // la note de depart retenue (0 = aucune), et la cible demandee. Roger les lit, et la cause est finie.
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    color: "#ffd479"
+                    font.pixelSize: 12
+                    text: qsTr("mesure : fantôme %1 · boule %2 · départ %3 · cible %4").arg(MicrophoneController.singingTargetStaffFraction.toFixed(3)).arg(MicrophoneController.detectedStaffFraction.toFixed(3)).arg(MicrophoneController.hasFirstNote ? "ok" : "AUCUNE").arg(MicrophoneController.singingTargetSemitones)
                 }
 
                 // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
