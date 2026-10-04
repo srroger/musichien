@@ -270,21 +270,25 @@ void MicrophoneController::newSingingQuestion()
 
 double MicrophoneController::singingTargetStaffFraction() const
 {
-    // OU TOMBE LA NOTE A ATTEINDRE - une seule question, deux reponses, selon ce qu'on demande au joueur.
+    // OU TOMBE LA NOTE A ATTEINDRE : un intervalle au-dessus de la PREMIERE NOTE QUE LE JOUEUR A CHANTEE.
     //
-    // DANS UN EXERCICE, la question est l'INTERVALLE : le jeu juge l'ecart entre les DEUX notes chantees, donc la cible
-    // se pose un intervalle au-dessus de la PREMIERE NOTE DE L'ESSAI - celle que le joueur a lui-meme posee. C'est la
-    // valeur ENREGISTREE que Roger veut y voir : elle ne bouge plus pendant qu'il chante, donc la fantome est un repere
-    // stable et non un marteau. Le detecteur remet son reading a zero a chaque reponse (voir
-    // ExerciseSessionController::answerSung), donc elle repart de la note de l'essai en cours.
+    // LA VERSION RELATIVE, ET PAS LA VERSION ABSOLUE. J'ai d'abord pose la fantome sur la note THEORIQUE - la tonique du
+    // reglage, plus l'intervalle - parce que l'application la connait d'avance. Roger l'a vue a l'ecran et a tranche :
+    // « je prefere la version relative. Imposer une premiere note, surtout a la voix est complique. Surtout pour un
+    // debutant et via un son de piano. La tu montres un premier fantome de la vraie note. mieux vaut l'eviter pour
+    // l'utilisateur. »
     //
-    // DANS UN MIROIR, la question est la NOTE elle-meme : un cours ne juge rien, il guide. Et la note a atteindre est
-    // connue D'AVANCE - l'application sait quel intervalle elle demande au-dessus de quelle tonique. La cible est donc
-    // ABSOLUE, et la fantome dit ou aller AVANT la premiere note. Roger : « on connait la note a atteindre deja, et on
-    // veut juste guider l'utilisateur ».
-    const std::int32_t fromMidiNumber = m_isSingingMirror
-                                          ? ( singingRootMidiNumber() + m_singingTargetSemitones )
-                                          : ( m_sungIntervalDetector.reading().firstMidiNumber + m_singingTargetSemitones );
+    // Il a raison, et la raison est plus profonde qu'un gout : la tonique se JOUE, elle ne se CHANTE pas. Un debutant qui
+    // n'est pas encore sur la tonique verrait une cible qui ne correspond a rien de ce qu'il entend dans sa tete. Le guide
+    // se pose donc sur la note qu'il a REELLEMENT chantee, et il vaut pour n'importe quelle note de depart - chantee
+    // juste ou non.
+    //
+    // La valeur est ENREGISTREE : elle ne bouge plus pendant qu'il chante, donc la fantome est un repere stable et non un
+    // marteau. Le detecteur remet son reading a zero a chaque reponse (voir ExerciseSessionController::answerSung), donc
+    // elle repart de la note de l'essai en cours. Sans premiere note, elle vaut l'intervalle seul - un non-sens musical,
+    // et c'est pourquoi l'ecran ne l'affiche pas tant que le joueur n'a rien pose (voir Main.qml).
+    const std::int32_t fromMidiNumber =
+      m_sungIntervalDetector.reading().firstMidiNumber + m_singingTargetSemitones;
 
     return domain::StaffPosition::fraction( fromMidiNumber );
 }

@@ -239,9 +239,8 @@ private:
     void onPitch( float p_frequencyHz );
     void ensureDetector();
 
-    // La tonique sur laquelle la cible est construite : le reglage du joueur, et le do central a defaut. Une seule
-    // definition, partagee par la note jouee et par la fantome - deux calculs separes finiraient par designer deux notes
-    // differentes, et c'est exactement ce qu'une aide ne doit jamais faire.
+    // La tonique sur laquelle la CIBLE JOUEE est construite : le reglage du joueur, et le do central a defaut. Une seule
+    // definition, pour que la note entendue et l'intervalle qu'elle annonce ne puissent pas se desaccorder.
     [[nodiscard]] std::int32_t singingRootMidiNumber() const;
 
     // Ouvre le peripherique, permission comprise. Extrait de startTest() pour que le RETOUR de l'application emprunte

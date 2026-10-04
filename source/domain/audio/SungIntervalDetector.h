@@ -70,23 +70,23 @@ public:
     }
 
 private:
-    // How long a note must be held before it counts as the note the singer MEANT. Long on purpose: a wobble, a breath
-    // or a slide never reads as a note - the voice gets the time it needs, and the result feels smooth rather than
-    // twitchy.
-    //
-    // SEVEN HUNDRED AND FIFTY, and not a whole second. Roger relayed what the singers told him: "c'etait dur d'arriver
-    // au bout de la progress bar". A second was chosen for smoothness, but the bar is what the singer actually watches,
-    // and it RESTARTS at zero the moment the note moves - so the second did not buy smoothness, it bought despair.
-    // Three quarters of a second still outlasts a wobble, and the bar can now be filled by an honest voice.
     // COMBIEN DE TEMPS UNE NOTE DOIT TENIR AVANT DE COMPTER.
     //
-    // 750 etait trop court : Roger, en chantant, « ma voix n'a pas le temps de se stabiliser que le jeu me la compte.
-    // C'est un peu frustrant. » Il demande l'inverse de ce qu'il demandait avant - une duree plus longue, qui FORCE le
-    // chanteur a poser sa voix - et il a raison : c'est la que le chant s'apprend.
+    // L'HISTOIRE DE CE CHIFFRE EST UNE HISTOIRE D'ALLER-RETOUR, et elle merite d'etre ecrite en entier plutot que
+    // reecrite a chaque fois : c'est le seul nombre du chant qui se regle au SOUFFLE du joueur, et il a deja bouge trois
+    // fois.
     //
-    // 1200 millisecondes, entre les deux. La barre de stabilite se remplit plus lentement, donc le joueur VOIT qu'il
-    // doit tenir, et une voix qui glisse n'est plus comptee par accident.
-    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 1200;
+    //   * 750 : choisi pour que la barre se remplisse vite. Roger, en chantant : « ma voix n'a pas le temps de se
+    //     stabiliser que le jeu me la compte. C'est un peu frustrant. »
+    //   * 1200 : la duree plus longue, qui FORCE le chanteur a poser sa voix. Roger l'a trouvee « toujours un peu dure » -
+    //     et une barre qui se remplit trop lentement decourage celui qu'elle est censee aider.
+    //   * 1000 : entre les deux, et c'est le reglage actuel. Assez long pour ignorer un tremblement, une respiration ou un
+    //     glissement - une note tenue une seconde est une note VOULUE ; assez court pour qu'un debutant voie sa barre se
+    //     remplir PENDANT qu'il chante.
+    //
+    // La barre REPART de zero des que la note bouge, donc ce nombre est ce que le chanteur regarde vraiment : il se regle
+    // a son souffle, jamais a une theorie du signal.
+    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 1000;
 
     // Combien de temps de silence fait une REPRISE.
     //

@@ -1,7 +1,6 @@
 #include "ui/MicrophoneController.h"
 
 #include "domain/audio/PitchDetector.h"
-#include "domain/music/StaffPosition.h"
 
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -392,28 +391,29 @@ TEST( MicrophoneControllerTest, starting_a_session_leaves_the_mirror_behind )
     EXPECT_FALSE( test.controller.isSingingMirror() );
 }
 
-// LE MIROIR MONTRE LA NOTE A ATTEINDRE AVANT QU'ON AIT CHANTE UNE SEULE NOTE.
+// LA FANTOME D'UN MIROIR SE POSE COMME CELLE D'UN EXERCICE - une seule regle, deux usages.
 //
-// Roger : « la on ne fait pas de scoring, donc on peut carrement mettre le fantome qu'on vient de developper... on veut
-// juste guider l'utilisateur ». Et la cible est connue D'AVANCE - c'est meme ce qui rend la chose possible, et ce qui
-// distingue un miroir d'un exercice : l'exercice juge un ECART, donc il lui faut la note du joueur ; le miroir guide
-// vers une NOTE, donc il l'a deja.
-TEST( MicrophoneControllerTest, a_singing_mirror_shows_the_note_to_reach_before_a_single_note )
+// J'avais d'abord pose la cible d'un miroir sur la note THEORIQUE (tonique + intervalle), parce que l'application la
+// connait d'avance. Roger l'a vue a l'ecran et a tranche : « je prefere la version relative. Imposer une premiere note,
+// surtout a la voix est complique. Surtout pour un debutant et via un son de piano. »
+//
+// La raison est plus profonde qu'un gout : la tonique se JOUE, elle ne se CHANTE pas. Ce test tient donc la regle qui
+// en decoule - le miroir n'a PAS de position a lui, et rien ne doit jamais le faire diverger de l'exercice.
+TEST( MicrophoneControllerTest, a_mirror_places_the_ghost_exactly_like_an_exercise )
 {
     (void)application();
 
     MicrophoneUnderTest test;
 
+    test.controller.setSingingTarget( 7 );
+
+    const double exerciseFraction = test.controller.singingTargetStaffFraction();
+
     test.controller.openSingingMirror( 7 );
 
     QCoreApplication::processEvents();
 
-    // RIEN n'a ete chante : la fantome a pourtant une position, et c'est tout l'interet.
-    EXPECT_FALSE( test.controller.hasFirstNote() );
-
-    // La note a atteindre : un intervalle au-dessus de la tonique de reference. Sans reglage enregistre, c'est le do
-    // central (60) - la meme valeur que celle que playSingingTarget() fait entendre.
-    EXPECT_DOUBLE_EQ( test.controller.singingTargetStaffFraction(), domain::StaffPosition::fraction( 60 + 7 ) );
+    EXPECT_DOUBLE_EQ( test.controller.singingTargetStaffFraction(), exerciseFraction );
 }
 
 }    // namespace musichien::ui

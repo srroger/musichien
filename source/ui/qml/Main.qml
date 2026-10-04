@@ -115,6 +115,16 @@ ApplicationWindow {
     // L'ECOLE DES CHIOTS : le vert NEON de l'etude.
     // Roger : « je changerai la couleur du bouton, le marronasse, je suis pas hyper fan. L'ecole des chiots est un peu un
     // training mode mais + cours. Du coup je mettrais une couleur proche du bleu des training mode, genre un vert neon. »
+    // LE BOUTON NEON : une BORDURE allumee, et un fond transparent.
+    // Roger, sur la rangee « Mode infini / Chanter / Survie » : « je n'aime pas vraiment cette couleur marron. Tu pourrais
+    // peut etre completement passer en mode neon, bordure neon rose rouge comme le bouton arcade, et le reste transparent.
+    // Avec le texte a l'interieur d'une couleur visible. »
+    // LA COULEUR VIENT DU MEME ENDROIT QUE L'ARCADE - l'accent du style Material, celui qui remplit deja le grand bouton -
+    // et elle n'est donc pas recopiee ici. Deux valeurs ecrites a la main finiraient par diverger, et « la meme que
+    // l'Arcade » est precisement ce qui est demande.
+    // UN COMPOSANT A PART ENTIERE, et non une option de TintedMenuButton : le bouton teinte est valide par Roger tel qu'il
+    // est, et lui ajouter un mode aurait change SON fond a lui. Deux habillages, deux composants - le jour ou l'un bouge,
+    // l'autre ne bronche pas.
 
     id: mainWindow
 
@@ -764,6 +774,7 @@ ApplicationWindow {
                 // vient donc du bouton qui la porte, ce qui est exactement ce qu'on veut.
                 // LA DIFFICULTE, ET LA FLECHE QUI DIT QU'ON PEUT MONTER.
                 // L'ENTRAINEMENT : trois familles, dix questions chacune, et aucune experience.
+                // LES TROIS VARIANTES DU JEU : ni fond, ni gris - une BORDURE allumee, et rien dedans.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -1113,25 +1124,26 @@ ApplicationWindow {
                     text: qsTr("Des leçons courtes, avec des exemples à écouter.")
                 }
 
+                // Roger : « je n'aime pas vraiment cette couleur marron pour les modes infini, chanter et survie. Tu
+                // pourrais peut-etre completement passer en mode neon, bordure neon rose rouge comme le bouton arcade, et
+                // le reste transparent. » Elles cessent donc d'etre des variantes du rouge eteint : elles deviennent des
+                // CADRES, et la page se lit d'un coup d'oeil - le plein pour ce qui se joue, le trait pour ce qui
+                // s'ouvre a cote.
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: mainWindow.buttonWidth
                     spacing: 8
 
-                    TintedMenuButton {
+                    NeonMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
-                        tintColour: mainWindow.questColour
-                        labelColour: mainWindow.questLabelColour
                         text: qsTr("Mode infini")
                         onClicked: ExerciseController.startInfiniteSession()
                     }
 
-                    TintedMenuButton {
+                    NeonMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
-                        tintColour: mainWindow.questColour
-                        labelColour: mainWindow.questLabelColour
                         text: qsTr("Chanter")
                         onClicked: {
                             MicrophoneController.startSingingSession();
@@ -1139,11 +1151,9 @@ ApplicationWindow {
                         }
                     }
 
-                    TintedMenuButton {
+                    NeonMenuButton {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
-                        tintColour: mainWindow.questColour
-                        labelColour: mainWindow.questLabelColour
                         text: qsTr("Survie")
                         onClicked: ExerciseController.startSurvivalSession()
                     }
@@ -2587,10 +2597,11 @@ ApplicationWindow {
                     // donc on peut carrement mettre la fantome qu'on vient de developper... on veut juste guider
                     // l'utilisateur ».
 
-                    // Un exercice juge, donc il ne montre la cible qu'apres une erreur. Un cours ne juge rien : il n'a
-                    // donc aucune raison d'attendre. Et la cible est connue D'AVANCE - voir singingTargetStaffFraction -
-                    // donc la fantome dit ou aller AVANT la premiere note.
-                    showGhost: MicrophoneController.isSingingMirror
+                    // ELLE ATTEND LA PREMIERE NOTE DU JOUEUR, comme dans un exercice - et c'est Roger qui l'a tranche,
+                    // apres l'avoir vue se poser d'avance sur la note theorique : « je prefere la version relative.
+                    // Imposer une premiere note, surtout a la voix est complique. » Un guide se pose sur la note qui a
+                    // ETE chantee ; avant, il n'y a rien a guider.
+                    showGhost: MicrophoneController.isSingingMirror && MicrophoneController.hasFirstNote
                 }
 
                 // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
@@ -4539,6 +4550,28 @@ ApplicationWindow {
         font.pixelSize: tintedButton.labelSize
         Material.background: tintedButton.tintColour
         Material.foreground: tintedButton.labelColour
+    }
+
+    // Ce qu'on perd, et il faut le dire : le fond Material porte aussi l'effet d'encre au toucher. Un cadre transparent
+    // n'en a pas. Sur trois petits boutons qui ouvrent une page, le trait fixe dit plus que l'ondulation.
+    component NeonMenuButton: MenuButton {
+        id: neonButton
+
+        readonly property color neonBorderColour: Material.accent
+        // Le libelle est le meme neon, ECLAIRCI : assez clair pour se lire sur le violet profond de la page, assez lie
+        // pour que l'oeil voie qu'il appartient a la meme famille que le trait.
+        readonly property color neonLabelColour: Qt.lighter(neonButton.neonBorderColour, 1.9)
+
+        Material.background: "transparent"
+        Material.foreground: neonButton.neonLabelColour
+
+        background: Rectangle {
+            color: "transparent"
+            radius: 5
+            border.width: 2
+            border.color: neonButton.neonBorderColour
+        }
+
     }
 
     // Un grand chiffre, avec ce qu'il veut dire. Trois par page suffisent : au-dela, on ne lit plus, on survole.
