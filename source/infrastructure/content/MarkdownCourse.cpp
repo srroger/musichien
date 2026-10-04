@@ -442,6 +442,28 @@ void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Co
         return block;
     }
 
+    // ":: schéma | nom-du-dessin | ce que le dessin montre"
+    //
+    // Meme contrat que ':: image' : un NOM, jamais un chemin, et la legende est obligatoire. Un dessin qu'on regarde
+    // sans savoir quoi y regarder ne vaut pas mieux qu'une page de texte de plus - et c'est justement ce qu'on essaie
+    // d'eviter ici.
+    if( keyword == "schéma" )
+    {
+        if( fields.size() < 3 )
+        {
+            std::cerr << "Musichien: a ':: schéma' card needs a drawing name and a caption: "
+                         ":: schéma | nom-du-dessin | ce que le dessin montre. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::Schema;
+        block.schemaName = fields[1];
+        block.caption = fields[2];
+
+        return block;
+    }
+
     // ":: chante | demi_tons:7 | ce qu'on demande de chanter"
     //
     // Meme forme que ':: essai', et la meme distance : ce que ce genre ajoute, ce n'est pas une donnee, c'est une PORTE -

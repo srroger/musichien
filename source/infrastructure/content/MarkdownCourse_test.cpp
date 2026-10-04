@@ -321,4 +321,29 @@ TEST( MarkdownCourseTest, a_scale_card_naming_an_unknown_mode_is_refused )
     EXPECT_FALSE( course.has_value() );
 }
 
+// UN DESSIN SE DECLARE COMME UNE IMAGE : un nom, et une legende obligatoire.
+//
+// La legende n'est pas un ornement : un dessin qu'on regarde sans savoir quoi y regarder ne vaut pas mieux qu'un
+// paragraphe de plus - et c'est precisement ce qu'un dessin est cense remplacer.
+TEST( MarkdownCourseTest, a_schema_card_carries_a_drawing_name_and_a_caption )
+{
+    const std::optional<musichien::domain::Course> course =
+      readCourse( ":: schéma | bourdon | le principe de tout bourdon\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Schema );
+    EXPECT_EQ( course->blocks.at( 0 ).schemaName, "bourdon" );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "le principe de tout bourdon" );
+}
+
+// ET SANS LEGENDE, IL EST REFUSE - la memoire du contrat, pas un caprice de mise en page.
+TEST( MarkdownCourseTest, a_schema_card_without_a_caption_is_refused )
+{
+    const std::optional<musichien::domain::Course> course = readCourse( ":: schéma | bourdon\n" );
+
+    EXPECT_FALSE( course.has_value() );
+}
+
 }    // namespace musichien::infrastructure

@@ -90,7 +90,21 @@ struct CourseBlock
         //
         // La meme chose que le banc d'essai des modes, et c'est deliberer : un cours qui ferait entendre une couleur
         // autrement que le jeu apprendrait a reconnaitre un son qui n'existe pas a l'ecran.
-        ModeScale
+        ModeScale,
+
+        // ":: schéma" - UN DESSIN, et il est DESSINE, pas photographie.
+        //
+        // Roger, en relisant le cours du centre : « on parle vite de la cornemuse, mais la musique celtique avec cette
+        // fameuse cornemuse est un exemple tres fort du bourdon et par extension du centre. Ce serait bien de rajouter
+        // une petite page. Peut-etre image (comme on l'a fait avec Pythagore) ou un dessin ou schema qui parle. Juste
+        // pour ne pas avoir que du texte. »
+        //
+        // Une image du commerce aurait montre un instrument ; un schema montre LE PRINCIPE - deux notes qui ne bougent
+        // pas, et une ligne qui revient s'y poser. C'est le propos du chapitre, et ca se dessine en quinze lignes, a
+        // n'importe quelle taille d'ecran, sans un octet de plus dans l'APK.
+        //
+        // Comme pour l'image, le domaine ne sait PAS ce qui est dessine : il porte un nom, et l'ecran decide.
+        Schema
     };
 
     Kind kind{ Kind::Text };
@@ -134,6 +148,12 @@ struct CourseBlock
     // Kind::ModeScale - QUEL MODE, dans l'ordre des couleurs du domaine (lydien, ionien, mixolydien, dorien, eolien,
     // phrygien, locrien). L'index, et non un nom : le nom se traduit et se reecrit, un rang ne bouge pas.
     std::int32_t modeIndex{ 0 };
+
+    // Kind::Schema - LE NOM DU DESSIN, comme imageName est le nom du fichier.
+    //
+    // Le domaine ignore ce qu'il y a dedans, et il doit l'ignorer : un schema est de la mise en page, et la mise en
+    // page vit dans l'interface. Ici, un nom - et rien d'autre.
+    std::string schemaName;
 };
 
 // UNE SECTION, c'est-a-dire un « ## » du fichier et ce qu'il introduit.

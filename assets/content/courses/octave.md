@@ -49,9 +49,37 @@ premier**, avant tous les autres.
 > Une corde deux fois plus courte vibre deux fois plus vite, et sonne deux fois plus haut. Voilà toute la
 > physique de l'octave, et elle tient en une ligne.
 
-C'est aussi le seul intervalle que l'humanité a chanté **sans le savoir** : quand deux personnes chantent la
-même mélodie et que l'une a une voix plus grave, elles se placent **naturellement** à l'octave. Personne ne le
-décide. Ça se fait tout seul, depuis toujours, partout.
+Et elle a un privilège que la quinte n'a pas : **on ne l'a jamais inventée**. C'est le seul intervalle que
+l'humanité chante sans le savoir — et il y a deux pages là-dessus, juste en dessous.
+
+## Et l'orgue le sait depuis mille ans
+
+Voilà une chose que les hommes ont trouvée **avant** de savoir l'écrire, et qu'ils n'ont jamais oubliée depuis.
+
+Regarde un orgue. Ses tuyaux portent des numéros, et ces numéros sont des **longueurs**, en pieds : 8 pieds,
+4 pieds, 2 pieds. À chaque fois **la moitié** du tuyau, à chaque fois **la même note**, un étage plus haut.
+
+L'organiste, lui, ne dit pas « une octave plus haut ». Il dit : **« je tire le prestant »**. Et ce qu'il entend
+alors n'est pas une autre note : c'est la sienne, en **plus grand**. Le même air, doublé — et d'un coup l'église
+se remplit.
+
+:: jeu | demi_tons:12 | harmonique | la même note, deux fois, ensemble — écoute comme elle devient plus GRANDE
+
+Ça ne fait pas plus de bruit. Ça prend plus de **place**. C'est mille ans de facture d'orgue qui te le disent —
+et ta corde, deux fois plus courte, disait exactement la même chose.
+
+## Le seul que tout le monde partage
+
+On a trouvé, sur tous les continents, des musiques à cinq notes, des musiques à sept notes, et des gammes qu'on ne
+sait pas encore lire. On n'a **jamais** trouvé une musique sans octave.
+
+Partout où des voix graves et des voix aiguës chantent ensemble, elles se placent à l'octave : sans se concerter,
+sans l'avoir appris, et sans même s'en rendre compte. Deux personnes qui chantent la même chanson, l'une avec une
+voix d'homme et l'autre avec une voix de femme, ne sont pas « à peu près » d'accord — elles sont **exactement** à
+l'octave.
+
+> C'est le seul intervalle dont on puisse dire ça. La quinte, il a fallu l'inventer, et on l'a inventée dans une
+> église de pierre. L'octave, personne ne l'a inventée : on l'a **trouvée**.
 
 ## L'entendre dans la vraie musique
 

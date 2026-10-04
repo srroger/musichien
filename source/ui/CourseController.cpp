@@ -49,6 +49,10 @@ constexpr const char * KIND_CYCLE = "cycle";
 // ":: gamme" - la gamme d'un mode, sur le bourdon.
 constexpr const char * KIND_SCALE = "gamme";
 
+// ":: schéma" - un DESSIN. Le QML le peint d'apres son nom, puis ecrit sa legende : le controleur, lui, ne sait meme
+// pas qu'il y a un dessin.
+constexpr const char * KIND_SCHEMA = "schema";
+
 // LA QUINTE, EN DEMI-TONS. Elle sert au bourdon ET a la chaine des quintes : une seule definition, donc pas deux
 // valeurs a tenir d'accord.
 constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
@@ -77,6 +81,8 @@ constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
             return KIND_CYCLE;
         case domain::CourseBlock::Kind::ModeScale:
             return KIND_SCALE;
+        case domain::CourseBlock::Kind::Schema:
+            return KIND_SCHEMA;
         case domain::CourseBlock::Kind::Text:
         default:
             return KIND_TEXT;
@@ -104,6 +110,7 @@ constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
     description.insert( QStringLiteral( "imageName" ), QString::fromStdString( p_block.imageName ) );
     description.insert( QStringLiteral( "fifthCount" ), p_block.fifthCount );
     description.insert( QStringLiteral( "modeIndex" ), p_block.modeIndex );
+    description.insert( QStringLiteral( "schemaName" ), QString::fromStdString( p_block.schemaName ) );
 
     return description;
 }
