@@ -110,7 +110,7 @@ public:
     // Garde le meme timbre pour la lecture suivante : la demande du domaine, mise en oeuvre ici.
     void holdTimbre() override;
 
-    void beginTimbreForSession() override;
+    void beginTimbreForSession( int p_timbreIndex = -1 ) override;
     // Le clic de menu : un accuse de reception, pas une reponse.
     void playTapCue() override;
 

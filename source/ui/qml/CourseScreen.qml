@@ -570,7 +570,7 @@ Item {
                                 anchors.fill: parent
                                 onClicked: {
                                     ExerciseController.playTapCue();
-                                    CourseController.playChord(modelData.chordQuality);
+                                    CourseController.playChord(modelData.chordQuality, modelData.chordInversion);
                                 }
                             }
 

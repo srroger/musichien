@@ -138,8 +138,9 @@ public:
     Q_INVOKABLE void playModeScale( int p_modeIndex );
 
     // UN ACCORD, JOUE : la tonique du jeu, et les intervalles de sa qualite. C'est la carte ':: accord' du chapitre de
-    // la couleur - le majeur et le mineur, entendus avant d'etre nommes.
-    Q_INVOKABLE void playChord( int p_quality );
+    // la couleur - le majeur et le mineur, entendus avant d'etre nommes. p_inversion remonte les notes du bas d'une
+    // octave : le meme accord, autrement pose.
+    Q_INVOKABLE void playChord( int p_quality, int p_inversion );
 
     Q_INVOKABLE void stopPlayback();
 

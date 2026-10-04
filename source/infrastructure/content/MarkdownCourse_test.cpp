@@ -378,6 +378,23 @@ TEST( MarkdownCourseTest, a_chord_card_names_a_colour_in_french )
     EXPECT_EQ( course->blocks.at( 0 ).caption, "do, mib, sol, ensemble" );
 }
 
+// LE RENVERSEMENT, FACULTATIF, EN QUATRIEME CHAMP - apres la legende.
+//
+// ':: accord | majeur | do, mi, sol' reste la position fondamentale ; '... | 1' remonte la note du bas d'une octave.
+// Ecrit APRES la legende pour ne pas casser les cartes qui n'en portent pas.
+TEST( MarkdownCourseTest, a_chord_card_carries_an_optional_inversion )
+{
+    const std::optional<musichien::domain::Course> root = readCourse( ":: accord | majeur | do, mi, sol\n" );
+
+    ASSERT_TRUE( root.has_value() );
+    EXPECT_EQ( root->blocks.at( 0 ).chordInversion, 0 );
+
+    const std::optional<musichien::domain::Course> first = readCourse( ":: accord | majeur | mi, sol, do | 1\n" );
+
+    ASSERT_TRUE( first.has_value() );
+    EXPECT_EQ( first->blocks.at( 0 ).chordInversion, 1 );
+}
+
 // ET UN ACCORD INCONNU EST REFUSE : la faute coute une carte, jamais l'application.
 TEST( MarkdownCourseTest, a_chord_card_naming_an_unknown_quality_is_refused )
 {
@@ -440,6 +457,24 @@ TEST( MarkdownCourseTest, an_essai_card_lists_what_it_opens )
     ASSERT_EQ( chordsCourse->blocks.at( 0 ).exerciseTargets.size(), 2U );
     EXPECT_EQ( chordsCourse->blocks.at( 0 ).exerciseTargets.at( 0 ), 0 );    // majeur
     EXPECT_EQ( chordsCourse->blocks.at( 0 ).exerciseTargets.at( 1 ), 1 );    // mineur
+}
+
+// L'INSTRUMENT D'UNE LECON, PAR SON NOM. Absent : le piano (le controleur decide).
+//
+// Roger : « je mettrais bien le piano par defaut pour les cours, sauf exception ». L'exception se declare donc dans
+// l'en-tete, par un NOM : le contenu n'ecrit jamais un rang d'instrument.
+TEST( MarkdownCourseTest, a_course_can_name_its_instrument )
+{
+    const std::optional<musichien::domain::Course> named =
+      readCourse( "---\ntitre: Un cours\ninstrument: guitare\n---\n\nUn paragraphe.\n" );
+
+    ASSERT_TRUE( named.has_value() );
+    EXPECT_EQ( named->instrumentName, "guitare" );
+
+    const std::optional<musichien::domain::Course> bare = readCourse( "Un paragraphe.\n" );
+
+    ASSERT_TRUE( bare.has_value() );
+    EXPECT_TRUE( bare->instrumentName.empty() );
 }
 
 }    // namespace musichien::infrastructure

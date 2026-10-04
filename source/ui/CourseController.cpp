@@ -1,5 +1,6 @@
 #include "ui/CourseController.h"
 
+#include "domain/audio/SampledInstrument.h"
 #include "domain/music/Chord.h"
 #include "domain/music/Interval.h"
 #include "domain/music/Mode.h"
@@ -8,6 +9,8 @@
 #include <array>
 #include <chrono>
 #include <iostream>
+#include <optional>
+#include <string>
 #include <utility>
 
 namespace musichien::ui
@@ -59,6 +62,11 @@ constexpr const char * KIND_CIRCLE = "cercle";
 
 // ":: accord" - un ACCORD, joue : trois notes (ou plus) dont la tierce dit la couleur.
 constexpr const char * KIND_CHORD = "accord";
+
+// LE PIANO, PAR DEFAUT, POUR LES COURS. C'est son rang dans INSTRUMENT_NAMES (voir SampledInstrument.h), ou il vient
+// en PREMIER - et c'est une decision de Roger : « je mettrais bien le piano par defaut pour les cours, sauf exception
+// des cas ou il est plus pertinent d'utiliser un autre instrument ».
+constexpr std::size_t PIANO_INSTRUMENT_INDEX = 0;
 
 // LA QUINTE, EN DEMI-TONS. Elle sert au bourdon ET a la chaine des quintes : une seule definition, donc pas deux
 // valeurs a tenir d'accord.
@@ -123,6 +131,7 @@ constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
     description.insert( QStringLiteral( "modeIndex" ), p_block.modeIndex );
     description.insert( QStringLiteral( "schemaName" ), QString::fromStdString( p_block.schemaName ) );
     description.insert( QStringLiteral( "chordQuality" ), p_block.chordQuality );
+    description.insert( QStringLiteral( "chordInversion" ), p_block.chordInversion );
     description.insert( QStringLiteral( "exerciseFamily" ), p_block.exerciseFamily );
 
     // La LISTE d'une carte ':: essai', en QVariantList : le QML la passe telle quelle. Absente pour toutes les autres
@@ -438,6 +447,24 @@ void CourseController::open( int p_index )
         return;
     }
 
+    // UN TIMBRE POUR TOUTE LA LECTURE, ET LE PIANO PAR DEFAUT.
+    //
+    // Sans cela, chaque carte re-tire un instrument (voir QAudioNotePlayer::timbreIndexFor), et comparer deux accords
+    // d'une MEME lecon reviendrait a comparer deux instruments. Roger l'a entendu sur le renversement : « j'entends
+    // quand meme une grosse difference, comme si on changeait totalement d'accord » - c'etait le PIANO qui avait
+    // change, pas l'accord. La lecon compare des SONS : le son ne doit pas bouger.
+    //
+    // Et Roger a demande que ce soit le PIANO, « sauf exception des cas ou il est plus pertinent d'utiliser un autre
+    // instrument » - l'exception se declare alors dans l'en-tete du cours, par un nom.
+    const std::string & wantedInstrument = m_courses.at( static_cast<std::size_t>( p_index ) ).instrumentName;
+
+    const std::optional<std::size_t> namedInstrument =
+      wantedInstrument.empty() ? std::nullopt : domain::instrumentIndexForName( wantedInstrument );
+
+    const std::size_t instrumentIndex = namedInstrument.value_or( PIANO_INSTRUMENT_INDEX );
+
+    m_notePlayer.beginTimbreForSession( static_cast<int>( instrumentIndex ) );
+
     m_readingIndex = p_index;
 
     // ON COMMENCE AU DEBUT, ET PAR PAGES : un cours rouvert repart de sa premiere page. Reprendre a la page laissee
@@ -585,7 +612,7 @@ void CourseController::playModeScale( int p_modeIndex )
       scale, drone, std::chrono::milliseconds{ 500 }, std::chrono::milliseconds{ 80 } );
 }
 
-void CourseController::playChord( int p_quality )
+void CourseController::playChord( int p_quality, int p_inversion )
 {
     // UN ACCORD, JOUE. La tonique vient du jeu, comme partout ailleurs : deux lecons ne doivent pas faire entendre
     // deux centres differents sans le dire. Le domaine construit les notes depuis la seule qualite - le cours n'ecrit
@@ -597,7 +624,40 @@ void CourseController::playChord( int p_quality )
 
     const domain::Chord chord{ static_cast<domain::ChordQuality>( p_quality ), EXERCISE_ROOT_MIDI_NUMBER };
 
-    m_notePlayer.playChord( chord.notes() );
+    const std::vector<domain::Note> root = chord.notes();
+
+    const int inversion = std::clamp( p_inversion, 0, static_cast<int>( root.size() ) - 1 );
+
+    // LE RENVERSEMENT, ET LE REGISTRE QUI NE MONTE PAS.
+    //
+    // Un renversement, c'est le MEME accord avec une AUTRE note en bas. Le repliement classique remonte la note du bas
+    // d'une octave - do, mi, sol devient mi, sol, do, une octave PLUS HAUT. Roger l'a entendu, et il a nomme la cause :
+    // « j'entends comme si l'accord montait - c'est le do qui monte, et pas le mi et le sol qui descendent ». C'est bien
+    // ce qui donne l'impression d'un AUTRE accord.
+    //
+    // On redescend donc TOUT l'accord d'une octave APRES le repliement : la TONIQUE reste a sa place, et ce sont les
+    // AUTRES notes qui descendent. Le meme accord, vraiment - seule la basse a bouge.
+    std::vector<domain::Note> voiced;
+    voiced.reserve( root.size() );
+
+    for( std::size_t index = 0; index < root.size(); ++index )
+    {
+        const std::int32_t shift = std::cmp_less( index, inversion ) ? domain::SEMITONES_PER_OCTAVE : 0;
+
+        voiced.push_back( root.at( index ).transposedBy( shift ) );
+    }
+
+    if( inversion > 0 )
+    {
+        for( domain::Note & note : voiced )
+        {
+            note = note.transposedBy( -domain::SEMITONES_PER_OCTAVE );
+        }
+    }
+
+    std::ranges::sort( voiced );
+
+    m_notePlayer.playChord( voiced );
 }
 
 void CourseController::stopPlayback()

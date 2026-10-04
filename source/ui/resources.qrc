@@ -85,6 +85,18 @@
         <file alias="assets/content/courses/les-modes-plus-clair-plus-obscur.md">../../assets/content/courses/les-modes-plus-clair-plus-obscur.md</file>
         <file alias="assets/content/courses/l-echelle-des-bemols.md">../../assets/content/courses/l-echelle-des-bemols.md</file>
         <!--
+          Chapitre 5 : les accords, un peu plus loin. Lecon 9 : la septieme, et la tension qui pousse - l'accord qui
+          appelle une suite, et pourquoi (le triton cache entre la tierce et la septieme).
+        -->
+        <file alias="assets/content/courses/la-septieme-et-la-tension.md">../../assets/content/courses/la-septieme-et-la-tension.md</file>
+        <file alias="assets/content/courses/pourquoi-la-septieme-tend.md">../../assets/content/courses/pourquoi-la-septieme-tend.md</file>
+        <!--
+          Lecon 10 : le renversement - le meme accord, autrement pose. La carte ':: accord' gagne un QUATRIEME champ
+          facultatif, le renversement, qui remonte la note du bas d'une octave.
+        -->
+        <file alias="assets/content/courses/le-meme-accord-autrement-pose.md">../../assets/content/courses/le-meme-accord-autrement-pose.md</file>
+        <file alias="assets/content/courses/pourquoi-l-ordre-des-notes-change-le-son.md">../../assets/content/courses/pourquoi-l-ordre-des-notes-change-le-son.md</file>
+        <!--
           Le glossaire. Un mot par entree, une definition d'UNE PHRASE : Roger veut un aide-memoire, pas un manuel.
           Meme motif que les autres contenus, alias compris - le chemin de ressource est celui du disque.
         -->

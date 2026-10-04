@@ -176,6 +176,12 @@ struct CourseBlock
     // domaine ne connait pas l'orthographe d'un contenu.
     std::int32_t chordQuality{ 0 };
 
+    // Kind::Chord - LE RENVERSEMENT : combien de notes du BAS on remonte d'une octave (0 = position fondamentale).
+    //
+    // Le MEME accord, autrement pose - do, mi, sol ; mi, sol, do ; sol, do, mi. Rien ne change dans la couleur, mais
+    // le BAS change, et c'est le bas qui fait la basse. C'est tout le sujet de la lecon du renversement.
+    std::int32_t chordInversion{ 0 };
+
     // Kind::TryExercise - QUELLE FAMILLE de questions ouvrir : 0 intervalles, 1 accords, 2 modes.
     //
     // Le chapitre de la couleur ne s'exerce pas sur des intervalles : un cours de modes doit ouvrir l'exercice des
@@ -211,6 +217,13 @@ struct Course
 {
     std::string title;
     std::string subtitle;
+
+    // L'INSTRUMENT des cartes de cette lecon, par son NOM (« piano », « guitare »...). VIDE : le PIANO.
+    //
+    // Roger : « je mettrais bien le piano par defaut pour les cours, sauf exception des cas ou il est plus pertinent
+    // d'utiliser un autre instrument ». Une lecon ne change donc d'instrument que lorsqu'elle le DIT - et toutes ses
+    // cartes sonnent alors du meme instrument, ce sans quoi elle comparerait des timbres au lieu de comparer des sons.
+    std::string instrumentName;
 
     int chapter{ 0 };
     int order{ 0 };

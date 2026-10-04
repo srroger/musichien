@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace musichien::domain
@@ -58,6 +59,23 @@ inline constexpr std::array<const char *, INSTRUMENT_COUNT> INSTRUMENT_NAMES{
 //
 // Le saxo et les trois formes d'onde restent OFFERTS dans les reglages : ils ne sont simplement pas imposes.
 [[nodiscard]] std::vector<bool> defaultEnabledInstruments();
+
+// L'INDEX de l'instrument qui porte ce nom, ou rien si aucun ne le porte.
+//
+// Un cours n'ecrit pas un index : il ecrit « piano », « guitare », et le code sait ou ca se range - la meme regle que
+// pour les modes et les accords.
+[[nodiscard]] inline std::optional<std::size_t> instrumentIndexForName( std::string_view p_name ) noexcept
+{
+    for( std::size_t index = 0; index < INSTRUMENT_NAMES.size(); ++index )
+    {
+        if( p_name == INSTRUMENT_NAMES.at( index ) )
+        {
+            return index;
+        }
+    }
+
+    return std::nullopt;
+}
 
 // The waveforms offered as instruments, in the same order as their names at the end of INSTRUMENT_NAMES. The adapter
 // maps the corresponding flags onto this list.

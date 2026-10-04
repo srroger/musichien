@@ -584,6 +584,18 @@ void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Co
         block.chordQuality = *quality;
         block.caption = fields[2];
 
+        // LE RENVERSEMENT, FACULTATIF, en QUATRIEME champ : ':: accord | majeur | mi, sol, do | 1'. Il vient APRES la
+        // legende pour ne pas casser les cartes qui n'en portent pas - un cours ecrit d'abord ce qu'on entend, et le
+        // renversement seulement quand il compte.
+        if( fields.size() >= 4 )
+        {
+            if( const std::optional<std::int32_t> inversion = semitonesFromField( fields[3] );
+                inversion.has_value() && *inversion >= 0 )
+            {
+                block.chordInversion = *inversion;
+            }
+        }
+
         return block;
     }
 
@@ -732,6 +744,12 @@ void readFrontMatterLine( std::string_view p_line, domain::Course & p_course )
 
             remaining = remaining.substr( comma + 1 );
         }
+    }
+    else if( key == "instrument" )
+    {
+        // LE NOM DE L'INSTRUMENT des cartes de cette lecon. Absent : le piano. Un nom que le jeu ne connait pas est
+        // IGNORE par le controleur - la lecon sonnera du piano, ce qui n'est jamais une faute.
+        p_course.instrumentName = std::string( value );
     }
     else if( ( key == "chapitre" ) || ( key == "ordre" ) )
     {
