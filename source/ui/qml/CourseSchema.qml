@@ -179,8 +179,8 @@ Item {
             function drawTwoScales(ctx) {
                 var fifths = ["do", "ré", "mi", "fa#", "sol", "la", "si"];
                 var scale = ["do", "ré", "mi", "fa", "sol", "la", "si"];
-                drawScaleRow(ctx, fifths, height * 0.28, "#d98a4a", "les sept quintes, rangées");
-                drawScaleRow(ctx, scale, height * 0.72, "#7fbf7a", "la gamme");
+                drawScaleRow(ctx, fifths, height * 0.28, "#ffa94d", "les sept quintes, rangées");
+                drawScaleRow(ctx, scale, height * 0.72, "#7ee787", "la gamme");
                 // LE LIEN, entre les deux cases qui different. C'est exactement la comparaison que le texte ne faisait pas
                 // voir - et c'est la charniere de toute la lecon.
                 var x = width / 2;
@@ -204,8 +204,10 @@ Item {
                     var x = 6 + i * cell;
                     // LA CASE QUI CHANGE, et elle seule, est coloree. Quatreieme position dans les deux rangees : c'est
                     // la meme place, et ce n'est pas la meme note.
+                    // ELLE EST AUSSI PLUS HAUTE, et pas seulement d'une autre couleur : deux signaux plutot qu'un,
+                    // parce qu'un dessin doit se lire d'un coup d'oeil, sans chercher.
                     ctx.fillStyle = (i === 3) ? markedColour : "#2b2350";
-                    ctx.fillRect(x + 1, top, cell - 2, pillHeight);
+                    ctx.fillRect(x + 1, (i === 3) ? top - 4 : top, cell - 2, (i === 3) ? pillHeight + 8 : pillHeight);
                     ctx.font = "bold 13px sans-serif";
                     ctx.fillStyle = "#ffffff";
                     ctx.fillText(notes[i], x + cell / 2, centreY);
