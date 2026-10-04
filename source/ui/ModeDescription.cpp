@@ -259,9 +259,9 @@ QVariantList describeScaleCircle( domain::Scale p_scale, std::int32_t p_tonicPit
 
     for( std::int32_t pitchClass = 0; pitchClass < static_cast<std::int32_t>( domain::SEMITONES_PER_OCTAVE ); ++pitchClass )
     {
-        const std::int32_t fromTonic = ( ( pitchClass - p_tonicPitchClass ) % domain::SEMITONES_PER_OCTAVE
-                                         + domain::SEMITONES_PER_OCTAVE )
-                                       % domain::SEMITONES_PER_OCTAVE;
+        const std::int32_t fromTonic =
+          ( ( ( pitchClass - p_tonicPitchClass ) % domain::SEMITONES_PER_OCTAVE ) + domain::SEMITONES_PER_OCTAVE )
+          % domain::SEMITONES_PER_OCTAVE;
 
         std::int32_t stepIndex = -1;
 
@@ -289,9 +289,9 @@ QVariantList describeScaleCircle( domain::Scale p_scale, std::int32_t p_tonicPit
         // cinq notes n'en ont pas autant que sept. Sans cela, une pentatonique se dessinerait sur un degrade trop long.
         description.insert( QStringLiteral( "degreeCount" ), static_cast<int>( degrees.count ) );
 
-        const std::int32_t fromFrame = ( ( pitchClass - p_framePitchClass ) % domain::SEMITONES_PER_OCTAVE
-                                         + domain::SEMITONES_PER_OCTAVE )
-                                       % domain::SEMITONES_PER_OCTAVE;
+        const std::int32_t fromFrame =
+          ( ( ( pitchClass - p_framePitchClass ) % domain::SEMITONES_PER_OCTAVE ) + domain::SEMITONES_PER_OCTAVE )
+          % domain::SEMITONES_PER_OCTAVE;
 
         placed.emplace_back( ( fromFrame * FIFTHS_STEP ) % domain::SEMITONES_PER_OCTAVE, description );
     }

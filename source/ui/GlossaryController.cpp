@@ -60,12 +60,10 @@ GlossaryController::GlossaryController( std::vector<domain::GlossaryEntry> p_ent
 {
     // LE TRI SE FAIT ICI, une fois, et non a chaque affichage. Le fichier peut ranger ses mots n'importe comment - et il
     // le fera, parce qu'un auteur ajoute toujours le mot nouveau A LA FIN.
-    std::sort( p_entries.begin(),
-               p_entries.end(),
-               []( const domain::GlossaryEntry & p_left, const domain::GlossaryEntry & p_right ) {
-                   return sortKeyFor( QString::fromStdString( p_left.word ) )
-                          < sortKeyFor( QString::fromStdString( p_right.word ) );
-               } );
+    std::ranges::sort( p_entries, []( const domain::GlossaryEntry & p_left, const domain::GlossaryEntry & p_right ) {
+        return sortKeyFor( QString::fromStdString( p_left.word ) )
+               < sortKeyFor( QString::fromStdString( p_right.word ) );
+    } );
 
     QString previousLetter;
 

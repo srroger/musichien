@@ -110,6 +110,11 @@ Item {
 
                     delegate: ColumnLayout {
                         required property var modelData
+                        // L'INDEX DOIT ETRE DECLARE, et pas seulement lu : Qt 6 ne le donne plus comme une propriete de
+                        // contexte des qu'un « required property » est declare. Sans cette ligne, le premier mot de
+                        // chaque section affichait un « index is not defined » dans le journal - et le separateur de
+                        // lettre ne se posait plus qu'a moitie.
+                        required property int index
 
                         Layout.fillWidth: true
                         spacing: 1

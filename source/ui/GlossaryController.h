@@ -30,7 +30,7 @@ class GlossaryController : public QObject
     Q_OBJECT
 
 public:
-    GlossaryController( std::vector<domain::GlossaryEntry> p_entries, QObject * p_parent = nullptr );
+    explicit GlossaryController( std::vector<domain::GlossaryEntry> p_entries, QObject * p_parent = nullptr );
 
     // Une ligne par mot : le mot, sa definition, de quoi dessiner les separateurs, et rien d'autre.
     Q_PROPERTY( QVariantList entries READ entries CONSTANT )

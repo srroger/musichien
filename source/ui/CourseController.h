@@ -94,7 +94,7 @@ public:
     // Un nom qui ne correspond a rien ne fait RIEN : une carte morte vaut mieux qu'une page qui plante. Mais un renvoi
     // qui ne mene nulle part se dit AU DEMARRAGE - le constructeur le signale, et c'est la seule facon de voir une
     // faute de frappe qu'aucun compilateur ne peut voir.
-    Q_INVOKABLE void openAnnexe( QString p_name );
+    Q_INVOKABLE void openAnnexe( const QString & p_name );
 
     Q_INVOKABLE void close();
 

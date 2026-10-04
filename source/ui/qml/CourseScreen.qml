@@ -18,7 +18,17 @@ import QtQuick
 import QtQuick.Layouts
 
 Item {
+    // LE PASSAGE DE PAGE. Roger : « si possible rajouter une petite animation quand on va a la page suivante, de page
+    // qui se tourne. »
+    // L'IDEE VIENT D'UN LIVRE : le contenu ENTRE par le cote ou l'on va. Vers l'avant il vient de la droite, vers
+    // l'arriere de la gauche - c'est ce qui dit au doigt qu'il a AVANCE plutot que recule, et sans ajouter une fleche.
+
     id: courseScreen
+
+    // On n'anime QUE le decalage. Une fonte demanderait de faire vivre deux pages a la fois, et un clignotement est pire
+    // que pas d'animation du tout.
+    property real pageTurnOffset: 0
+    property int pageTurnAnchor: -1
 
     // La page demande a sortir, et celui qui la porte decide comment.
     signal closeRequested()
@@ -30,6 +40,32 @@ Item {
     signal annexeRequested(string p_annexeName)
 
     anchors.fill: parent
+
+    NumberAnimation {
+        id: pageTurn
+
+        target: courseScreen
+        property: "pageTurnOffset"
+        to: 0
+        duration: 220
+        easing.type: Easing.OutCubic
+    }
+
+    Connections {
+        function onCourseChanged() {
+            // « courseChanged » part AUSSI a l'ouverture d'un cours, au retour a la note complete et a la fermeture : on
+            // n'anime donc que si la PAGE a vraiment change, sinon l'ecran clignoterait pour rien.
+            if (CourseController.sectionIndex === courseScreen.pageTurnAnchor)
+                return ;
+
+            const versLavant = CourseController.sectionIndex > courseScreen.pageTurnAnchor;
+            courseScreen.pageTurnAnchor = CourseController.sectionIndex;
+            courseScreen.pageTurnOffset = versLavant ? 70 : -70;
+            pageTurn.restart();
+        }
+
+        target: CourseController
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -94,7 +130,10 @@ Item {
 
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: courseScreen.closeRequested()
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        courseScreen.closeRequested();
+                    }
                 }
 
             }
@@ -223,7 +262,10 @@ Item {
 
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: CourseController.previousSection()
+                            onClicked: {
+                                ExerciseController.playTapCue();
+                                CourseController.previousSection();
+                            }
                         }
 
                     }
@@ -248,7 +290,10 @@ Item {
 
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: CourseController.nextSection()
+                            onClicked: {
+                                ExerciseController.playTapCue();
+                                CourseController.nextSection();
+                            }
                         }
 
                     }
@@ -269,7 +314,10 @@ Item {
 
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: CourseController.setShowingWholeNote(true)
+                            onClicked: {
+                                ExerciseController.playTapCue();
+                                CourseController.setShowingWholeNote(true);
+                            }
                         }
 
                     }
@@ -290,7 +338,10 @@ Item {
 
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: CourseController.setShowingWholeNote(false)
+                            onClicked: {
+                                ExerciseController.playTapCue();
+                                CourseController.setShowingWholeNote(false);
+                            }
                         }
 
                     }
@@ -320,6 +371,12 @@ Item {
                     font.pixelSize: 17
                     font.bold: true
                     text: CourseController.sectionTitle
+
+                    // Le titre entre AVEC sa page, pas avant elle.
+                    transform: Translate {
+                        x: courseScreen.pageTurnOffset
+                    }
+
                 }
 
                 Repeater {
@@ -376,7 +433,10 @@ Item {
 
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: CourseController.playInterval(modelData.semitones, modelData.direction)
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    CourseController.playInterval(modelData.semitones, modelData.direction);
+                                }
                             }
 
                         }
@@ -435,7 +495,10 @@ Item {
 
                                     MouseArea {
                                         anchors.fill: parent
-                                        onClicked: Qt.openUrlExternally(modelData.url)
+                                        onClicked: {
+                                            ExerciseController.playTapCue();
+                                            Qt.openUrlExternally(modelData.url);
+                                        }
                                     }
 
                                 }
@@ -474,6 +537,7 @@ Item {
                                     // L'ENTRAINEMENT DE CE COURS, et non l'entrainement en general : l'intervalle que la
                                     // lecon vient d'enseigner est mis en avant dans les questions qui suivent, sans jamais
                                     // elargir la palette du joueur. C'est ce qui fait qu'une lecon change quelque chose.
+                                    ExerciseController.playTapCue();
                                     ExerciseController.startTrainingSessionFromLesson(modelData.semitones);
                                 }
                             }
@@ -507,7 +571,10 @@ Item {
 
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: courseScreen.singRequested(modelData.semitones)
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    courseScreen.singRequested(modelData.semitones);
+                                }
                             }
 
                         }
@@ -539,9 +606,18 @@ Item {
 
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: courseScreen.annexeRequested(modelData.annexeName)
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    courseScreen.annexeRequested(modelData.annexeName);
+                                }
                             }
 
+                        }
+
+                        // LA PAGE ENTIERE ENTRE D'UN BLOC : chaque carte suit le meme decalage que le titre, donc la
+                        // page se deplace d'un seul geste plutot que ligne par ligne.
+                        transform: Translate {
+                            x: courseScreen.pageTurnOffset
                         }
 
                     }

@@ -117,7 +117,7 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
     //
     // Il est TRIE avant tout le reste, et le tri porte sur m_courses : la liste et l'ouverture partagent donc le meme
     // ordre, et un index ne peut pas designer deux cours differents selon qui le lit.
-    std::sort( m_courses.begin(), m_courses.end(), libraryOrder );
+    std::ranges::sort( m_courses, libraryOrder );
 
     for( const domain::Course & course : m_courses )
     {
@@ -157,7 +157,7 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
             }
 
             const bool isResolved =
-              std::any_of( m_courses.begin(), m_courses.end(), [&block]( const domain::Course & p_candidate ) {
+              std::ranges::any_of( m_courses, [&block]( const domain::Course & p_candidate ) {
                   return p_candidate.title == block.annexeName;
               } );
 
@@ -170,7 +170,7 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
     }
 }
 
-void CourseController::openAnnexe( QString p_name )
+void CourseController::openAnnexe( const QString & p_name )
 {
     // Le TITRE, compare sans tenir compte de la casse ni des espaces autour : un auteur ecrit ce qu'il veut, et une
     // majuscule ne doit pas fermer une porte.
@@ -269,7 +269,7 @@ QString CourseController::sectionTitle() const
 
     const domain::Course & course = m_courses.at( static_cast<std::size_t>( m_readingIndex ) );
 
-    if( ( m_sectionIndex < 0 ) || ( m_sectionIndex >= static_cast<int>( course.sections.size() ) ) )
+    if( ( m_sectionIndex < 0 ) || std::cmp_greater_equal( m_sectionIndex, course.sections.size() ) )
     {
         return {};
     }
@@ -315,7 +315,7 @@ void CourseController::open( int p_index )
 {
     // Un index qui n'existe pas ne fait RIEN. Une page ne doit pas pouvoir planter sur un clic de trop, et c'est le
     // seul endroit ou la liste des cours rencontre un entier venu de l'exterieur.
-    if( ( p_index < 0 ) || ( p_index >= static_cast<int>( m_courses.size() ) ) )
+    if( ( p_index < 0 ) || std::cmp_greater_equal( p_index, m_courses.size() ) )
     {
         return;
     }

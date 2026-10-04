@@ -11,25 +11,51 @@ concepts: 7
 
 Do. Sol. Ensemble.
 
+:: jeu | demi_tons:7 | harmonique | do et sol, joués ensemble
+
 Ça ne bouge pas. Ça ne tire nulle part. Ça ne réclame aucune suite.
 
-Tu peux t'arrêter là, et la musique a l'air finie. C'est rare : presque tous les intervalles
-demandent quelque chose — celui-ci ne demande rien.
+Tu peux t'arrêter là, et la musique a l'air finie. C'est rare : presque tous les couples de notes
+demandent quelque chose — ceux-là ne demandent rien.
 
-C'est ça, une **quinte juste**. Avec l'octave, c'est le seul intervalle qui sonne **complet à deux
-notes toutes seules**. Tu l'entends depuis que tu es né ; tu ne savais juste pas son nom.
+**Ce que tu viens d'entendre a un nom : la quinte juste.**
+
+C'est le nom qu'on donne à la **distance** entre ces deux notes. Et une distance, en musique, s'appelle
+un **intervalle** : c'est le mot pour dire « de combien deux notes sont éloignées », sans se soucier des
+notes elles-mêmes. La quinte juste est la plus simple de toutes, juste après l'octave.
+
+Tu l'entends depuis que tu es né. Tu ne savais juste pas son nom.
 
 ## L'écoute
 
-Écoute-les une par une. Ne cherche rien à comprendre pour l'instant : laisse juste tes oreilles
-constater.
+Séparons-les, maintenant. La même distance, mais l'une après l'autre.
 
 :: jeu | demi_tons:7 | ascendant | do → sol, montant
 :: jeu | demi_tons:7 | descendant | sol → do, descendant
-:: jeu | demi_tons:7 | harmonique | les deux ensemble — c'est là qu'on entend qu'elles s'accordent
 
-La troisième est celle qui compte. Les deux autres, tu les chantes dans ta tête. La troisième, tu
-l'entends **s'accorder** — et tu ne peux pas ne pas l'entendre.
+Ça monte, ça descend — et c'est **la même distance** dans les deux sens. Un intervalle ne regarde pas
+d'où l'on vient : il dit seulement de combien on se déplace.
+
+Remets-les ensemble, et tu l'entends **s'accorder**. Ça, tu ne peux pas ne pas l'entendre.
+
+## D'où elle vient
+
+Il y a très longtemps, quelqu'un a remarqué une chose simple : si tu pinces une corde, puis
+**exactement la même corde aux deux tiers de sa longueur**, tu obtiens deux notes qui s'accordent.
+
+Deux tiers. C'est tout. C'est la première distance que l'humanité ait su écrire avec un chiffre — et
+c'est celle-là, pas une autre.
+
+> Imagine une église, au Moyen Âge. Le chant est seul : une seule mélodie, que tout le monde connaît.
+> Puis, un jour, quelqu'un s'écoute chanter, et ajoute **la même mélodie une quinte plus haut**. D'un
+> coup, la pierre se met à résonner.
+
+Ce jour-là, l'Europe a chanté deux notes ensemble pour la première fois — et ce n'était pas une fanfare.
+C'était ça : une quinte. Dans une église de pierre, c'est l'intervalle qui vibre tout seul, et pendant
+des siècles on n'en a presque pas utilisé d'autre.
+
+Ça ne veut pas dire que c'est « religieux ». Ça veut dire que c'est **le premier accord que l'oreille
+accepte sans qu'on le lui apprenne** — et c'est pour ça qu'il sonne encore aujourd'hui.
 
 ## L'entendre dans la vraie musique
 
@@ -43,16 +69,18 @@ Maintenant, la même chose, mais écrite par quelqu'un d'autre il y a longtemps.
 
 ## Le geste
 
-Fais-le maintenant, **sans bourdon** : c'est plus difficile, et c'est justement l'exercice.
+À toi. Tu pars du **do**, et tu dois te poser **une quinte juste plus haut** : monte jusqu'au sol, et
+rien d'autre.
 
-:: chante | demi_tons:7 | 🎤  Chante le sol par-dessus le do, et regarde si tu tombes juste
+:: chante | demi_tons:7 | 🎤  Pars du do, et monte jusqu'au sol — une quinte juste, sans autre aide que ton oreille
 
-Tu le trouveras **du premier coup**. C'est le seul intervalle dont on puisse dire ça : monter d'une quinte à
-partir d'une note que tu viens d'entendre, ça n'est pas une performance, ça se fait tout seul. Les autres
-demanderont ta journée. Celui-ci, non.
+Tu le trouveras **du premier coup**. C'est le seul intervalle dont on puisse dire ça : monter d'une
+quinte à partir d'une note que tu viens d'entendre, ça n'est pas une performance, ça se fait tout seul.
+Les autres demanderont ta journée. Celui-ci, non.
 
-> (Le bouton t'écoute et te dit **quel** intervalle tu as chanté, et de combien de cents tu es à côté. Aucun
-> score : c'est un miroir, pas un juge.)
+> Si tu veux un repère, le jeu t'en soufflera deux : le thème de **Retour vers le Futur** monte d'une
+> quinte, celui du **temple de Zelda** descend d'une quinte. Mais le meilleur repère est celui que tu
+> trouves toi : cherche la chanson que **tu** connais, elle ne te lâchera plus.
 
 ## L'essai
 

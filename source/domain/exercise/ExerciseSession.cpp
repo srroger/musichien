@@ -354,9 +354,7 @@ Interval ExerciseSession::drawTarget()
 
     for( const Interval & interval : m_palette )
     {
-        const bool isStudied = std::find( m_settings.studyFocus.begin(),
-                                          m_settings.studyFocus.end(),
-                                          interval.semitones() )
+        const bool isStudied = std::ranges::find( m_settings.studyFocus, interval.semitones() )
                                != m_settings.studyFocus.end();
 
         weights.push_back( isStudied ? STUDIED_DRAW_WEIGHT : 1.0 );
