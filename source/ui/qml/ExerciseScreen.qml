@@ -858,7 +858,7 @@ Item {
                     visible: MicrophoneController.detectedFrequencyHz > 0
                     color: "#8a77ad"
                     font.pixelSize: 13
-                    text: qsTr("%1  ·  %2 Hz  ·  %3 cents").arg(MicrophoneController.detectedNoteLabel).arg(MicrophoneController.detectedFrequencyHz, 0, 'f', 1).arg(Math.round(MicrophoneController.detectedCents))
+                    text: qsTr("%1  ·  %2 cents").arg(MicrophoneController.detectedNoteLabel).arg(Math.round(MicrophoneController.detectedCents))
                 }
 
                 // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.

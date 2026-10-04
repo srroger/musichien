@@ -234,13 +234,21 @@ void MicrophoneController::newSingingQuestion()
 
 double MicrophoneController::singingTargetStaffFraction() const
 {
-    // LA MEME NOTE QUE playSingingTarget JOUE, ET LA MEME FONCTION QUE LA BOULE DETECTEE.
+    // LA NOTE REELLEMENT CHANTEE, TRANSPOSEE DE L'INTERVALLE DEMANDE.
     //
-    // La tonique vient de la MEME source que l'accordeur : une seule note de reference dans tout le jeu, donc jamais de
-    // desaccord entre ce qu'on entend et ce qu'on voit.
-    const std::int32_t rootMidi = ( m_preferences != nullptr ) ? m_preferences->storedTuningRoot().midiNumber() : 60;
+    // Mon premier jet partait de la note THEORIQUE du jeu - sa racine - et c'etait faux dans la pratique. Roger l'a vu
+    // sur un octave : « normalement la boule fantome devrait etre a la meme position que le premier chant, car on ne monte
+    // qu'un octave, et pourtant ce n'est pas le cas. » Il avait raison, et l'explication est simple : entre ce que le jeu
+    // JOUE et ce que le joueur CHANTE, il y a tout l'ecart de la voix - et un chanteur peut poser sa premiere note une
+    // quarte plus haut sans s'en rendre compte.
+    //
+    // C'est donc la note ENTENDUE qui commande, transposee de l'intervalle : si la premiere note est montee d'un octave,
+    // la cible monte d'un octave aussi - et comme la portee replie les octaves (voir StaffPosition::drawnMidiNumber), le
+    // fantome retombe exactement sur la premiere boule. Ce que le joueur doit faire, c'est un INTERVALLE, pas une note
+    // absolue.
+    const auto & reading = m_sungIntervalDetector.reading();
 
-    return domain::StaffPosition::fraction( rootMidi + m_singingTargetSemitones );
+    return domain::StaffPosition::fraction( reading.firstMidiNumber + m_singingTargetSemitones );
 }
 
 void MicrophoneController::setSingingTarget( int p_semitones )
