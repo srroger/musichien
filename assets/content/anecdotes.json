@@ -14,6 +14,15 @@
     { "type": "histoire", "texte": "Le diapason a varie pendant des siecles : le la etait plus grave au temps de Mozart qu'aujourd'hui." },
     { "type": "lore", "texte": "Une oreille ne se developpe pas en une nuit, mais chaque seance laisse une trace : c'est pour ca qu'on revient." },
 
+
+    { "type": "acoustique", "texte": "Ingé son, c'est un métier !" },
+    { "type": "theorie", "texte": "todo" },
+    { "type": "astuce", "texte": "Si tu n'arrives pas à altérer une note à l'harmonica, aspire le 2, tu verras que naturellement tu l'altère un peu. Commence de là" },
+    { "type": "lore", "texte": "Le chien Musichien, c'est un chien musicien. C'est un shiba et non un corgi !" },
+    { "type": "histoire", "texte": "Ozar Midrashim veut dire \"Trésor d'étude\", utilisé dans Soul Reaver." },
+    { "type": "coaching", "texte": "Une oreille ne se developpe pas en une nuit, mais chaque seance laisse une trace : c'est pour ca qu'on revient." },
+
+
     { "type": "acoustique", "texte": "Deux notes à l'octave ont des fréquences dans un rapport de 2 pour 1 : c'est ce qui donne cette impression étonnante de même note, mais plus haut." },
     { "type": "acoustique", "texte": "Le son n'est pas une petite chose qui voyage dans l'air : c'est une vibration qui se propage de proche en proche." },
     { "type": "acoustique", "texte": "Une note musicale contient souvent plusieurs fréquences à la fois : la plus basse donne la fondamentale, les autres participent au timbre." },
