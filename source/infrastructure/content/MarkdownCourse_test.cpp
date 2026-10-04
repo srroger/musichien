@@ -215,4 +215,18 @@ TEST( MarkdownCourseTest, a_level_two_heading_opens_a_page )
     EXPECT_EQ( course->blocks.size(), 4U );
 }
 
+TEST( MarkdownCourseTest, a_singing_card_carries_its_distance )
+{
+    // « :: chante » est une PORTE, et non une donnee : elle ne porte qu'une distance, et l'ecran decide ou elle mene.
+    // C'est ce qui permettra de deplacer l'outil de chant sans toucher un seul cours.
+    const std::optional<musichien::domain::Course> course = readCourse( ":: chante | demi_tons:7 | Chante le sol\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::SingInterval );
+    EXPECT_EQ( course->blocks.at( 0 ).semitones, 7 );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "Chante le sol" );
+}
+
 }    // namespace musichien::infrastructure

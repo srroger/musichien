@@ -49,6 +49,13 @@ struct CourseBlock
         // ":: essai" - the button that starts the matching exercise.
         TryExercise,
 
+        // ":: chante" - the button that OPENS THE SINGING TOOL on this interval.
+        //
+        // Roger, sur le cours de la quinte juste : « on propose au joueur de chanter la quinte. Autant lui fournir l'outil
+        // pour qu'il verifie lui-meme s'il chante juste. » Un cours qui demande une chose et ne donne pas le moyen de la
+        // verifier est un cours qui laisse le joueur deviner - et c'est le seul endroit du jeu ou la voix sert.
+        SingInterval,
+
         // ":: annexe" - the way to the long annexe.
         Annexe
     };

@@ -27,6 +27,9 @@ constexpr const char * KIND_TEXT = "text";
 constexpr const char * KIND_PLAY = "play";
 constexpr const char * KIND_LISTEN = "listen";
 constexpr const char * KIND_TRY = "try";
+
+// ":: chante" - la carte qui ouvre l'outil de chant. C'est une PORTE, et non une donnee : elle ne porte qu'une distance.
+constexpr const char * KIND_SING = "sing";
 constexpr const char * KIND_ANNEXE = "annexe";
 
 [[nodiscard]] const char * kindName( domain::CourseBlock::Kind p_kind ) noexcept
@@ -39,6 +42,8 @@ constexpr const char * KIND_ANNEXE = "annexe";
             return KIND_LISTEN;
         case domain::CourseBlock::Kind::TryExercise:
             return KIND_TRY;
+        case domain::CourseBlock::Kind::SingInterval:
+            return KIND_SING;
         case domain::CourseBlock::Kind::Annexe:
             return KIND_ANNEXE;
         case domain::CourseBlock::Kind::Text:

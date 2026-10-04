@@ -1670,6 +1670,12 @@ ApplicationWindow {
             // LE BOUTON DE SORTIE SUIT LA MEME REGLE QUE LE RETOUR DU TELEPHONE : depuis une lecon, on remonte a la
             // liste ; depuis la liste, on sort de l'Ecole.
             onCloseRequested: mainWindow.goBackOneStep()
+            // CHANTER UN INTERVALLE DEPUIS UN COURS : la page dit l'intention, et c'est ICI qu'on sait ou vit l'outil de
+            // chant. La cible est posee AVANT d'ouvrir, sinon la page s'ouvrirait sur la question d'avant.
+            onSingRequested: function(p_semitones) {
+                MicrophoneController.setSingingTarget(p_semitones);
+                singingDialog.open();
+            }
             // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
             onVisibleChanged: {
                 if (!visible && !mainWindow.schoolIsOpen)

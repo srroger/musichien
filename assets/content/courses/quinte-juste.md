@@ -45,14 +45,14 @@ Maintenant, la même chose, mais écrite par quelqu'un d'autre il y a longtemps.
 
 Fais-le maintenant, **sans bourdon** : c'est plus difficile, et c'est justement l'exercice.
 
-:: jeu | demi_tons:7 | ascendant | do → sol : écoute, puis chante-le
+:: chante | demi_tons:7 | 🎤  Chante le sol par-dessus le do, et regarde si tu tombes juste
 
 Tu le trouveras **du premier coup**. C'est le seul intervalle dont on puisse dire ça : monter d'une quinte à
 partir d'une note que tu viens d'entendre, ça n'est pas une performance, ça se fait tout seul. Les autres
 demanderont ta journée. Celui-ci, non.
 
-> (Tu peux déjà le faire avec l'accordeur et son micro : le geste est le même. Un bouton « chante-le » depuis
-> cette page viendra s'y brancher, et il n'y aura pas de bourdon pour autant — il polluerait la prise de son.)
+> (Le bouton t'écoute et te dit **quel** intervalle tu as chanté, et de combien de cents tu es à côté. Aucun
+> score : c'est un miroir, pas un juge.)
 
 ## L'essai
 

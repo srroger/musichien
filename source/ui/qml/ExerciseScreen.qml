@@ -650,6 +650,10 @@ Item {
                     // Le BILAN : son mot, sous le verdict. Vide hors bilan, et ce n'est pas un detail - un ecran qui parle
                     // pour ne rien dire devient un ecran qu'on n'ecoute plus, et le silence est ce qui donne du poids aux
                     // mots qui restent (voir encouragementText, cote controleeur).
+                    // LES DEGRES DU MODE, SOUS SON NOM.
+                    // Roger : « j'ecrirai dans la ligne juste en dessous, les notes qu'il y a dedans en degre [...] ecrit
+                    // avec les memes couleurs de degrade que les boutons, et le rouge pour la note caracteristique.
+                    // Histoire d'avoir un repere pour l'utilisateur. »
 
                     id: promptColumn
 
@@ -720,6 +724,46 @@ Item {
                         }
                         color: "#cbb8e8"
                         font.pixelSize: 17
+                    }
+
+                    // C'EST LE MODE VRAI, jamais celui que la question joue modifie : c'est un RAPPEL, pour que le joueur
+                    // puisse comparer ce qu'il entend a ce qu'il sait du mode. Et la teinte est prise a la MEME source que
+                    // les boutons de modes - la clarte du mode - pour que les deux se repondent d'un coup d'oeil.
+                    Row {
+                        // La couleur sort de la meme formule que les boutons de modes : une seule teinte a maintenir, et
+                        // le mode le plus clair reste le plus clair partout.
+                        readonly property color badgeColour: Qt.rgba(0.3 + (0.7 * ExerciseController.heardMode.brightness), 0.2 + (0.62 * ExerciseController.heardMode.brightness), 0.55 + (0.45 * ExerciseController.heardMode.brightness), 1)
+
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: 5
+                        visible: ExerciseController.isForeignNoteQuestion
+
+                        Repeater {
+                            model: ExerciseController.isForeignNoteQuestion ? ExerciseController.heardMode.degrees : []
+
+                            delegate: Rectangle {
+                                required property var modelData
+
+                                width: 32
+                                height: 30
+                                radius: 6
+                                // LE ROUGE DE LA NOTE CARACTERISTIQUE : c'est celle qui donne au mode sa couleur, et
+                                // c'est celle qu'un joueur doit apprendre a entendre. Le domaine la designe - elle n'est
+                                // JAMAIS recalculee ici, sinon deux copies finiraient par se contredire.
+                                color: modelData.isCharacteristic ? "#d43a3a" : parent.badgeColour
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    color: "#ffffff"
+                                    font.pixelSize: 14
+                                    font.bold: modelData.isCharacteristic
+                                    text: modelData.label
+                                }
+
+                            }
+
+                        }
+
                     }
 
                 }

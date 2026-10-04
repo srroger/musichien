@@ -285,6 +285,39 @@ void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Co
         return block;
     }
 
+    // ":: chante | demi_tons:7 | ce qu'on demande de chanter"
+    //
+    // Meme forme que ':: essai', et la meme distance : ce que ce genre ajoute, ce n'est pas une donnee, c'est une PORTE -
+    // celle qui ouvre l'outil de chant sur cet intervalle.
+    if( keyword == "chante" )
+    {
+        if( fields.size() < 2 )
+        {
+            std::cerr << "Musichien: a ':: chante' card needs a distance. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        const std::optional<std::int32_t> semitones = semitonesFromField( fields[1] );
+
+        if( !semitones.has_value() )
+        {
+            std::cerr << "Musichien: a ':: chante' card has no usable distance. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::SingInterval;
+        block.semitones = *semitones;
+
+        if( fields.size() > 2 )
+        {
+            block.caption = fields[2];
+        }
+
+        return block;
+    }
+
     if( keyword == "annexe" )
     {
         if( fields.size() < 2 )
