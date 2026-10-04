@@ -321,6 +321,12 @@ Item {
 
                 Repeater {
                     // LA CARTE "ECOUTE" : la seule du jeu qui SORT de l'application.
+                    // LA CARTE "CHANTE-LE" : elle ouvre l'OUTIL DE CHANT sur cet intervalle.
+                    // Roger, sur le cours de la quinte juste : « on propose au joueur de chanter la quinte. Autant lui
+                    // fournir l'outil pour qu'il verifie lui-meme s'il chante juste. » Un cours qui demande une chose
+                    // et ne donne pas le moyen de la verifier laisse le joueur deviner.
+                    // La page dit l'INTENTION et celui qui la porte decide : c'est ce qui lui permet d'ignorer ou vit
+                    // l'outil de chant, et meme s'il y en a un.
 
                     model: CourseController.blocks
 
@@ -465,15 +471,6 @@ Item {
 
                         }
 
-                        // LA CARTE "CHANTE-LE" : elle ouvre l'OUTIL DE CHANT sur cet intervalle.
-                        //
-                        // Roger, sur le cours de la quinte juste : « on propose au joueur de chanter la quinte. Autant lui
-                        // fournir l'outil pour qu'il verifie lui-meme s'il chante juste. » Un cours qui demande une chose
-                        // et ne donne pas le moyen de la verifier laisse le joueur deviner.
-                        //
-                        // La page dit l'INTENTION et celui qui la porte decide : c'est ce qui lui permet d'ignorer ou vit
-                        // l'outil de chant, et meme s'il y en a un.
-                        //
                         // ⚠️ CETTE CARTE A ETE LIVREE MORTE. Elle a tenu sur UNE seule ligne, commentaires et code
                         // melanges : tout ce qui suit le premier « // » appartient au commentaire, donc le Rectangle
                         // n'existait pas. Roger lisait « chante le sol » sans avoir un seul bouton pour le faire. Une
@@ -505,6 +502,7 @@ Item {
                             }
 
                         }
+
                         // LA CARTE "POUR ALLER PLUS LOIN" : inerte pour l'instant, et elle le dit.
                         Rectangle {
                             Layout.fillWidth: true

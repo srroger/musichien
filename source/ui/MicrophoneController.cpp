@@ -171,6 +171,11 @@ void MicrophoneController::selectDevice( int p_deviceIndex )
 
 void MicrophoneController::startTest()
 {
+    openDetector();
+}
+
+void MicrophoneController::openDetector()
+{
     // The microphone is a RUNTIME permission on Android; on the desktop it is always granted and the callback fires
     // immediately. Asking here, at the moment of use, is the whole point: never at launch, never for nothing.
     QCoreApplication::instance()->requestPermission( QMicrophonePermission{}, [this]( const QPermission & p_permission ) {
@@ -189,6 +194,36 @@ void MicrophoneController::startTest()
             emit isListeningChanged();
         }
     } );
+}
+
+void MicrophoneController::handleApplicationSuspended()
+{
+    // L'INTENTION est notee AVANT de fermer quoi que ce soit : si l'ecran voulait ecouter, il voudra encore ecouter au
+    // retour, et c'est ce drapeau qui le dira.
+    m_reopenAfterSuspend = m_isListening;
+
+    if( m_detector )
+    {
+        m_detector->stop();
+    }
+
+    // m_isListening n'est PAS mis a faux, et c'est deliberé : il dit ce que l'ECRAN demande, pas l'etat du peripherique.
+    // Confondre les deux est exactement ce qui laissait le jeu muet - m_isListening restait vrai sur un peripherique que
+    // la plateforme avait repris, donc ensureListening() ne rouvrait plus rien.
+}
+
+void MicrophoneController::handleApplicationResumed()
+{
+    const bool mustReopen = std::exchange( m_reopenAfterSuspend, false );
+
+    // Rien n'a ete ferme ici : sur un ordinateur de bureau, perdre le focus n'arrete pas le micro, et le relancer ferait
+    // un clic a chaque retour de fenetre.
+    if( !mustReopen || !m_isListening )
+    {
+        return;
+    }
+
+    openDetector();
 }
 
 void MicrophoneController::stopTest()

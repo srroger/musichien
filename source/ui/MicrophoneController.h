@@ -147,6 +147,23 @@ public:
     // relancerait pour rien le peripherique, ce qui s'entendrait sous la forme d'un clic.
     Q_INVOKABLE void ensureListening();
 
+    // --- Le cycle de vie de l'application ---------------------------------------------------------------------------
+
+    // L'application part en arriere-plan. Android REPREND le microphone a cet instant : le garder ouvert ne le garde pas
+    // vivant, et le flux qui subsiste ecrirait dans un peripherique deja detruit. On ferme donc proprement - mais on
+    // RETIENT qu'on voulait ecouter.
+    //
+    // C'est ce « retenir » qui manquait, et c'est lui qui privait le jeu de son micro : m_isListening restait a VRAI sur
+    // un peripherique mort, donc ensureListening() ne faisait plus rien au retour, et il fallait quitter l'ecran puis y
+    // revenir pour retrouver l'ecoute - par accident. Roger : « ca empeche de jouer aujourd'hui ».
+    void handleApplicationSuspended();
+
+    // L'application revient au premier plan : on rouvre le micro si l'ecran le demandait avant de partir.
+    //
+    // Le test se fait sur ce qui a ete ferme ICI, et non sur l'etat de la plateforme : sur un ordinateur de bureau rien
+    // ne se ferme, et rouvrir le peripherique au moindre regain de focus ferait cliquer l'accordeur pour rien.
+    void handleApplicationResumed();
+
     // --- La question chantee -----------------------------------------------------------------------------------------
 
     // Draws a new interval to sing. Called when the page opens, and after every answer.
@@ -203,6 +220,14 @@ signals:
 private:
     void onPitch( float p_frequencyHz );
     void ensureDetector();
+
+    // Ouvre le peripherique, permission comprise. Extrait de startTest() pour que le RETOUR de l'application emprunte
+    // exactement le meme chemin : un chemin de reprise ecrit a part finirait par diverger de celui du premier usage.
+    void openDetector();
+
+    // Vrai quand le peripherique a ete ferme par un passage en arriere-plan, et qu'il reste donc a rouvrir au retour.
+    // C'est le drapeau qui distingue « le micro a ete rendu » de « le micro n'a jamais ete demande ».
+    bool m_reopenAfterSuspend{ false };
 
     QStringList m_deviceNames;
     DetectorFactory m_factory;

@@ -826,6 +826,8 @@ Item {
             // Le chant : quand la question le demande, la grille s'efface et il ne reste qu'a chanter. La portee, la
             // boule et la barre de stabilite sont le composant partage avec l'accordeur ; seule la cible change.
             ColumnLayout {
+                // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
+
                 Layout.fillWidth: true
                 // LA GARDE ETAIT LE BUG, ALORS ELLE RESTE ECRITE. Sans cette ligne, le bloc de chant s'affichait sur TOUTES
                 // les questions : Roger a vu l'interface de chant posee AU-DESSUS de la grille des intervalles, sur une
@@ -837,8 +839,6 @@ Item {
                 // tait. Un exercice passe la plupart de son temps sans chant, et un micro ouvert pour rien vide la batterie.
                 onVisibleChanged: visible ? MicrophoneController.ensureListening() : MicrophoneController.stopTest()
 
-                // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
-                //
                 // La consigne « chante... » n'est PAS repetee ici : elle vit en haut de l'ecran, avec les autres consignes,
                 // ou le joueur la lit deja. Deux fois la meme phrase, c'est une de trop.
                 StaffBall {

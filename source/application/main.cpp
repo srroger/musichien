@@ -750,6 +750,29 @@ int main( int p_argumentCount, char * p_arguments[] )
     // La session peut poser des questions CHANTEES : elle a besoin du micro pour les juger.
     exerciseController.setMicrophoneController( &microphoneController );
 
+    // LE MEME CYCLE DE VIE, POUR LE MICRO - et c'est un jeu MUET que ce branchement repare.
+    //
+    // La sortie audio se refermait deja a l'arriere-plan (plus haut, et c'etait un crash). L'ENTREE, elle, n'etait
+    // fermee par personne : Android reprend le microphone des que l'application s'efface, le controleur continuait
+    // pourtant de croire qu'il ecoutait, et le retour donnait un accordeur, un chant et un exercice MUETS - jusqu'a ce
+    // qu'on quitte l'ecran et qu'on y revienne, ce qui rouvrait le peripherique par accident.
+    //
+    // Roger : « c'est ce qui empeche de jouer aujourd'hui ». Le micro est l'instrument du jeu : il se reprend, comme la
+    // sortie, et pour la meme raison.
+    QObject::connect( qApp,
+                      &QGuiApplication::applicationStateChanged,
+                      qApp,
+                      [&microphoneController]( Qt::ApplicationState p_state ) {
+                          if( p_state == Qt::ApplicationSuspended )
+                          {
+                              microphoneController.handleApplicationSuspended();
+                          }
+                          else if( p_state == Qt::ApplicationActive )
+                          {
+                              microphoneController.handleApplicationResumed();
+                          }
+                      } );
+
     // Ce que le joueur VEUT entendre. Le filtrage se fait ICI, dans la couche de cablage, ce qui evite a l'adaptateur
     // audio de connaitre les preferences - et il se refait a chaque changement, donc decocher le saxo s'entend des la
     // question suivante.
