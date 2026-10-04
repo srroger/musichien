@@ -819,6 +819,8 @@ Item {
             // Le chant : quand la question le demande, la grille s'efface et il ne reste qu'a chanter. La portee, la
             // boule et la barre de stabilite sont le composant partage avec l'accordeur ; seule la cible change.
             ColumnLayout {
+                // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
+
                 Layout.fillWidth: true
                 visible: ExerciseController.questionKind === 2
                 spacing: 10
@@ -843,6 +845,20 @@ Item {
                     // le joueur a besoin de savoir ou poser sa voix, et pas avant - une aide qui arrive trop tot chante a
                     // sa place.
                     showGhost: ExerciseController.singingGhostIsVisible && MicrophoneController.hasFirstNote
+                }
+
+                // Roger : « est-ce qu'on pourrait aussi afficher la note en train d'etre jouee, exactement comme sur
+                // l'accordeur ? Ca me permettrait de deboguer la vraie valeur affichee. » Et il a raison d'ajouter que ce
+                // n'est pas une triche : savoir QUELLE note on vient de chanter ne dit pas de combien on s'est trompe.
+                // L'ecart en cents, lui, est deja ce que le jeu juge - le montrer ne donne donc aucune reponse, il rend
+                // la mesure lisible.
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: MicrophoneController.detectedFrequencyHz > 0
+                    color: "#8a77ad"
+                    font.pixelSize: 13
+                    text: qsTr("%1  ·  %2 Hz  ·  %3 cents").arg(MicrophoneController.detectedNoteLabel).arg(MicrophoneController.detectedFrequencyHz, 0, 'f', 1).arg(Math.round(MicrophoneController.detectedCents))
                 }
 
                 // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.

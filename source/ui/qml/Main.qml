@@ -290,16 +290,25 @@ ApplicationWindow {
     // n'existe que pour garder le focus et prendre la touche, afin que le retour remonte dans l'application au lieu d'en
     // sortir.
     Item {
+        // Le focus se perd des qu'un dialogue s'ouvre puis se ferme. Sans cela, la touche suivante repart a Android et
+        // ferme l'application - le bug reviendrait une fois sur deux, ce qui est le pire des bugs.
+        // ON NE REPREND LE FOCUS QUE QUAND ON A QUELQUE CHOSE A EN FAIRE.
+        // C'est ici qu'etait le bug que Roger a trouve : « quand j'appuie sur le bouton arriere, rien ne se passe » sur les
+        // pages de reference. Ce capteur reprenait le focus chaque fois qu'il le perdait - donc il le reprenait AU
+        // DIALOGUE qui venait de l'obtenir. La page ne recevait jamais la touche, et le capteur la consommait pour ne rien
+        // faire : l'ecran restait immobile.
+
         id: backKeyCatcher
 
         anchors.fill: parent
         // DERRIERE tout le reste : il ne doit rien masquer.
         z: -1
         focus: true
-        // Le focus se perd des qu'un dialogue s'ouvre puis se ferme. Sans cela, la touche suivante repart a Android et
-        // ferme l'application - le bug reviendrait une fois sur deux, ce qui est le pire des bugs.
+        // Il ne garde donc le focus que la ou il sert : dans l'Ecole, et pendant une partie. Partout ailleurs - la page de
+        // garde, les pages de reference - il le laisse a qui le prend, et la touche Retour retrouve son sens ordinaire :
+        // fermer la page ouverte, ou quitter l'application depuis la garde.
         onActiveFocusChanged: {
-            if (!activeFocus)
+            if (!activeFocus && (mainWindow.schoolIsOpen || ExerciseController.running))
                 forceActiveFocus();
 
         }
@@ -312,6 +321,29 @@ ApplicationWindow {
             event.accepted = true;
             mainWindow.goBackOneStep();
         }
+
+        // ET IL LE PREND AU MOMENT OU IL DEVIENT UTILE. Le focus ne se perd pas toujours AVANT : un capteur qui
+        // attendrait une perte de focus pour s'installer ne s'installerait jamais au premier coup.
+        Connections {
+            function onSchoolIsOpenChanged() {
+                if (mainWindow.schoolIsOpen)
+                    backKeyCatcher.forceActiveFocus();
+
+            }
+
+            target: mainWindow
+        }
+
+        Connections {
+            function onRunningChanged() {
+                if (ExerciseController.running)
+                    backKeyCatcher.forceActiveFocus();
+
+            }
+
+            target: ExerciseController
+        }
+
     }
 
     // Elle vit ICI, a la racine, et non dans le composant DarkComboBox : un composant inline n'accepte pas d'objet
