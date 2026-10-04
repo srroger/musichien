@@ -175,6 +175,9 @@ ApplicationWindow {
     // Dialogue : c'est ce qui permet au bouton retour d'Android de remonter d'un cran dans l'Ecole au lieu de traverser
     // le dialogue et de ramener a la garde.
     property bool schoolIsOpen: false
+    // LE GLOSSAIRE EST OUVERT. Une page a part, comme l'Ecole : elle se pose par-dessus la garde, elle se ferme par son
+    // bouton ou par le Retour du telephone, et rien d'autre ne change.
+    property bool glossaryIsOpen: false
 
     function kindColour(index) {
         return kindColours[index % kindColours.length];
@@ -272,6 +275,12 @@ ApplicationWindow {
             leaveGameDialog.open();
             return true;
         }
+        if (glossaryIsOpen) {
+            // LE GLOSSAIRE PASSE AVANT L'ECOLE : il est declare APRES elle, donc il est devant. Une seule regle, et
+            // elle se lit dans l'ordre du fichier plutot que dans une liste de priorites a tenir a jour.
+            glossaryIsOpen = false;
+            return true;
+        }
         if (schoolIsOpen) {
             // D'UNE LECON, on remonte a la LISTE : c'est ce que le geste veut dire.
             if (CourseController.reading)
@@ -327,7 +336,7 @@ ApplicationWindow {
         // garde, les pages de reference - il le laisse a qui le prend, et la touche Retour retrouve son sens ordinaire :
         // fermer la page ouverte, ou quitter l'application depuis la garde.
         onActiveFocusChanged: {
-            if (!activeFocus && (mainWindow.schoolIsOpen || ExerciseController.running))
+            if (!activeFocus && (mainWindow.schoolIsOpen || mainWindow.glossaryIsOpen || ExerciseController.running))
                 forceActiveFocus();
 
         }
@@ -346,6 +355,12 @@ ApplicationWindow {
         Connections {
             function onSchoolIsOpenChanged() {
                 if (mainWindow.schoolIsOpen)
+                    backKeyCatcher.forceActiveFocus();
+
+            }
+
+            function onGlossaryIsOpenChanged() {
+                if (mainWindow.glossaryIsOpen)
                     backKeyCatcher.forceActiveFocus();
 
             }
@@ -718,6 +733,7 @@ ApplicationWindow {
         // is felt without being watched - 220 ms is the length of a breath, and the eye reads the arrival instead of
         // the cut. The screen is only invisible once the fade is over, so it never eats a tap.
         // L'ECOLE DES CHIOTS, FRERE DE L'ECRAN D'EXERCICE.
+        // LE GLOSSAIRE, FRERE DE L'ECOLE ET DECLARE APRES ELLE.
 
         anchors.fill: parent
 
@@ -781,6 +797,10 @@ ApplicationWindow {
                 // LA DIFFICULTE, ET LA FLECHE QUI DIT QU'ON PEUT MONTER.
                 // L'ENTRAINEMENT : trois familles, dix questions chacune, et aucune experience.
                 // LES TROIS VARIANTES DU JEU : ni fond, ni gris - une BORDURE allumee, et rien dedans.
+                // LE GLOSSAIRE : les mots du jeu, comme un dictionnaire.
+                // Roger, 04/10/2026 : « je veux que ca fasse vraiment liste de dico [...] Normalement on devrait savoir
+                // utiliser un dictionnaire. » Meme famille de couleur que l'Ecole, et ce n'est pas une coincidence : c'est
+                // la meme matiere - on y LIT, on n'y joue pas.
 
                 width: scrollView.availableWidth
                 spacing: 12
@@ -1131,6 +1151,19 @@ ApplicationWindow {
                     color: "#8a77ad"
                     font.pixelSize: 12
                     text: qsTr("Des leçons courtes, avec des exemples à écouter.")
+                }
+
+                // ET LE POISSON ROUGE, voulu par Roger. Il dit la verite : un glossaire sert a ceux qui oublient.
+                TintedMenuButton {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: mainWindow.buttonWidth
+                    height: 46
+                    tintColour: mainWindow.schoolColour
+                    labelColour: mainWindow.schoolLabelColour
+                    text: qsTr("🐟  Le Glossaire")
+                    onClicked: {
+                        mainWindow.glossaryIsOpen = true;
+                    }
                 }
 
                 // Roger : « je n'aime pas vraiment cette couleur marron pour les modes infini, chanter et survie. Tu
@@ -1765,6 +1798,28 @@ ApplicationWindow {
                     CourseController.close();
 
             }
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 150
+                }
+
+            }
+
+        }
+
+        // Les deux pages se ressemblent - on y lit, on n'y joue pas - et le dernier declare passe devant : c'est ce
+        // qu'on veut d'une page qu'on vient d'ouvrir. C'est aussi ce que dit la danse du Retour, deux fonctions plus
+        // haut, et les deux se lisent dans le meme ordre.
+        GlossaryScreen {
+            id: glossaryScreen
+
+            anchors.fill: parent
+            opacity: (mainWindow.glossaryIsOpen && !ExerciseController.running) ? 1 : 0
+            visible: opacity > 0
+            // Pendant la fonte, le calque est encore visible : le desactiver evite qu'il avale un tap destine a la garde.
+            enabled: mainWindow.glossaryIsOpen
+            onCloseRequested: mainWindow.goBackOneStep()
 
             Behavior on opacity {
                 NumberAnimation {

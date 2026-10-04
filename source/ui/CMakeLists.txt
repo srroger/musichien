@@ -17,6 +17,7 @@ set(MUSICHIEN_QML_RESOURCE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc PARENT
 set(MUSICHIEN_QML_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/CourseScreen.qml
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/ExerciseScreen.qml
+    ${CMAKE_CURRENT_SOURCE_DIR}/qml/GlossaryScreen.qml
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/Main.qml
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/StaffBall.qml
     PARENT_SCOPE
@@ -50,6 +51,11 @@ musichienFunction_AddLibrary(ui
     # - il traduit en cartes dessinables ce que le domaine lui a donne. Voir le contrat, note 29 du Vault.
     CourseController.h
     CourseController.cpp
+
+    # LE GLOSSAIRE : une liste, et des lettres de section. C'est ici que vit l'ordre d'un dictionnaire francais - sans
+    # casse et sans accents - parce que c'est une regle d'AFFICHAGE, et qu'elle se teste sans interface.
+    GlossaryController.h
+    GlossaryController.cpp
 
     # Le banc d'essai des modes : sept boutons ranges par clarte, pour entendre une couleur sur un bourdon
     ModeDescription.h
@@ -102,6 +108,7 @@ if(MUSICHIEN_BUILD_TESTING)
         ModePreviewController_test.cpp
         ModeDescription_test.cpp
         CourseController_test.cpp
+        GlossaryController_test.cpp
         ExerciseScreen_test.cpp
         MainScreen_test.cpp
         MicrophoneController_test.cpp

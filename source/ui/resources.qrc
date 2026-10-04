@@ -28,6 +28,12 @@
         -->
         <file>qml/CourseScreen.qml</file>
         <!--
+          LE GLOSSAIRE : un dictionnaire, et rien d'autre. La page est un ecran SEPARE et non un mode du lecteur de
+          cours : Roger veut une liste plate, pas des chapitres. Un fichier a part le dit mieux qu'une option dans un
+          autre.
+        -->
+        <file>qml/GlossaryScreen.qml</file>
+        <!--
           LES COURS, un fichier par lecon, en Markdown. Meme motif que les autres contenus, alias compris : le chemin de
           ressource est celui du disque, sur le PC comme sur le telephone.
 
@@ -36,6 +42,11 @@
         -->
         <file alias="assets/content/courses/quinte-juste.md">../../assets/content/courses/quinte-juste.md</file>
         <file alias="assets/content/courses/pourquoi-la-quinte-sonne-juste.md">../../assets/content/courses/pourquoi-la-quinte-sonne-juste.md</file>
+        <!--
+          Le glossaire. Un mot par entree, une definition d'UNE PHRASE : Roger veut un aide-memoire, pas un manuel.
+          Meme motif que les autres contenus, alias compris - le chemin de ressource est celui du disque.
+        -->
+        <file alias="assets/content/glossaire.json">../../assets/content/glossaire.json</file>
         <!--
           The content files live at the root of the project, as docs/ARCHITECTURE.md requires, and the
           alias gives each one the runtime path it has on disk: ':/assets/content/...'. An alias rather
