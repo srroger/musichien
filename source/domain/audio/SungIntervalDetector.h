@@ -78,7 +78,15 @@ private:
     // au bout de la progress bar". A second was chosen for smoothness, but the bar is what the singer actually watches,
     // and it RESTARTS at zero the moment the note moves - so the second did not buy smoothness, it bought despair.
     // Three quarters of a second still outlasts a wobble, and the bar can now be filled by an honest voice.
-    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 750;
+    // COMBIEN DE TEMPS UNE NOTE DOIT TENIR AVANT DE COMPTER.
+    //
+    // 750 etait trop court : Roger, en chantant, « ma voix n'a pas le temps de se stabiliser que le jeu me la compte.
+    // C'est un peu frustrant. » Il demande l'inverse de ce qu'il demandait avant - une duree plus longue, qui FORCE le
+    // chanteur a poser sa voix - et il a raison : c'est la que le chant s'apprend.
+    //
+    // 1200 millisecondes, entre les deux. La barre de stabilite se remplit plus lentement, donc le joueur VOIT qu'il
+    // doit tenir, et une voix qui glisse n'est plus comptee par accident.
+    static constexpr std::int32_t MINIMUM_HOLD_MILLISECONDS = 1200;
 
     // Combien de temps de silence fait une REPRISE.
     //
