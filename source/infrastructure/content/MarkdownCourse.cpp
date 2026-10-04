@@ -328,6 +328,25 @@ void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Co
         return block;
     }
 
+    // ":: bourdon | ce qu'il faut y entendre"
+    //
+    // Le bourdon du jeu : la tonique et sa quinte, tenues. C'est la formule EXACTE des questions de couleur, et un
+    // cours qui ferait entendre un autre bourdon apprendrait a reconnaitre un son qui n'existe pas a l'ecran.
+    if( keyword == "bourdon" )
+    {
+        if( fields.size() < 2 )
+        {
+            std::cerr << "Musichien: a ':: bourdon' card needs a caption. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::Drone;
+        block.caption = fields[1];
+
+        return block;
+    }
+
     // ":: chante | demi_tons:7 | ce qu'on demande de chanter"
     //
     // Meme forme que ':: essai', et la meme distance : ce que ce genre ajoute, ce n'est pas une donnee, c'est une PORTE -

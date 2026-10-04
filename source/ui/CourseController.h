@@ -113,6 +113,12 @@ public:
     // l'oreille reconnait les autres.
     Q_INVOKABLE void playHarmonicSeries();
 
+    // LE BOURDON DU JEU, TENU CINQ SECONDES : la tonique et sa quinte, sans tierce.
+    //
+    // Meme formule que les questions de couleur - un centre qui ne colore rien lui-meme. Le chapitre du centre ne peut
+    // pas s'enseigner sans lui : un centre qu'on ne TIENT pas ne s'entend pas.
+    Q_INVOKABLE void playDrone();
+
     Q_INVOKABLE void stopPlayback();
 
 signals:

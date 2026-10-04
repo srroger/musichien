@@ -395,6 +395,7 @@ Item {
                     // « qrc:/... » : un chemin dans un fichier de contenu est un chemin qui se casse le jour ou
                     // l'image demenage.
                     // LA CARTE "SERIE" : le jeu joue la serie harmonique, et l'ecran la nomme.
+                    // LA CARTE "BOURDON" : le jeu TIENT un centre, et l'ecran le nomme.
 
                     model: CourseController.blocks
 
@@ -677,6 +678,39 @@ Item {
                                 onClicked: {
                                     ExerciseController.playTapCue();
                                     CourseController.playHarmonicSeries();
+                                }
+                            }
+
+                        }
+
+                        // C'est la formule exacte des questions de couleur du jeu : la tonique et sa quinte, sans tierce.
+                        // Un centre qui ne colore rien lui-meme - donc qui laisse entendre la couleur de ce qu'on pose
+                        // dessus. Avec une tierce, il dirait deja majeur ou mineur.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "bourdon"
+                            implicitHeight: droneText.implicitHeight + 24
+                            radius: 10
+                            color: "#21351f"
+                            border.color: "#3f6a3a"
+                            border.width: 1
+
+                            Text {
+                                id: droneText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#cdeec6"
+                                font.pixelSize: 14
+                                text: qsTr("🎵  %1").arg(modelData.caption)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    CourseController.playDrone();
                                 }
                             }
 

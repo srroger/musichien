@@ -70,7 +70,14 @@ struct CourseBlock
         //
         // Une carte a part et non un ':: jeu' : ce n'est pas un intervalle, c'est une EMPILEMENT - et c'est ce que le
         // chapitre de la quinte demande d'entendre. Le jeu joue ce qu'il sait jouer ; il sait jouer ca.
-        HarmonicSeries
+        HarmonicSeries,
+
+        // ":: bourdon" - UNE NOTE TENUE, avec sa quinte, sous ce qu'on va dire.
+        //
+        // C'est LE BOURDON DU JEU, la formule exacte des questions de couleur : la tonique et sa quinte, sans tierce,
+        // donc un centre qui ne colore rien lui-meme. Le chapitre du centre ne peut pas s'enseigner sans lui - un
+        // centre qui n'est pas TENU ne s'entend pas.
+        Drone
     };
 
     Kind kind{ Kind::Text };

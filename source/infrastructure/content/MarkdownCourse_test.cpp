@@ -265,4 +265,18 @@ TEST( MarkdownCourseTest, a_series_card_needs_only_a_caption )
     EXPECT_EQ( course->blocks.at( 0 ).caption, "ecoute la serie harmonique d'un do" );
 }
 
+// ":: bourdon" N'A BESOIN QUE D'UNE LEGENDE, comme la serie : ce qu'il fait entendre est LA formule du jeu - la
+// tonique et sa quinte, sans tierce - et un cours n'a pas a la choisir.
+TEST( MarkdownCourseTest, a_drone_card_needs_only_a_caption )
+{
+    const std::optional<musichien::domain::Course> course =
+      readCourse( ":: bourdon | le bourdon du jeu : le do, et sa quinte\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Drone );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "le bourdon du jeu : le do, et sa quinte" );
+}
+
 }    // namespace musichien::infrastructure

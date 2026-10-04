@@ -43,6 +43,19 @@
         <file alias="assets/content/courses/quinte-juste.md">../../assets/content/courses/quinte-juste.md</file>
         <file alias="assets/content/courses/pourquoi-la-quinte-sonne-juste.md">../../assets/content/courses/pourquoi-la-quinte-sonne-juste.md</file>
         <!--
+          Leçon 2 : L'octave, et son os a macher. Meme motif, meme alias - le chemin de ressource est celui du disque.
+
+          Une lecon NEUVE demande une ligne ICI et un rebuild : c'est le prix d'un contenu embarque, et il vaut mieux
+          l'ecrire que le decouvrir.
+        -->
+        <file alias="assets/content/courses/octave.md">../../assets/content/courses/octave.md</file>
+        <file alias="assets/content/courses/pourquoi-l-octave-sonne-pareil.md">../../assets/content/courses/pourquoi-l-octave-sonne-pareil.md</file>
+        <!--
+          Lecon 3 : Le centre. Elle ne porte AUCUN intervalle dans ses concepts : il n'y a rien a travailler ici, il y a
+          quelque chose a ENTENDRE - un centre tenu. C'est pour ca qu'une carte de bourdon a ete ajoutee au jeu.
+        -->
+        <file alias="assets/content/courses/le-centre.md">../../assets/content/courses/le-centre.md</file>
+        <!--
           Le glossaire. Un mot par entree, une definition d'UNE PHRASE : Roger veut un aide-memoire, pas un manuel.
           Meme motif que les autres contenus, alias compris - le chemin de ressource est celui du disque.
         -->

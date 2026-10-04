@@ -39,6 +39,9 @@ constexpr const char * KIND_IMAGE = "image";
 // ":: serie" - la serie harmonique d'une note, jouee. Le jeu la joue, l'ecran la nomme.
 constexpr const char * KIND_SERIES = "serie";
 
+// ":: bourdon" - le bourdon du jeu, tenu : la tonique et sa quinte, sans tierce.
+constexpr const char * KIND_DRONE = "bourdon";
+
 [[nodiscard]] const char * kindName( domain::CourseBlock::Kind p_kind ) noexcept
 {
     switch( p_kind )
@@ -57,6 +60,8 @@ constexpr const char * KIND_SERIES = "serie";
             return KIND_IMAGE;
         case domain::CourseBlock::Kind::HarmonicSeries:
             return KIND_SERIES;
+        case domain::CourseBlock::Kind::Drone:
+            return KIND_DRONE;
         case domain::CourseBlock::Kind::Text:
         default:
             return KIND_TEXT;
@@ -440,6 +445,25 @@ void CourseController::playHarmonicSeries()
     }
 
     m_notePlayer.playMelody( notes, MELODIC_GAP );
+}
+
+void CourseController::playDrone()
+{
+    // LE BOURDON DU JEU, et c'est la MEME formule que les questions de couleur : la tonique, et sa quinte.
+    //
+    // LA QUINTE OUVERTE, sans tierce : un centre qui ne colore rien lui-meme, et qui laisse donc entendre la couleur de
+    // ce qu'on pose dessus. Avec une tierce, le bourdon dirait deja majeur ou mineur, et le chapitre des modes
+    // n'aurait plus rien a faire entendre.
+    //
+    // Meme note de depart que partout ailleurs dans les cours (le do du milieu), pour que deux lecons ne fassent pas
+    // entendre deux centres differents sans le dire.
+    static constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
+    static constexpr std::chrono::milliseconds DRONE_DURATION{ 5000 };
+
+    const std::array<domain::Note, 2> drone{ domain::Note{ EXERCISE_ROOT_MIDI_NUMBER },
+                                             domain::Note{ EXERCISE_ROOT_MIDI_NUMBER + FIFTH_IN_SEMITONES } };
+
+    m_notePlayer.playChordFor( drone, DRONE_DURATION );
 }
 
 void CourseController::stopPlayback()
