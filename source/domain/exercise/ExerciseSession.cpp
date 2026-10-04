@@ -967,19 +967,39 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
         // simple comparison, is what makes this happen at every step: without it the condition would
         // stay true for ever after the third success, and the palette would grow on every single
         // correct answer.
+        // UNE PROGRESSION PAR FAMILLE, ET SEULEMENT CELLE QU'ON VIENT DE JOUER.
+        //
+        // Roger, apres avoir fait tester le jeu a des amis : « arrive aux accords, on n'a pas 2 accords a trouver mais deja
+        // 4 ; et aux modes c'est pire, on n'a pas 2 modes mais 6. Pour rappel, le joueur est toujours debutant. »
+        //
+        // La cause etait ici, et c'etait un CHOIX ecrit noir sur blanc : les trois palettes s'elargissaient sur les MEMES
+        // reussites - la serie de la session, toutes familles confondues. Dix questions d'intervalle faisaient donc monter
+        // les accords et les modes sans qu'une seule question d'accord ait ete posee. Trois compteurs semblaient plus
+        // fragiles qu'un seul ; c'est l'inverse, et c'est le telephone qui a tranche.
         const auto wideningPeriod = static_cast<std::int32_t>( m_settings.successesBeforeWidening );
 
-        if( ( wideningPeriod > 0 ) && ( m_score.streak() % wideningPeriod == 0 ) )
+        const QuestionFamily family = familyOf( m_currentQuestion.kind );
+
+        std::int32_t & familyStreak = m_familyStreaks.at( static_cast<std::size_t>( family ) );
+
+        ++familyStreak;
+
+        if( ( wideningPeriod > 0 ) && ( familyStreak % wideningPeriod == 0 ) )
         {
-            widenPalette();
-
-            // Les accords s'elargissent sur les MEMES reussites : une seule progression a tenir, plutot que deux
-            // compteurs dont l'un finirait par mentir. Une couleur de plus tous les trois succes, comme un intervalle.
-            widenChordPalette();
-
-            // Et les modes aussi, pour la meme raison exactement : le pilier harmonie avance sur les reussites de la
-            // session en cours, sans compteur a lui.
-            widenModePalette();
+            // UNE SEULE PALETTE GRANDIT : celle de la famille qu'on vient de reussir. Le commutateur couvre les trois cas
+            // sans defaut, pour qu'une famille ajoutee demain fasse echouer la compilation plutot que de rester muette.
+            switch( family )
+            {
+                case QuestionFamily::Interval:
+                    widenPalette();
+                    break;
+                case QuestionFamily::Chord:
+                    widenChordPalette();
+                    break;
+                case QuestionFamily::Mode:
+                    widenModePalette();
+                    break;
+            }
         }
 
         m_state = SessionState::Feedback;
@@ -990,6 +1010,13 @@ bool ExerciseSession::resolveAnswer( bool p_isCorrect, std::optional<Interval> p
     ++m_currentQuestion.wrongAttemptCount;
 
     ++m_consecutiveErrors;
+
+    // ET L'ERREUR NE REMET A ZERO QUE SA FAMILLE.
+    //
+    // C'est la meme regle que la montee, vue de l'autre cote : se tromper sur un mode ne doit pas annuler ce qu'on vient
+    // de comprendre sur les accords. Sans cela, une seule erreur ferait reculer trois progressions - et le joueur
+    // paierait pour une chose qu'il n'a pas ratee.
+    m_familyStreaks.at( static_cast<std::size_t>( familyOf( m_currentQuestion.kind ) ) ) = 0;
 
     if( ( m_consecutiveErrors >= 2 ) && ( m_currentQuestion.kind == QuestionKind::NamedInterval )
         && ( m_currentQuestion.direction != IntervalDirection::Harmonic ) )

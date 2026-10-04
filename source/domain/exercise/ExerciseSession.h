@@ -861,9 +861,14 @@ private:
     // reussites - exactement comme la palette d'intervalles, et pour la meme raison : une couleur a la fois.
     std::vector<ChordQuality> m_chordPalette;
 
-    // Les modes que le joueur a rencontres : un PREFIXE de modeLearningOrder(), elargi par les MEMES reussites que le
-    // reste. Une seule progression a tenir, plutot que trois compteurs dont l'un finirait par mentir.
+    // Les modes que le joueur a rencontres : un PREFIXE de modeLearningOrder().
     std::vector<Mode> m_modePalette;
+
+    // LES SERIES, UNE PAR FAMILLE : c'est ce qui fait grandir les trois palettes, chacune sur SES reussites.
+    //
+    // Une serie par famille plutot qu'une seule, et le commentaire qui refusait ce choix a ete paye par une soiree de
+    // test chez Roger : « arrive aux accords, on n'a pas 2 accords a trouver mais deja 4 ». Voir registerAnswer.
+    std::array<std::int32_t, QUESTION_FAMILY_COUNT> m_familyStreaks{};
 
     // Le livre des phrases modales, s'il a ete donne. C'est lui qui fait entendre un mode en MELODIE plutot qu'en gamme.
     const PhraseBook * m_phraseBook{ nullptr };

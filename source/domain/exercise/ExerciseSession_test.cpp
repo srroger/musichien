@@ -1756,4 +1756,34 @@ TEST( ExerciseSessionTest, an_uncapped_session_still_widens )
     EXPECT_GT( session.palette().size(), startingSize ) << "sans plafond, la palette doit grandir";
 }
 
+TEST( ExerciseSessionTest, interval_successes_do_not_widen_the_chord_or_mode_palettes )
+{
+    // LE BUG QUE ROGER A TROUVE EN FAISANT TESTER LE JEU, dans ses mots : « arrive aux accords, on n'a pas 2 accords a
+    // trouver mais deja 4 ; et aux modes c'est pire, on n'a pas 2 modes mais 6. Pour rappel, le joueur est toujours
+    // debutant. »
+    //
+    // Les trois palettes montaient ENSEMBLE, sur la serie de la session. Dix questions d'intervalle suffisaient donc a
+    // elargir les accords et les modes sans qu'une seule question d'accord ait ete posee - et c'est exactement ce qu'il
+    // a entendu.
+    SessionSettings settings = intervalOnlySettings();
+
+    ExerciseSession session{ TEST_SEED, settings };
+
+    const std::size_t chordPaletteAtStart = session.chordPalette().size();
+    const std::size_t modePaletteAtStart = session.modePalette().size();
+
+    for( int question = 0; question < 9; ++question )
+    {
+        answerCorrectly( session );
+        session.advance();
+    }
+
+    // La palette d'INTERVALLES a grandi : c'est le but, et sans cette ligne le test ne prouverait rien.
+    EXPECT_GT( session.palette().size(), settings.startingPaletteSize );
+
+    // Et les deux autres n'ont pas bouge d'un pouce : c'est tout ce que ce test existe pour dire.
+    EXPECT_EQ( session.chordPalette().size(), chordPaletteAtStart );
+    EXPECT_EQ( session.modePalette().size(), modePaletteAtStart );
+}
+
 }    // namespace musichien::domain

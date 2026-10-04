@@ -247,18 +247,18 @@ ApplicationWindow {
     // seule regle, et trois portes. Elle rend VRAI si elle a consomme le geste, et FAUX quand il n'y a plus rien a
     // remonter - c'est alors la sortie de l'application, et elle est demandee.
     function goBackOneStep() {
+        // UNE PARTIE EN COURS D'ABORD : elle passe AVANT l'Ecole, parce qu'elle est ce qui se voit. C'est l'ordre de
+        // lecture de l'ecran, pas une preference - sans lui, le retour fermerait la lecon cachee derriere la partie.
+        if (ExerciseController.running) {
+            leaveGameDialog.open();
+            return true;
+        }
         if (schoolIsOpen) {
             // D'UNE LECON, on remonte a la LISTE : c'est ce que le geste veut dire.
             if (CourseController.reading)
                 CourseController.close();
             else
                 schoolIsOpen = false;
-            return true;
-        }
-        // UNE PARTIE EN COURS : on ne sort pas d'une partie sur une touche qu'on a pu frôler. Roger : « pour les jeux,
-        // je preferais quand meme une popup ».
-        if (ExerciseController.running) {
-            leaveGameDialog.open();
             return true;
         }
         return false;
@@ -1663,7 +1663,7 @@ ApplicationWindow {
             id: courseScreen
 
             anchors.fill: parent
-            opacity: mainWindow.schoolIsOpen ? 1 : 0
+            opacity: (mainWindow.schoolIsOpen && !ExerciseController.running) ? 1 : 0
             visible: opacity > 0
             // Pendant la fonte, le calque est encore visible : le desactiver evite qu'il avale un tap destine a la garde.
             enabled: mainWindow.schoolIsOpen
@@ -1672,9 +1672,9 @@ ApplicationWindow {
             onCloseRequested: mainWindow.goBackOneStep()
             // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
             onVisibleChanged: {
-                if (!visible) {
+                if (!visible && !mainWindow.schoolIsOpen)
                     CourseController.close();
-                }
+
             }
 
             Behavior on opacity {
