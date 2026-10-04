@@ -346,11 +346,6 @@ void QAudioNotePlayer::stopSinkWhenSilent()
 
 void QAudioNotePlayer::playSamples( std::vector<float> p_samples, float p_gain )
 {
-    // ⚠️ MESURE TEMPORAIRE : qui joue quoi, et quand. Roger entend la musique d'intro se couper a l'affichage de la page
-    // de garde, et le rendu est pourtant PROUVE correct - donc c'est la LECTURE qui est interrompue. Cette ligne nomme
-    // l'auteur au lieu de le supposer, et elle part avec les autres des que la cause est comprise.
-    std::cerr << "Musichien: SON joue " << p_samples.size() << " echantillons\n";
-
     ensureAudioOutputIsOpen();
 
     if( ( m_mixer == nullptr ) || p_samples.empty() )
@@ -413,9 +408,6 @@ void QAudioNotePlayer::mixSamples( std::vector<float> p_samples, float p_gain )
 
 void QAudioNotePlayer::stopAll()
 {
-    // ⚠️ MESURE TEMPORAIRE : une coupure dit son nom, pour qu'on ne se demande pas qui a arrete la musique d'intro.
-    std::cerr << "Musichien: SON coupe (stopAll)\n";
-
     if( m_mixer != nullptr )
     {
         m_mixer->clear();
