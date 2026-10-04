@@ -149,6 +149,23 @@ namespace
 // UN PARAGRAPHE SE TERMINE SUR UNE LIGNE VIDE, une directive, ou la fin du fichier. Ce qui le ferme
 // compte autant que lui : sans cela, deux paragraphes separes par une carte se colleraient en un seul.
 // ---------------------------------------------------------------------------------------------------------------------
+// Un bloc entre dans la lecon, ET dans la page ou il se trouve.
+//
+// Les deux listes sortent d'ici, et d'ici seulement : la page lit les sections, le « voir la note complete » lit la liste
+// plate, et personne ne peut les faire diverger puisque c'est le meme geste qui les remplit.
+void appendBlock( domain::Course & p_course, domain::CourseBlock p_block )
+{
+    // Le CHAPEAU : ce qui precede le premier titre. Il n'existe que s'il porte quelque chose - un cours qui commence
+    // directement par un « ## » n'a pas de page vide devant lui.
+    if( p_course.sections.empty() )
+    {
+        p_course.sections.push_back( domain::CourseSection{} );
+    }
+
+    p_course.sections.back().blocks.push_back( p_block );
+    p_course.blocks.push_back( std::move( p_block ) );
+}
+
 void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Course & p_course )
 {
     if( !p_inParagraph )
@@ -164,7 +181,7 @@ void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Co
         block.kind = domain::CourseBlock::Kind::Text;
         block.markdown = std::string( trimmed );
 
-        p_course.blocks.push_back( std::move( block ) );
+        appendBlock( p_course, std::move( block ) );
     }
 
     p_paragraph.clear();
@@ -403,8 +420,25 @@ std::optional<domain::Course> readCourse( std::string_view p_markdownText )
 
             if( std::optional<domain::CourseBlock> block = readDirective( trimmed ); block.has_value() )
             {
-                course.blocks.push_back( std::move( *block ) );
+                appendBlock( course, std::move( *block ) );
             }
+
+            continue;
+        }
+
+        // UN TITRE DE NIVEAU 2 OUVRE UNE PAGE.
+        //
+        // C'est TOUTE la decoupe du cours, et elle vient de l'auteur du fichier : Roger veut plusieurs pages par chapitre,
+        // et les « ## » sont exactement ces pages. Les ignorer pour tout aplatir, c'etait jeter une structure deja
+        // ecrite - et c'est ce que faisait la premiere version.
+        if( trimmed.starts_with( "## " ) )
+        {
+            flushParagraph( paragraph, inParagraph, course );
+
+            domain::CourseSection section;
+            section.title = std::string( trim( trimmed.substr( 3 ) ) );
+
+            course.sections.push_back( std::move( section ) );
 
             continue;
         }

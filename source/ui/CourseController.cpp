@@ -169,14 +169,91 @@ QVariantList CourseController::blocks() const
         return blockList;
     }
 
-    // L'ORDRE EST CELUI DU FICHIER, et c'est tout l'interet d'avoir garde une SEQUENCE : l'interface n'a rien a
-    // retrouver, elle dessine ce qu'on lui donne dans l'ordre ou on le lui donne.
-    for( const domain::CourseBlock & block : m_courses.at( static_cast<std::size_t>( m_readingIndex ) ).blocks )
+    const domain::Course & course = m_courses.at( static_cast<std::size_t>( m_readingIndex ) );
+
+    // LA NOTE COMPLETE, quand on l'a demandee - ou quand le cours n'a AUCUNE section : un fichier sans « ## » est une
+    // page unique, et refuser de l'afficher serait une facon elegante de ne rien montrer du tout.
+    if( ( m_showingWholeNote ) || ( course.sections.empty() ) )
+    {
+        for( const domain::CourseBlock & block : course.blocks )
+        {
+            blockList.append( describeBlock( block ) );
+        }
+
+        return blockList;
+    }
+
+    // SINON, LA PAGE. L'ordre des blocs est celui du fichier, et l'interface n'a rien a retrouver : elle dessine ce
+    // qu'on lui donne dans l'ordre ou on le lui donne.
+    const domain::CourseSection & section = course.sections.at( static_cast<std::size_t>( m_sectionIndex ) );
+
+    for( const domain::CourseBlock & block : section.blocks )
     {
         blockList.append( describeBlock( block ) );
     }
 
     return blockList;
+}
+
+int CourseController::sectionCount() const noexcept
+{
+    if( m_readingIndex < 0 )
+    {
+        return 0;
+    }
+
+    return static_cast<int>( m_courses.at( static_cast<std::size_t>( m_readingIndex ) ).sections.size() );
+}
+
+QString CourseController::sectionTitle() const
+{
+    if( ( m_readingIndex < 0 ) || m_showingWholeNote )
+    {
+        return {};
+    }
+
+    const domain::Course & course = m_courses.at( static_cast<std::size_t>( m_readingIndex ) );
+
+    if( ( m_sectionIndex < 0 ) || ( m_sectionIndex >= static_cast<int>( course.sections.size() ) ) )
+    {
+        return {};
+    }
+
+    return QString::fromStdString( course.sections.at( static_cast<std::size_t>( m_sectionIndex ) ).title );
+}
+
+void CourseController::nextSection()
+{
+    // AU BOUT, ON NE DEBORDE PAS : la derniere page reste la derniere. C'est la note complete qui prend la suite, et
+    // c'est a l'ecran de la proposer - pas au modele de la glisser.
+    if( m_sectionIndex + 1 < sectionCount() )
+    {
+        ++m_sectionIndex;
+
+        emit courseChanged();
+    }
+}
+
+void CourseController::previousSection()
+{
+    if( m_sectionIndex > 0 )
+    {
+        --m_sectionIndex;
+
+        emit courseChanged();
+    }
+}
+
+void CourseController::setShowingWholeNote( bool p_showingWholeNote )
+{
+    if( m_showingWholeNote == p_showingWholeNote )
+    {
+        return;
+    }
+
+    m_showingWholeNote = p_showingWholeNote;
+
+    emit courseChanged();
 }
 
 void CourseController::open( int p_index )
@@ -189,6 +266,11 @@ void CourseController::open( int p_index )
     }
 
     m_readingIndex = p_index;
+
+    // ON COMMENCE AU DEBUT, ET PAR PAGES : un cours rouvert repart de sa premiere page. Reprendre a la page laissee
+    // serait une autre fonctionnalite - et un lecteur qui rouvre une lecon veut la relire, pas la reprendre au milieu.
+    m_sectionIndex = 0;
+    m_showingWholeNote = false;
 
     emit courseChanged();
 }

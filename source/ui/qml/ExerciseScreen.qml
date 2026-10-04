@@ -1596,7 +1596,7 @@ Item {
                             font.bold: true
                             // La forme plurielle de Qt, et pas un « (s) » ecrit a la main : c'est ce qui permet a une
                             // traduction de dire « 0 erreur » et « 1 erreur » comme sa langue le demande.
-                            text: modelData.errors === 0 ? qsTr("aucune erreur") : qsTr("%n erreur(s)", "", modelData.errors)
+                            text: modelData.errors === 0 ? qsTr("Parfait !") : qsTr("%n erreur(s)", "", modelData.errors)
                         }
 
                     }

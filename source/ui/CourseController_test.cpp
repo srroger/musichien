@@ -227,4 +227,51 @@ TEST( CourseControllerTest, an_annexe_is_told_apart_from_a_course )
     EXPECT_TRUE( controller.library().at( 1 ).toMap().value( QStringLiteral( "isAnnexe" ) ).toBool() );
 }
 
+TEST( CourseControllerTest, a_course_is_read_one_page_at_a_time )
+{
+    // Roger : « je verrais plus ca comme plusieurs pages par chapitre », et a la fin « la note complete pour s'y referer ».
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course course = makeQuintCourse();
+
+    domain::CourseSection first;
+    first.title = "Premiere page";
+    first.blocks = { course.blocks.at( 0 ) };
+
+    domain::CourseSection second;
+    second.title = "Deuxieme page";
+    second.blocks = { course.blocks.at( 1 ) };
+
+    course.sections = { first, second };
+
+    CourseController controller{ notePlayer, { course } };
+
+    controller.open( 0 );
+
+    // On commence a la premiere page, et on ne voit QUE ses blocs.
+    EXPECT_EQ( controller.sectionCount(), 2 );
+    EXPECT_EQ( controller.sectionIndex(), 0 );
+    EXPECT_EQ( controller.sectionTitle(), QString( "Premiere page" ) );
+    ASSERT_EQ( controller.blocks().size(), 1U );
+    EXPECT_EQ( controller.blocks().at( 0 ).toMap().value( QStringLiteral( "kind" ) ).toString(), QString( "text" ) );
+
+    controller.nextSection();
+
+    EXPECT_EQ( controller.sectionIndex(), 1 );
+    ASSERT_EQ( controller.blocks().size(), 1U );
+    EXPECT_EQ( controller.blocks().at( 0 ).toMap().value( QStringLiteral( "kind" ) ).toString(), QString( "play" ) );
+
+    // ON NE DEBORDE PAS : la derniere page reste la derniere. C'est l'ecran qui propose la note complete.
+    controller.nextSection();
+    EXPECT_EQ( controller.sectionIndex(), 1 );
+
+    // ET LA NOTE COMPLETE REND TOUT, dans l'ordre du fichier, et sans titre de page.
+    controller.setShowingWholeNote( true );
+    EXPECT_EQ( controller.blocks().size(), 3 );
+    EXPECT_TRUE( controller.sectionTitle().isEmpty() );
+
+    controller.setShowingWholeNote( false );
+    EXPECT_EQ( controller.sectionIndex(), 1 );
+}
+
 }    // namespace musichien::ui

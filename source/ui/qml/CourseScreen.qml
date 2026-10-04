@@ -185,10 +185,111 @@ Item {
             contentHeight: courseColumn.height
 
             ColumnLayout {
+                // LA NAVIGATION, AU BOUT DE LA PAGE.
+
                 id: courseColumn
 
                 width: parent.width
                 spacing: 14
+
+                // A la fin de la derniere page, on propose LA NOTE COMPLETE - c'est le « et a la fin, on verrait la note
+                // complete pour s'y referer » de Roger. Un cours sans section n'affiche rien de tout cela : il a une
+                // seule page, et il n'y a rien a tourner.
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    spacing: 8
+                    visible: CourseController.sectionCount > 1
+
+                    Rectangle {
+                        Layout.preferredWidth: 120
+                        Layout.preferredHeight: 44
+                        radius: 10
+                        color: "#2a1a4a"
+                        visible: !CourseController.showingWholeNote && CourseController.sectionIndex > 0
+
+                        Text {
+                            anchors.centerIn: parent
+                            color: "#cbbde8"
+                            font.pixelSize: 14
+                            text: qsTr("< Precedent")
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: CourseController.previousSection()
+                        }
+
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                    }
+
+                    Rectangle {
+                        Layout.preferredWidth: 170
+                        Layout.preferredHeight: 44
+                        radius: 10
+                        color: "#6a4fa8"
+                        visible: !CourseController.showingWholeNote && CourseController.sectionIndex + 1 < CourseController.sectionCount
+
+                        Text {
+                            anchors.centerIn: parent
+                            color: "#ffffff"
+                            font.pixelSize: 14
+                            text: qsTr("Suivant >")
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: CourseController.nextSection()
+                        }
+
+                    }
+
+                    Rectangle {
+                        Layout.preferredWidth: 190
+                        Layout.preferredHeight: 44
+                        radius: 10
+                        color: "#6a4fa8"
+                        visible: !CourseController.showingWholeNote && CourseController.sectionIndex + 1 >= CourseController.sectionCount
+
+                        Text {
+                            anchors.centerIn: parent
+                            color: "#ffffff"
+                            font.pixelSize: 14
+                            text: qsTr("Voir la note complete")
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: CourseController.setShowingWholeNote(true)
+                        }
+
+                    }
+
+                    Rectangle {
+                        Layout.preferredWidth: 170
+                        Layout.preferredHeight: 44
+                        radius: 10
+                        color: "#2a1a4a"
+                        visible: CourseController.showingWholeNote
+
+                        Text {
+                            anchors.centerIn: parent
+                            color: "#cbbde8"
+                            font.pixelSize: 14
+                            text: qsTr("Revenir aux pages")
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: CourseController.setShowingWholeNote(false)
+                        }
+
+                    }
+
+                }
 
                 Text {
                     Layout.preferredWidth: 0
@@ -199,6 +300,20 @@ Item {
                     font.pixelSize: 22
                     font.bold: true
                     text: CourseController.title
+                }
+
+                // LE TITRE DE LA PAGE. Le cours se lit une SECTION a la fois, et c'est ce titre qui dit ou l'on est - il
+                // vient du « ## » ecrit dans le fichier, pas d'une decoupe inventee ici.
+                Text {
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
+                    Layout.fillWidth: true
+                    visible: text !== ""
+                    wrapMode: Text.WordWrap
+                    color: "#cbbde8"
+                    font.pixelSize: 17
+                    font.bold: true
+                    text: CourseController.sectionTitle
                 }
 
                 Repeater {

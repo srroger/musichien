@@ -81,6 +81,23 @@ struct CourseBlock
     std::string annexeName;
 };
 
+// UNE SECTION, c'est-a-dire un « ## » du fichier et ce qu'il introduit.
+//
+// Roger : « je trouve que le cours en forme de grosse note qui descend, c'est bien mais un peu lourd. Je verrais plus ca
+// comme plusieurs pages par chapitre : "Deux notes et rien entre elles", "L'ecoute"... Et a la fin, on verrait la note
+// complete pour s'y referer. »
+//
+// Il a raison, et la structure est DEJA dans les fichiers : les titres de niveau 2 sont exactement les pages qu'il
+// decrit - mon propre specimen en a sept. Les aplatir pour tout afficher d'un bloc, c'etait jeter une decoupe que
+// l'auteur avait deja faite.
+struct CourseSection
+{
+    // Le titre du « ## », sans les diese. VIDE pour ce qui precede le premier titre : un chapeau, s'il y en a un.
+    std::string title;
+
+    std::vector<CourseBlock> blocks;
+};
+
 // A lesson, ready to be shown.
 struct Course
 {
@@ -96,7 +113,12 @@ struct Course
     // exercise it belongs to - and feed the review plan - without knowing anything about either.
     std::vector<std::int32_t> concepts;
 
-    // The lesson itself, in order.
+    // La lecon, dans l'ordre, decoupee en pages.
+    std::vector<CourseSection> sections;
+
+    // LES MEMES BLOCS, A PLAT. Les deux existent, et c'est un choix assume : la page lit les SECTIONS, et le « voir la
+    // note complete » lit la liste plate. Les deux sortent du MEME passage de lecture, donc elles ne peuvent pas
+    // diverger - mais les recalculer l'une depuis l'autre a chaque affichage couterait une copie pour rien.
     std::vector<CourseBlock> blocks;
 
     [[nodiscard]] bool isEmpty() const noexcept { return blocks.empty(); }

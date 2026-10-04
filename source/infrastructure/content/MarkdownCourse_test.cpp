@@ -184,4 +184,35 @@ TEST( MarkdownCourseTest, an_unknown_directive_is_skipped )
     EXPECT_EQ( course->blocks[0].markdown, "Un paragraphe." );
 }
 
+TEST( MarkdownCourseTest, a_level_two_heading_opens_a_page )
+{
+    // ROGER : « je verrais plus ca comme plusieurs pages par chapitre ». Les pages ne sont pas inventees : ce sont les
+    // « ## » du fichier, et le lecteur les separes en gardant AUSSI la liste plate - c'est elle que lit le « voir la note
+    // complete », et les deux sortent du meme passage, donc elles ne peuvent pas diverger.
+    constexpr std::string_view CONTENT = "Un chapeau.\n\n"
+                                         "## Premiere page\n\n"
+                                         "Du texte.\n\n"
+                                         ":: essai | demi_tons:7\n\n"
+                                         "## Deuxieme page\n\n"
+                                         "Encore du texte.\n";
+
+    const std::optional<musichien::domain::Course> course = readCourse( CONTENT );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->sections.size(), 3U );
+
+    // Le CHAPEAU n'a pas de titre, et c'est voulu : c'est ce qui precede le premier « ## ».
+    EXPECT_EQ( course->sections.at( 0 ).title, "" );
+    EXPECT_EQ( course->sections.at( 1 ).title, "Premiere page" );
+    EXPECT_EQ( course->sections.at( 2 ).title, "Deuxieme page" );
+
+    // La deuxieme page porte DEUX blocs, et ils sont bien a elle : le titre ne les a pas avales.
+    ASSERT_EQ( course->sections.at( 1 ).blocks.size(), 2U );
+    EXPECT_EQ( course->sections.at( 1 ).blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Text );
+    EXPECT_EQ( course->sections.at( 1 ).blocks.at( 1 ).kind, musichien::domain::CourseBlock::Kind::TryExercise );
+
+    // ET LA LISTE PLATE EST INTACTE : quatre blocs, dans l'ordre du fichier, titres exclus.
+    EXPECT_EQ( course->blocks.size(), 4U );
+}
+
 }    // namespace musichien::infrastructure
