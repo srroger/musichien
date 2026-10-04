@@ -714,6 +714,13 @@ Item {
                             if (ExerciseController.isForeignNoteQuestion)
                                 return qsTr("Sept notes montent en %1 sur le bourdon : l'une n'appartient pas à la gamme. Laquelle ?").arg(ExerciseController.heardMode.name);
 
+                            // LE CHANT A SA PROPRE CONSIGNE, et il la fallait : il retombait sur le generique « Ecoute
+                            // bien… », que Roger a vu a l'ecran pendant une question chantee. Or on ne lui demande pas
+                            // d'ecouter mais de CHANTER - et un joueur qui lit « ecoute bien » attend un son qui ne
+                            // vient pas.
+                            if (ExerciseController.questionKind === 2)
+                                return qsTr("Chante deux notes : %1. La seconde est celle que le jeu attend.").arg(MicrophoneController.singingTargetLabel);
+
                             if (ExerciseController.isModeColourQuestion)
                                 return qsTr("Écoute les deux modes : le second est-il plus clair, plus obscur, ou pareil ?");
 

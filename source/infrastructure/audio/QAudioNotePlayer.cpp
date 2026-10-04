@@ -1,4 +1,3 @@
-#include <iostream>
 #include "infrastructure/audio/QAudioNotePlayer.h"
 
 #include "domain/music/Note.h"
@@ -11,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <format>
+#include <iostream>
 #include <iterator>
 #include <utility>
 
