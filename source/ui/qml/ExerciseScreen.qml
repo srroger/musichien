@@ -827,31 +827,12 @@ Item {
             // boule et la barre de stabilite sont le composant partage avec l'accordeur ; seule la cible change.
             ColumnLayout {
                 // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
-                // ⚠️ LIGNE DE MESURE TEMPORAIRE - a retirer des que la boule fantome est comprise.
-
-                Layout.fillWidth: true
-                visible: ExerciseController.questionKind === 2
-                spacing: 10
-                // Le micro suit l'ecran qui s'en sert : il s'ouvre quand la question se chante, et se referme quand
-                // elle se tait. Un exercice passe la plupart de son temps sans chant, et un micro ouvert pour rien
-                // vide la batterie.
-                onVisibleChanged: visible ? MicrophoneController.ensureListening() : MicrophoneController.stopTest()
-
-                Text {
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    color: "#ffffff"
-                    font.pixelSize: 22
-                    font.bold: true
-                    wrapMode: Text.WordWrap
-                    text: qsTr("Chante : %1").arg(MicrophoneController.singingTargetLabel)
-                }
 
                 StaffBall {
                     Layout.preferredHeight: 120
                     // LA BOULE FANTOME S'ALLUME DES LA PREMIERE ERREUR, et des que le joueur chante : elle part de sa voix,
                     // donc elle n'a plus besoin d'attendre la fin d'une note pour savoir ou se placer.
-                    showGhost: ExerciseController.singingGhostIsVisible && MicrophoneController.detectedFrequencyHz > 0
+                    showGhost: ExerciseController.singingGhostIsVisible && MicrophoneController.hasFirstNote
                 }
 
                 // Roger : « est-ce qu'on pourrait aussi afficher la note en train d'etre jouee, exactement comme sur
@@ -871,13 +852,6 @@ Item {
                 // Quatre hypotheses sont mortes en lisant le code, et je refuse d'en tenter une cinquieme a l'aveugle.
                 // Ces quatre nombres disent TOUT : la position calculee de la fantome, la position reelle de la boule,
                 // la note de depart retenue (0 = aucune), et la cible demandee. Roger les lit, et la cause est finie.
-                Text {
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    color: "#ffd479"
-                    font.pixelSize: 12
-                    text: qsTr("mesure : fantôme %1 · boule %2 · départ %3 · cible %4").arg(MicrophoneController.singingTargetStaffFraction.toFixed(3)).arg(MicrophoneController.detectedStaffFraction.toFixed(3)).arg(MicrophoneController.hasFirstNote ? "ok" : "AUCUNE").arg(MicrophoneController.singingTargetSemitones)
-                }
 
                 // La barre de stabilite : elle se remplit tant que la note est tenue, puis repart pour la deuxieme.
                 Rectangle {

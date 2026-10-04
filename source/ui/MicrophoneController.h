@@ -66,17 +66,20 @@ class MicrophoneController final : public QObject
 
     // OU TOMBE LA NOTE A CHANTER SUR LA PORTEE, pour y poser la boule fantome.
     //
-    // ELLE SUIT LA VOIX, DONC ELLE ECOUTE LA VOIX. Roger a mis le doigt sur la faute : « a la seconde voix, je vois
-    // toujours le fantome du precedent. Le nouveau fantome s'affiche a la fin. C'etait tres certainement un connect ou
-    // refresh mal gere. »
+    // LA VALEUR ENREGISTREE, ET RIEN D'AUTRE. Roger a fini de mettre le doigt dessus : « il faut vraiment se baser sur la
+    // note jouee la premiere fois, afficher le fantome a partir de la valeur enregistree et c'est tout. Et penser a bien
+    // rafraichir derriere. »
     //
-    // C'etait bien ca. Une liaison QML ne se recalcule QUE sur le signal qu'elle declare, et cette position la disait
-    // « singingTargetChanged » - un signal qui ne part qu'une fois par question, au changement de cible. La position se
-    // calculait donc au tout debut, restait figee pendant qu'on chantait, et ne bougeait qu'a la question suivante.
+    // Deux erreurs successives m'ont mene ici, et elles disent tout ce qu'il faut retenir :
+    //   * la premiere version lisait bien la note enregistree, mais ecoutait singingTargetChanged - un signal qui ne part
+    //     qu'une fois par question. La position se calculait donc AVANT la premiere note et restait figee ;
+    //   * la seconde suivait la hauteur entendue a l'instant, ce que Roger a immediatement ressenti : « le fantome suit
+    //     tout le temps la voix. Trop de refresh. »
     //
-    // Elle ecoute desormais la MEME chose que la boule : la hauteur entendue. setSingingTarget() emet ce signal aussi,
-    // pour qu'un changement de cible la reveille tout de suite - une valeur derivee de deux sources doit ecouter les deux.
-    Q_PROPERTY( double singingTargetStaffFraction READ singingTargetStaffFraction NOTIFY detectedStaffFractionChanged )
+    // Elle ecoute donc sungIntervalChanged - l'ecran se rafraichit quand le detecteur parle, et la valeur lue, elle, est
+    // celle de la PREMIERE note de l'essai en cours. Le detecteur remet son reading a zero a chaque reponse (voir
+    // ExerciseSessionController::answerSung), donc la fantome repart de la bonne note a chaque tentative.
+    Q_PROPERTY( double singingTargetStaffFraction READ singingTargetStaffFraction NOTIFY sungIntervalChanged )
     Q_PROPERTY( bool isSingingCaptureActive READ isSingingCaptureActive NOTIFY singingCaptureStateChanged )
     Q_PROPERTY( bool hasSungInterval READ hasSungInterval NOTIFY sungIntervalChanged )
     Q_PROPERTY( int sungSemitones READ sungSemitones NOTIFY sungIntervalChanged )

@@ -235,11 +235,11 @@ void MicrophoneController::newSingingQuestion()
 
 double MicrophoneController::singingTargetStaffFraction() const
 {
-    // LA NOTE QUE TU CHANTES MAINTENANT, TRANSPOSEE DE L'INTERVALLE.
+    // LA PREMIERE NOTE DE L'ESSAI EN COURS, TRANSPOSEE DE L'INTERVALLE - et rien de plus.
     //
     // Roger a trouve la cause, et elle explique tout ce que je n'arrivais pas a expliquer : « pour que le fantome
     // apparaisse il faut que le premier essai soit mauvais. Hors au deuxieme essai, je pense que le fantome se base sur
-    // la mauvaise note de depart - celle de la premiere ! »
+    // la note de la PREMIERE TENTATIVE »
     //
     // Il a raison. La fantome ne s'affiche qu'APRES un echec, et le detecteur garde alors en memoire les notes du premier
     // essai : le joueur reprend une nouvelle premiere note, et la cible se placait depuis l'ANCIENNE. D'ou un decalage
@@ -251,21 +251,11 @@ double MicrophoneController::singingTargetStaffFraction() const
     //
     // Le repli sur la premiere note du detecteur sert au seul cas ou rien n'est entendu : sans lui, la fantome
     // sauterait a l'octave n'importe ou entre deux lectures du micro.
-    const std::int32_t fromMidi = ( m_detectedFrequencyHz > 0.0 )
-                                    ? static_cast<std::int32_t>( std::lround( m_detectedMidi ) )
-                                    : m_sungIntervalDetector.reading().firstMidiNumber;
+    // LA PREMIERE NOTE DE L'ESSAI EN COURS, ET RIEN D'AUTRE : c'est la valeur ENREGISTREE que Roger veut voir. Elle ne
+    // bouge plus pendant qu'il chante, donc la fantome est un repere stable et non un marteau.
+    const std::int32_t fromMidi = m_sungIntervalDetector.reading().firstMidiNumber;
 
     const double fraction = domain::StaffPosition::fraction( fromMidi + m_singingTargetSemitones );
-
-    // ⚠️ MESURE TEMPORAIRE, et elle reste une version de plus : le telephone de Roger est branche, et c'est ce journal qui
-    // confirmera le correctif au lieu de me faire croire qu'il l'est. Une ligne seulement quand la valeur change.
-    if( fraction != m_lastLoggedGhostFraction )
-    {
-        m_lastLoggedGhostFraction = fraction;
-
-        std::cerr << "Musichien: FANTÔME " << fraction << " · depuis " << fromMidi << " · cible "
-                  << m_singingTargetSemitones << " · boule " << m_detectedStaffFraction << '\n';
-    }
 
     return fraction;
 }
