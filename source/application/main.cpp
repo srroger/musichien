@@ -864,7 +864,18 @@ int main( int p_argumentCount, char * p_arguments[] )
     // Bonjour. Un arpège montant de do, sol, do : une quinte et une octave, aucune tierce, donc rien
     // à comprendre - seulement quelque chose qui monte et qui flotte. Au piano, et très discret : c'est
     // la moitié du reproche qui était juste.
-    notePlayer.playGreeting();
+    //
+    // MAIS APRES LA PAGE, ET NON AVANT. Roger entendait sa PREMIERE NOTE puis le silence : « un peu comme si
+    // l'affichage de la page de garde cassait la musique d'intro ». C'est exactement ca - ouvrir les peripheriques
+    // audio, ce que fait la page qui s'installe, coupe ce qui joue deja - et sa conclusion est la bonne.
+    //
+    // Le decalage est SON idee, et c'est la plus simple qui soit : on laisse la page prendre la main, PUIS on souhaite la
+    // bienvenue. Meme arpege, meme volume, huit cents millisecondes plus tard - et le son n'a plus rien a interrompre.
+    //
+    // Le lecteur n'est PAS un QObject - c'est un adaptateur du domaine, et il n'a aucune raison de l'etre - donc le
+    // minuteur n'a pas de contexte a surveiller. La capture par reference est sure ici : les objets de main() vivent
+    // jusqu'a la fin de la boucle d'evenements, et le minuteur meurt avec elle.
+    QTimer::singleShot( 800, [&notePlayer]() { notePlayer.playGreeting(); } );
 
     qmlRegisterSingletonInstance( QML_MODULE_NAME,
                                   QML_MODULE_MAJOR_VERSION,

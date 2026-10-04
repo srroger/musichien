@@ -277,6 +277,13 @@ void MicrophoneController::setSingingTarget( int p_semitones )
 
     emit singingTargetChanged();
     emit sungIntervalChanged();
+
+    // LA BOULE FANTOME DEPEND DE DEUX CHOSES, DONC ELLE ECOUTE LES DEUX.
+    //
+    // Sa position suit la hauteur entendue et se decale de l'intervalle : changer la CIBLE la deplace aussi. Ce signal
+    // est emis par la mise a jour de la hauteur, et le rappeler ici evite que la fantome attende la lecture suivante du
+    // micro pour se replacer - un demi-temps de retard, exactement ce que Roger voyait.
+    emit detectedStaffFractionChanged();
 }
 
 void MicrophoneController::playSingingTarget()

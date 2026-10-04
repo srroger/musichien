@@ -66,14 +66,17 @@ class MicrophoneController final : public QObject
 
     // OU TOMBE LA NOTE A CHANTER SUR LA PORTEE, pour y poser la boule fantome.
     //
-    // Roger a trouve la solution, et elle est plus juste que ce que je cherchais : « tu n'as pas besoin de connaitre la
-    // distance, tu as juste a connaitre la note que tu devrais jouer et l'afficher comme si tu l'avais chantee, et tout
-    // le process fera le travail pour bien positionner la boule. »
+    // ELLE SUIT LA VOIX, DONC ELLE ECOUTE LA VOIX. Roger a mis le doigt sur la faute : « a la seconde voix, je vois
+    // toujours le fantome du precedent. Le nouveau fantome s'affiche a la fin. C'etait tres certainement un connect ou
+    // refresh mal gere. »
     //
-    // C'est donc la MEME fonction du domaine que la boule detectee - domain::StaffPosition::fraction - nourrie de la note
-    // ATTENDUE au lieu de la note entendue. Une seule regle de portee, aucune distance a recalculer, et le Do tombe au
-    // meme endroit quelle que soit son octave : le fantome du Sol attendu tombe donc la ou tombe le Sol.
-    Q_PROPERTY( double singingTargetStaffFraction READ singingTargetStaffFraction NOTIFY singingTargetChanged )
+    // C'etait bien ca. Une liaison QML ne se recalcule QUE sur le signal qu'elle declare, et cette position la disait
+    // « singingTargetChanged » - un signal qui ne part qu'une fois par question, au changement de cible. La position se
+    // calculait donc au tout debut, restait figee pendant qu'on chantait, et ne bougeait qu'a la question suivante.
+    //
+    // Elle ecoute desormais la MEME chose que la boule : la hauteur entendue. setSingingTarget() emet ce signal aussi,
+    // pour qu'un changement de cible la reveille tout de suite - une valeur derivee de deux sources doit ecouter les deux.
+    Q_PROPERTY( double singingTargetStaffFraction READ singingTargetStaffFraction NOTIFY detectedStaffFractionChanged )
     Q_PROPERTY( bool isSingingCaptureActive READ isSingingCaptureActive NOTIFY singingCaptureStateChanged )
     Q_PROPERTY( bool hasSungInterval READ hasSungInterval NOTIFY sungIntervalChanged )
     Q_PROPERTY( int sungSemitones READ sungSemitones NOTIFY sungIntervalChanged )
