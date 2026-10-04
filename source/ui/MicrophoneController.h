@@ -207,6 +207,11 @@ private:
     double m_detectedPitchRatio{ 0.0 };
     double m_detectedMidi{ 0.0 };
     double m_detectedStaffFraction{ 0.5 };
+
+    // ⚠️ MESURE TEMPORAIRE : la derniere valeur de fantome ECRITE dans le journal, pour n'y ecrire que quand elle
+    // change. Sans ce garde-fou, une valeur relue a chaque image noierait la sortie - et le journal d'Android est deja
+    // bavard. Elle part avec la ligne affichee, des que la cause est comprise.
+    mutable double m_lastLoggedGhostFraction{ -1.0 };
     int m_detectedOctaveShift{ 0 };
     double m_detectedCents{ 0.0 };
     int m_detectedTuningState{ 0 };

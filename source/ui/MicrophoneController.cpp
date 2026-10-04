@@ -16,6 +16,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <iostream>
 #include <optional>
 #include <utility>
 
@@ -234,21 +235,22 @@ void MicrophoneController::newSingingQuestion()
 
 double MicrophoneController::singingTargetStaffFraction() const
 {
-    // LA NOTE REELLEMENT CHANTEE, TRANSPOSEE DE L'INTERVALLE DEMANDE.
-    //
-    // Mon premier jet partait de la note THEORIQUE du jeu - sa racine - et c'etait faux dans la pratique. Roger l'a vu
-    // sur un octave : « normalement la boule fantome devrait etre a la meme position que le premier chant, car on ne monte
-    // qu'un octave, et pourtant ce n'est pas le cas. » Il avait raison, et l'explication est simple : entre ce que le jeu
-    // JOUE et ce que le joueur CHANTE, il y a tout l'ecart de la voix - et un chanteur peut poser sa premiere note une
-    // quarte plus haut sans s'en rendre compte.
-    //
-    // C'est donc la note ENTENDUE qui commande, transposee de l'intervalle : si la premiere note est montee d'un octave,
-    // la cible monte d'un octave aussi - et comme la portee replie les octaves (voir StaffPosition::drawnMidiNumber), le
-    // fantome retombe exactement sur la premiere boule. Ce que le joueur doit faire, c'est un INTERVALLE, pas une note
-    // absolue.
     const auto & reading = m_sungIntervalDetector.reading();
 
-    return domain::StaffPosition::fraction( reading.firstMidiNumber + m_singingTargetSemitones );
+    const double fraction = domain::StaffPosition::fraction( reading.firstMidiNumber + m_singingTargetSemitones );
+
+    // ⚠️ MESURE TEMPORAIRE. Quatre hypotheses sont mortes en lisant le code, et le telephone de Roger est branche :
+    // autant lire les VALEURS au lieu de raisonner dessus. Une ligne seulement quand la valeur change, sinon la sortie
+    // d'Android serait noyee.
+    if( fraction != m_lastLoggedGhostFraction )
+    {
+        m_lastLoggedGhostFraction = fraction;
+
+        std::cerr << "Musichien: FANTÔME " << fraction << " · depart " << reading.firstMidiNumber << " · cible "
+                  << m_singingTargetSemitones << " · boule " << m_detectedStaffFraction << '\n';
+    }
+
+    return fraction;
 }
 
 void MicrophoneController::setSingingTarget( int p_semitones )
