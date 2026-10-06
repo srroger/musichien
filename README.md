@@ -43,15 +43,136 @@ scripts/start_code_oss.sh
 # 4. Pour le téléphone : compile, VÉRIFIE l'absence de permission réseau, signe, puis installe
 scripts/install_dependencies.sh --with-android   # une seule fois
 scripts/build_android.sh
+
+# 5. Depuis un Mac : installer Qt (bureau + iOS), puis produire une IPA
+scripts/install_dependencies.sh --with-ios --with-superbuild   # une seule fois
+source scripts/setup_env.sh
+scripts/build_ios.sh                             # archive Xcode + .ipa signée
 ```
 
 Procédure complète, prérequis et dépannage : `docs/BUILD_AND_SETUP.md`.
+Mise en place pas à pas sur un Mac (Xcode, Homebrew, Qt, IPA) : voir la section « macOS » ci-dessous.
+
+---
+
+## 🍎 macOS : mise en place pas à pas
+
+Objectif : cloner le dépôt, installer les dépendances, compiler, puis produire une **IPA** pour
+l'iPhone. Rien de spécifique au Mac du côté du code : seuls quelques outils changent.
+
+### 1. Outils de base
+
+```bash
+# Xcode (App Store) : indispensable, il fournit clang, les SDK Apple et l'outillage iOS
+xcode-select --install          # à lancer si Xcode n'est pas déjà installé
+
+# Homebrew (https://brew.sh) s'il n'est pas déjà là
+brew install llvm cmake ninja git pipx
+```
+
+- `llvm` apporte `clang`, `clang-format` et `clang-tidy` (le clang d'Apple ne les fournit pas).
+  `scripts/setup_env.sh` met son dossier `bin` sur le `PATH` : le build est alors le même qu'ailleurs.
+- `pipx` ne sert qu'à installer `aqtinstall` automatiquement. Facultatif si tu fournis Qt à la main (§3).
+
+### 2. Cloner et créer le dossier des dépendances
+
+```bash
+git clone <url-du-depot> Musichien
+cd Musichien
+
+# Les dépendances épinglées vivent À CÔTÉ du projet, jamais dans le système.
+mkdir -p ../Roger-externals
+```
+
+`../Roger-externals` est le chemin par défaut. Pour un autre emplacement :
+`export MUSICHIEN_EXTERNAL_DIR=/chemin/vers/mes-externals` avant tout.
+
+### 3. Installer Qt — deux méthodes
+
+**Méthode A — automatique (recommandée).** Le script télécharge Qt depuis le miroir officiel, **sans
+compte Qt**, et remplit `../Roger-externals/Qt/<version>/` :
+
+```bash
+scripts/install_dependencies.sh --with-ios --with-superbuild
+```
+
+Il installe deux variantes : `macos` (bureau) et `ios` (iPhone/iPad). Avec `--with-android` en plus, il
+ajoute aussi la variante Android.
+
+**Méthode B — Qt déjà installé à la main.** Si Qt vient de l'installeur officiel
+(`~/Qt/<version>/macos`), copie-le dans la disposition attendue, puis saute l'étape Qt du script avec
+`--without-qt` :
+
+```bash
+VERSION=6.12.0                 # ta version, ≥ 6.11
+mkdir -p ../Roger-externals/Qt/${VERSION}
+cp -R ~/Qt/${VERSION}/macos ../Roger-externals/Qt/${VERSION}/macos
+cp -R ~/Qt/${VERSION}/ios   ../Roger-externals/Qt/${VERSION}/ios    # seulement pour iOS
+
+scripts/install_dependencies.sh --without-qt --with-superbuild
+```
+
+> [!important] La disposition des dossiers compte
+> `setup_env.sh` cherche `Qt/<version>/macos/lib/cmake/Qt6/Qt6Config.cmake` — le nom du dossier interne
+> doit être exactement `macos` (ou `gcc_64`, ou `clang_64`), et `Qt/<version>/ios/…` pour iOS. Un dossier
+> nommé autrement, ou posé directement à la racine de `Roger-externals`, n'est **pas** détecté.
+>
+> La version doit être **≥ 6.11** (voir « Pourquoi Qt 6.11 » dans `docs/BUILD_AND_SETUP.md`) et les
+> modules **qtmultimedia**, **qtshadertools** et **qt5compat** doivent être installés. L'installeur Qt
+> les propose à la sélection des composants — ne les oublie pas, sinon `find_package(Qt6 …)` échoue.
+
+---
+
+### 4. Charger l'environnement
+
+```bash
+source scripts/setup_env.sh
+```
+
+À refaire **dans chaque nouveau terminal**. Le script affiche ce qu'il a trouvé (`MUSICHIEN_QT_DIR`,
+`MUSICHIEN_QT_IOS_DIR`, `CLANG_DIR`…). S'il prévient qu'aucun Qt épinglé n'est trouvé, **ne continue
+pas** : reviens au §3.
+
+### 5. Compiler et tester sur le Mac
+
+```bash
+cmake --preset "macOS-Release Musichien"
+cmake --build --preset "Build macOS-Release Musichien"
+```
+
+L'application se trouve dans `../Musichien-build/macOS-Release/bin/musichien.app`.
+
+### 6. Produire une IPA pour l'iPhone
+
+```bash
+export MUSICHIEN_IOS_TEAM_ID=ABCDE12345     # ton identifiant d'équipe Apple (une fois)
+scripts/build_ios.sh
+```
+
+Le script configure (générateur Xcode), **archive** l'application, puis **exporte** une `.ipa` signée
+dans `../Musichien-build/iOS-Release/ipa/`. Options : `--no-export` (s'arrêter à l'archive) et
+`--simulator` (build de simulateur, sans signature). Détails : `docs/BUILD_AND_SETUP.md` §6.
+
+### Récapitulatif
+
+| Étape | Commande |
+|---|---|
+| Outils | `xcode-select --install` puis `brew install llvm cmake ninja git pipx` |
+| Dépendances | `scripts/install_dependencies.sh --with-ios --with-superbuild` |
+| Qt déjà installé | copier `~/Qt/<v>/{macos,ios}` → `../Roger-externals/Qt/<v>/`, puis ajouter `--without-qt` |
+| Environnement | `source scripts/setup_env.sh` |
+| Bureau | `cmake --preset "macOS-Release Musichien"` |
+| iPhone | `export MUSICHIEN_IOS_TEAM_ID=…` puis `scripts/build_ios.sh` |
 
 ---
 
 ## 🧱 Dépendances
 
 ### Outils pris sur la machine (génériques)
+
+Le même jeu de scripts tourne sur **Linux (Arch)** et sur **macOS** : `scripts/platform.sh` détecte
+l'hôte, et `scripts/install_dependencies.sh` utilise `pacman` ou **Homebrew** en conséquence. Sur un Mac,
+**Xcode 16+** est requis pour iOS (le bureau ne l'exige pas).
 
 | Outil | Version minimum | Rôle |
 |---|---|---|

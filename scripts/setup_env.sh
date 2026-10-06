@@ -45,6 +45,16 @@ fi
 export MUSICHIEN_PROJECT_DIR
 
 # ---------------------------------------------------------------------------------------------------------------------
+# Host helpers
+#
+# Sourced, not executed: they describe the host (Linux or macOS) and hide the tools that are GNU-only -
+# 'find -maxdepth' and 'sort -V' do not exist on macOS. See scripts/platform.sh.
+# ---------------------------------------------------------------------------------------------------------------------
+MUSICHIEN_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=platform.sh
+. "${MUSICHIEN_SCRIPT_DIR}/platform.sh"
+
+# ---------------------------------------------------------------------------------------------------------------------
 # External dependencies
 #
 # Follows the convention of the other projects: a sibling folder holding every pinned dependency.
@@ -64,10 +74,27 @@ fi
 # ---------------------------------------------------------------------------------------------------------------------
 # Compiler
 #
-# CLANG_DIR is expected by CMakePresets.json.
+# CLANG_DIR is expected by CMakePresets.json, which builds the compiler path as ${CLANG_DIR}/clang.
+#
+#   Linux   the toolchain of the distribution, in /usr/bin;
+#   macOS   Homebrew's llvm when it is installed - it brings clang-format and clang-tidy, and a clang
+#           recent enough for C++26 - otherwise the Xcode command line tools, in /usr/bin.
+#
+# On macOS its bin directory is also PREPENDED to the PATH, because Homebrew's llvm is keg-only: its
+# tools are not on the PATH by default.
 # ---------------------------------------------------------------------------------------------------------------------
 if [ -z "${CLANG_DIR:-}" ]; then
-    export CLANG_DIR="/usr/bin"
+    if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+        MUSICHIEN_BREW_LLVM_BIN="$(musichien_brew_prefix llvm)/bin"
+        if [ -x "${MUSICHIEN_BREW_LLVM_BIN}/clang++" ]; then
+            export CLANG_DIR="${MUSICHIEN_BREW_LLVM_BIN}"
+            export PATH="${MUSICHIEN_BREW_LLVM_BIN}:${PATH}"
+        else
+            export CLANG_DIR="/usr/bin"
+        fi
+    else
+        export CLANG_DIR="/usr/bin"
+    fi
 fi
 
 
@@ -80,17 +107,14 @@ fi
 # ---------------------------------------------------------------------------------------------------------------------
 if [ -n "${MUSICHIEN_EXTERNAL_DIR:-}" ]; then
 
-    PINNED_CMAKE_DIR="$(find "${MUSICHIEN_EXTERNAL_DIR}" -maxdepth 1 -mindepth 1 -type d -name 'cmake-*' \
-                        2>/dev/null | sort -V | tail -n 1)"
-
+    PINNED_CMAKE_DIR="$(musichien_newest_directory "${MUSICHIEN_EXTERNAL_DIR}/cmake-*")"
 
     if [ -n "${PINNED_CMAKE_DIR}" ] && [ -x "${PINNED_CMAKE_DIR}/bin/cmake" ]; then
         export PATH="${PINNED_CMAKE_DIR}/bin:${PATH}"
         export MUSICHIEN_PINNED_CMAKE_DIR="${PINNED_CMAKE_DIR}"
     fi
 
-    PINNED_NINJA_DIR="$(find "${MUSICHIEN_EXTERNAL_DIR}" -maxdepth 1 -mindepth 1 -type d -name 'ninja-*' \
-                        2>/dev/null | sort -V | tail -n 1)"
+    PINNED_NINJA_DIR="$(musichien_newest_directory "${MUSICHIEN_EXTERNAL_DIR}/ninja-*")"
 
     if [ -n "${PINNED_NINJA_DIR}" ] && [ -x "${PINNED_NINJA_DIR}/ninja" ]; then
         export PATH="${PINNED_NINJA_DIR}:${PATH}"
@@ -106,7 +130,7 @@ fi
 # Two layouts are supported, because both are legitimately used on this machine:
 #
 #   1. the layout produced by aqtinstall (see scripts/install_dependencies.sh)
-#          <externals>/Qt/<version>/gcc_64
+#          <externals>/Qt/<version>/<desktop>       gcc_64 on Linux, macos on macOS
 #
 #   2. the flat layout used by the other personal projects
 #          <externals>/Qt-<version>
@@ -115,42 +139,57 @@ fi
 # warns loudly and CMake falls back to the Qt of the machine, which breaks reproducibility on purpose.
 # ---------------------------------------------------------------------------------------------------------------------
 
-# Prints "<version><TAB><directory>" for every pinned Qt installation found.
+# Prints "<version><TAB><directory>" for every pinned Qt installation found. The desktop sub directory
+# itself is resolved by musichien_qt_desktop_subdir, because its name depends on the host.
 musichien_list_pinned_qt_installations()
 {
     [ -n "${MUSICHIEN_EXTERNAL_DIR:-}" ] || return 0
 
-    if [ -d "${MUSICHIEN_EXTERNAL_DIR}/Qt" ]; then
+    local versionDirectory version desktopDirectory
 
-        find "${MUSICHIEN_EXTERNAL_DIR}/Qt" -maxdepth 1 -mindepth 1 -type d -name '6.*' 2>/dev/null |
-        while IFS= read -r versionDirectory; do
-            printf '%s\t%s\n' "$(basename "${versionDirectory}")" "${versionDirectory}/gcc_64"
-        done
-    fi
+    for versionDirectory in "${MUSICHIEN_EXTERNAL_DIR}"/Qt/6.*; do
+        [ -d "${versionDirectory}" ] || continue
 
-    find "${MUSICHIEN_EXTERNAL_DIR}" -maxdepth 1 -mindepth 1 -type d -name 'Qt-6.*' 2>/dev/null |
-    while IFS= read -r versionDirectory; do
+        version="${versionDirectory##*/}"
+        desktopDirectory="$(musichien_qt_desktop_subdir "${versionDirectory}")"
+
+        [ -n "${desktopDirectory}" ] && printf '%s\t%s\n' "${version}" "${desktopDirectory}"
+    done
+
+    for versionDirectory in "${MUSICHIEN_EXTERNAL_DIR}"/Qt-6.*; do
+        [ -f "${versionDirectory}/lib/cmake/Qt6/Qt6Config.cmake" ] || continue
         printf '%s\t%s\n' "${versionDirectory##*Qt-}" "${versionDirectory}"
     done
 }
 
 if [ -z "${MUSICHIEN_QT_DIR:-}" ] || [ "${MUSICHIEN_QT_IS_FALLBACK:-0}" = "1" ]; then
 
-
     TAB_CHARACTER="$(printf '\t')"
 
-    # Keep only the directories holding a real Qt6 installation, then take the newest version.
-    BEST_QT_ENTRY="$(musichien_list_pinned_qt_installations |
-                     while IFS="${TAB_CHARACTER}" read -r qtVersion qtDirectory; do
-                         if [ -f "${qtDirectory}/lib/cmake/Qt6/Qt6Config.cmake" ]; then
-                             printf '%s\t%s\n' "${qtVersion}" "${qtDirectory}"
-                         fi
-                     done |
-                     sort -V | tail -n 1)"
+    # Keep only the directories holding a real Qt6 installation, then the newest version wins.
+    # 'sort -V' is not used: macOS does not have it. See musichien_greatest_version.
+    BEST_QT_VERSION=""
+    BEST_QT_DIRECTORY=""
 
-    if [ -n "${BEST_QT_ENTRY}" ]; then
-        export MUSICHIEN_QT_VERSION="${BEST_QT_ENTRY%%${TAB_CHARACTER}*}"
-        export MUSICHIEN_QT_DIR="${BEST_QT_ENTRY#*${TAB_CHARACTER}}"
+    while IFS="${TAB_CHARACTER}" read -r qtVersion qtDirectory; do
+        [ -f "${qtDirectory}/lib/cmake/Qt6/Qt6Config.cmake" ] || continue
+
+        if [ -z "${BEST_QT_DIRECTORY}" ]; then
+            BEST_QT_VERSION="${qtVersion}"
+            BEST_QT_DIRECTORY="${qtDirectory}"
+            continue
+        fi
+
+        newestVersion="$(musichien_greatest_version "${qtVersion}" "${BEST_QT_VERSION}")"
+        if [ "${newestVersion}" = "${qtVersion}" ]; then
+            BEST_QT_VERSION="${qtVersion}"
+            BEST_QT_DIRECTORY="${qtDirectory}"
+        fi
+    done < <(musichien_list_pinned_qt_installations)
+
+    if [ -n "${BEST_QT_DIRECTORY}" ]; then
+        export MUSICHIEN_QT_VERSION="${BEST_QT_VERSION}"
+        export MUSICHIEN_QT_DIR="${BEST_QT_DIRECTORY}"
         export MUSICHIEN_QT_IS_FALLBACK=0
     fi
 
@@ -195,8 +234,7 @@ if [ -n "${MUSICHIEN_EXTERNAL_DIR:-}" ]; then
         # The newest NDK wins, exactly like the pinned CMake and Ninja above. Several NDKs can live
         # side by side, and Qt was compiled against one precise revision: r27c here, which is the
         # only one this project is expected to use.
-        MUSICHIEN_ANDROID_NDK_DIR="$(find "${MUSICHIEN_ANDROID_SDK_DIR}/ndk" -maxdepth 1 -mindepth 1 -type d \
-                                    2>/dev/null | sort -V | tail -n 1)"
+        MUSICHIEN_ANDROID_NDK_DIR="$(musichien_newest_directory "${MUSICHIEN_ANDROID_SDK_DIR}/ndk/*")"
 
         if [ -n "${MUSICHIEN_ANDROID_NDK_DIR}" ]; then
             export MUSICHIEN_ANDROID_NDK_DIR
@@ -217,13 +255,22 @@ if [ -n "${MUSICHIEN_EXTERNAL_DIR:-}" ]; then
         fi
     fi
 
-    # Qt for Android lives next to the desktop Qt chosen above, in the same version directory:
-    #   .../Qt/<version>/gcc_64              <- the desktop build
-    #   .../Qt/<version>/android_arm64_v8a   <- the phone build
-    # Deriving one from the other guarantees that both always share the same Qt version.
-    if [ -d "${MUSICHIEN_QT_DIR:-/nonexistent}/lib/cmake/Qt6" ] &&
-       [ -d "${MUSICHIEN_QT_DIR%/gcc_64}/android_arm64_v8a/lib/cmake/Qt6" ]; then
-        export MUSICHIEN_QT_ANDROID_DIR="${MUSICHIEN_QT_DIR%/gcc_64}/android_arm64_v8a"
+    # Qt for Android and for iOS live next to the desktop Qt chosen above, in the same version
+    # directory:
+    #   .../Qt/<version>/<desktop>            <- gcc_64 or macos: the desktop build
+    #   .../Qt/<version>/android_arm64_v8a    <- the phone build
+    #   .../Qt/<version>/ios                  <- the iPhone build (a macOS-only package)
+    # Stripping the desktop suffix is what guarantees all of them share the same Qt version.
+    MUSICHIEN_QT_VERSION_ROOT="${MUSICHIEN_QT_DIR%/gcc_64}"
+    MUSICHIEN_QT_VERSION_ROOT="${MUSICHIEN_QT_VERSION_ROOT%/macos}"
+    MUSICHIEN_QT_VERSION_ROOT="${MUSICHIEN_QT_VERSION_ROOT%/clang_64}"
+
+    if [ -d "${MUSICHIEN_QT_VERSION_ROOT}/android_arm64_v8a/lib/cmake/Qt6" ]; then
+        export MUSICHIEN_QT_ANDROID_DIR="${MUSICHIEN_QT_VERSION_ROOT}/android_arm64_v8a"
+    fi
+
+    if [ -d "${MUSICHIEN_QT_VERSION_ROOT}/ios/lib/cmake/Qt6" ]; then
+        export MUSICHIEN_QT_IOS_DIR="${MUSICHIEN_QT_VERSION_ROOT}/ios"
     fi
 
 fi
@@ -231,16 +278,19 @@ fi
 # ---------------------------------------------------------------------------------------------------------------------
 # JDK
 #
-# Gradle and the Android Gradle Plugin do not support the JDK 26 installed on this machine: the build
-# fails with obscure messages about unsupported class file versions. JDK 21 is what the Android
-# toolchain of Qt expects, so JAVA_HOME is pinned to it.
+# Gradle and the Android Gradle Plugin do not support the JDK 26 installed by default on the reference
+# machine: the build fails with obscure messages about unsupported class file versions. JDK 21 is what
+# the Android toolchain of Qt expects, so JAVA_HOME is pinned to it. Its location is host dependent
+# (musichien_jdk_home knows both).
 #
 # JAVA_HOME is left untouched when it already designates a 21, so that a deliberate choice wins.
 # ---------------------------------------------------------------------------------------------------------------------
-if [ -d "/usr/lib/jvm/java-21-openjdk" ]; then
+MUSICHIEN_PINNED_JDK="$(musichien_jdk_home)"
+
+if [ -d "${MUSICHIEN_PINNED_JDK}" ]; then
     case "${JAVA_HOME:-}" in
-        *java-21*) ;;
-        *) export JAVA_HOME="/usr/lib/jvm/java-21-openjdk" ;;
+        *java-21*|*openjdk@21*|*jdk-21*) ;;
+        *) export JAVA_HOME="${MUSICHIEN_PINNED_JDK}" ;;
     esac
 fi
 
@@ -269,6 +319,13 @@ echo "    adb                        = $(command -v adb || echo '<not found>')"
 echo "-----------------------------------------------------------------------------------------------------"
 fi
 
+if [ -n "${MUSICHIEN_QT_IOS_DIR:-}" ]; then
+echo "  iOS (macOS only)"
+echo "    MUSICHIEN_QT_IOS_DIR       = ${MUSICHIEN_QT_IOS_DIR}"
+echo "    xcodebuild                 = $(command -v xcodebuild || echo '<not found>')"
+echo "-----------------------------------------------------------------------------------------------------"
+fi
+
 echo "  Useful commands:"
 echo "    cmake --preset \"Clang-Debug Musichien\""
 echo "    cmake --build --preset \"Build Clang-Debug Musichien\""
@@ -276,6 +333,9 @@ echo "    ctest --preset \"CTest Clang-Debug Musichien\""
 echo "    ./Musichien-build/Clang-Debug/bin/musichien"
 if [ -n "${MUSICHIEN_QT_ANDROID_DIR:-}" ]; then
 echo "    scripts/build_android.sh"
+fi
+if [ -n "${MUSICHIEN_QT_IOS_DIR:-}" ]; then
+echo "    scripts/build_ios.sh"
 fi
 
 echo "-----------------------------------------------------------------------------------------------------"

@@ -98,6 +98,39 @@
                 "MUSICHIEN_ENABLE_CLANG_TIDY": "OFF",
                 "MUSICHIEN_ENABLE_QML_INSPECTION": "OFF"
             }
+        },
+        {
+            "name": "macOS-Release Musichien",
+            "displayName": "Musichien - macOS (Release)",
+            "description": "Native macOS build: for development and for running the application on the Mac",
+            "inherits": "baseMusichien",
+            "binaryDir": "${sourceDir}/../Musichien-build/macOS-Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_C_COMPILER": "$env{CLANG_DIR}/clang",
+                "CMAKE_CXX_COMPILER": "$env{CLANG_DIR}/clang++"
+            }
+        },
+        {
+            "name": "iOS-Release Musichien",
+            "displayName": "Musichien - iOS (Release, arm64)",
+            "description": "Cross compilation for iPhone and iPad, with Qt for iOS and the Xcode generator (the generator is what lets xcodebuild archive the application)",
+            "inherits": "base",
+            "generator": "Xcode",
+            "binaryDir": "${sourceDir}/../Musichien-build/iOS-Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_SYSTEM_NAME": "iOS",
+                "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "CMAKE_TOOLCHAIN_FILE": "$env{MUSICHIEN_QT_IOS_DIR}/lib/cmake/Qt6/qt.toolchain.cmake",
+                "QT_HOST_PATH": "$env{MUSICHIEN_QT_DIR}",
+                "MUSICHIEN_EXTERNAL_DIR": "$env{MUSICHIEN_EXTERNAL_DIR}",
+                "MUSICHIEN_QT_DIR": "$env{MUSICHIEN_QT_IOS_DIR}",
+                "MUSICHIEN_BUILD_TESTING": "OFF",
+                "MUSICHIEN_BUILD_SHARED_LIBS": "OFF",
+                "MUSICHIEN_ENABLE_CLANG_TIDY": "OFF",
+                "MUSICHIEN_ENABLE_QML_INSPECTION": "OFF"
+            }
         }
     ],
     "buildPresets": [
@@ -120,6 +153,15 @@
         {
             "name": "Build Android-Release Musichien",
             "configurePreset": "Android-Release Musichien"
+        },
+        {
+            "name": "Build macOS-Release Musichien",
+            "configurePreset": "macOS-Release Musichien"
+        },
+        {
+            "name": "Build iOS-Release Musichien",
+            "configurePreset": "iOS-Release Musichien",
+            "configuration": "Release"
         }
     ],
     "testPresets": [

@@ -72,7 +72,13 @@ target_sources(musichien_app PRIVATE ${MUSICHIEN_QML_FILES})
 # Naming the directory that holds the QML files is the whole fix. It is exported by the ui module,
 # which owns them, so that moving a QML file only means updating one line there.
 # ---------------------------------------------------------------------------------------------------------------------
-if(ANDROID)
+# The same rule applies to iOS: the QML plugins the application imports must be EMBEDDED in the app
+# bundle, or the application starts and dies with the very same 'plugin not found' error as on Android.
+# Naming the directory that holds the QML files is what lets Qt's import scanner find them.
+#
+# 'IOS' is the variable CMake and Qt set when the target platform is iOS; it is false on macOS, where
+# the plugins are taken from the Qt installation on the machine, exactly like on Linux.
+if(ANDROID OR IOS)
     set_target_properties(musichien_app PROPERTIES
         QT_QML_ROOT_PATH "${MUSICHIEN_QML_ROOT_PATH}"
     )
@@ -156,5 +162,17 @@ set_target_properties(musichien_app PROPERTIES FOLDER "application")
 # ---------------------------------------------------------------------------------------------------------------------
 if(ANDROID)
     include(musichienAndroid)
+endif()
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Apple packaging (macOS and iOS)
+#
+# Gives the bundle its identity: identifier, display name and version numbers. On iOS this is what the
+# device and the App Store read; on macOS it is what the Finder and the notarisation read.
+#
+# See cmake/musichienApple.cmake.
+# ---------------------------------------------------------------------------------------------------------------------
+if(APPLE)
+    include(musichienApple)
 endif()
 
