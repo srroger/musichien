@@ -724,8 +724,13 @@ Item {
                             // Le VAMP : deux fois la meme gamme, sur deux centres differents. La consigne doit le dire,
                             // parce que c'est justement ce que le joueur ne peut pas deviner - il entend deux fois les
                             // memes notes, et c'est pourtant deux modes.
+                            // LE VAMP N'A PAS DE « PAREIL » : ses deux passages portent DEUX CENTRES differents, donc
+                            // « pareil » n'y serait pas un choix mais un piege - le joueur qui l'entend repondrait juste
+                            // en se trompant. Seule la comparaison a centre FIXE, plus bas, peut etre pareille. Roger l'a
+                            // vu a l'ecran : « il y a un jeu clair obscur ou on peut avoir le choix pareil et un autre
+                            // non, pourtant tu as mis le texte 'ou pareil' pour les 2 ».
                             if (ExerciseController.isModeVampQuestion)
-                                return qsTr("Le 2ᵉ passage : plus clair, plus obscur, ou pareil ?");
+                                return qsTr("Le 2ᵉ passage : plus clair, ou plus obscur ?");
 
                             if (ExerciseController.isForeignNoteQuestion)
                                 return qsTr("Une note n'est pas dans la gamme %1 : laquelle ?").arg(ExerciseController.heardMode.name);
@@ -753,9 +758,20 @@ Item {
                     // puisse comparer ce qu'il entend a ce qu'il sait du mode. Et la teinte est prise a la MEME source que
                     // les boutons de modes - la clarte du mode - pour que les deux se repondent d'un coup d'oeil.
                     Row {
-                        // La couleur sort de la meme formule que les boutons de modes : une seule teinte a maintenir, et
-                        // le mode le plus clair reste le plus clair partout.
-                        readonly property color badgeColour: Qt.rgba(0.3 + (0.7 * ExerciseController.heardMode.brightness), 0.2 + (0.62 * ExerciseController.heardMode.brightness), 0.55 + (0.45 * ExerciseController.heardMode.brightness), 1)
+                        // LA TEINTE DES PASTILLES DE DEGRES EST SON PROPRE BARREAU, ET VOLONTAIREMENT SOMBRE.
+                        //
+                        // Roger : « on affiche les degres dans des carres violets trop clairs dans l'interface, ca fait
+                        // flashy, tres bizarre ». Le fond du probleme : la formule partagee avec les boutons de modes
+                        // monte jusqu'au BLANC pour un mode clair - et un carre presque blanc PORTANT DU TEXTE BLANC est
+                        // a la fois criard et illisible.
+                        //
+                        // Ici, la clarte du mode reste LISIBLE (l'ordre clair -> obscur est conserve, puisque c'est lui
+                        // qui apprend quelque chose), mais elle joue dans une plage qui reste violette et sombre : le
+                        // texte blanc tient donc toujours, et la rangee ne crie plus.
+                        readonly property color badgeColour: Qt.rgba( 0.16 + ( 0.16 * ExerciseController.heardMode.brightness ),
+                                                                       0.11 + ( 0.13 * ExerciseController.heardMode.brightness ),
+                                                                       0.30 + ( 0.18 * ExerciseController.heardMode.brightness ),
+                                                                       1 )
 
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 5
