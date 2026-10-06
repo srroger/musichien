@@ -188,7 +188,15 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
 
             if( isVoice && ( rms * 32768.0 > SILENCE_RMS ) )
             {
-                frequencyHz = domain::PitchEstimator::estimate( impl.m_window, impl.m_sampleRate );
+                // LA PLAGE DE VOIX QUAND LE FILTRE EST LA, la plage entiere sinon : c'est le MEME interrupteur, comme
+                // Roger l'a demande. La fenetre, elle, ne bouge pas.
+                frequencyHz =
+                  impl.m_voicePreFilterEnabled
+                    ? domain::PitchEstimator::estimate( impl.m_window,
+                                                        impl.m_sampleRate,
+                                                        domain::PitchEstimator::VOICE_MINIMUM_FREQUENCY_HZ,
+                                                        domain::PitchEstimator::VOICE_MAXIMUM_FREQUENCY_HZ )
+                    : domain::PitchEstimator::estimate( impl.m_window, impl.m_sampleRate );
             }
 
             if( frequencyHz > 0.0 )

@@ -175,4 +175,35 @@ TEST( PitchEstimatorTest, a_rate_that_makes_no_sense_says_nothing )
     EXPECT_DOUBLE_EQ( 0.0, PitchEstimator::estimate( sine( 440.0 ), 0.0 ) );
 }
 
+TEST( PitchEstimatorTest, the_tuner_range_hears_a_rumble_that_the_voice_range_refuses )
+{
+    // LA PLAGE DE VOIX RETIRE LE GRONDEMENT, ET L'ACCORDEUR LE GARDE. Un son de 50 Hz est SOUS la plage de la voix : il
+    // doit donc rendre 0 ici, et une hauteur la-bas. C'est toute la separation que Roger a exigee - l'accordeur reste un
+    // accordeur, le chant ecoute une voix.
+    const std::vector<double> rumble = sine( 50.0 );
+
+    EXPECT_NEAR( 50.0, PitchEstimator::estimate( rumble, SAMPLE_RATE ), 1.0 );
+    EXPECT_DOUBLE_EQ( 0.0,
+                      PitchEstimator::estimate( rumble,
+                                                SAMPLE_RATE,
+                                                PitchEstimator::VOICE_MINIMUM_FREQUENCY_HZ,
+                                                PitchEstimator::VOICE_MAXIMUM_FREQUENCY_HZ ) );
+}
+
+TEST( PitchEstimatorTest, the_voice_range_still_hears_a_sung_note )
+{
+    // ET LE PLUS IMPORTANT DES DEUX : une note de voix TRAVERSE la plage sans rien perdre. Une plage qui couperait la
+    // voix serait pire que pas de plage du tout.
+    //
+    // La tolerance est LARGE (5 Hz) et c'est delibere : ce test verifie que la note est ENTENDUE, pas la finesse de
+    // l'estimateur - celle-la a ses propres tests. Le comptage seul donne ~442 Hz a 440, et c'est la finesse normale de
+    // YIN avant l'affinage par le spectre.
+    EXPECT_NEAR( 440.0,
+                 PitchEstimator::estimate( sine( 440.0 ),
+                                           SAMPLE_RATE,
+                                           PitchEstimator::VOICE_MINIMUM_FREQUENCY_HZ,
+                                           PitchEstimator::VOICE_MAXIMUM_FREQUENCY_HZ ),
+                 5.0 );
+}
+
 }    // namespace musichien::domain
