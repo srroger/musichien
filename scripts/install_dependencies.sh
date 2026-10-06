@@ -2,13 +2,20 @@
 # =====================================================================================================================
 # Musichien - installs every external dependency, pinned by version.
 #
-#   Usage:  scripts/install_dependencies.sh [--with-android] [--with-superbuild]
+#   Usage:  scripts/install_dependencies.sh [--with-android] [--with-ios] [--without-qt] [--with-superbuild]
+#
+# Runs on Linux (Arch / Manjaro) and on macOS. Which package manager is used, which Qt binary is
+# downloaded and where the pinned JDK lives all follow from the host, detected by scripts/platform.sh.
 #
 # What this script installs:
-#   1. the system packages needed to build a Qt application (Arch / Manjaro)
+#   1. the system packages needed to build a Qt application (pacman on Linux, Homebrew on macOS)
 #   2. aqtinstall, the command line Qt installer that does NOT require a Qt account
-#   3. the pinned Qt itself: desktop always, Android only with --with-android
+#   3. the pinned Qt itself: the desktop Qt always; Android with --with-android; iOS with --with-ios
 #   4. the dependencies built from source (GoogleTest, nlohmann/json), with --with-superbuild
+#
+# --without-qt skips steps 2 and 3 entirely. It is for the developer who already has a Qt
+# installation (from the official installer, for example) and copied it into MUSICHIEN_EXTERNAL_DIR
+# by hand: scripts/setup_env.sh detects that Qt exactly like one downloaded by aqt.
 #
 # Every dependency lands in MUSICHIEN_EXTERNAL_DIR, and NOT in the system directories: the machine
 # can be upgraded freely without ever breaking the project.
@@ -20,11 +27,15 @@ set -euo pipefail
 # Arguments
 # ---------------------------------------------------------------------------------------------------------------------
 WITH_ANDROID=OFF
+WITH_IOS=OFF
+WITH_QT=ON
 WITH_SUPERBUILD=OFF
 
 for argument in "$@"; do
     case "${argument}" in
         --with-android)    WITH_ANDROID=ON ;;
+        --with-ios)        WITH_IOS=ON ;;
+        --without-qt)      WITH_QT=OFF ;;
         --with-superbuild) WITH_SUPERBUILD=ON ;;
         *) echo "Unknown argument: ${argument}"; exit 1 ;;
     esac
@@ -35,6 +46,22 @@ done
 # ---------------------------------------------------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Host helpers: OS detection, package installation, and the version-aware directory pickers. Nothing
+# here assumes a GNU tool, so the very same script runs on macOS.
+# shellcheck source=platform.sh
+source "${SCRIPT_DIR}/platform.sh"
+
+# On macOS the Xcode command line tools bring 'clang' and 'clang++', but clang-format and clang-tidy
+# come from Homebrew's 'llvm', which is keg-only: it is NOT on the PATH by default. Prepending its bin
+# directory here is what makes the tool check below find them on a second run, and what makes CMake
+# find the modern clang instead of Apple's older one.
+if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+    MUSICHIEN_BREW_LLVM_BIN="$(musichien_brew_prefix llvm)/bin"
+    if [ -x "${MUSICHIEN_BREW_LLVM_BIN}/clang-format" ]; then
+        export PATH="${MUSICHIEN_BREW_LLVM_BIN}:${PATH}"
+    fi
+fi
 
 MUSICHIEN_EXTERNAL_DIR="${MUSICHIEN_EXTERNAL_DIR:-$(cd "${PROJECT_DIR}/../Roger-externals" 2>/dev/null && pwd || true)}"
 
@@ -48,7 +75,10 @@ echo "==========================================================================
 echo " Musichien - dependency installation"
 echo "====================================================================================================="
 echo "  external dependencies : ${MUSICHIEN_EXTERNAL_DIR}"
+echo "  host                  : ${MUSICHIEN_HOST_OS}"
 echo "  Android support       : ${WITH_ANDROID}"
+echo "  iOS support           : ${WITH_IOS}"
+echo "  Qt (via aqtinstall)   : ${WITH_QT}"
 echo "  source built deps     : ${WITH_SUPERBUILD}"
 echo "====================================================================================================="
 
@@ -62,16 +92,33 @@ echo "==========================================================================
 # exactly what happened with 'clang-tools', which is not a package on Arch: clang-format, clang-tidy
 # and clangd all come from the 'clang' package.
 #
+# The mapping depends on the host:
+#
+#   Linux (Arch)  clang, clang-format, clang-tidy and clangd all come from the 'clang' package;
+#   macOS         'clang' and 'clang++' come from the Xcode command line tools (already present by the
+#                 time this runs), clang-format and clang-tidy from Homebrew's 'llvm', the rest too.
+#
 # Format: <command>:<package that provides it>
 # ---------------------------------------------------------------------------------------------------------------------
-REQUIRED_TOOLS=(
-    "clang:clang"                # the compiler used by every preset
-    "clang-format:clang"         # formatting, driven by .clang-format
-    "clang-tidy:clang"           # naming rules and static analysis
-    "cmake:cmake"
-    "ninja:ninja"
-    "git:git"
-)
+if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+    REQUIRED_TOOLS=(
+        "clang:llvm"                # the compiler used by every preset (Apple's clang stays a fallback)
+        "clang-format:llvm"         # formatting, driven by .clang-format
+        "clang-tidy:llvm"           # naming rules and static analysis
+        "cmake:cmake"
+        "ninja:ninja"
+        "git:git"
+    )
+else
+    REQUIRED_TOOLS=(
+        "clang:clang"                # the compiler used by every preset
+        "clang-format:clang"         # formatting, driven by .clang-format
+        "clang-tidy:clang"           # naming rules and static analysis
+        "cmake:cmake"
+        "ninja:ninja"
+        "git:git"
+    )
+fi
 
 echo
 echo "--- Step 1/5: required tools -----------------------------------------------------------"
@@ -100,28 +147,38 @@ if [ ${#MISSING_PACKAGES[@]} -eq 0 ]; then
 else
     echo
     echo "  Packages to install: ${MISSING_PACKAGES[*]}"
-    echo "  The next command asks for your administrator password (sudo)."
-    echo
 
-    # A rolling release does not support partial upgrades, and this is not theoretical: installing one
-    # package on a machine that has not been upgraded for a while can produce a binary whose library
-    # dependencies are newer than the ones installed. The symptom appears at run time, in a tool that
-    # has nothing to do with this project, as 'error while loading shared libraries'. 'adb' was broken
-    # exactly that way here, by an android-tools built against a libprotobuf newer than the installed
-    # one - hence this warning.
-    PENDING_UPDATE_COUNT="$(pacman -Qu 2>/dev/null | wc -l || echo 0)"
-
-    if [ "${PENDING_UPDATE_COUNT}" -gt 50 ]; then
-        echo "  WARNING: ${PENDING_UPDATE_COUNT} packages are waiting to be upgraded on this machine."
-        echo "           Installing a single package now may leave one of them unusable until the whole"
-        echo "           system is upgraded. Consider running 'sudo pacman -Syu' first."
+    if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+        echo "  Homebrew installs them; no administrator password is needed."
         echo
+    else
+        echo "  The next command asks for your administrator password (sudo)."
+        echo
+
+        # A rolling release does not support partial upgrades, and this is not theoretical: installing
+        # one package on a machine that has not been upgraded for a while can produce a binary whose
+        # library dependencies are newer than the ones installed. The symptom appears at run time, in a
+        # tool that has nothing to do with this project, as 'error while loading shared libraries'.
+        # 'adb' was broken exactly that way here, by an android-tools built against a libprotobuf newer
+        # than the installed one - hence this warning.
+        PENDING_UPDATE_COUNT="$(pacman -Qu 2>/dev/null | wc -l || echo 0)"
+
+        if [ "${PENDING_UPDATE_COUNT}" -gt 50 ]; then
+            echo "  WARNING: ${PENDING_UPDATE_COUNT} packages are waiting to be upgraded on this machine."
+            echo "           Installing a single package now may leave one of them unusable until the whole"
+            echo "           system is upgraded. Consider running 'sudo pacman -Syu' first."
+            echo
+        fi
     fi
 
-    if ! sudo pacman -S --needed --noconfirm "${MISSING_PACKAGES[@]}"; then
+    if ! musichien_install_packages "${MISSING_PACKAGES[@]}"; then
         echo
-        echo "  ERROR: the installation failed. Run it by hand to see the details:"
-        echo "         sudo pacman -S --needed ${MISSING_PACKAGES[*]}"
+        echo "  ERROR: the installation failed. Install by hand to see the details:"
+        if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+            echo "         brew install ${MISSING_PACKAGES[*]}"
+        else
+            echo "         sudo pacman -S --needed ${MISSING_PACKAGES[*]}"
+        fi
         exit 1
     fi
 fi
@@ -132,29 +189,40 @@ if [ "${WITH_ANDROID}" = "ON" ]; then
     echo
     echo "  Android host tooling (only needed to build for Android)..."
 
-    # jdk21-openjdk belongs here and not in the general list: a desktop only build needs no JDK at all.
-    ANDROID_PACKAGES=(
-        android-tools        # adb, fastboot
-        android-udev         # so that adb sees the phone without sudo
-        jdk21-openjdk        # required by the Android toolchain of Qt: JDK 21, never the JDK 26 of the system
-    )
+    # The JDK belongs here and not in the general list: a desktop-only build needs no JDK at all. JDK
+    # 21 is what the Android toolchain of Qt expects; a newer one is too recent for Gradle and AGP.
+    if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+        ANDROID_PACKAGES=(
+            android-platform-tools   # adb, fastboot (the SDK also ships its own adb)
+            openjdk@21               # required by the Android toolchain of Qt: JDK 21
+        )
+    else
+        ANDROID_PACKAGES=(
+            android-tools        # adb, fastboot
+            android-udev         # so that adb sees the phone without sudo
+            jdk21-openjdk        # required by the Android toolchain of Qt: JDK 21, never the JDK 26 of the system
+        )
+    fi
 
     echo "  Packages to install: ${ANDROID_PACKAGES[*]}"
-    echo "  The next command asks for your administrator password (sudo)."
-    echo
 
-    if ! sudo pacman -S --needed --noconfirm "${ANDROID_PACKAGES[@]}"; then
+    if ! musichien_install_packages "${ANDROID_PACKAGES[@]}"; then
         echo
-        echo "  ERROR: the installation failed. Run it by hand to see the details:"
-        echo "         sudo pacman -S --needed ${ANDROID_PACKAGES[*]}"
+        echo "  ERROR: the installation failed."
         exit 1
     fi
 
     echo
-    echo "  NOTE: JDK 21 is required by the Android toolchain of Qt. The JDK 26 of the system is too"
+    echo "  NOTE: JDK 21 is required by the Android toolchain of Qt. A newer JDK is too"
     echo "        recent for Gradle and AGP, and produces obscure build failures."
-    echo "  NOTE: add your user to the kvm group to be able to use the emulator, then log out:"
-    echo "          sudo gpasswd -a ${USER} kvm"
+
+    if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+        echo "  NOTE: Homebrew's openjdk is keg-only, so it is not on the PATH by default; the"
+        echo "        environment script points JAVA_HOME at it directly, which is what Gradle reads."
+    else
+        echo "  NOTE: add your user to the kvm group to be able to use the emulator, then log out:"
+        echo "          sudo gpasswd -a ${USER} kvm"
+    fi
 fi
 
 
@@ -165,11 +233,17 @@ fi
 # the very same official Qt binaries from the Qt mirror, without any account and without any
 # interactive step. It is therefore the right tool for a reproducible, scriptable setup.
 # ---------------------------------------------------------------------------------------------------------------------
+# '--without-qt' skips everything below: an existing Qt installation, copied by hand into
+# MUSICHIEN_EXTERNAL_DIR, is detected by scripts/setup_env.sh exactly like one installed by aqt.
+if [ "${WITH_QT}" = "ON" ]; then
+
 echo
 echo "--- Step 2/5: aqtinstall ----------------------------------------------------------------"
 
-if ! pacman -Q python-pipx >/dev/null 2>&1; then
-    sudo pacman -S --needed --noconfirm python-pipx
+if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+    command -v pipx >/dev/null 2>&1 || brew install pipx
+else
+    pacman -Q python-pipx >/dev/null 2>&1 || musichien_install_packages python-pipx
 fi
 
 if command -v aqt >/dev/null 2>&1; then
@@ -205,7 +279,15 @@ QT_VERSION="${MUSICHIEN_QT_VERSION:-}"
 
 if [ -z "${QT_VERSION}" ]; then
     echo "  asking the Qt mirror for the available desktop versions..."
-    QT_VERSION="$("${AQT}" list-qt linux desktop 2>/dev/null | tr ' ' '\n' | sort -V | tail -n 1)"
+
+    if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+        QT_LIST_HOST="mac"
+    else
+        QT_LIST_HOST="linux"
+    fi
+
+    AVAILABLE_QT_VERSIONS="$("${AQT}" list-qt "${QT_LIST_HOST}" desktop 2>/dev/null | tr ' ' '\n')"
+    QT_VERSION="$(musichien_greatest_version ${AVAILABLE_QT_VERSIONS})"
 fi
 
 if [ -z "${QT_VERSION}" ]; then
@@ -216,7 +298,9 @@ fi
 # Qt 6.11 or newer is a hard requirement: earlier versions forward to the draft name
 # std::saturate_cast, which the final C++26 standard renamed to std::saturating_cast.
 # See docs/BUILD_AND_SETUP.md, section "Why Qt 6.11 is required".
-if [ "$(printf '%s\n' "6.11" "${QT_VERSION}" | sort -V | head -n 1)" != "6.11" ]; then
+#
+# musichien_greatest_version returns the greater of the two: if it is not our version, ours is older.
+if [ "$(musichien_greatest_version "6.11" "${QT_VERSION}")" != "${QT_VERSION}" ]; then
     echo "  ERROR: Qt ${QT_VERSION} is too old: Qt 6.11 or newer is required to build in C++26."
     echo "         Set MUSICHIEN_QT_VERSION to a newer version and re-run."
     exit 1
@@ -237,18 +321,29 @@ QT_MODULES=(
     qt5compat
 )
 
+# The desktop Qt: the reference version, and the HOST Qt that the cross compilation of Android and
+# iOS both need for their host tools (androiddeployqt, moc, and so on).
+if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+    QT_DESKTOP_HOST="mac"
+    QT_DESKTOP_ARCH="clang_64"
+else
+    QT_DESKTOP_HOST="linux"
+    QT_DESKTOP_ARCH="linux_gcc_64"
+fi
+
 echo "  selected Qt version: ${QT_VERSION}"
 echo "  modules: ${QT_MODULES[*]}"
-echo "  installing Qt for the desktop (linux_gcc_64)..."
-run_aqt install-qt linux desktop "${QT_VERSION}" linux_gcc_64 \
+echo "  installing Qt for the desktop (${QT_DESKTOP_ARCH})..."
+run_aqt install-qt "${QT_DESKTOP_HOST}" desktop "${QT_VERSION}" "${QT_DESKTOP_ARCH}" \
     -m "${QT_MODULES[@]}" \
     -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
 
 if [ "${WITH_ANDROID}" = "ON" ]; then
 
-    # IMPORTANT: since Qt 6.8, the Android packages are NO LONGER in the "linux_x64/android"
+    # IMPORTANT: since Qt 6.8, the Android packages are NO LONGER in the "<host>_x64/android"
     # repository. That one stopped at Qt 6.7.3, in September 2024. They are published in the cross
-    # platform repository "all_os/android", which is why the host is "all_os" here and not "linux".
+    # platform repository "all_os/android", which is why the host is "all_os" here and not the host
+    # operating system.
     #
     # Symptom of getting this wrong: 'aqt list-qt linux android' shows nothing newer than 6.7.3, and
     # one could wrongly conclude that Qt dropped Android support. It did not.
@@ -261,11 +356,32 @@ if [ "${WITH_ANDROID}" = "ON" ]; then
         -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
 fi
 
+if [ "${WITH_IOS}" = "ON" ]; then
 
+    if [ "${MUSICHIEN_HOST_OS}" != "macos" ]; then
+        echo
+        echo "  ERROR: iOS can only be built on macOS: Qt for iOS is a macOS-only package."
+        exit 1
+    fi
 
+    # Qt for iOS is published for the mac host, with the architecture literally named 'ios'. The
+    # desktop Qt installed just above is the HOST Qt that Qt's tools need while cross compiling - it
+    # is found at build time through QT_HOST_PATH, which the iOS preset sets.
+    echo "  installing Qt for iOS (ios) with the same modules..."
+    run_aqt install-qt mac ios "${QT_VERSION}" ios \
+        -m "${QT_MODULES[@]}" \
+        -O "${MUSICHIEN_EXTERNAL_DIR}/Qt"
+fi
 
 echo
 echo "  Qt installed into: ${MUSICHIEN_EXTERNAL_DIR}/Qt/${QT_VERSION}"
+
+else
+    echo
+    echo "--- Steps 2/5 and 3/5 skipped (--without-qt) -----------------------------------------"
+    echo "  Using the Qt already present in '${MUSICHIEN_EXTERNAL_DIR}'."
+    echo "  scripts/setup_env.sh must find a Qt6Config.cmake there: see its detection rules."
+fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 # 4. Android SDK and NDK
@@ -308,6 +424,14 @@ if [ "${WITH_ANDROID}" = "ON" ]; then
     #   read from <Qt>/android_arm64_v8a/lib/cmake/Qt6/qt.toolchain.cmake
     ANDROID_NDK_REVISION="27.2.12479018"
 
+    # Google publishes the same command line tools revision for every host; only the platform tag in
+    # the file name changes: 'linux' on Linux, 'mac' on macOS.
+    if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+        ANDROID_CMDLINE_TOOLS_OS_TAG="mac"
+    else
+        ANDROID_CMDLINE_TOOLS_OS_TAG="linux"
+    fi
+
     mkdir -p "${ANDROID_SDK_DIR}"
 
     if [ -x "${ANDROID_SDK_MANAGER}" ]; then
@@ -318,7 +442,7 @@ if [ "${WITH_ANDROID}" = "ON" ]; then
         ANDROID_TOOLS_ARCHIVE="$(mktemp -t musichien-android-tools-XXXXXX.zip)"
 
         if ! curl --location --fail --silent --show-error --output "${ANDROID_TOOLS_ARCHIVE}" \
-             "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_COMMAND_LINE_TOOLS_BUILD}_latest.zip"; then
+             "https://dl.google.com/android/repository/commandlinetools-${ANDROID_CMDLINE_TOOLS_OS_TAG}-${ANDROID_COMMAND_LINE_TOOLS_BUILD}_latest.zip"; then
             echo "  ERROR: could not download the SDK command line tools. Check the network connection."
             rm -f "${ANDROID_TOOLS_ARCHIVE}"
             exit 1
@@ -340,12 +464,18 @@ if [ "${WITH_ANDROID}" = "ON" ]; then
     fi
 
     # sdkmanager is a Java program, and Gradle and the Android Gradle Plugin do not support the JDK 26
-    # installed on this machine. JDK 21 is used here exactly as scripts/setup_env.sh does.
-    export JAVA_HOME="/usr/lib/jvm/java-21-openjdk"
+    # installed by default on the reference machine. JDK 21 is used here exactly as scripts/setup_env.sh
+    # does; its location is host dependent, hence musichien_jdk_home.
+    JAVA_HOME="$(musichien_jdk_home)"
+    export JAVA_HOME
 
     if [ ! -x "${JAVA_HOME}/bin/java" ]; then
-        echo "  ERROR: JDK 21 was not found in ${JAVA_HOME}."
-        echo "         Install it first: sudo pacman -S jdk21-openjdk"
+        echo "  ERROR: JDK 21 was not found (looked in '${JAVA_HOME}')."
+        if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+            echo "         Install it first: brew install openjdk@21"
+        else
+            echo "         Install it first: sudo pacman -S jdk21-openjdk"
+        fi
         exit 1
     fi
 
@@ -365,8 +495,11 @@ if [ "${WITH_ANDROID}" = "ON" ]; then
 
     echo
     echo "  Android SDK installed into: ${ANDROID_SDK_DIR}"
-    echo "  NOTE: add your user to the kvm group to be able to use an emulator, then log out:"
-    echo "          sudo gpasswd -a ${USER} kvm"
+
+    if [ "${MUSICHIEN_HOST_OS}" = "linux" ]; then
+        echo "  NOTE: add your user to the kvm group to be able to use an emulator, then log out:"
+        echo "          sudo gpasswd -a ${USER} kvm"
+    fi
 fi
 
 
@@ -404,5 +537,14 @@ echo "   cmake --preset \"Clang-Debug Musichien\""
 echo "   cmake --build --preset \"Build Clang-Debug Musichien\""
 echo "   ctest --preset \"CTest Clang-Debug Musichien\""
 echo "   ./Musichien-build/Clang-Debug/bin/musichien"
+
+if [ "${MUSICHIEN_HOST_OS}" = "macos" ]; then
+echo "   cmake --preset \"macOS-Release Musichien\"          # native macOS build (Xcode or Ninja)"
+fi
+
+if [ "${WITH_IOS}" = "ON" ]; then
+echo "   scripts/build_ios.sh                               # build, archive and sign the iPhone package"
+fi
+
 echo "====================================================================================================="
 

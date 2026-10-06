@@ -31,6 +31,23 @@ sudo pacman -S android-tools android-udev
 > ⚠️ **JDK 26 est à éviter.** Il est installé par défaut sur la machine, mais il est **en avance** sur
 > ce que supportent Gradle et AGP. Utiliser JDK 21 pour tout ce qui touche à Android.
 
+### macOS
+
+Le même script détecte l'hôte (`scripts/platform.sh`) et utilise **Homebrew** au lieu de `pacman`. Sur
+un Mac, **Xcode** (et ses *Command Line Tools*) est indispensable : il fournit le compilateur, l'outillage
+Apple, et c'est lui qui compile pour l'iPhone.
+
+```bash
+xcode-select --install                      # si Xcode n'est pas déjà installé (App Store, version 16+)
+brew install llvm cmake ninja git pipx       # llvm apporte clang, clang-format et clang-tidy
+```
+
+> [!note] Pourquoi `llvm` et pas le clang d'Apple ?
+> `clang-format` et `clang-tidy` viennent de Homebrew's `llvm` sur macOS (le clang d'Apple ne les
+> fournit pas). `scripts/setup_env.sh` préfixe `CLANG_DIR` et le `PATH` vers ce `llvm` : le build est
+> alors strictement le même que sur Linux. Xcode reste nécessaire pour **iOS**, jamais pour le bureau.
+
+
 ---
 
 ## 2. Dépendances épinglées
@@ -44,6 +61,12 @@ scripts/install_dependencies.sh --with-superbuild
 
 # Avec le support Android en plus
 scripts/install_dependencies.sh --with-android --with-superbuild
+
+# Avec le support iOS en plus (macOS seulement)
+scripts/install_dependencies.sh --with-ios --with-superbuild
+
+# En fournissant Qt soi-même (installé puis copié dans MUSICHIEN_EXTERNAL_DIR) : saute l'étape Qt
+scripts/install_dependencies.sh --without-qt --with-superbuild
 ```
 
 ### Ce que fait le script, étape par étape
@@ -140,6 +163,8 @@ source scripts/setup_env.sh
 | `MUSICHIEN_EXTERNAL_DIR` | Dossier des dépendances épinglées |
 | `MUSICHIEN_QT_VERSION` | La version de Qt effectivement utilisée |
 | `MUSICHIEN_QT_DIR` | **Le** Qt utilisé (détecté automatiquement) |
+| `MUSICHIEN_QT_ANDROID_DIR` | Le Qt pour Android, si installé |
+| `MUSICHIEN_QT_IOS_DIR` | Le Qt pour iOS, si installé *(macOS seulement)* |
 | `CLANG_DIR` | Dossier du compilateur, lu par `CMakePresets.json` |
 | `PATH` | **CMake et Ninja épinglés**, s'ils existent dans `MUSICHIEN_EXTERNAL_DIR` |
 
@@ -149,7 +174,7 @@ source scripts/setup_env.sh
 
 | Disposition | Origine | Chemin |
 |---|---|---|
-| **aqt** | `scripts/install_dependencies.sh` | `<externals>/Qt/<version>/gcc_64` |
+| **aqt** | `scripts/install_dependencies.sh` | `<externals>/Qt/<version>/gcc_64` (Linux) ou `macos` (macOS) |
 | **à plat** | les autres projets personnels | `<externals>/Qt-<version>` |
 
 Le script retient **la version la plus récente** qui contient réellement un
@@ -184,6 +209,8 @@ ctest --preset "CTest Clang-Debug Musichien"
 | `Clang-RelWithDebInfo Musichien` | **Le défaut** : rapide, avec les informations de débogage |
 | `Clang-Release Musichien` | Pour mesurer les performances réelles |
 | `Superbuild Musichien` | Construit **uniquement** les dépendances sources |
+| `macOS-Release Musichien` | Build macOS natif *(macOS seulement)* |
+| `iOS-Release Musichien` | Cross-compilation iPhone/iPad, générateur Xcode *(macOS seulement)* |
 
 Pour itérer plus vite, désactiver temporairement l'analyse statique :
 
@@ -216,7 +243,61 @@ avec CodeLLDB) et `extensions.json` (extensions recommandées).
 
 ---
 
-## 6. Android
+## 6. macOS et iOS
+
+Rien de spécifique en amont : depuis un Mac, `scripts/install_dependencies.sh --with-ios` installe le Qt
+de bureau (`clang_64`), le Qt pour iOS (`ios`) et — en option — Android. Le build natif macOS passe par
+le preset `macOS-Release Musichien`.
+
+> [!note] On peut aussi fournir Qt soi-même
+> Si Qt a été installé par l'installeur officiel, il suffit de copier `~/Qt/<version>/macos` (et `ios`)
+> dans `MUSICHIEN_EXTERNAL_DIR/Qt/<version>/`, puis de lancer
+> `scripts/install_dependencies.sh --without-qt --with-superbuild`. `setup_env.sh` détecte ce Qt
+> exactement comme celui téléchargé par `aqt`. La disposition attendue est décrite pas à pas dans le
+> `README`, section « macOS ».
+
+### Construire pour macOS
+
+```bash
+source scripts/setup_env.sh
+cmake --preset "macOS-Release Musichien"
+cmake --build --preset "Build macOS-Release Musichien"
+../Musichien-build/macOS-Release/bin/musichien.app/Contents/MacOS/musichien
+```
+
+### Créer une IPA pour l'iPhone
+
+```bash
+export MUSICHIEN_IOS_TEAM_ID=ABCDE12345     # une fois : ton identifiant d'équipe Apple
+scripts/build_ios.sh
+```
+
+Le script enchaîne : configuration (générateur **Xcode**, `QT_HOST_PATH` = Qt de bureau, toolchain
+`qt.toolchain.cmake`), **archive** (`xcodebuild archive`) puis **export** d'une `.ipa` signée
+(`xcodebuild -exportArchive`). Il accepte `--no-export` (s'arrêter à l'archive) et `--simulator`
+(construire pour le simulateur, sans signature).
+
+| Variable | Rôle |
+|---|---|
+| `MUSICHIEN_IOS_TEAM_ID` | L'`DEVELOPMENT_TEAM` Apple. Sans elle, Xcode résout la signature lui-même |
+| `MUSICHIEN_IOS_EXPORT_METHOD` | `development` (défaut), `ad-hoc`, `app-store` ou `enterprise` |
+
+### Ce qui est partagé avec Android
+
+Le même `source/application/CMakeLists.txt` pose `QT_QML_ROOT_PATH` pour **iOS comme pour Android** : les
+greffons QML importés doivent être **embarqués** dans le paquet, sinon l'application démarre puis se ferme
+aussitôt (`module "QtQuick.Controls" plugin … not found`). C'est la découverte n°4 du monde Android, et la
+cause est identique.
+
+> [!warning] Point à valider en premier sur un vrai Mac
+> Le projet **n'utilise pas** `qt_add_qml_module` : le QML est embarqué via `resources.qrc`, et c'est
+> l'analyseur d'imports qui décide des greffons à joindre. Sur Android cela fonctionne parce qu'Android a
+> un chemin dédié ; sur iOS c'est **la première chose à vérifier au démarrage** de l'application sur
+> l'appareil. Si un écran reste noir, c'est ici qu'il faut regarder.
+
+---
+
+## 7. Android
 
 ### ⚠️ Découverte n°1 : le dépôt Android de Qt a **déménagé**
 
@@ -432,7 +513,7 @@ porte, et le contrôle du script la garde étroite.
 
 ---
 
-## 7. Dépannage
+## 8. Dépannage
 
 | Symptôme | Cause probable | Solution |
 |---|---|---|
@@ -453,4 +534,9 @@ porte, et le contrôle du script la garde étroite.
 | `no member named 'adjacent' in 'std::ranges::views'` | libc++ **18** (NDK r27c) est plus ancienne que libstdc++ 16 | Éviter les fonctionnalités de bibliothèque absentes de libc++ 18 : `views::adjacent`, `span::at`, `views::zip`… |
 | `no member named 'at' in 'std::span<float>'` | `std::span::at` est **C++26**, absent de libc++ 18 | Passer par un petit helper local vérifié, comme dans `ToneSynthesizer` |
 | `adb` introuvable ou cassé | `platform-tools` du SDK absent du `PATH` | `source scripts/setup_env.sh` : il le place en tête |
+| `xcodebuild` introuvable | Xcode absent, ou seuls les Command Line Tools sont installés | Installer Xcode (App Store), puis `sudo xcode-select -s /Applications/Xcode.app` |
+| `MUSICHIEN_QT_IOS_DIR is not defined` | Qt pour iOS non installé *(Mac seulement)* | `scripts/install_dependencies.sh --with-ios`, puis `source scripts/setup_env.sh` |
+| L'IPA n'est pas exportée, erreur de signature | Identifiant d'équipe Apple absent | `export MUSICHIEN_IOS_TEAM_ID=…` (voir §6) |
+| `clang-format` / `clang-tidy` introuvables (macOS) | Homebrew `llvm` non installé | `brew install llvm` (keg-only : `setup_env.sh` met son `bin` sur le `PATH`) |
+| `sort: illegal option -- V` ou `find: -maxdepth` (macOS) | Un script qui utilisait un outil GNU | Utiliser les helpers portables de `scripts/platform.sh` (`musichien_greatest_version`, `musichien_newest_directory`) |
 
