@@ -934,7 +934,16 @@ Item {
                         model: 2
 
                         Rectangle {
-                            readonly property bool lit: (index === 0) ? MicrophoneController.hasFirstNote : (MicrophoneController.hasFirstNote && exerciseScreen.singingCountdown === 0)
+                            // CHAQUE PASTILLE ALLUME SA PROPRE NOTE, ET RIEN D'AUTRE. Roger : « pour la premiere note,
+                            // aucun des deux pastilles n'est allume. Pour la deuxieme les 2 sont allumes. Il faudrait
+                            // soit le 1 en 1, puis le 2 seulement en 2 ».
+                            //
+                            // La cause : la pastille 1 attendait `hasFirstNote`, qui ne devient vrai qu'a la VALIDATION
+                            // de la premiere note - donc au moment ou le splash couvre l'ecran. Elle ne s'allumait donc
+                            // jamais pendant qu'on la chante. Ici, elle s'allume des que la note TIENT (la stabilite a
+                            // commence), et elle s'eteint quand la seconde prend la main : c'est ce « seulement » que
+                            // Roger a demande.
+                            readonly property bool lit: (index === 0) ? (!MicrophoneController.hasFirstNote && MicrophoneController.sungStability > 0) : (MicrophoneController.hasFirstNote && !MicrophoneController.hasSungInterval)
 
                             width: 30
                             height: 30

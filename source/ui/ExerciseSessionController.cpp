@@ -4463,13 +4463,21 @@ void ExerciseSessionController::playCurrentQuestionAsChord()
         return;
     }
 
-    // Sur une question d'harmonie, la confirmation est LE MODE POSE, rejoue seul, sur son bourdon.
+    // Sur une question d'harmonie, la confirmation est LA COMPARAISON ENTIERE - les deux modes, dans l'ordre ou ils
+    // ont ete poses, comme la question les a poses.
     //
-    // C'est la reponse, et l'entendre une seconde fois juste apres l'avoir trouvee est ce qui la fixe. Le mode d'AVANT
-    // n'etait que la question : le rejouer melerait la reponse a ce qu'elle repond.
-    if( ( question.kind == domain::QuestionKind::ModeColour ) || ( question.kind == domain::QuestionKind::ModeName ) )
+    // Roger a entendu le defaut, et l'a diagnostique mieux que le code ne le disait : « on ne rejoue que le deuxieme
+    // mode, puis une longue attente, suffisante pour jouer plusieurs fois le mode ». La confirmation ne rejouait QUE le
+    // mode pose (`true`), alors que la pause qui suit est calculee, elle, pour DEUX modes (voir
+    // modeSoundDurationMs) : le long silence n'etait rien d'autre que la place du mode manquant.
+    //
+    // ET LE VAMP PASSE PAR ICI AUSSI. Il tombait dans le cas general et ne rejouait qu'une NOTE, sans aucun mode -
+    // Roger : « le vamp, juste le verdict avec une note jouee, mais aucun mode ». Les trois familles d'harmonie sont
+    // donc traitees ensemble, et c'est la meme oreille qui compare : la meme confirmation vaut pour les trois.
+    if( ( question.kind == domain::QuestionKind::ModeColour ) || ( question.kind == domain::QuestionKind::ModeName )
+        || ( question.kind == domain::QuestionKind::ModeVamp ) )
     {
-        playModeQuestion( true );
+        playModeQuestion( false );
 
         return;
     }
