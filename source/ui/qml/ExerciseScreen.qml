@@ -860,6 +860,10 @@ Item {
                 // ou le joueur la lit deja. Deux fois la meme phrase, c'est une de trop.
                 StaffBall {
                     Layout.preferredHeight: 120
+                    // LE JEU PARLE SA PROPRE COULEUR. Roger, rapporte par des joueurs : la boule suivait les regles de
+                    // l'accordeur (rouge/jaune/vert), et on croyait que c'etait rapporte au jeu. Ici, donc, le gris pale
+                    // dit « je n'ecoute pas », et le vert qui s'opacifie dit « la note tient » - voir StaffBall.
+                    gameMode: true
                     // L'INTERFACE DISPARAIT PENDANT LA TRANSITION : Roger veut « enlever toute l'interface » quand la
                     // premiere note est validee, le temps du compte a rebours.
                     visible: exerciseScreen.singingCountdown === 0
@@ -951,7 +955,9 @@ Item {
                     // Le premier tic (fort) part avec la validation, dans le Connections ci-dessous ; ce minuteur fait
                     // les suivants, FAIBLES - « un ding fort puis 2 plus faibles, un peu comme un metronome, mais
                     // toujours leger » (Roger).
-                    interval: 800
+                    // Roger : « j'accelererai le compte a rebours ». Un tic toutes les 450 ms au lieu de 800 : la
+                    // transition reste lisible, mais elle ne fait plus attendre entre deux notes.
+                    interval: 450
                     repeat: true
                     onTriggered: {
                         exerciseScreen.singingCountdown = exerciseScreen.singingCountdown - 1;
@@ -965,12 +971,12 @@ Item {
                 }
 
                 Connections {
-                    function onSungIntervalChanged() {
-                        // LA PREMIERE NOTE VIENT D'ETRE CAPTEE. LA GARDE `singingTransitionDone` EST LE CORRECTIF DE LA
-                        // BOUCLE : `sungIntervalChanged` part a CHAQUE lecture du detecteur, donc sans ce drapeau la
-                        // transition se relancait apres elle-meme - elle rejouait une note et recommencait le compte a
-                        // rebours, sans fin. Roger : « le jeu rejoue une note. Ca fout le bordel ».
+                    // LA PREMIERE NOTE VIENT D'ETRE CAPTEE. LA GARDE `singingTransitionDone` EST LE CORRECTIF DE LA
+                    // BOUCLE : `sungIntervalChanged` part a CHAQUE lecture du detecteur, donc sans ce drapeau la
+                    // transition se relancait apres elle-meme - elle rejouait une note et recommencait le compte a
+                    // rebours, sans fin. Roger : « le jeu rejoue une note. Ca fout le bordel ».
 
+                    function onSungIntervalChanged() {
                         // UNE NOUVELLE QUESTION : tout retombe, et le detecteur se remet a ecouter.
                         if (!MicrophoneController.hasFirstNote) {
                             exerciseScreen.singingCountdown = 0;
@@ -985,6 +991,7 @@ Item {
                         if (ExerciseController.questionKind === 2 && !exerciseScreen.singingTransitionDone && !MicrophoneController.hasSungInterval) {
                             exerciseScreen.singingTransitionDone = true;
                             MicrophoneController.beginSingingTransition();
+                            MicrophoneController.playValidationChime();
                             MicrophoneController.playCountdownTick(true);
                             exerciseScreen.singingCountdown = 3;
                             singingCountdownTimer.restart();
@@ -1987,11 +1994,26 @@ Item {
             anchors.centerIn: parent
             spacing: 10
 
-            Text {
+            // LA COCHE, DESSINEE ET NON EMOJI. Roger n'aimait pas « l'icone de la coche » - un emoji se rend
+            // differemment sur chaque telephone, avec sa propre palette et son propre trait. Ici, deux segments et un
+            // bout arrondi : c'est le dessin minimal d'une coche, et il ne bouge pas d'un appareil a l'autre.
+            Canvas {
                 Layout.alignment: Qt.AlignHCenter
-                color: "#8ef2b0"
-                font.pixelSize: 64
-                text: "✅"
+                Layout.preferredWidth: 76
+                Layout.preferredHeight: 76
+                onPaint: {
+                    var ctx = getContext("2d");
+                    ctx.reset();
+                    ctx.strokeStyle = "#8ef2b0";
+                    ctx.lineWidth = 9;
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+                    ctx.beginPath();
+                    ctx.moveTo(width * 0.17, height * 0.53);
+                    ctx.lineTo(width * 0.4, height * 0.77);
+                    ctx.lineTo(width * 0.84, height * 0.24);
+                    ctx.stroke();
+                }
             }
 
             Text {

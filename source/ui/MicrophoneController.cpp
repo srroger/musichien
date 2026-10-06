@@ -355,12 +355,43 @@ void MicrophoneController::announceFirstNote()
     }
 }
 
+namespace
+{
+// LE TIC DU COMPTE A REBOURS, PLUS DISCRET QUE LE « GLING ». Roger : « un "gling" de validation [...] qui est plus
+// important que le bruit du metronome, que je mettrais moins fort ». Le tic guide, le gling felicite : un peu moins de
+// la moitie du gain suffit a mettre le guide derriere la felicitation.
+constexpr double COUNTDOWN_CLICK_GAIN = 0.45;
+}    // namespace
+
 void MicrophoneController::playCountdownTick( bool p_accented )
 {
     if( m_notePlayer != nullptr )
     {
-        m_notePlayer->playMetronomeClick( p_accented );
+        // MOINS FORT QUE LE GLING. Roger : « un "gling" de validation [...] qui est plus important que le bruit du
+        // metronome, que je mettrais moins fort ». Le tic guide, il ne felicite pas : le gain le met DERRIERE le gling
+        // au lieu de le couvrir.
+        m_notePlayer->playMetronomeClick( p_accented, COUNTDOWN_CLICK_GAIN );
     }
+}
+
+void MicrophoneController::playValidationChime()
+{
+    if( m_notePlayer == nullptr )
+    {
+        return;
+    }
+
+    // UN ACCORD MAJEUR, UNE OCTAVE AU-DESSUS DE LA CIBLE : brillant, court, et impossible a confondre avec une note a
+    // chanter - il est plus aigu, et plusieurs notes y sonnent ensemble. C'est le « c'est bon » du jeu, et c'est le son
+    // que Roger a demande. Le detecteur est en PAUSE pendant tout ceci (beginSingingTransition), donc ce « gling » ne
+    // compte jamais comme un chant.
+    const std::int32_t rootMidi = singingRootMidiNumber();
+
+    const std::array<domain::Note, 3> notes{ domain::Note{ rootMidi + 12 },
+                                             domain::Note{ rootMidi + 16 },
+                                             domain::Note{ rootMidi + 19 } };
+
+    m_notePlayer->playChord( notes );
 }
 
 void MicrophoneController::beginSingingTransition()

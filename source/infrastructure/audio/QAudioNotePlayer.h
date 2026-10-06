@@ -118,7 +118,7 @@ public:
     //
     // NOTE : le metronome de la page Rythme ne passe PLUS par ici. Il bat dans le flux audio (voir startMetronome), a
     // l'echantillon pres. Cette methode reste pour les usages qui veulent un clic immediat, et pour les tests.
-    void playMetronomeClick( bool p_accented ) override;
+    void playMetronomeClick( bool p_accented, double p_gain = 1.0 ) override;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Le metronome, en tant qu'HORLOGE

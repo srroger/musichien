@@ -1013,7 +1013,7 @@ void QAudioNotePlayer::playTapCue()
     mixSamples( std::move( samples ) );
 }
 
-void QAudioNotePlayer::playMetronomeClick( bool p_accented )
+void QAudioNotePlayer::playMetronomeClick( bool p_accented, double p_gain )
 {
     ensureAudioOutputIsOpen();
 
@@ -1023,7 +1023,7 @@ void QAudioNotePlayer::playMetronomeClick( bool p_accented )
     // premiers temps faibles.
     if( !click.empty() )
     {
-        mixSamples( click, p_accented ? ACCENTED_CLICK_GAIN : PLAIN_CLICK_GAIN );
+        mixSamples( click, static_cast<float>( p_gain ) * ( p_accented ? ACCENTED_CLICK_GAIN : PLAIN_CLICK_GAIN ) );
 
         return;
     }
@@ -1041,7 +1041,7 @@ void QAudioNotePlayer::playMetronomeClick( bool p_accented )
 
     for( float & sample : samples )
     {
-        sample *= p_accented ? FALLBACK_ACCENTED_CLICK_GAIN : FALLBACK_PLAIN_CLICK_GAIN;
+        sample *= static_cast<float>( p_gain ) * ( p_accented ? FALLBACK_ACCENTED_CLICK_GAIN : FALLBACK_PLAIN_CLICK_GAIN );
     }
 
     // MIXE et non remplace : le metronome doit s'entendre EN MEME TEMPS que la batterie. C'etait le bug - le clic

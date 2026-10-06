@@ -25,6 +25,10 @@ Item {
     // Eteinte par defaut, et pour une raison : ce composant sert aussi a l'accordeur et au banc de chant, ou il n'y a
     // rien a attendre. C'est la question d'exercice qui l'allume, et elle seule.
     property bool showGhost: false
+    // LA LANGUE COULEUR DU JEU, DIFFERENTE DE CELLE DE L'ACCORDEUR. Roger, rapporte par des joueurs : « la couleur de la
+    // boule suit les regles de l'accordeur, rouge jaune vert. Certaines personnes avaient du mal a comprendre pourquoi,
+    // et pensaient que c'etait rapporte au jeu ». Le jeu parle donc une autre langue - voir ballColor().
+    property bool gameMode: false
     // La geometrie de la portee, et rien d'autre. La cle de sol est PLUS HAUTE que la portee - sept interlignes
     // contre quatre - donc c'est elle qui donne sa hauteur au composant : la portee est posee dans la partie basse,
     // et l'espace au-dessus lui appartient. Un composant qui n'aurait reserve que la portee aurait vu sa cle deborder
@@ -37,8 +41,19 @@ Item {
     // Le signe qui dit de quel cote la vraie note se trouve, et rien quand la boule dit la verite entiere.
     readonly property int octaveShift: (staffBall.showOctaveShift && MicrophoneController.detectedFrequencyHz > 0) ? MicrophoneController.detectedOctaveShift : 0
 
-    // Green when in tune, yellow when close, red beyond - the same colours the tuner page uses.
+    // La langue de l'ACCORDEUR : vert juste, jaune proche, rouge au-dela - elle dit la JUSTESSE.
+    // La langue du JEU dit autre chose : la PROGRESSION. Gris pale tant qu'on n'ecoute pas, puis un vert dont l'opacite
+    // suit la barre de progres - « un vert qui devient de moins en moins transparent quand la progress bar augmente »
+    // (Roger). Deux langues pour deux questions differentes, « est-ce juste ? » et « est-ce que je tiens ? » : c'est de
+    // les avoir melangees que venait la confusion.
     function ballColor() {
+        if (staffBall.gameMode) {
+            if (!MicrophoneController.isSingingCaptureActive)
+                return Qt.rgba(0.54, 0.47, 0.68, 0.3);
+
+            var held = Math.max(0, Math.min(1, MicrophoneController.sungStability));
+            return Qt.rgba(0.56, 0.95, 0.69, 0.3 + (0.7 * held));
+        }
         if (!MicrophoneController.isListening || MicrophoneController.detectedFrequencyHz <= 0)
             return "#8a77ad";
 
@@ -119,7 +134,9 @@ Item {
         width: 18
         height: 18
         radius: 9
-        visible: MicrophoneController.detectedFrequencyHz > 0
+        // DANS LE JEU, LA BOULE EST TOUJOURS LA, meme sans son : elle dit « je t'ecoute » en gris pale, et elle prend sa
+        // couleur en ecoutant. Sur l'accordeur, au contraire, une boule sans note n'aurait rien a dire.
+        visible: staffBall.gameMode || MicrophoneController.detectedFrequencyHz > 0
         color: ballColor()
         x: parent.width / 2 - width / 2
         y: staffBall.ballY(MicrophoneController.detectedStaffFraction) - height / 2
