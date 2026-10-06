@@ -340,12 +340,13 @@ void MicrophoneController::announceFirstNote()
         return;
     }
 
-    // LE « DING » : la premiere note est prise. Puis LA NOTE ELLE-MEME, rejouee - le chanteur entend ou il est, et
-    // c'est ce qui l'ANCRE avant la seconde. Roger : « il faudrait carrement faire un bruitage (ou rejouer la frequence
-    // qu'il vient de chanter) ». C'est la reponse au vrai probleme qu'il a nomme : « les gens n'ont pas compris qu'il
-    // fallait faire une 2eme note ».
-    m_notePlayer->playMetronomeClick( true );
-
+    // ON REJOUE LA NOTE qui vient d'etre chantee - le chanteur entend ou il est, et c'est ce qui l'ANCRE avant la
+    // seconde. Roger : « rejouer la frequence qu'il vient de chanter ». C'est la reponse au vrai probleme qu'il a
+    // nomme : « les gens n'ont pas compris qu'il fallait faire une 2eme note ».
+    //
+    // PLUS DE « DING » : Roger l'a trouve de trop, et c'est le COMPTE A REBOURS qui porte le son (voir
+    // playCountdownTick). Le detecteur est en PAUSE pendant tout ceci (beginSingingTransition), sinon le micro
+    // entendrait cette note et croirait a un nouveau chant.
     const std::int32_t firstMidi = m_sungIntervalDetector.reading().firstMidiNumber;
 
     if( firstMidi != 0 )
@@ -360,6 +361,21 @@ void MicrophoneController::playCountdownTick( bool p_accented )
     {
         m_notePlayer->playMetronomeClick( p_accented );
     }
+}
+
+void MicrophoneController::beginSingingTransition()
+{
+    // Le detecteur cesse d'etre alimente : les sons du compte a rebours et la note rejouee ne comptent plus comme un
+    // chant. La premiere note, elle, reste acquise.
+    m_singingTransition = true;
+}
+
+void MicrophoneController::endSingingTransition()
+{
+    // Le jeu redemande une note : on se remet a ecouter. L'horloge repart de maintenant, sinon le temps Accumule
+    // pendant la transition ferait croire d'un coup que la seconde note a ete tenue.
+    m_singingTransition = false;
+    m_pitchClock.restart();
 }
 
 void MicrophoneController::startSingingCapture()
@@ -594,24 +610,30 @@ void MicrophoneController::onPitch( float p_frequencyHz )
     {
         const auto elapsedMilliseconds = static_cast<std::int32_t>( m_pitchClock.restart() );
 
-        m_sungIntervalDetector.update( m_detectedFrequencyHz, referencePitch, elapsedMilliseconds );
-
-        if( m_sungIntervalDetector.reading().hasInterval() )
+        // L'INTERFERENCE, EVITEE. Pendant la TRANSITION (les sons que le jeu joue : la note rejouee, le compte a
+        // rebours), on N'ALIMENTE PAS le detecteur. Roger : « les sons font interferences avec le micro, du coup le
+        // micro croit que c'est un nouveau chant ». La PREMIERE NOTE est gardee : on cesse seulement d'ecouter.
+        if( !m_singingTransition )
         {
-            // La reponse est complete : on rend le micro, on compte, et on avance d'une question.
-            stopSingingCapture();
+            m_sungIntervalDetector.update( m_detectedFrequencyHz, referencePitch, elapsedMilliseconds );
 
-            if( sungVerdict() == 1 )
+            if( m_sungIntervalDetector.reading().hasInterval() )
             {
-                ++m_singingCorrectCount;
+                // La reponse est complete : on rend le micro, on compte, et on avance d'une question.
+                stopSingingCapture();
+
+                if( sungVerdict() == 1 )
+                {
+                    ++m_singingCorrectCount;
+                }
+
+                ++m_singingQuestionIndex;
+
+                emit singingQuestionChanged();
             }
 
-            ++m_singingQuestionIndex;
-
-            emit singingQuestionChanged();
+            emit sungIntervalChanged();
         }
-
-        emit sungIntervalChanged();
     }
 }
 

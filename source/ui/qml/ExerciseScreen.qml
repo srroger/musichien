@@ -850,6 +850,9 @@ Item {
                 // ou le joueur la lit deja. Deux fois la meme phrase, c'est une de trop.
                 StaffBall {
                     Layout.preferredHeight: 120
+                    // L'INTERFACE DISPARAIT PENDANT LA TRANSITION : Roger veut « enlever toute l'interface » quand la
+                    // premiere note est validee, le temps du compte a rebours.
+                    visible: exerciseScreen.singingCountdown === 0
                     // LA BOULE FANTOME : elle se pose sur la PREMIERE NOTE ENREGISTREE de l'essai, transposee de l'intervalle
                     // demande. Elle ne bouge plus pendant qu'on chante - c'est un repere, pas un marteau. Roger l'a dit
                     // exactement comme ca : « afficher le fantome a partir de la valeur enregistree et c'est tout ».
@@ -864,7 +867,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    visible: MicrophoneController.detectedFrequencyHz > 0
+                    visible: MicrophoneController.detectedFrequencyHz > 0 && exerciseScreen.singingCountdown === 0
                     color: "#8a77ad"
                     font.pixelSize: 13
                     text: qsTr("%1  ·  %2 cents").arg(MicrophoneController.detectedNoteLabel).arg(Math.round(MicrophoneController.detectedCents))
@@ -876,6 +879,7 @@ Item {
                     Layout.preferredHeight: 8
                     radius: 4
                     color: "#1b1035"
+                    visible: exerciseScreen.singingCountdown === 0
 
                     Rectangle {
                         height: 8
@@ -892,6 +896,7 @@ Item {
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     spacing: 14
+                    visible: exerciseScreen.singingCountdown === 0
 
                     Repeater {
                         model: 2
@@ -920,15 +925,30 @@ Item {
 
                 }
 
-                // LE COMPTE A REBOURS : 3, 2, 1, et chaque tic S'ENTEND. C'est la respiration qui separe les deux notes.
-                Text {
+                // LA TRANSITION, ET RIEN D'AUTRE. Roger : « enlever toute l'interface, mettre une coche de validation
+                // verte. Les chiffres du compte a rebours en GROS, un peu comme dans les vieux films... Et boom retour
+                // sur l'interface avec les 2 pastilles (mais 1 valide) ».
+                ColumnLayout {
                     Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
+                    Layout.alignment: Qt.AlignHCenter
                     visible: exerciseScreen.singingCountdown > 0
-                    color: "#ffd479"
-                    font.pixelSize: 34
-                    font.bold: true
-                    text: exerciseScreen.singingCountdown.toString()
+                    spacing: 0
+
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        color: "#8ef2b0"
+                        font.pixelSize: 52
+                        text: "✅"
+                    }
+
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        color: "#ffd479"
+                        font.pixelSize: 84
+                        font.bold: true
+                        text: exerciseScreen.singingCountdown.toString()
+                    }
+
                 }
 
                 // UNE SEULE LIGNE, ET COURTE. Le reste est dans les pastilles et dans le son.
@@ -944,29 +964,39 @@ Item {
                 Timer {
                     id: singingCountdownTimer
 
-                    interval: 700
+                    // Le premier tic (fort) part avec la validation, dans le Connections ci-dessous ; ce minuteur fait
+                    // les suivants, FAIBLES - « un ding fort puis 2 plus faibles, un peu comme un metronome, mais
+                    // toujours leger » (Roger).
+                    interval: 800
                     repeat: true
                     onTriggered: {
                         exerciseScreen.singingCountdown = exerciseScreen.singingCountdown - 1;
-                        MicrophoneController.playCountdownTick(exerciseScreen.singingCountdown === 1);
-                        if (exerciseScreen.singingCountdown <= 0)
+                        if (exerciseScreen.singingCountdown <= 0) {
                             stop();
-
+                            MicrophoneController.endSingingTransition();
+                        } else {
+                            MicrophoneController.playCountdownTick(false);
+                        }
                     }
                 }
 
                 Connections {
                     function onSungIntervalChanged() {
-                        // UNE NOUVELLE QUESTION : la pastille retombe, et le compte a rebours se remet a zero.
+                        // UNE NOUVELLE QUESTION : tout retombe, et le detecteur se remet a ecouter.
                         if (!MicrophoneController.hasFirstNote) {
                             exerciseScreen.singingCountdown = 0;
                             singingCountdownTimer.stop();
+                            MicrophoneController.endSingingTransition();
                             return ;
                         }
-                        // LA PREMIERE NOTE VIENT D'ETRE CAPTEE : on l'ANNONCE (un « ding », puis la note rejouee), et on
-                        // lance le compte a rebours. La garde sur la famille evite de sonner ailleurs que dans le chant.
+                        // LA PREMIERE NOTE VIENT D'ETRE CAPTEE. On MET LE DETECTEUR EN PAUSE d'abord - sinon le micro
+                        // entendrait les sons joues et croirait a un nouveau chant. Puis on REJOUE la note, et on lance
+                        // le compte a rebours, dont le PREMIER tic est fort. La garde sur la famille evite d'agir
+                        // ailleurs que dans le chant.
                         if (ExerciseController.questionKind === 2 && exerciseScreen.singingCountdown === 0 && !MicrophoneController.hasSungInterval) {
+                            MicrophoneController.beginSingingTransition();
                             MicrophoneController.announceFirstNote();
+                            MicrophoneController.playCountdownTick(true);
                             exerciseScreen.singingCountdown = 3;
                             singingCountdownTimer.restart();
                         }
@@ -978,6 +1008,7 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
+                    visible: exerciseScreen.singingCountdown === 0
 
                     Button {
                         Layout.fillWidth: true

@@ -210,6 +210,13 @@ public:
     // Un tic du COMPTE A REBOURS qui precede la seconde note. Accentue pour le dernier, comme une mesure qui commence.
     Q_INVOKABLE void playCountdownTick( bool p_accented );
 
+    // LA TRANSITION ENTRE LES DEUX NOTES : le jeu JOUE des sons (la note rejouee, le compte a rebours), et le micro les
+    // ENTENDRAIT - le detecteur croirait alors a un nouveau chant. Roger : « les sons font interferences avec le micro,
+    // du coup le micro croit que c'est un nouveau chant ». On met donc le detecteur en PAUSE le temps des sons : la
+    // premiere note est gardee, et rien de ce qui est joue ne compte comme chante.
+    Q_INVOKABLE void beginSingingTransition();
+    Q_INVOKABLE void endSingingTransition();
+
     // Opens the microphone and listens for two held notes.
     Q_INVOKABLE void startSingingCapture();
     Q_INVOKABLE void stopSingingCapture();
@@ -285,6 +292,10 @@ private:
     std::mt19937 m_singingRandomEngine{ std::random_device{}() };
     int m_singingTargetSemitones{ 7 };
     bool m_isSingingCaptureActive{ false };
+
+    // Vrai pendant la transition entre les deux notes : le detecteur n'est alors PAS alimente, pour que les sons joues
+    // par le jeu (la note rejouee, le compte a rebours) ne soient pas pris pour un chant. Voir beginSingingTransition.
+    bool m_singingTransition{ false };
 
     // Vrai quand l'ecran de chant a ete ouvert par une carte de cours : l'intervalle est donne, rien n'est compte, et
     // rien n'est tire au hasard. Faux des l'ouverture d'une session de jeu.
