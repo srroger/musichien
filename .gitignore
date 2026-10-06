@@ -95,3 +95,6 @@ coverage/
 # ---------------------------------------------------------------------------------------------------------------------
 .DS_Store
 Thumbs.db
+
+# Un build en arriere-plan peut en laisser un : jamais dans le depot.
+nohup.out
