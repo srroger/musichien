@@ -55,6 +55,12 @@ Item {
     // suivante !" »
     // There is still no "next" button: a loop the player has to carry forward themselves feels slower
     // than it is. A tap anywhere skips the pause instead - free, and always available.
+    // =================================================================================================================
+    // LE SPLASH DE LA TRANSITION CHANTEE
+    // =================================================================================================================
+    // Roger : « il faudrait vraiment un espece de gros splashscreen qui ecrase reellement TOUTE l'interface. On est sur
+    // un ecran de telephone, l'espace est petit, continuer de voir les vies etc. c'est pas le mieux. Il faut vraiment
+    // une page visuelle et epuree. »
 
     id: exerciseScreen
 
@@ -75,6 +81,9 @@ Item {
     // aussi avant que la premiere note soit prise. Roger : « un compte a rebours avant de lui faire reapparaitre
     // l'interface pour qu'il chante la deuxieme note ».
     property int singingCountdown: 0
+    // VRAI pendant TOUTE la transition d'une question chantee : c'est ce qui empeche la transition de se relancer
+    // elle-meme (voir le Connections du chant). Remis a faux quand une nouvelle note recommence.
+    property bool singingTransitionDone: false
     // Horizontal offset of the whole screen during the shake. Zero is the resting state, and it is both
     // where the animation starts and where it ends.
     property real shakeOffset: 0
@@ -834,6 +843,7 @@ Item {
             // boule et la barre de stabilite sont le composant partage avec l'accordeur ; seule la cible change.
             ColumnLayout {
                 // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
+                // (Le compte a rebours n'est PAS dessine ici : il prend tout l'ecran, voir le splash en bas du fichier.)
 
                 Layout.fillWidth: true
                 // LA GARDE ETAIT LE BUG, ALORS ELLE RESTE ECRITE. Sans cette ligne, le bloc de chant s'affichait sur TOUTES
@@ -925,32 +935,6 @@ Item {
 
                 }
 
-                // LA TRANSITION, ET RIEN D'AUTRE. Roger : « enlever toute l'interface, mettre une coche de validation
-                // verte. Les chiffres du compte a rebours en GROS, un peu comme dans les vieux films... Et boom retour
-                // sur l'interface avec les 2 pastilles (mais 1 valide) ».
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignHCenter
-                    visible: exerciseScreen.singingCountdown > 0
-                    spacing: 0
-
-                    Text {
-                        Layout.alignment: Qt.AlignHCenter
-                        color: "#8ef2b0"
-                        font.pixelSize: 52
-                        text: "✅"
-                    }
-
-                    Text {
-                        Layout.alignment: Qt.AlignHCenter
-                        color: "#ffd479"
-                        font.pixelSize: 84
-                        font.bold: true
-                        text: exerciseScreen.singingCountdown.toString()
-                    }
-
-                }
-
                 // UNE SEULE LIGNE, ET COURTE. Le reste est dans les pastilles et dans le son.
                 Text {
                     Layout.fillWidth: true
@@ -982,20 +966,25 @@ Item {
 
                 Connections {
                     function onSungIntervalChanged() {
+                        // LA PREMIERE NOTE VIENT D'ETRE CAPTEE. LA GARDE `singingTransitionDone` EST LE CORRECTIF DE LA
+                        // BOUCLE : `sungIntervalChanged` part a CHAQUE lecture du detecteur, donc sans ce drapeau la
+                        // transition se relancait apres elle-meme - elle rejouait une note et recommencait le compte a
+                        // rebours, sans fin. Roger : « le jeu rejoue une note. Ca fout le bordel ».
+
                         // UNE NOUVELLE QUESTION : tout retombe, et le detecteur se remet a ecouter.
                         if (!MicrophoneController.hasFirstNote) {
                             exerciseScreen.singingCountdown = 0;
+                            exerciseScreen.singingTransitionDone = false;
                             singingCountdownTimer.stop();
                             MicrophoneController.endSingingTransition();
                             return ;
                         }
-                        // LA PREMIERE NOTE VIENT D'ETRE CAPTEE. On MET LE DETECTEUR EN PAUSE d'abord - sinon le micro
-                        // entendrait les sons joues et croirait a un nouveau chant. Puis on REJOUE la note, et on lance
-                        // le compte a rebours, dont le PREMIER tic est fort. La garde sur la famille evite d'agir
-                        // ailleurs que dans le chant.
-                        if (ExerciseController.questionKind === 2 && exerciseScreen.singingCountdown === 0 && !MicrophoneController.hasSungInterval) {
+                        // ET PLUS AUCUNE NOTE N'EST JOUEE : Roger ne veut plus l'entendre (« il ne faudrait pas qu'il
+                        // rejoue quoi que ce soit »). Seuls les tics du compte a rebours portent le son, et le detecteur
+                        // est en PAUSE pendant ce temps (beginSingingTransition).
+                        if (ExerciseController.questionKind === 2 && !exerciseScreen.singingTransitionDone && !MicrophoneController.hasSungInterval) {
+                            exerciseScreen.singingTransitionDone = true;
                             MicrophoneController.beginSingingTransition();
-                            MicrophoneController.announceFirstNote();
                             MicrophoneController.playCountdownTick(true);
                             exerciseScreen.singingCountdown = 3;
                             singingCountdownTimer.restart();
@@ -1980,6 +1969,44 @@ Item {
                 height: 48
                 text: qsTr("← Retour au banc")
                 onClicked: ExerciseController.stopSession()
+            }
+
+        }
+
+    }
+
+    // Il est declare ICI, a la RACINE, et non dans le bloc du chant : c'est la seule facon de couvrir AUSSI les vies,
+    // le compteur et les boutons - l'interface du chant ne peut pas les recouvrir, ils sont ses voisins.
+    Rectangle {
+        anchors.fill: parent
+        z: 1000
+        visible: exerciseScreen.singingCountdown > 0
+        color: "#1d1033"
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: 10
+
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                color: "#8ef2b0"
+                font.pixelSize: 64
+                text: "✅"
+            }
+
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                color: "#ffd479"
+                font.pixelSize: 120
+                font.bold: true
+                text: exerciseScreen.singingCountdown.toString()
+            }
+
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                color: "#cbb8e8"
+                font.pixelSize: 16
+                text: qsTr("Prépare la 2ᵉ note")
             }
 
         }
