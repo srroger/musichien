@@ -53,13 +53,16 @@ Item {
     // supplementaire speciale [...] 2-3 phrases dans le genre, qui tourneraient de maniere aleatoire en fonction de la
     // famille la plus ratee. Et si tout est parfait, un "Wow, tu peux clairement envisager de passer a l'etape
     // suivante !" »
+    // There is still no "next" button: a loop the player has to carry forward themselves feels slower
+    // than it is. A tap anywhere skips the pause instead - free, and always available.
 
     id: exerciseScreen
 
-    // There is still no "next" button: a loop the player has to carry forward themselves feels slower
-    // than it is. A tap anywhere skips the pause instead - free, and always available.
-    readonly property int successPause: 1200
-    readonly property int mistakePause: 1800
+    // ROGER A DEMANDE PLUS DE TEMPS (04/10/2026) : « entre chaque question, ce serait bien de laisser plus de temps pour
+    // que l'utilisateur puisse bien lire ce qui se passe ». On allonge donc les deux pauses - et comme un tap les
+    // ecourte, allonger ne coute rien a qui lit vite.
+    readonly property int successPause: 1800
+    readonly property int mistakePause: 2600
     // Elle vient du CONTROLEUR, donc du domaine et de son tempo : une mesure a 90 bpm dure deux secondes et demie, et
     // aucune constante ecrite ici ne saurait le dire sans mentir le jour ou le tempo change.
     readonly property int rhythmPause: ExerciseController.rhythmCellDurationMs + 600
@@ -67,7 +70,7 @@ Item {
     // fois quand deux modes se comparent. La pause doit donc couvrir la LECTURE ENTIERE plus le temps de lire le verdict -
     // sinon elle avance au milieu du son, ce que Roger a vu tout de suite : « pour les modes, ca va beaucoup trop vite,
     // le son se coupe en plein milieu, t'as pas le temps de lire ».
-    readonly property int modePause: ExerciseController.modeSoundDurationMs + 3000
+    readonly property int modePause: ExerciseController.modeSoundDurationMs + 4500
     // Horizontal offset of the whole screen during the shake. Zero is the resting state, and it is both
     // where the animation starts and where it ends.
     property real shakeOffset: 0
@@ -1541,6 +1544,11 @@ Item {
                     height: 52
                     text: qsTr("♪ Écouter")
                     enabled: ExerciseController.isAsking
+                    // LA GARDE ETAIT ABSENTE, ET C'EST LE « double bouton » DE ROGER : « pour les exercices chanter, il y
+                    // a 2 fois les boutons ecouter et passer ». La section du chant a deja SON bouton d'ecoute (qui joue
+                    // la CIBLE) ; celui-ci, qui REJOUE la question, n'a rien a faire sous une question chantee - il
+                    // s'affichait pourtant la, sans rien faire, et en double.
+                    visible: ExerciseController.questionKind !== 2
                     onClicked: ExerciseController.replay()
                 }
 
