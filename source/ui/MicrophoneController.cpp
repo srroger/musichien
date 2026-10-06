@@ -333,6 +333,35 @@ void MicrophoneController::playSingingTarget()
     m_notePlayer->playMelody( notes, std::chrono::milliseconds{ 400 } );
 }
 
+void MicrophoneController::announceFirstNote()
+{
+    if( m_notePlayer == nullptr )
+    {
+        return;
+    }
+
+    // LE « DING » : la premiere note est prise. Puis LA NOTE ELLE-MEME, rejouee - le chanteur entend ou il est, et
+    // c'est ce qui l'ANCRE avant la seconde. Roger : « il faudrait carrement faire un bruitage (ou rejouer la frequence
+    // qu'il vient de chanter) ». C'est la reponse au vrai probleme qu'il a nomme : « les gens n'ont pas compris qu'il
+    // fallait faire une 2eme note ».
+    m_notePlayer->playMetronomeClick( true );
+
+    const std::int32_t firstMidi = m_sungIntervalDetector.reading().firstMidiNumber;
+
+    if( firstMidi != 0 )
+    {
+        m_notePlayer->playNote( domain::Note{ firstMidi } );
+    }
+}
+
+void MicrophoneController::playCountdownTick( bool p_accented )
+{
+    if( m_notePlayer != nullptr )
+    {
+        m_notePlayer->playMetronomeClick( p_accented );
+    }
+}
+
 void MicrophoneController::startSingingCapture()
 {
     m_sungIntervalDetector.reset();

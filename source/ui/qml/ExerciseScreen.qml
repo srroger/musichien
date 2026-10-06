@@ -71,6 +71,10 @@ Item {
     // sinon elle avance au milieu du son, ce que Roger a vu tout de suite : « pour les modes, ca va beaucoup trop vite,
     // le son se coupe en plein milieu, t'as pas le temps de lire ».
     readonly property int modePause: ExerciseController.modeSoundDurationMs + 4500
+    // LE COMPTE A REBOURS DE LA SECONDE NOTE : 3, 2, 1, puis zero (le jeu redemande une note). ZERO au repos, et donc
+    // aussi avant que la premiere note soit prise. Roger : « un compte a rebours avant de lui faire reapparaitre
+    // l'interface pour qu'il chante la deuxieme note ».
+    property int singingCountdown: 0
     // Horizontal offset of the whole screen during the shake. Zero is the resting state, and it is both
     // where the animation starts and where it ends.
     property real shakeOffset: 0
@@ -712,23 +716,23 @@ Item {
                             // parce que c'est justement ce que le joueur ne peut pas deviner - il entend deux fois les
                             // memes notes, et c'est pourtant deux modes.
                             if (ExerciseController.isModeVampQuestion)
-                                return qsTr("Deux fois la même gamme, sur deux centres différents : le second passage est-il plus clair, ou plus obscur ?");
+                                return qsTr("Le 2ᵉ passage : plus clair, plus obscur, ou pareil ?");
 
                             if (ExerciseController.isForeignNoteQuestion)
-                                return qsTr("Sept notes montent en %1 sur le bourdon : l'une n'appartient pas à la gamme. Laquelle ?").arg(ExerciseController.heardMode.name);
+                                return qsTr("Une note n'est pas dans la gamme %1 : laquelle ?").arg(ExerciseController.heardMode.name);
 
                             // LE CHANT A SA PROPRE CONSIGNE, et il la fallait : il retombait sur le generique « Ecoute
                             // bien… », que Roger a vu a l'ecran pendant une question chantee. Or on ne lui demande pas
                             // d'ecouter mais de CHANTER - et un joueur qui lit « ecoute bien » attend un son qui ne
                             // vient pas.
                             if (ExerciseController.questionKind === 2)
-                                return qsTr("Chante deux notes : %1. La seconde est celle que le jeu attend.").arg(MicrophoneController.singingTargetLabel);
+                                return qsTr("Chante la cible : %1").arg(MicrophoneController.singingTargetLabel);
 
                             if (ExerciseController.isModeColourQuestion)
-                                return qsTr("Écoute les deux modes : le second est-il plus clair, plus obscur, ou pareil ?");
+                                return qsTr("Le 2ᵉ mode : plus clair, plus obscur, ou pareil ?");
 
                             if (ExerciseController.isModeQuestion)
-                                return qsTr("Écoute ce mode sur son bourdon : lequel est-ce ?");
+                                return qsTr("Quel mode ?");
 
                             return qsTr("Écoute bien…");
                         }
@@ -882,13 +886,93 @@ Item {
 
                 }
 
+                // LES DEUX NOTES, EN DEUX PASTILLES. Roger : les joueurs ne comprenaient PAS qu'il fallait une SECONDE
+                // note, parce qu'une phrase sous la portee ne se lit pas quand on regarde la boule. Deux pastilles, si :
+                // la premiere s'allume quand la note tient, la seconde au moment ou le jeu redemande une note.
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 14
+
+                    Repeater {
+                        model: 2
+
+                        Rectangle {
+                            readonly property bool lit: (index === 0) ? MicrophoneController.hasFirstNote : (MicrophoneController.hasFirstNote && exerciseScreen.singingCountdown === 0)
+
+                            width: 30
+                            height: 30
+                            radius: 15
+                            color: lit ? "#8ef2b0" : "#2a1a4a"
+                            border.color: lit ? "#8ef2b0" : "#5a4a8f"
+                            border.width: 2
+
+                            Text {
+                                anchors.centerIn: parent
+                                color: parent.lit ? "#12240f" : "#cbbde8"
+                                font.pixelSize: 15
+                                font.bold: true
+                                text: index + 1
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                // LE COMPTE A REBOURS : 3, 2, 1, et chaque tic S'ENTEND. C'est la respiration qui separe les deux notes.
+                Text {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: exerciseScreen.singingCountdown > 0
+                    color: "#ffd479"
+                    font.pixelSize: 34
+                    font.bold: true
+                    text: exerciseScreen.singingCountdown.toString()
+                }
+
+                // UNE SEULE LIGNE, ET COURTE. Le reste est dans les pastilles et dans le son.
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
                     color: "#cbb8e8"
-                    font.pixelSize: 13
-                    visible: !MicrophoneController.hasSungInterval
-                    text: MicrophoneController.hasFirstNote ? qsTr("Première note tenue — maintenant la deuxième") : qsTr("Tiens la première note…")
+                    font.pixelSize: 14
+                    visible: !MicrophoneController.hasSungInterval && exerciseScreen.singingCountdown === 0
+                    text: MicrophoneController.hasFirstNote ? qsTr("2ᵉ note") : qsTr("1ʳᵉ note")
+                }
+
+                Timer {
+                    id: singingCountdownTimer
+
+                    interval: 700
+                    repeat: true
+                    onTriggered: {
+                        exerciseScreen.singingCountdown = exerciseScreen.singingCountdown - 1;
+                        MicrophoneController.playCountdownTick(exerciseScreen.singingCountdown === 1);
+                        if (exerciseScreen.singingCountdown <= 0)
+                            stop();
+
+                    }
+                }
+
+                Connections {
+                    function onSungIntervalChanged() {
+                        // UNE NOUVELLE QUESTION : la pastille retombe, et le compte a rebours se remet a zero.
+                        if (!MicrophoneController.hasFirstNote) {
+                            exerciseScreen.singingCountdown = 0;
+                            singingCountdownTimer.stop();
+                            return ;
+                        }
+                        // LA PREMIERE NOTE VIENT D'ETRE CAPTEE : on l'ANNONCE (un « ding », puis la note rejouee), et on
+                        // lance le compte a rebours. La garde sur la famille evite de sonner ailleurs que dans le chant.
+                        if (ExerciseController.questionKind === 2 && exerciseScreen.singingCountdown === 0 && !MicrophoneController.hasSungInterval) {
+                            MicrophoneController.announceFirstNote();
+                            exerciseScreen.singingCountdown = 3;
+                            singingCountdownTimer.restart();
+                        }
+                    }
+
+                    target: MicrophoneController
                 }
 
                 RowLayout {
@@ -1303,7 +1387,7 @@ Item {
                     // tout le cercle et les boutons d'actions, ce qui est dommage ». Une explication qui pousse les
                     // commandes hors de portee coute plus qu'elle n'apprend. Deux lignes au maximum.
                     visible: ExerciseController.modeCircle.length > 0
-                    text: qsTr("Le bourdon : la tonique et sa quinte, tenues sous la gamme. C'est lui qui donne le centre.")
+                    text: qsTr("Le bourdon : tonique + quinte, tenues.")
                 }
 
                 // Elle est là PENDANT la question, et c'est un choix de Roger : « je mettrais quand même la roue dans la
@@ -1778,7 +1862,7 @@ Item {
                 color: "#8a77ad"
                 font.pixelSize: 14
                 visible: !ExerciseController.sessionGrantsExperience
-                text: qsTr("Ici, pas d'expérience : l'Arcade seule en donne. Mais tout compte pour tes statistiques.")
+                text: qsTr("Pas d'XP ici — l'Arcade en donne. Tout compte pour tes stats.")
             }
 
             // Roger : « a la fin du bilan, si il a gagne un trophee ou une recompense, il faut lui dire (et lui dire qu'ils

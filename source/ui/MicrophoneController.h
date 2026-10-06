@@ -201,6 +201,15 @@ public:
     // Plays the interval to sing, for the beginner level. The advanced level simply does not call it.
     Q_INVOKABLE void playSingingTarget();
 
+    // LA PREMIERE NOTE EST CAPTEE : on l'ANNONCE. Un court « ding », puis ON REJOUE LA NOTE qui vient d'etre chantee -
+    // c'est l'idee de Roger : « il faudrait carrement faire un bruitage (ou rejouer la frequence qu'il vient de
+    // chanter) ». Le chanteur s'ANCRE ainsi avant la seconde note, au lieu de deviner qu'il en reste une - c'etait le
+    // vrai probleme : « les gens n'ont pas compris qu'il fallait faire une 2eme note ».
+    Q_INVOKABLE void announceFirstNote();
+
+    // Un tic du COMPTE A REBOURS qui precede la seconde note. Accentue pour le dernier, comme une mesure qui commence.
+    Q_INVOKABLE void playCountdownTick( bool p_accented );
+
     // Opens the microphone and listens for two held notes.
     Q_INVOKABLE void startSingingCapture();
     Q_INVOKABLE void stopSingingCapture();
