@@ -991,7 +991,6 @@ Item {
                         if (ExerciseController.questionKind === 2 && !exerciseScreen.singingTransitionDone && !MicrophoneController.hasSungInterval) {
                             exerciseScreen.singingTransitionDone = true;
                             MicrophoneController.beginSingingTransition();
-                            MicrophoneController.playValidationChime();
                             MicrophoneController.playCountdownTick(true);
                             exerciseScreen.singingCountdown = 3;
                             singingCountdownTimer.restart();

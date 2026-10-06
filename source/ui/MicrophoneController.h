@@ -210,10 +210,6 @@ public:
     // Un tic du COMPTE A REBOURS qui precede la seconde note. Accentue pour le dernier, comme une mesure qui commence.
     Q_INVOKABLE void playCountdownTick( bool p_accented );
 
-    // LE « GLING » DE VALIDATION : le son qui dit que la premiere note est enregistree. Roger l'a voulu PLUS IMPORTANT
-    // que le metronome du compte a rebours, qui n'est qu'un guide - d'ou le gain reduit de playCountdownTick.
-    Q_INVOKABLE void playValidationChime();
-
     // LA TRANSITION ENTRE LES DEUX NOTES : le jeu JOUE des sons (la note rejouee, le compte a rebours), et le micro les
     // ENTENDRAIT - le detecteur croirait alors a un nouveau chant. Roger : « les sons font interferences avec le micro,
     // du coup le micro croit que c'est un nouveau chant ». On met donc le detecteur en PAUSE le temps des sons : la
