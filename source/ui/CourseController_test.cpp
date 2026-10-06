@@ -69,7 +69,10 @@ TEST( CourseControllerTest, the_library_shows_one_line_per_course )
 
     const QVariantMap entry = controller.library().front().toMap();
 
-    EXPECT_EQ( entry.value( QStringLiteral( "title" ) ).toString(), QString( "La quinte juste" ) );
+    // LE NUMERO EST DEVANT, et il est calcule : « 1. La quinte juste ». C'est le rang dans le CATALOGUE, pas une valeur
+    // ecrite dans le fichier - un titre qui porterait son propre numero se desynchroniserait le jour ou deux lecons
+    // s'echangent.
+    EXPECT_EQ( entry.value( QStringLiteral( "title" ) ).toString(), QString( "1. La quinte juste" ) );
     EXPECT_EQ( entry.value( QStringLiteral( "blockCount" ) ).toInt(), 3 );
 }
 
@@ -93,7 +96,7 @@ TEST( CourseControllerTest, opening_a_course_gives_its_blocks_in_the_order_of_th
     controller.open( 0 );
 
     ASSERT_TRUE( controller.isReading() );
-    EXPECT_EQ( controller.title(), QString( "La quinte juste" ) );
+    EXPECT_EQ( controller.title(), QString( "1. La quinte juste" ) );
 
     const QVariantList blocks = controller.blocks();
 
@@ -222,7 +225,7 @@ TEST( CourseControllerTest, an_annexe_is_told_apart_from_a_course )
     ASSERT_EQ( controller.library().size(), 2 );
 
     EXPECT_EQ( controller.library().at( 0 ).toMap().value( QStringLiteral( "title" ) ).toString(),
-               QString( "La quinte juste" ) );
+               QString( "1. La quinte juste" ) );
     EXPECT_FALSE( controller.library().at( 0 ).toMap().value( QStringLiteral( "isAnnexe" ) ).toBool() );
     EXPECT_TRUE( controller.library().at( 1 ).toMap().value( QStringLiteral( "isAnnexe" ) ).toBool() );
 }
@@ -319,6 +322,64 @@ TEST( CourseControllerTest, a_file_name_where_a_title_belongs_opens_nothing )
     controller.openAnnexe( QStringLiteral( "pourquoi-la-quinte-sonne-juste" ) );
 
     EXPECT_FALSE( controller.isReading() );
+}
+
+// LE NUMERO D'UN COURS EST SON RANG DANS LE CATALOGUE, et les os a macher n'en portent pas.
+//
+// Roger : « je mettrais bien un "1. La quinte juste" pour bien rappeler que c'est la quinte juste ». Le numero est
+// CALCULE, jamais ecrit : l'auteur ecrit le titre, l'ordre du catalogue fait le reste - et deux lecons qui s'echangent se
+// renumerotent toutes seules, sans qu'aucun fichier soit a reviser.
+//
+// Une annexe n'en porte pas, parce qu'elle n'est pas une lecon : son chapitre vaut zero, et c'est deja ce qui la range a
+// la fin. Lui coller un numero ferait croire qu'elle est une etape du parcours.
+TEST( CourseControllerTest, a_lesson_carries_its_rank_and_an_annexe_carries_none )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course second = makeQuintCourse();
+    second.title = "Les modes";
+    second.order = 2;
+
+    domain::Course annexe = makeQuintCourse();
+    annexe.title = "Pourquoi la quinte sonne juste";
+    annexe.chapter = 0;
+
+    const CourseController controller{ notePlayer, { annexe, second, makeQuintCourse() } };
+
+    ASSERT_EQ( controller.library().size(), 3 );
+
+    // L'ORDRE EST CELUI DU CATALOGUE : la lecon 1, la lecon 2, puis l'os a macher.
+    EXPECT_EQ( controller.library().at( 0 ).toMap().value( QStringLiteral( "title" ) ).toString(),
+               QString( "1. La quinte juste" ) );
+    EXPECT_EQ( controller.library().at( 1 ).toMap().value( QStringLiteral( "title" ) ).toString(),
+               QString( "2. Les modes" ) );
+
+    // ET L'ANNEXE N'EST PAS NUMEROTEE, meme quand elle est donnee en premier.
+    EXPECT_EQ( controller.library().at( 2 ).toMap().value( QStringLiteral( "title" ) ).toString(),
+               QString( "Pourquoi la quinte sonne juste" ) );
+}
+
+// LES CONCEPTS D'UN COURS SONT DONNES A L'ESSAI, EN DISTANCES.
+//
+// Le domaine les portait deja, ils etaient LUS mais jamais consommes : c'est ce que la carte « :: essai » passe au
+// controleur d'entrainement, pour ouvrir une session qui contient ce que la lecon vient d'enseigner. La page ne les
+// fournit qu'une fois un cours ouvert, comme le reste.
+TEST( CourseControllerTest, a_course_gives_its_concepts_as_distances )
+{
+    domain::NotePlayerFake notePlayer;
+
+    domain::Course course = makeQuintCourse();
+    course.concepts = { 3, 4 };
+
+    CourseController controller{ notePlayer, { course } };
+
+    EXPECT_TRUE( controller.currentConcepts().isEmpty() );
+
+    controller.open( 0 );
+
+    ASSERT_EQ( controller.currentConcepts().size(), 2 );
+    EXPECT_EQ( controller.currentConcepts().at( 0 ).toInt(), 3 );
+    EXPECT_EQ( controller.currentConcepts().at( 1 ).toInt(), 4 );
 }
 
 }    // namespace musichien::ui

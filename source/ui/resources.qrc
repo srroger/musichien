@@ -26,6 +26,7 @@
           L'Ecole des Chiots. La page est un ecran SEPARE, comme ScaleScreen : Main.qml fait deja quatre mille cinq cents
           lignes, et rien de neuf ne s'y ajoute au-dela du bouton qui l'ouvre.
         -->
+        <file>qml/CourseSchema.qml</file>
         <file>qml/CourseScreen.qml</file>
         <!--
           LE GLOSSAIRE : un dictionnaire, et rien d'autre. La page est un ecran SEPARE et non un mode du lecteur de
@@ -43,6 +44,88 @@
         <file alias="assets/content/courses/quinte-juste.md">../../assets/content/courses/quinte-juste.md</file>
         <file alias="assets/content/courses/pourquoi-la-quinte-sonne-juste.md">../../assets/content/courses/pourquoi-la-quinte-sonne-juste.md</file>
         <!--
+          Leçon 2 : L'octave, et son os a macher. Meme motif, meme alias - le chemin de ressource est celui du disque.
+
+          Une lecon NEUVE demande une ligne ICI et un rebuild : c'est le prix d'un contenu embarque, et il vaut mieux
+          l'ecrire que le decouvrir.
+        -->
+        <file alias="assets/content/courses/octave.md">../../assets/content/courses/octave.md</file>
+        <file alias="assets/content/courses/pourquoi-l-octave-sonne-pareil.md">../../assets/content/courses/pourquoi-l-octave-sonne-pareil.md</file>
+        <!--
+          Lecon 3 : Le centre. Elle ne porte AUCUN intervalle dans ses concepts : il n'y a rien a travailler ici, il y a
+          quelque chose a ENTENDRE - un centre tenu. C'est pour ca qu'une carte de bourdon a ete ajoutee au jeu.
+        -->
+        <file alias="assets/content/courses/le-centre.md">../../assets/content/courses/le-centre.md</file>
+        <!--
+          Lecon 4 : Le cercle des quintes, et son os a macher. Lecon 5 : les sept pas, et le sien.
+
+          Chacune porte sa propre annexe, et le renvoi se verifie AU DEMARRAGE : un cours qui pointe une annexe
+          inexistante le dit tout de suite, au lieu de laisser une carte morte dans la page.
+        -->
+        <file alias="assets/content/courses/le-cercle-des-quintes.md">../../assets/content/courses/le-cercle-des-quintes.md</file>
+        <file alias="assets/content/courses/le-cercle-mode-demploi.md">../../assets/content/courses/le-cercle-mode-demploi.md</file>
+        <file alias="assets/content/courses/les-sept-pas.md">../../assets/content/courses/les-sept-pas.md</file>
+        <file alias="assets/content/courses/pourquoi-sept-notes.md">../../assets/content/courses/pourquoi-sept-notes.md</file>
+        <!--
+          Lecon 6 : Gamme majeure, gamme mineure, et son os a macher. Elle reste sur le MEME centre et fait entendre la
+          meme note de depart, claire puis sombre : c'est la tierce qui decide, et le relatif (do majeur / la mineur) est
+          l'image qui relie les deux.
+        -->
+        <file alias="assets/content/courses/gamme-majeure-mineure.md">../../assets/content/courses/gamme-majeure-mineure.md</file>
+        <file alias="assets/content/courses/le-majeur-et-le-mineur.md">../../assets/content/courses/le-majeur-et-le-mineur.md</file>
+        <!--
+          Chapitre 4 : LA COULEUR. Lecon 7 (l'accord, clair ou sombre) et lecon 8 (les modes), avec leurs os a macher.
+
+          Ces deux lecons sont les premieres a ne PAS s'exercer sur des intervalles : un ':: essai | accord' ouvre
+          l'exercice des accords, un ':: essai | mode' celui des modes. Et la lecon 7 fait ENTENDRE un accord, ce
+          qu'aucune carte ne savait faire avant ':: accord' - la carte du chapitre.
+        -->
+        <file alias="assets/content/courses/l-accord-clair-ou-sombre.md">../../assets/content/courses/l-accord-clair-ou-sombre.md</file>
+        <file alias="assets/content/courses/pourquoi-trois-notes-suffisent.md">../../assets/content/courses/pourquoi-trois-notes-suffisent.md</file>
+        <file alias="assets/content/courses/les-modes-plus-clair-plus-obscur.md">../../assets/content/courses/les-modes-plus-clair-plus-obscur.md</file>
+        <file alias="assets/content/courses/l-echelle-des-bemols.md">../../assets/content/courses/l-echelle-des-bemols.md</file>
+        <!--
+          Chapitre 5 : les accords, un peu plus loin. Lecon 9 : la septieme, et la tension qui pousse - l'accord qui
+          appelle une suite, et pourquoi (le triton cache entre la tierce et la septieme).
+        -->
+        <file alias="assets/content/courses/la-septieme-et-la-tension.md">../../assets/content/courses/la-septieme-et-la-tension.md</file>
+        <file alias="assets/content/courses/pourquoi-la-septieme-tend.md">../../assets/content/courses/pourquoi-la-septieme-tend.md</file>
+        <!--
+          Lecon 10 : le renversement - le meme accord, autrement pose. La carte ':: accord' gagne un QUATRIEME champ
+          facultatif, le renversement, qui remonte la note du bas d'une octave.
+        -->
+        <file alias="assets/content/courses/le-meme-accord-autrement-pose.md">../../assets/content/courses/le-meme-accord-autrement-pose.md</file>
+        <file alias="assets/content/courses/pourquoi-l-ordre-des-notes-change-le-son.md">../../assets/content/courses/pourquoi-l-ordre-des-notes-change-le-son.md</file>
+        <!--
+          Chapitre 6 : LA GRAMMAIRE. Les intervalles nommes un par un - quarte, secondes, sixtes, septiemes, triton,
+          unisson. Chacun a deja ete ENTENDU dans les chapitres precedents ; ici, il recoit son nom.
+        -->
+        <file alias="assets/content/courses/la-quarte.md">../../assets/content/courses/la-quarte.md</file>
+        <file alias="assets/content/courses/les-secondes.md">../../assets/content/courses/les-secondes.md</file>
+        <file alias="assets/content/courses/les-sixtes.md">../../assets/content/courses/les-sixtes.md</file>
+        <file alias="assets/content/courses/les-septiemes.md">../../assets/content/courses/les-septiemes.md</file>
+        <file alias="assets/content/courses/le-triton.md">../../assets/content/courses/le-triton.md</file>
+        <file alias="assets/content/courses/l-unisson.md">../../assets/content/courses/l-unisson.md</file>
+        <!--
+          Chapitre 7 : LES MODES, UN PAR UN. Sept cours particuliers - la couleur, l'usage, les cliches, le ressenti -
+          dans l'ordre de couleur du domaine, du plus clair au plus sombre.
+        -->
+        <file alias="assets/content/courses/le-lydien.md">../../assets/content/courses/le-lydien.md</file>
+        <file alias="assets/content/courses/l-ionien.md">../../assets/content/courses/l-ionien.md</file>
+        <file alias="assets/content/courses/le-mixolydien.md">../../assets/content/courses/le-mixolydien.md</file>
+        <file alias="assets/content/courses/le-dorien.md">../../assets/content/courses/le-dorien.md</file>
+        <file alias="assets/content/courses/l-eolien.md">../../assets/content/courses/l-eolien.md</file>
+        <file alias="assets/content/courses/le-phrygien.md">../../assets/content/courses/le-phrygien.md</file>
+        <file alias="assets/content/courses/le-locrien.md">../../assets/content/courses/le-locrien.md</file>
+        <!--
+          Chapitre 8 : LES AUTRES PILIERS. Le rythme (le pilier qui n'est pas la hauteur), les temperaments (le comma,
+          et pourquoi la meme distance peut sonner faux), et les intervalles composes (les memes couleurs, une octave
+          plus haut).
+        -->
+        <file alias="assets/content/courses/le-rythme.md">../../assets/content/courses/le-rythme.md</file>
+        <file alias="assets/content/courses/les-temperaments.md">../../assets/content/courses/les-temperaments.md</file>
+        <file alias="assets/content/courses/les-intervalles-composes.md">../../assets/content/courses/les-intervalles-composes.md</file>
+        <!--
           Le glossaire. Un mot par entree, une definition d'UNE PHRASE : Roger veut un aide-memoire, pas un manuel.
           Meme motif que les autres contenus, alias compris - le chemin de ressource est celui du disque.
         -->
@@ -55,6 +138,11 @@
           Le nom du fichier est cite par le cours SANS dossier ni extension : c'est l'ecran qui sait ou elles vivent.
         -->
         <file alias="assets/content/images/pythagore-forgerons.png">../../assets/content/images/pythagore-forgerons.png</file>
+        <!--
+          Roger a depose une VRAIE illustration : « Le Joueur de Cornemuse » d'Abraham Bloemaert, XVIIe siecle. Un
+          .jpg, donc : le nom du fichier porte son extension, et l'ecran la respecte au lieu d'imposer '.png'.
+        -->
+        <file alias="assets/content/images/cornemuse.jpg">../../assets/content/images/cornemuse.jpg</file>
         <!--
           The content files live at the root of the project, as docs/ARCHITECTURE.md requires, and the
           alias gives each one the runtime path it has on disk: ':/assets/content/...'. An alias rather

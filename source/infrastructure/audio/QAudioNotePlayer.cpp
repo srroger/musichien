@@ -935,7 +935,7 @@ void QAudioNotePlayer::holdTimbre()
     m_holdTimbre = true;
 }
 
-void QAudioNotePlayer::beginTimbreForSession()
+void QAudioNotePlayer::beginTimbreForSession( int p_timbreIndex )
 {
     // UN timbre pour toute la session, et un nouveau a chaque session : le tirage a lieu ICI, une fois, puis
     // timbreIndexFor ne le touche plus.
@@ -955,9 +955,18 @@ void QAudioNotePlayer::beginTimbreForSession()
         return;
     }
 
-    std::uniform_int_distribution<std::size_t> distribution{ 0, timbreCount - 1 };
+    // UN INSTRUMENT DEMANDE, ou un TIRAGE. Un cours DEMANDE le sien - le piano, sauf exception : c'est ce qui fait
+    // qu'une lecon compare des SONS et non des timbres.
+    if( ( p_timbreIndex >= 0 ) && std::cmp_less( p_timbreIndex, timbreCount ) )
+    {
+        m_instrumentIndex = static_cast<std::size_t>( p_timbreIndex );
+    }
+    else
+    {
+        std::uniform_int_distribution<std::size_t> distribution{ 0, timbreCount - 1 };
 
-    m_instrumentIndex = distribution( m_instrumentRandomEngine );
+        m_instrumentIndex = distribution( m_instrumentRandomEngine );
+    }
 
     // Et le timbre est TENU : c'est la seule chose qui distingue ce tirage des autres.
     m_timbreIsHeldForSession = true;

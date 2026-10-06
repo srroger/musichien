@@ -355,4 +355,49 @@ TEST( MainScreenTest, nothing_needs_to_scroll_sideways_on_a_phone )
     ASSERT_GT( flickableCount, 0 ) << "aucune page defilante trouvee : le test ne mesure rien";
 }
 
+// UNE PAGE QU'ON OUVRE DOIT AVOIR UNE PORTE QUI SE VOIT.
+//
+// Roger a trouve ce bug en ouvrant le cercle depuis une lecon : « bloque, et le retour du telephone ne fonctionne
+// pas ». La page du cercle n'avait AUCUNE sortie : elle se fermait par le bouton Retour du telephone, et par lui
+// seul. Depuis la garde, cela suffisait - le dialogue prenait la touche. Depuis une LECON, non : le capteur de touche
+// vit dans l'Ecole et reprend le focus, donc le dialogue ne recoit jamais la touche, et c'est la lecon cachee
+// DERRIERE lui que le retour fermait. L'ecran semblait mort, et il l'etait.
+//
+// Le test verifie les DEUX moities, parce que l'une sans l'autre ne sert a rien : la page DIT qu'elle veut sortir
+// (un signal), et elle offre de quoi le demander (un bouton).
+TEST( MainScreenTest, the_circle_page_carries_its_own_way_out )
+{
+    application();
+    // ENREGISTRE LES VIEW MODELS ICI, MEME SI UN AUTRE TEST L'A DEJA FAIT. La page importe `Musichien`, donc sans
+    // cette ligne le composant ne se cree pas - et le test ne passait alors que par l'ordre dans lequel gtest les
+    // execute. Un test qui depend de son voisin n'est pas un test : c'est une coincidence.
+    registerViewModels();
+
+    QQmlEngine engine;
+
+    QQmlComponent component{ &engine, QUrl{ QStringLiteral( "qrc:/qml/KeyCircleScreen.qml" ) } };
+
+    const std::unique_ptr<QObject> page{ component.create() };
+
+    ASSERT_NE( nullptr, page.get() ) << component.errorString().toStdString();
+
+    // 1. Elle dit l'INTENTION : c'est ce qui permet a celui qui la porte de la refermer, sans qu'elle ait besoin de
+    //    savoir qu'elle vit dans un dialogue - ni meme qu'un dialogue existe.
+    EXPECT_GE( page->metaObject()->indexOfSignal( "closeRequested()" ), 0 )
+      << "la page du cercle a perdu le signal par lequel elle demande a sortir";
+
+    // 2. Et elle donne le MOYEN de le demander. Sans cette porte visible, la page n'est atteignable que par le bouton
+    //    Retour du telephone - et ce bouton, justement, ne l'atteint pas depuis une lecon.
+    QStringList texts;
+
+    collectTexts( page.get(), texts );
+
+    const bool hasVisibleExit = std::ranges::any_of( texts, []( const QString & p_text ) {
+        return p_text.contains( QStringLiteral( "Fermer" ) );
+    } );
+
+    EXPECT_TRUE( hasVisibleExit ) << "la page du cercle n'a aucune sortie visible : on n'en sort que par le retour du "
+                                     "telephone, et c'est exactement ce qui a bloque Roger";
+}
+
 }    // namespace musichien::ui

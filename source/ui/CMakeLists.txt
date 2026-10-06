@@ -15,6 +15,7 @@ set(MUSICHIEN_QML_RESOURCE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc PARENT
 # Listed explicitly rather than globbed: a new QML file must be added here on purpose, which keeps
 # the build honest and reproducible.
 set(MUSICHIEN_QML_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/qml/CourseSchema.qml
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/CourseScreen.qml
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/ExerciseScreen.qml
     ${CMAKE_CURRENT_SOURCE_DIR}/qml/GlossaryScreen.qml

@@ -125,6 +125,11 @@ ApplicationWindow {
     // UN COMPOSANT A PART ENTIERE, et non une option de TintedMenuButton : le bouton teinte est valide par Roger tel qu'il
     // est, et lui ajouter un mode aurait change SON fond a lui. Deux habillages, deux composants - le jour ou l'un bouge,
     // l'autre ne bronche pas.
+    // LES PAGES DE REFERENCE PASSENT AVANT TOUT LE RESTE, parce qu'elles sont DEVANT tout le reste.
+    // C'est le bug que Roger a trouve en ouvrant le cercle depuis une lecon : « bloque, et le retour du telephone
+    // ne fonctionne pas ». Le capteur de touche reprend le focus des que l'Ecole est ouverte - donc le dialogue ne
+    // recoit JAMAIS la touche - et la regle ci-dessous s'attaquait a la lecon cachee DERRIERE lui. La page restait
+    // ouverte pour toujours, et l'ecran semblait mort.
 
     id: mainWindow
 
@@ -269,6 +274,16 @@ ApplicationWindow {
     // seule regle, et trois portes. Elle rend VRAI si elle a consomme le geste, et FAUX quand il n'y a plus rien a
     // remonter - c'est alors la sortie de l'application, et elle est demandee.
     function goBackOneStep() {
+        // La liste est courte, et elle doit le rester : ce sont les pages qu'une LECON peut ouvrir par-dessus l'Ecole.
+        // Une page qu'on n'ouvre que depuis la garde se ferme deja toute seule - le dialogue, lui, prend la touche.
+        if (keyCircleDialog.visible) {
+            keyCircleDialog.close();
+            return true;
+        }
+        if (singingDialog.visible) {
+            singingDialog.close();
+            return true;
+        }
         // UNE PARTIE EN COURS D'ABORD : elle passe AVANT l'Ecole, parce qu'elle est ce qui se voit. C'est l'ordre de
         // lecture de l'ecran, pas une preference - sans lui, le retour fermerait la lecon cachee derriere la partie.
         if (ExerciseController.running) {
@@ -1792,6 +1807,9 @@ ApplicationWindow {
             onAnnexeRequested: function(p_annexeName) {
                 CourseController.openAnnexe(p_annexeName);
             }
+            // OUVRIR LE CERCLE DES QUINTES : la page de reference du jeu, en plein ecran. Le cours l'annonce, Main.qml
+            // sait ou elle vit, et l'Ecole reste ouverte derriere - le retour ramene donc a la lecon.
+            onCircleRequested: keyCircleDialog.open()
             // Quitter l'Ecole LIBERE la lecon : le prochain passage ouvrira le catalogue, pas la lecon d'avant.
             onVisibleChanged: {
                 if (!visible && !mainWindow.schoolIsOpen)
@@ -3473,7 +3491,10 @@ ApplicationWindow {
         // NI TITRE, NI BOUTONS STANDARD, ET LE PADDING A ZERO : les trois creent une en-tete ou un pied de page, qui
         // gardent le BLANC du style et laissent mon fond sombre ne remplir que la zone de contenu. Roger l'a vu tout de
         // suite - « un bout a la couleur de fond, mais le haut est blanc ». La page entiere est donc la page, et elle
-        // porte elle-meme son titre et sa sortie, comme KeyCircleScreen et l'accordeur.
+        // porte elle-meme son titre et sa sortie, comme l'accordeur - ET COMME LE CERCLE, depuis qu'on a verifie :
+        // ce commentaire affirmait deja que la page du cercle avait une sortie, et elle n'en avait AUCUNE. Roger s'est
+        // retrouve bloque dessus en l'ouvrant depuis une lecon. C'est le piege 3.10 de la note 30 : un commentaire peut
+        // mentir pendant des mois, et personne ne le relit.
         padding: 0
         onOpened: ScaleController.start()
 
@@ -3505,6 +3526,15 @@ ApplicationWindow {
 
         KeyCircleScreen {
             anchors.fill: parent
+            // LA PORTE DE LA PAGE, par laquelle on sort. C'est ICI qu'on sait qu'elle est un dialogue, et la page n'a
+            // pas besoin de le savoir.
+            onCloseRequested: keyCircleDialog.close()
+        }
+
+        // LA MEME NUIT QUE LA PAGE. Sans cela le dialogue gardait le fond BLANC du style Material, et il en restait une
+        // bande visible sur un bord - Roger la voyait : « une legere barre blanche en haut ».
+        background: Rectangle {
+            color: "#1d1033"
         }
 
     }

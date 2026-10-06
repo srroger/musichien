@@ -38,6 +38,19 @@ Item {
     // OUVRIR UNE ANNEXE : la carte « :: annexe » cite un nom, et c'est ICI qu'on sait ou vit le lecteur de cours. La
     // page dit l'INTENTION, celui qui la porte decide - la meme regle que pour la carte de chant.
     signal annexeRequested(string p_annexeName)
+    // OUVRIR LE CERCLE : la page de reference du jeu. La page dit l'intention, celui qui la porte decide - la meme regle
+    // que pour l'annexe et pour le chant.
+    signal circleRequested()
+
+    // L'IMAGE DEVIENT UNE ADRESSE ICI, ET NULLE PART AILLEURS. Un cours ecrit un NOM ; c'est l'ecran qui sait ou vivent
+    // les images. Et un nom qui porte deja son extension est respecte tel quel - sinon le .jpg que Roger a depose pour
+    // la cornemuse ne s'afficherait jamais, et le telephone ne le dirait pas plus qu'une image distante.
+    function imageSourceFor(fileName) {
+        if (fileName.indexOf(".") >= 0)
+            return "qrc:/assets/content/images/" + fileName;
+
+        return "qrc:/assets/content/images/" + fileName + ".png";
+    }
 
     anchors.fill: parent
 
@@ -223,11 +236,52 @@ Item {
 
         // LE COURS OUVERT. L'ordre des blocs est celui du FICHIER : c'est la donnee, pas une mise en page.
         Flickable {
+            // LE SWIPE. Roger : « je me demande si ce serait possible d'aller d'une page a une en swippant de gauche a
+            // droite au lieu d'appuyer sur le bouton ? » ... puis, apres l'avoir essaye : « le swipe n'a pas l'air de
+            // fonctionner. »
+            // LE PREMIER ESSAI ETAIT FAUX, et la raison vaut d'etre gardee : un MouseArea pose DERRIERE le contenu ne
+            // voyait jamais le relachement, parce qu'un FLICKABLE REPREND TOUS LES GLISSEMENTS - verticaux comme
+            // horizontaux. Un doigt qui bouge est un defilement, un point c'est tout ; le MouseArea n'avait plus la main.
+
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: CourseController.reading
             clip: true
             contentHeight: courseColumn.height
+            flickableDirection: Flickable.VerticalFlick
+
+            // UN DRAGHANDLER EST UN GESTIONNAIRE DE POINTEUR, et il passe AVANT le Flickable. Et comme il n'ecoute QUE
+            // l'axe HORIZONTAL, il ne s'active pas sur un geste vertical - le defilement reste donc au Flickable, intact.
+            DragHandler {
+                id: pageSwipe
+
+                // LE GLISSEMENT ACCUMULE, en horizontal : on le lit au relachement.
+                property real swept: 0
+
+                target: null
+                yAxis.enabled: false
+                dragThreshold: 24
+                enabled: !CourseController.showingWholeNote && CourseController.sectionCount > 1
+                onActiveChanged: {
+                    // Un geste commence : on repart de zero.
+                    if (active) {
+                        pageSwipe.swept = 0;
+                        return ;
+                    }
+                    // IL FAUT VRAIMENT GLISSER : 60 px, sinon c'est un frolement.
+                    if (Math.abs(pageSwipe.swept) < 60)
+                        return ;
+
+                    // Vers la GAUCHE (contenu qui s'en va) : page suivante. Vers la DROITE : precedente.
+                    if (pageSwipe.swept < 0)
+                        CourseController.nextSection();
+                    else
+                        CourseController.previousSection();
+                }
+                xAxis.onActiveValueChanged: (delta) => {
+                    pageSwipe.swept += delta;
+                }
+            }
 
             ColumnLayout {
                 // LA NAVIGATION, AU BOUT DE LA PAGE.
@@ -395,12 +449,56 @@ Item {
                     // « qrc:/... » : un chemin dans un fichier de contenu est un chemin qui se casse le jour ou
                     // l'image demenage.
                     // LA CARTE "SERIE" : le jeu joue la serie harmonique, et l'ecran la nomme.
+                    // LA CARTE "BOURDON" : le jeu TIENT un centre, et l'ecran le nomme.
+                    // LA CARTE "CYCLE" : le cercle des quintes se PARCOURT.
+                    // LA CARTE "GAMME" : la gamme d'un mode, jouee sur le bourdon.
+                    // LE SCHEMA - la seule carte du catalogue qui DESSINE.
+                    // Roger, en relisant le cours du centre : « la musique celtique avec cette fameuse cornemuse est
+                    // un exemple tres fort du bourdon. Ce serait bien de rajouter une petite page, peut-etre image ou
+                    // un dessin ou schema qui parle. Juste pour ne pas avoir que du texte. »
+                    // Une image du commerce aurait montre un INSTRUMENT. Ce dessin montre le PRINCIPE - deux notes
+                    // tenues du debut a la fin, et une ligne qui part, derive, et REVIENT se poser sur le centre.
+                    // C'est exactement le propos du chapitre, et ca se voit avant de le lire.
 
                     model: CourseController.blocks
 
                     delegate: ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 6
+
+                        // OUVRIR LE CERCLE. Roger : « on est capable de le fabriquer dans le code, on a meme une page
+                        // dediee au cercle. » Alors on l'ouvre - et le cours n'a pas besoin de savoir ou elle vit.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "cercle"
+                            implicitHeight: circleText.implicitHeight + 24
+                            radius: 10
+                            color: "#241a3d"
+                            border.color: "#5a4a8f"
+                            border.width: 1
+
+                            Text {
+                                id: circleText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#cbb8e8"
+                                font.pixelSize: 13
+                                // La legende est FACULTATIVE : le bouton a un nom par defaut, et un cours qui n'a rien de
+                                // mieux a dire n'a pas a le repeter.
+                                text: modelData.caption !== "" ? qsTr("🎡  %1").arg(modelData.caption) : qsTr("🎡  Ouvrir le cercle des quintes")
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    courseScreen.circleRequested();
+                                }
+                            }
+
+                        }
 
                         // UN PARAGRAPHE DE MARKDOWN : Qt le rend, nous ne le composons pas.
                         Text {
@@ -441,6 +539,38 @@ Item {
                                 onClicked: {
                                     ExerciseController.playTapCue();
                                     CourseController.playInterval(modelData.semitones, modelData.direction);
+                                }
+                            }
+
+                        }
+
+                        // LA CARTE "L'ACCORD" : le jeu joue trois notes, et la tierce dit la couleur. C'est la carte du
+                        // chapitre de la couleur - le majeur et le mineur, entendus avant d'etre nommes.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "accord"
+                            implicitHeight: chordText.implicitHeight + 24
+                            radius: 10
+                            color: "#21351f"
+                            border.color: "#3f6a3a"
+                            border.width: 1
+
+                            Text {
+                                id: chordText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#cdeec6"
+                                font.pixelSize: 14
+                                text: qsTr("🎹  %1").arg(modelData.caption)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    CourseController.playChord(modelData.chordQuality, modelData.chordInversion);
                                 }
                             }
 
@@ -530,7 +660,7 @@ Item {
                                 wrapMode: Text.WordWrap
                                 color: "#d8cdf4"
                                 font.pixelSize: 14
-                                text: qsTr("Essaie-le : l'exercice des intervalles")
+                                text: modelData.exerciseFamily === 1 ? qsTr("Essaie-le : l'exercice des accords") : modelData.exerciseFamily === 2 ? qsTr("Essaie-le : l'exercice des modes") : qsTr("Essaie-le : l'exercice des intervalles")
                             }
 
                             MouseArea {
@@ -539,11 +669,12 @@ Item {
                                     // ON NE FERME PAS L'ECOLE : l'ecran d'exercice est un calque declare PLUS BAS, donc il
                                     // passe par-dessus la page. Quitter la partie fait alors RETOMBER sur la lecon qu'on
                                     // etait en train de lire - ce que Roger attend, et non la page de garde.
-                                    // L'ENTRAINEMENT DE CE COURS, et non l'entrainement en general : l'intervalle que la
-                                    // lecon vient d'enseigner est mis en avant dans les questions qui suivent, sans jamais
-                                    // elargir la palette du joueur. C'est ce qui fait qu'une lecon change quelque chose.
+                                    // L'EXERCICE DE CE COURS, et non l'entrainement en general. Le mot de la carte dit la
+                                    // FAMILLE : intervalle, accord ou mode ; la LISTE dit ce qu'on ouvre dedans (les modes
+                                    // 'tous', par exemple). Pour les intervalles, la palette est EXACTEMENT les concepts
+                                    // du cours.
                                     ExerciseController.playTapCue();
-                                    ExerciseController.startTrainingSessionFromLesson(modelData.semitones);
+                                    ExerciseController.startTrainingSessionFromLesson(CourseController.currentConcepts, modelData.exerciseFamily, modelData.exerciseTargets);
                                 }
                             }
 
@@ -632,7 +763,7 @@ Item {
                                 // Une hauteur MAXIMALE : sans elle, une image haute mangerait trois pages de defilement.
                                 // PreserveAspectFit garde les proportions, donc rien n'est deforme.
                                 Layout.preferredHeight: 380
-                                source: "qrc:/assets/content/images/" + modelData.imageName + ".png"
+                                source: courseScreen.imageSourceFor(modelData.imageName)
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
                                 smooth: true
@@ -677,6 +808,128 @@ Item {
                                 onClicked: {
                                     ExerciseController.playTapCue();
                                     CourseController.playHarmonicSeries();
+                                }
+                            }
+
+                        }
+
+                        // C'est la formule exacte des questions de couleur du jeu : la tonique et sa quinte, sans tierce.
+                        // Un centre qui ne colore rien lui-meme - donc qui laisse entendre la couleur de ce qu'on pose
+                        // dessus. Avec une tierce, il dirait deja majeur ou mineur.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "bourdon"
+                            implicitHeight: droneText.implicitHeight + 24
+                            radius: 10
+                            color: "#21351f"
+                            border.color: "#3f6a3a"
+                            border.width: 1
+
+                            Text {
+                                id: droneText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#cdeec6"
+                                font.pixelSize: 14
+                                text: qsTr("🎵  %1").arg(modelData.caption)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    CourseController.playDrone();
+                                }
+                            }
+
+                        }
+
+                        // PEINT, ET NON CHARGE : net a toutes les tailles d'ecran, anime, et il ne coute pas un octet de
+                        // plus dans l'APK. Le point qui avance fait la difference entre un dessin et un schema - sans
+                        // lui, on voit une courbe ; avec lui, on voit une melodie qui RENTRE chez elle.
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "schema"
+                            spacing: 6
+
+                            CourseSchema {
+                                Layout.fillWidth: true
+                                schemaName: modelData.schemaName
+                            }
+
+                            Text {
+                                Layout.preferredWidth: 0
+                                Layout.minimumWidth: 0
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                color: "#8a77ad"
+                                font.pixelSize: 12
+                                text: modelData.caption
+                            }
+
+                        }
+
+                        // Rien de dessine, et c'est volontaire : ce qui compte ici, c'est de l'ENTENDRE revenir sur ses
+                        // pas. Une roue a l'ecran attirerait l'oeil sur autre chose que le son.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "cycle"
+                            implicitHeight: cycleText.implicitHeight + 24
+                            radius: 10
+                            color: "#2b2350"
+                            border.color: "#5a4a8f"
+                            border.width: 1
+
+                            Text {
+                                id: cycleText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#d8cdf4"
+                                font.pixelSize: 14
+                                text: qsTr("🎹  %1").arg(modelData.caption)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    CourseController.playFifthCycle(modelData.fifthCount);
+                                }
+                            }
+
+                        }
+
+                        // C'est la carte qui rend les couleurs audibles. Sans bourdon, sept notes sont sept notes ;
+                        // avec lui, elles sont une COULEUR - et c'est la meme formule que le banc d'essai des modes.
+                        Rectangle {
+                            Layout.fillWidth: true
+                            visible: modelData.kind === "gamme"
+                            implicitHeight: scaleText.implicitHeight + 24
+                            radius: 10
+                            color: "#21351f"
+                            border.color: "#3f6a3a"
+                            border.width: 1
+
+                            Text {
+                                id: scaleText
+
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                wrapMode: Text.WordWrap
+                                color: "#cdeec6"
+                                font.pixelSize: 14
+                                text: qsTr("🎼  %1").arg(modelData.caption)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    ExerciseController.playTapCue();
+                                    CourseController.playModeScale(modelData.modeIndex);
                                 }
                             }
 

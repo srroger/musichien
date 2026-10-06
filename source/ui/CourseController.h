@@ -52,6 +52,13 @@ public:
     Q_PROPERTY( QString subtitle READ subtitle NOTIFY courseChanged )
     Q_PROPERTY( QVariantList blocks READ blocks NOTIFY courseChanged )
 
+    // LES CONCEPTS DU COURS OUVERT, en distances - ce que la carte « :: essai » met dans la palette du joueur.
+    //
+    // Le domaine les portait deja (Course::concepts), ils etaient LUS mais jamais consommes. C'est le lien que
+    // Course.h annoncait - « what this lesson teaches, as distances in semitones » - et il sert desormais : l'essai
+    // ouvre un entrainement dont la palette contient exactement ce que la lecon enseigne.
+    Q_PROPERTY( QVariantList currentConcepts READ currentConcepts NOTIFY courseChanged )
+
     [[nodiscard]] bool isReading() const noexcept { return m_readingIndex >= 0; }
 
     [[nodiscard]] QString title() const;
@@ -59,6 +66,8 @@ public:
     [[nodiscard]] QString subtitle() const;
 
     [[nodiscard]] QVariantList blocks() const;
+
+    [[nodiscard]] QVariantList currentConcepts() const;
 
     // LA PAGE OU L'ON SE TROUVE, ET COMBIEN IL Y EN A.
     //
@@ -113,6 +122,26 @@ public:
     // l'oreille reconnait les autres.
     Q_INVOKABLE void playHarmonicSeries();
 
+    // LE BOURDON DU JEU, TENU CINQ SECONDES : la tonique et sa quinte, sans tierce.
+    //
+    // Meme formule que les questions de couleur - un centre qui ne colore rien lui-meme. Le chapitre du centre ne peut
+    // pas s'enseigner sans lui : un centre qu'on ne TIENT pas ne s'entend pas.
+    Q_INVOKABLE void playDrone();
+
+    // LE CERCLE DES QUINTES, PARCOURU : p_fifthCount quintes enchainees, chaque note ramenee dans l'octave de depart.
+    //
+    // Sept montrent d'ou vient une gamme ; douze font le tour. Le repli dans l'octave est ce qui transforme une fusee
+    // montante en CERCLE.
+    Q_INVOKABLE void playFifthCycle( int p_fifthCount );
+
+    // LA GAMME D'UN MODE, SUR LE BOURDON : la meme chose que le banc d'essai des modes, et volontairement.
+    Q_INVOKABLE void playModeScale( int p_modeIndex );
+
+    // UN ACCORD, JOUE : la tonique du jeu, et les intervalles de sa qualite. C'est la carte ':: accord' du chapitre de
+    // la couleur - le majeur et le mineur, entendus avant d'etre nommes. p_inversion remonte les notes du bas d'une
+    // octave : le meme accord, autrement pose.
+    Q_INVOKABLE void playChord( int p_quality, int p_inversion );
+
     Q_INVOKABLE void stopPlayback();
 
 signals:
@@ -120,6 +149,12 @@ signals:
 
 private:
     domain::NotePlayer & m_notePlayer;
+
+    // LE TITRE TEL QU'IL S'AFFICHE, NUMERO COMPRIS - « 1. La quinte juste ».
+    //
+    // Le numero vient du RANG dans le catalogue, jamais du fichier : un titre qui porterait son propre numero se
+    // desynchroniserait le jour ou deux lecons s'echangent. Un os a macher (chapitre zero) n'en porte pas.
+    [[nodiscard]] QString displayTitleFor( std::size_t p_index ) const;
 
     std::vector<domain::Course> m_courses;
 

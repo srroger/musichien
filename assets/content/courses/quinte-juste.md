@@ -3,7 +3,7 @@ titre: La quinte juste
 sous-titre: Deux notes qui n'ont rien à se prouver
 chapitre: 1
 ordre: 1
-concepts: 7
+concepts: 0, 7
 ---
 
 
@@ -84,7 +84,7 @@ Les autres demanderont ta journée. Celui-ci, non.
 
 ## L'essai
 
-:: essai | demi_tons:7
+:: essai | intervalle
 
 Quand tu joues, tu ne vas pas deviner. Tu vas **reconnaître** — et c'est très différent.
 

@@ -1,5 +1,6 @@
 #include "infrastructure/content/MarkdownCourse.h"
 
+#include <array>
 #include <charconv>
 #include <iostream>
 #include <string>
@@ -92,6 +93,91 @@ namespace
     return fields;
 }
 
+// LES NOMS DE MODES, EN FRANCAIS, ET DANS L'ORDRE DES COULEURS DU DOMAINE.
+//
+// L'ordre n'est PAS alphabetique, et il n'est pas negociable : c'est celui de Mode.cpp - lydien, ionien, mixolydien,
+// dorien, eolien, phrygien, locrien - c'est-a-dire du plus clair au plus sombre. C'est l'ordre de la phrase
+// mnemotechnique de Roger, et un fichier de cours qui ecrit 'ionien' doit tomber sur le rang 1, pas sur le rang 3.
+//
+// Le nom vient du fichier de contenu, le RANG part vers le domaine : un contenu ne connait jamais l'ordre interne
+// d'une enumeration, il dit ce qu'il veut dire et le code sait ou ca se range.
+// L'ORDRE, ecrit une fois : il sert au rang d'un mode ET au mot 'tous' (les sept, dans cet ordre).
+constexpr std::array<std::string_view, 7> MODE_NAMES{
+  "lydien",
+  "ionien",
+  "mixolydien",
+  "dorien",
+  "éolien",
+  "phrygien",
+  "locrien",
+};
+
+[[nodiscard]] std::optional<std::int32_t> modeRankFrom( std::string_view p_name )
+{
+    const std::string_view wanted = trim( p_name );
+
+    for( std::size_t index = 0; index < MODE_NAMES.size(); ++index )
+    {
+        if( wanted == MODE_NAMES.at( index ) )
+        {
+            return static_cast<std::int32_t>( index );
+        }
+    }
+
+    return std::nullopt;
+}
+
+// LES QUALITES D'ACCORD, EN FRANCAIS, ET DANS L'ORDRE DU DOMAINE (Chord.h).
+//
+// Meme regle que pour les modes : un fichier ecrit un NOM, le lecteur le traduit en rang. Le nom vient du contenu, le
+// rang part vers le domaine - un contenu ne connait jamais l'ordre interne d'une enumeration.
+[[nodiscard]] std::optional<std::int32_t> chordQualityFrom( std::string_view p_name )
+{
+    static constexpr std::array<std::pair<std::string_view, std::int32_t>, 9> CHORD_NAMES{
+      { { "majeur", 0 },
+        { "mineur", 1 },
+        { "sus4", 2 },
+        { "sus2", 3 },
+        { "diminué", 4 },
+        { "augmenté", 5 },
+        { "7", 6 },
+        { "maj7", 7 },
+        { "m7", 8 } } };
+
+    const std::string_view wanted = trim( p_name );
+
+    for( const auto & [name, rank] : CHORD_NAMES )
+    {
+        if( wanted == name )
+        {
+            return rank;
+        }
+    }
+
+    return std::nullopt;
+}
+
+// LA FAMILLE DE QUESTIONS qu'un cours demande d'ouvrir, par son mot : les trois familles du jeu.
+//
+// Sans mot - ou avec un mot inconnu - c'est la famille des INTERVALLES, le comportement d'origine : un cours qui se
+// trompe ouvre l'exercice le plus courant plutot que rien du tout.
+[[nodiscard]] std::int32_t exerciseFamilyFrom( std::string_view p_field )
+{
+    const std::string_view word = trim( p_field );
+
+    if( ( word == "accord" ) || ( word == "accords" ) )
+    {
+        return 1;
+    }
+
+    if( ( word == "mode" ) || ( word == "modes" ) )
+    {
+        return 2;
+    }
+
+    return 0;
+}
+
 // LA DISTANCE SE LIT DANS LA VALEUR, PAS DANS SON ORTHOGRAPHE.
 //
 // The contract writes 'demi_tons:7' because it reads well out loud. Refusing a plain '7' over that
@@ -143,6 +229,66 @@ namespace
     }
 
     return domain::IntervalDirection::Ascending;
+}
+
+// LA LISTE D'UNE CARTE ':: essai', interpretee SELON SA FAMILLE.
+//
+// Les intervalles se donnent en distances ; les accords et les modes, par leur NOM francais - comme partout ailleurs, le
+// contenu ecrit un mot et le domaine recoit un rang. Et pour les modes, le mot 'tous' ouvre les sept d'un coup : c'est ce
+// qui permet a une lecon d'ouvrir d'abord 'ionien, eolien', puis la famille entiere.
+//
+// Un jeton illisible est IGNORE : la faute coute un element de la liste, jamais la liste, et jamais la page.
+[[nodiscard]] std::vector<std::int32_t> exerciseTargetsFrom( std::int32_t p_family, std::string_view p_list )
+{
+    std::vector<std::int32_t> targets;
+
+    std::size_t position = 0;
+
+    while( position <= p_list.size() )
+    {
+        const std::size_t comma = p_list.find( ',', position );
+
+        const std::string_view token = trim( ( comma == std::string_view::npos ) ? p_list.substr( position )
+                                                                                 : p_list.substr( position, comma - position ) );
+
+        if( !token.empty() )
+        {
+            if( ( p_family == 2 ) && ( token == "tous" ) )
+            {
+                for( std::size_t rank = 0; rank < MODE_NAMES.size(); ++rank )
+                {
+                    targets.push_back( static_cast<std::int32_t>( rank ) );
+                }
+            }
+            else if( p_family == 2 )
+            {
+                if( const std::optional<std::int32_t> rank = modeRankFrom( token ); rank.has_value() )
+                {
+                    targets.push_back( *rank );
+                }
+            }
+            else if( p_family == 1 )
+            {
+                if( const std::optional<std::int32_t> rank = chordQualityFrom( token ); rank.has_value() )
+                {
+                    targets.push_back( *rank );
+                }
+            }
+            else if( const std::optional<std::int32_t> semitones = semitonesFromField( token ); semitones.has_value() )
+            {
+                targets.push_back( *semitones );
+            }
+        }
+
+        if( comma == std::string_view::npos )
+        {
+            break;
+        }
+
+        position = comma + 1;
+    }
+
+    return targets;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -261,26 +407,28 @@ void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Co
         return block;
     }
 
+    // ":: essai | intervalle" / ":: essai | accord" / ":: essai | mode" - et, au besoin, LA LISTE.
+    //
+    // La PORTE vers l'exercice. Le deuxieme champ dit QUELLE FAMILLE ouvrir ; le troisieme, facultatif, dit CE QU'ON
+    // ouvre quand la famille en a besoin : ':: essai | mode | ionien, eolien', puis ':: essai | mode | tous'. Les
+    // intervalles, eux, ne sont pas ecrits ici : ils viennent des `concepts` du cours, une seule fois.
     if( keyword == "essai" )
     {
-        if( fields.size() < 2 )
-        {
-            std::cerr << "Musichien: a ':: essai' card needs a distance. It was skipped.\n";
-
-            return std::nullopt;
-        }
-
-        const std::optional<std::int32_t> semitones = semitonesFromField( fields[1] );
-
-        if( !semitones.has_value() )
-        {
-            std::cerr << "Musichien: a ':: essai' card has no usable distance. It was skipped.\n";
-
-            return std::nullopt;
-        }
-
         block.kind = domain::CourseBlock::Kind::TryExercise;
-        block.semitones = *semitones;
+
+        std::int32_t family = 0;
+
+        if( fields.size() >= 2 )
+        {
+            family = exerciseFamilyFrom( fields[1] );
+        }
+
+        block.exerciseFamily = family;
+
+        if( fields.size() >= 3 )
+        {
+            block.exerciseTargets = exerciseTargetsFrom( family, fields[2] );
+        }
 
         return block;
     }
@@ -324,6 +472,167 @@ void flushParagraph( std::string & p_paragraph, bool & p_inParagraph, domain::Co
 
         block.kind = domain::CourseBlock::Kind::HarmonicSeries;
         block.caption = fields[1];
+
+        return block;
+    }
+
+    // ":: bourdon | ce qu'il faut y entendre"
+    //
+    // Le bourdon du jeu : la tonique et sa quinte, tenues. C'est la formule EXACTE des questions de couleur, et un
+    // cours qui ferait entendre un autre bourdon apprendrait a reconnaitre un son qui n'existe pas a l'ecran.
+    if( keyword == "bourdon" )
+    {
+        if( fields.size() < 2 )
+        {
+            std::cerr << "Musichien: a ':: bourdon' card needs a caption. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::Drone;
+        block.caption = fields[1];
+
+        return block;
+    }
+
+    // ":: cycle | 7 | ce qu'on entend"
+    //
+    // La chaine des quintes, entendue : on monte de quinte en quinte, et chaque note est ramenee dans l'octave de
+    // depart. Douze fait le tour complet ; sept s'arrete a la gamme, et c'est le meme geste.
+    if( keyword == "cycle" )
+    {
+        if( fields.size() < 3 )
+        {
+            std::cerr << "Musichien: a ':: cycle' card needs a count and a caption: "
+                         ":: cycle | 7 | ce qu'on entend. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        const std::optional<std::int32_t> count = semitonesFromField( fields[1] );
+
+        if( !count.has_value() || *count <= 0 )
+        {
+            std::cerr << "Musichien: a ':: cycle' card has no usable count. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::FifthCycle;
+        block.fifthCount = *count;
+        block.caption = fields[2];
+
+        return block;
+    }
+
+    // ":: gamme | ionien | ce qu'on entend"
+    //
+    // La gamme d'un mode, sur le bourdon. Le mode est nomme EN FRANCAIS, comme le reste du contenu, et traduit en rang
+    // ici : un fichier de cours ne doit pas connaitre l'ordre interne d'une enumeration.
+    if( keyword == "gamme" )
+    {
+        if( fields.size() < 3 )
+        {
+            std::cerr << "Musichien: a ':: gamme' card needs a mode and a caption: "
+                         ":: gamme | ionien | ce qu'on entend. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        const std::optional<std::int32_t> mode = modeRankFrom( fields[1] );
+
+        if( !mode.has_value() )
+        {
+            std::cerr << "Musichien: a ':: gamme' card names a mode the game does not know: '" << fields[1]
+                      << "'. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::ModeScale;
+        block.modeIndex = *mode;
+        block.caption = fields[2];
+
+        return block;
+    }
+
+    // ":: accord | majeur | ce qu'on entend"
+    //
+    // UN ACCORD, joue : trois notes dont la tierce dit la couleur. Le nom est en francais et se traduit en rang, comme
+    // pour ':: gamme'. C'est la carte du chapitre de la couleur : le majeur et le mineur, entendus avant d'etre nommes.
+    if( keyword == "accord" )
+    {
+        if( fields.size() < 3 )
+        {
+            std::cerr << "Musichien: a ':: accord' card needs a quality and a caption: "
+                         ":: accord | majeur | ce qu'on entend. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        const std::optional<std::int32_t> quality = chordQualityFrom( fields[1] );
+
+        if( !quality.has_value() )
+        {
+            std::cerr << "Musichien: a ':: accord' card names a quality the game does not know: '" << fields[1]
+                      << "'. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::Chord;
+        block.chordQuality = *quality;
+        block.caption = fields[2];
+
+        // LE RENVERSEMENT, FACULTATIF, en QUATRIEME champ : ':: accord | majeur | mi, sol, do | 1'. Il vient APRES la
+        // legende pour ne pas casser les cartes qui n'en portent pas - un cours ecrit d'abord ce qu'on entend, et le
+        // renversement seulement quand il compte.
+        if( fields.size() >= 4 )
+        {
+            if( const std::optional<std::int32_t> inversion = semitonesFromField( fields[3] );
+                inversion.has_value() && *inversion >= 0 )
+            {
+                block.chordInversion = *inversion;
+            }
+        }
+
+        return block;
+    }
+
+    // ":: schéma | nom-du-dessin | ce que le dessin montre"
+    //
+    // Meme contrat que ':: image' : un NOM, jamais un chemin, et la legende est obligatoire. Un dessin qu'on regarde
+    // sans savoir quoi y regarder ne vaut pas mieux qu'une page de texte de plus - et c'est justement ce qu'on essaie
+    // d'eviter ici.
+    if( keyword == "schéma" )
+    {
+        if( fields.size() < 3 )
+        {
+            std::cerr << "Musichien: a ':: schéma' card needs a drawing name and a caption: "
+                         ":: schéma | nom-du-dessin | ce que le dessin montre. It was skipped.\n";
+
+            return std::nullopt;
+        }
+
+        block.kind = domain::CourseBlock::Kind::Schema;
+        block.schemaName = fields[1];
+        block.caption = fields[2];
+
+        return block;
+    }
+
+    // ":: cercle" ou ":: cercle | ce que le bouton annonce"
+    //
+    // Une PORTE, comme ':: essai' et ':: chante' : elle n'ouvre rien elle-meme, elle dit qu'on veut ouvrir le cercle.
+    // La legende est donc facultative - le bouton a un nom par defaut, et il n'a pas besoin d'etre repete.
+    if( keyword == "cercle" )
+    {
+        block.kind = domain::CourseBlock::Kind::Circle;
+
+        if( fields.size() > 1 )
+        {
+            block.caption = fields[1];
+        }
 
         return block;
     }
@@ -435,6 +744,12 @@ void readFrontMatterLine( std::string_view p_line, domain::Course & p_course )
 
             remaining = remaining.substr( comma + 1 );
         }
+    }
+    else if( key == "instrument" )
+    {
+        // LE NOM DE L'INSTRUMENT des cartes de cette lecon. Absent : le piano. Un nom que le jeu ne connait pas est
+        // IGNORE par le controleur - la lecon sonnera du piano, ce qui n'est jamais une faute.
+        p_course.instrumentName = std::string( value );
     }
     else if( ( key == "chapitre" ) || ( key == "ordre" ) )
     {

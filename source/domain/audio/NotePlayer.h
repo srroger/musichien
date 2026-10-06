@@ -232,7 +232,13 @@ public:
     // question porte sur l'intervalle. Un timbre par session, et l'oreille ne juge plus que ce qu'on lui demande.
     //
     // Un corps par defaut, comme playChordFor : un adaptateur qui n'a pas de timbre a choisir n'a rien a faire ici.
-    virtual void beginTimbreForSession() {}
+    // p_timbreIndex : l'instrument a TENIR pour la session, ou une valeur NEGATIVE pour en tirer un au hasard.
+    //
+    // Le hasard est le comportement d'une partie ; une VALEUR est celui d'un cours, qui veut le meme son partout -
+    // « piano », sauf exception.
+    //
+    // Un corps par defaut, comme playChordFor : un adaptateur qui n'a pas de timbre a choisir n'a rien a faire ici.
+    virtual void beginTimbreForSession( int p_timbreIndex = -1 ) { (void)p_timbreIndex; }
 
     // Le clic du métronome : un temps simple, ou le PREMIER temps d'une mesure (accentué). Un corps par défaut, comme
     // le clic de menu : un adaptateur sans métronome se contente du clic ordinaire.

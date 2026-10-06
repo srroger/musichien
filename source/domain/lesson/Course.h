@@ -70,7 +70,56 @@ struct CourseBlock
         //
         // Une carte a part et non un ':: jeu' : ce n'est pas un intervalle, c'est une EMPILEMENT - et c'est ce que le
         // chapitre de la quinte demande d'entendre. Le jeu joue ce qu'il sait jouer ; il sait jouer ca.
-        HarmonicSeries
+        HarmonicSeries,
+
+        // ":: bourdon" - UNE NOTE TENUE, avec sa quinte, sous ce qu'on va dire.
+        //
+        // C'est LE BOURDON DU JEU, la formule exacte des questions de couleur : la tonique et sa quinte, sans tierce,
+        // donc un centre qui ne colore rien lui-meme. Le chapitre du centre ne peut pas s'enseigner sans lui - un
+        // centre qui n'est pas TENU ne s'entend pas.
+        Drone,
+
+        // ":: cycle" - LA CHAINE DES QUINTES, entendue.
+        //
+        // C'est le cercle qui se PARCOURT : on monte de quinte en quinte, et chaque note est ramenee dans l'octave de
+        // depart. Sans ce repli, la douzieme quinte serait sept octaves plus haut et l'oreille n'entendrait qu'une
+        // fuse et pas un cercle.
+        FifthCycle,
+
+        // ":: gamme" - LA GAMME D'UN MODE, jouee sur le bourdon.
+        //
+        // La meme chose que le banc d'essai des modes, et c'est deliberer : un cours qui ferait entendre une couleur
+        // autrement que le jeu apprendrait a reconnaitre un son qui n'existe pas a l'ecran.
+        ModeScale,
+
+        // ":: schéma" - UN DESSIN, et il est DESSINE, pas photographie.
+        //
+        // Roger, en relisant le cours du centre : « on parle vite de la cornemuse, mais la musique celtique avec cette
+        // fameuse cornemuse est un exemple tres fort du bourdon et par extension du centre. Ce serait bien de rajouter
+        // une petite page. Peut-etre image (comme on l'a fait avec Pythagore) ou un dessin ou schema qui parle. Juste
+        // pour ne pas avoir que du texte. »
+        //
+        // Une image du commerce aurait montre un instrument ; un schema montre LE PRINCIPE - deux notes qui ne bougent
+        // pas, et une ligne qui revient s'y poser. C'est le propos du chapitre, et ca se dessine en quinze lignes, a
+        // n'importe quelle taille d'ecran, sans un octet de plus dans l'APK.
+        //
+        // Comme pour l'image, le domaine ne sait PAS ce qui est dessine : il porte un nom, et l'ecran decide.
+        Schema,
+
+        // ":: cercle" - OUVRIR LE CERCLE DES QUINTES, la page de reference du jeu.
+        //
+        // Roger : « on est capable de le fabriquer dans le code, on a meme une page dediee au cercle. » Il a raison, et
+        // c'est le meme contrat que ':: essai' et ':: chante' : le cours dit l'INTENTION, et celui qui le porte sait ou
+        // vit la page. Le domaine, lui, ne connait meme pas son nom.
+        Circle,
+
+        // ":: accord" - UN ACCORD, joue : trois notes (ou plus) dont la TIERCE dit la couleur.
+        //
+        // Roger, sur le chapitre de la couleur : les « deux premieres secondes de n'importe quelle musique » sont un
+        // ACCORD, et c'est ce que la lecon doit faire ENTENDRE avant de le nommer. Une carte a part et non un ':: jeu',
+        // parce qu'un accord n'est pas un intervalle : c'est un empilement dont la tierce decide l'humeur - clair ou
+        // sombre - et c'est exactement ce que le chapitre enseigne.
+        Chord
     };
 
     Kind kind{ Kind::Text };
@@ -105,6 +154,45 @@ struct CourseBlock
     // Le chemin est construit par l'ecran, a partir d'un dossier unique : un cours n'ecrit jamais 'qrc:/...', parce
     // qu'un chemin dans un fichier de contenu est un chemin qui se casse le jour ou l'image demenage.
     std::string imageName;
+
+    // Kind::FifthCycle - COMBIEN DE QUINTES on enchain e, a partir de la tonique.
+    //
+    // Douze pour faire le tour complet, sept pour montrer d'ou vient une gamme : c'est le MEME geste, arrete plus tot.
+    std::int32_t fifthCount{ 12 };
+
+    // Kind::ModeScale - QUEL MODE, dans l'ordre des couleurs du domaine (lydien, ionien, mixolydien, dorien, eolien,
+    // phrygien, locrien). L'index, et non un nom : le nom se traduit et se reecrit, un rang ne bouge pas.
+    std::int32_t modeIndex{ 0 };
+
+    // Kind::Schema - LE NOM DU DESSIN, comme imageName est le nom du fichier.
+    //
+    // Le domaine ignore ce qu'il y a dedans, et il doit l'ignorer : un schema est de la mise en page, et la mise en
+    // page vit dans l'interface. Ici, un nom - et rien d'autre.
+    std::string schemaName;
+
+    // Kind::Chord - LA QUALITE de l'accord, dans l'ordre du domaine (majeur, mineur, ...).
+    //
+    // Un RANG, jamais un nom : le fichier ecrit 'majeur' et le lecteur le traduit, exactement comme ':: gamme'. Le
+    // domaine ne connait pas l'orthographe d'un contenu.
+    std::int32_t chordQuality{ 0 };
+
+    // Kind::Chord - LE RENVERSEMENT : combien de notes du BAS on remonte d'une octave (0 = position fondamentale).
+    //
+    // Le MEME accord, autrement pose - do, mi, sol ; mi, sol, do ; sol, do, mi. Rien ne change dans la couleur, mais
+    // le BAS change, et c'est le bas qui fait la basse. C'est tout le sujet de la lecon du renversement.
+    std::int32_t chordInversion{ 0 };
+
+    // Kind::TryExercise - QUELLE FAMILLE de questions ouvrir : 0 intervalles, 1 accords, 2 modes.
+    //
+    // Le chapitre de la couleur ne s'exerce pas sur des intervalles : un cours de modes doit ouvrir l'exercice des
+    // modes. Le rang EST celui de domain::QuestionFamily, et le domaine des cours n'a pas besoin d'en savoir plus.
+    std::int32_t exerciseFamily{ 0 };
+
+    // Kind::TryExercise - LA LISTE de ce qu'on ouvre, quand la famille en a besoin : les modes, les qualites d'accord.
+    //
+    // Vide : la session prend la palette du NIVEAU. Non vide : exactement ces rangs, et la palette ne bouge plus. C'est
+    // ce qui permet a une lecon de modes d'ouvrir 'ionien, eolien' sur une page, puis 'tous' sur la suivante.
+    std::vector<std::int32_t> exerciseTargets;
 };
 
 // UNE SECTION, c'est-a-dire un « ## » du fichier et ce qu'il introduit.
@@ -129,6 +217,13 @@ struct Course
 {
     std::string title;
     std::string subtitle;
+
+    // L'INSTRUMENT des cartes de cette lecon, par son NOM (« piano », « guitare »...). VIDE : le PIANO.
+    //
+    // Roger : « je mettrais bien le piano par defaut pour les cours, sauf exception des cas ou il est plus pertinent
+    // d'utiliser un autre instrument ». Une lecon ne change donc d'instrument que lorsqu'elle le DIT - et toutes ses
+    // cartes sonnent alors du meme instrument, ce sans quoi elle comparerait des timbres au lieu de comparer des sons.
+    std::string instrumentName;
 
     int chapter{ 0 };
     int order{ 0 };

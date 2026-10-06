@@ -265,4 +265,216 @@ TEST( MarkdownCourseTest, a_series_card_needs_only_a_caption )
     EXPECT_EQ( course->blocks.at( 0 ).caption, "ecoute la serie harmonique d'un do" );
 }
 
+// ":: bourdon" N'A BESOIN QUE D'UNE LEGENDE, comme la serie : ce qu'il fait entendre est LA formule du jeu - la
+// tonique et sa quinte, sans tierce - et un cours n'a pas a la choisir.
+TEST( MarkdownCourseTest, a_drone_card_needs_only_a_caption )
+{
+    const std::optional<musichien::domain::Course> course =
+      readCourse( ":: bourdon | le bourdon du jeu : le do, et sa quinte\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Drone );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "le bourdon du jeu : le do, et sa quinte" );
+}
+
+// ":: cycle" PORTE UN NOMBRE DE QUINTES, ":: gamme" PORTE UN MODE NOMME EN FRANCAIS - et le mode se traduit en rang.
+//
+// Le rang est celui du domaine : lydien, ionien, mixolydien, dorien, eolien, phrygien, locrien. Ce n'est PAS l'ordre
+// alphabetique, et c'est justement pour ca que la traduction vit ici : un fichier de cours ecrit « ionien », et le code
+// sait ou ca se range. Un contenu ne doit jamais connaitre l'ordre interne d'une enumeration.
+TEST( MarkdownCourseTest, a_cycle_card_carries_its_count_and_a_scale_card_its_mode )
+{
+    const std::optional<musichien::domain::Course> cycleCourse =
+      readCourse( ":: cycle | 7 | sept quintes d'affilee\n" );
+
+    ASSERT_TRUE( cycleCourse.has_value() );
+    ASSERT_EQ( cycleCourse->blocks.size(), 1U );
+
+    EXPECT_EQ( cycleCourse->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::FifthCycle );
+    EXPECT_EQ( cycleCourse->blocks.at( 0 ).fifthCount, 7 );
+    EXPECT_EQ( cycleCourse->blocks.at( 0 ).caption, "sept quintes d'affilee" );
+
+    const std::optional<musichien::domain::Course> scaleCourse =
+      readCourse( ":: gamme | ionien | la gamme de do\n" );
+
+    ASSERT_TRUE( scaleCourse.has_value() );
+    ASSERT_EQ( scaleCourse->blocks.size(), 1U );
+
+    EXPECT_EQ( scaleCourse->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::ModeScale );
+
+    // LE IONIEN EST LE RANG 1, PAS LE RANG 0 : le rang zero est le lydien, qui est le plus CLAIR des sept. Un cours qui
+    // demanderait le majeur et entendrait le lydien ne s'en apercevrait pas tout de suite - et c'est exactement le genre
+    // d'erreur qu'un test attrape.
+    EXPECT_EQ( scaleCourse->blocks.at( 0 ).modeIndex, 1 );
+}
+
+// ET UN MODE INCONNU EST REFUSE : le cours continue, une carte manque.
+//
+// Ici il ne restait RIEN d'autre, donc c'est le COURS entier qui tombe - et c'est voulu : une faute de frappe ne fait
+// jamais tomber l'application, mais elle ne laisse pas non plus une page vide dans le catalogue.
+TEST( MarkdownCourseTest, a_scale_card_naming_an_unknown_mode_is_refused )
+{
+    const std::optional<musichien::domain::Course> course = readCourse( ":: gamme | dorique | la gamme\n" );
+
+    EXPECT_FALSE( course.has_value() );
+}
+
+// UN DESSIN SE DECLARE COMME UNE IMAGE : un nom, et une legende obligatoire.
+//
+// La legende n'est pas un ornement : un dessin qu'on regarde sans savoir quoi y regarder ne vaut pas mieux qu'un
+// paragraphe de plus - et c'est precisement ce qu'un dessin est cense remplacer.
+TEST( MarkdownCourseTest, a_schema_card_carries_a_drawing_name_and_a_caption )
+{
+    const std::optional<musichien::domain::Course> course =
+      readCourse( ":: schéma | bourdon | le principe de tout bourdon\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Schema );
+    EXPECT_EQ( course->blocks.at( 0 ).schemaName, "bourdon" );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "le principe de tout bourdon" );
+}
+
+// ET SANS LEGENDE, IL EST REFUSE - la memoire du contrat, pas un caprice de mise en page.
+TEST( MarkdownCourseTest, a_schema_card_without_a_caption_is_refused )
+{
+    const std::optional<musichien::domain::Course> course = readCourse( ":: schéma | bourdon\n" );
+
+    EXPECT_FALSE( course.has_value() );
+}
+
+// UNE PORTE PEUT NE RIEN DIRE. ':: cercle' ouvre la page du cercle, et la legende est FACULTATIVE : le bouton a un nom
+// par defaut, et un cours qui n'a rien de mieux a dire n'a pas a le repeter.
+TEST( MarkdownCourseTest, a_circle_card_needs_nothing_at_all )
+{
+    const std::optional<musichien::domain::Course> course = readCourse( ":: cercle\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Circle );
+    EXPECT_TRUE( course->blocks.at( 0 ).caption.empty() );
+}
+
+// UN ACCORD SE NOMME EN FRANCAIS, et se traduit en rang - comme un mode.
+//
+// C'est la carte du chapitre de la couleur : le majeur et le mineur, entendus avant d'etre nommes. Le nom vient du
+// fichier, le RANG part vers le domaine.
+TEST( MarkdownCourseTest, a_chord_card_names_a_colour_in_french )
+{
+    const std::optional<musichien::domain::Course> course =
+      readCourse( ":: accord | mineur | do, mib, sol, ensemble\n" );
+
+    ASSERT_TRUE( course.has_value() );
+    ASSERT_EQ( course->blocks.size(), 1U );
+
+    EXPECT_EQ( course->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::Chord );
+
+    // LE MINEUR EST LE RANG 1, le majeur le rang 0 : l'ordre du domaine, du plus simple au plus riche.
+    EXPECT_EQ( course->blocks.at( 0 ).chordQuality, 1 );
+    EXPECT_EQ( course->blocks.at( 0 ).caption, "do, mib, sol, ensemble" );
+}
+
+// LE RENVERSEMENT, FACULTATIF, EN QUATRIEME CHAMP - apres la legende.
+//
+// ':: accord | majeur | do, mi, sol' reste la position fondamentale ; '... | 1' remonte la note du bas d'une octave.
+// Ecrit APRES la legende pour ne pas casser les cartes qui n'en portent pas.
+TEST( MarkdownCourseTest, a_chord_card_carries_an_optional_inversion )
+{
+    const std::optional<musichien::domain::Course> root = readCourse( ":: accord | majeur | do, mi, sol\n" );
+
+    ASSERT_TRUE( root.has_value() );
+    EXPECT_EQ( root->blocks.at( 0 ).chordInversion, 0 );
+
+    const std::optional<musichien::domain::Course> first = readCourse( ":: accord | majeur | mi, sol, do | 1\n" );
+
+    ASSERT_TRUE( first.has_value() );
+    EXPECT_EQ( first->blocks.at( 0 ).chordInversion, 1 );
+}
+
+// ET UN ACCORD INCONNU EST REFUSE : la faute coute une carte, jamais l'application.
+TEST( MarkdownCourseTest, a_chord_card_naming_an_unknown_quality_is_refused )
+{
+    const std::optional<musichien::domain::Course> course = readCourse( ":: accord | bizarre | un accord\n" );
+
+    EXPECT_FALSE( course.has_value() );
+}
+
+// L'ESSAI DIT SA FAMILLE, et sans mot c'est celle des intervalles.
+//
+// Roger, sur le chapitre de la couleur : un cours de modes doit ouvrir l'exercice des MODES, pas celui des intervalles.
+TEST( MarkdownCourseTest, an_essai_card_carries_the_family_to_open )
+{
+    const std::optional<musichien::domain::Course> intervalCourse = readCourse( ":: essai | intervalle\n" );
+
+    ASSERT_TRUE( intervalCourse.has_value() );
+    EXPECT_EQ( intervalCourse->blocks.at( 0 ).kind, musichien::domain::CourseBlock::Kind::TryExercise );
+    EXPECT_EQ( intervalCourse->blocks.at( 0 ).exerciseFamily, 0 );
+
+    const std::optional<musichien::domain::Course> chordCourse = readCourse( ":: essai | accord\n" );
+
+    ASSERT_TRUE( chordCourse.has_value() );
+    EXPECT_EQ( chordCourse->blocks.at( 0 ).exerciseFamily, 1 );
+
+    const std::optional<musichien::domain::Course> modeCourse = readCourse( ":: essai | mode\n" );
+
+    ASSERT_TRUE( modeCourse.has_value() );
+    EXPECT_EQ( modeCourse->blocks.at( 0 ).exerciseFamily, 2 );
+
+    // UN MOT INCONNU, ou pas de mot du tout : la famille des intervalles, le comportement d'origine.
+    const std::optional<musichien::domain::Course> bareCourse = readCourse( ":: essai\n" );
+
+    ASSERT_TRUE( bareCourse.has_value() );
+    EXPECT_EQ( bareCourse->blocks.at( 0 ).exerciseFamily, 0 );
+    EXPECT_TRUE( bareCourse->blocks.at( 0 ).exerciseTargets.empty() );
+}
+
+// ET LA LISTE DIT CE QU'ON OUVRE DEDANS - les modes, par exemple.
+//
+// C'est ce qui permet a une lecon de modes d'ouvrir 'ionien, eolien' sur une page, puis 'tous' sur la suivante, parce
+// qu'elle parle de la famille entiere.
+TEST( MarkdownCourseTest, an_essai_card_lists_what_it_opens )
+{
+    const std::optional<musichien::domain::Course> modesCourse = readCourse( ":: essai | mode | ionien, éolien\n" );
+
+    ASSERT_TRUE( modesCourse.has_value() );
+    ASSERT_EQ( modesCourse->blocks.at( 0 ).exerciseTargets.size(), 2U );
+    EXPECT_EQ( modesCourse->blocks.at( 0 ).exerciseTargets.at( 0 ), 1 );    // ionien
+    EXPECT_EQ( modesCourse->blocks.at( 0 ).exerciseTargets.at( 1 ), 4 );    // eolien
+
+    // 'tous' ouvre les SEPT modes, dans l'ordre de couleur du domaine.
+    const std::optional<musichien::domain::Course> allCourse = readCourse( ":: essai | mode | tous\n" );
+
+    ASSERT_TRUE( allCourse.has_value() );
+    EXPECT_EQ( allCourse->blocks.at( 0 ).exerciseTargets.size(), 7U );
+
+    const std::optional<musichien::domain::Course> chordsCourse = readCourse( ":: essai | accord | majeur, mineur\n" );
+
+    ASSERT_TRUE( chordsCourse.has_value() );
+    ASSERT_EQ( chordsCourse->blocks.at( 0 ).exerciseTargets.size(), 2U );
+    EXPECT_EQ( chordsCourse->blocks.at( 0 ).exerciseTargets.at( 0 ), 0 );    // majeur
+    EXPECT_EQ( chordsCourse->blocks.at( 0 ).exerciseTargets.at( 1 ), 1 );    // mineur
+}
+
+// L'INSTRUMENT D'UNE LECON, PAR SON NOM. Absent : le piano (le controleur decide).
+//
+// Roger : « je mettrais bien le piano par defaut pour les cours, sauf exception ». L'exception se declare donc dans
+// l'en-tete, par un NOM : le contenu n'ecrit jamais un rang d'instrument.
+TEST( MarkdownCourseTest, a_course_can_name_its_instrument )
+{
+    const std::optional<musichien::domain::Course> named =
+      readCourse( "---\ntitre: Un cours\ninstrument: guitare\n---\n\nUn paragraphe.\n" );
+
+    ASSERT_TRUE( named.has_value() );
+    EXPECT_EQ( named->instrumentName, "guitare" );
+
+    const std::optional<musichien::domain::Course> bare = readCourse( "Un paragraphe.\n" );
+
+    ASSERT_TRUE( bare.has_value() );
+    EXPECT_TRUE( bare->instrumentName.empty() );
+}
+
 }    // namespace musichien::infrastructure

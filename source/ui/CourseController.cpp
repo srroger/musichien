@@ -1,11 +1,16 @@
 #include "ui/CourseController.h"
 
+#include "domain/audio/SampledInstrument.h"
+#include "domain/music/Chord.h"
 #include "domain/music/Interval.h"
+#include "domain/music/Mode.h"
 
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <iostream>
+#include <optional>
+#include <string>
 #include <utility>
 
 namespace musichien::ui
@@ -39,6 +44,34 @@ constexpr const char * KIND_IMAGE = "image";
 // ":: serie" - la serie harmonique d'une note, jouee. Le jeu la joue, l'ecran la nomme.
 constexpr const char * KIND_SERIES = "serie";
 
+// ":: bourdon" - le bourdon du jeu, tenu : la tonique et sa quinte, sans tierce.
+constexpr const char * KIND_DRONE = "bourdon";
+
+// ":: cycle" - la chaine des quintes, parcourue.
+constexpr const char * KIND_CYCLE = "cycle";
+
+// ":: gamme" - la gamme d'un mode, sur le bourdon.
+constexpr const char * KIND_SCALE = "gamme";
+
+// ":: schéma" - un DESSIN. Le QML le peint d'apres son nom, puis ecrit sa legende : le controleur, lui, ne sait meme
+// pas qu'il y a un dessin.
+constexpr const char * KIND_SCHEMA = "schema";
+
+// ":: cercle" - la PORTE vers la page de reference du cercle. Comme ':: essai', c'est une porte et non une donnee.
+constexpr const char * KIND_CIRCLE = "cercle";
+
+// ":: accord" - un ACCORD, joue : trois notes (ou plus) dont la tierce dit la couleur.
+constexpr const char * KIND_CHORD = "accord";
+
+// LE PIANO, PAR DEFAUT, POUR LES COURS. C'est son rang dans INSTRUMENT_NAMES (voir SampledInstrument.h), ou il vient
+// en PREMIER - et c'est une decision de Roger : « je mettrais bien le piano par defaut pour les cours, sauf exception
+// des cas ou il est plus pertinent d'utiliser un autre instrument ».
+constexpr std::size_t PIANO_INSTRUMENT_INDEX = 0;
+
+// LA QUINTE, EN DEMI-TONS. Elle sert au bourdon ET a la chaine des quintes : une seule definition, donc pas deux
+// valeurs a tenir d'accord.
+constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
+
 [[nodiscard]] const char * kindName( domain::CourseBlock::Kind p_kind ) noexcept
 {
     switch( p_kind )
@@ -57,6 +90,18 @@ constexpr const char * KIND_SERIES = "serie";
             return KIND_IMAGE;
         case domain::CourseBlock::Kind::HarmonicSeries:
             return KIND_SERIES;
+        case domain::CourseBlock::Kind::Drone:
+            return KIND_DRONE;
+        case domain::CourseBlock::Kind::FifthCycle:
+            return KIND_CYCLE;
+        case domain::CourseBlock::Kind::ModeScale:
+            return KIND_SCALE;
+        case domain::CourseBlock::Kind::Schema:
+            return KIND_SCHEMA;
+        case domain::CourseBlock::Kind::Chord:
+            return KIND_CHORD;
+        case domain::CourseBlock::Kind::Circle:
+            return KIND_CIRCLE;
         case domain::CourseBlock::Kind::Text:
         default:
             return KIND_TEXT;
@@ -82,6 +127,23 @@ constexpr const char * KIND_SERIES = "serie";
     description.insert( QStringLiteral( "listenFor" ), QString::fromStdString( p_block.listenFor ) );
     description.insert( QStringLiteral( "annexeName" ), QString::fromStdString( p_block.annexeName ) );
     description.insert( QStringLiteral( "imageName" ), QString::fromStdString( p_block.imageName ) );
+    description.insert( QStringLiteral( "fifthCount" ), p_block.fifthCount );
+    description.insert( QStringLiteral( "modeIndex" ), p_block.modeIndex );
+    description.insert( QStringLiteral( "schemaName" ), QString::fromStdString( p_block.schemaName ) );
+    description.insert( QStringLiteral( "chordQuality" ), p_block.chordQuality );
+    description.insert( QStringLiteral( "chordInversion" ), p_block.chordInversion );
+    description.insert( QStringLiteral( "exerciseFamily" ), p_block.exerciseFamily );
+
+    // La LISTE d'une carte ':: essai', en QVariantList : le QML la passe telle quelle. Absente pour toutes les autres
+    // cartes, et une liste vide pour un ':: essai' qui n'en porte pas - le QML lit la meme chose partout.
+    QVariantList targets;
+
+    for( const std::int32_t target : p_block.exerciseTargets )
+    {
+        targets.append( target );
+    }
+
+    description.insert( QStringLiteral( "exerciseTargets" ), targets );
 
     return description;
 }
@@ -130,11 +192,15 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
     // ordre, et un index ne peut pas designer deux cours differents selon qui le lit.
     std::ranges::sort( m_courses, libraryOrder );
 
-    for( const domain::Course & course : m_courses )
+    for( std::size_t index = 0; index < m_courses.size(); ++index )
     {
+        const domain::Course & course = m_courses.at( index );
+
         QVariantMap entry;
 
-        entry.insert( QStringLiteral( "title" ), QString::fromStdString( course.title ) );
+        // LE NUMERO, DEVANT : « 1. La quinte juste ». Roger : « je mettrais bien un "1. La quinte juste" pour bien
+        // rappeler que c'est la quinte juste ».
+        entry.insert( QStringLiteral( "title" ), displayTitleFor( index ) );
         entry.insert( QStringLiteral( "subtitle" ), QString::fromStdString( course.subtitle ) );
         entry.insert( QStringLiteral( "chapter" ), course.chapter );
         entry.insert( QStringLiteral( "order" ), course.order );
@@ -181,6 +247,35 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
     }
 }
 
+QString CourseController::displayTitleFor( std::size_t p_index ) const
+{
+    const domain::Course & course = m_courses.at( p_index );
+
+    // UN OS A MACHER N'EST PAS NUMEROTE. Son chapitre vaut zero - c'est deja ce qui le range a la fin du catalogue - et
+    // lui coller un numero ferait croire qu'il est une lecon.
+    if( course.chapter <= 0 )
+    {
+        return QString::fromStdString( course.title );
+    }
+
+    // LE RANG PARMI LES COURS NUMEROTES, et non l'indice dans le catalogue : compter les annexes decalerait tous les
+    // numeros d'un coup.
+    //
+    // Le numero est CALCULE, jamais ecrit dans le fichier : un titre qui porterait son propre numero se desynchroniserait
+    // le jour ou deux lecons s'echangent. L'auteur ecrit le titre, et l'ordre du catalogue fait le reste.
+    std::size_t rank = 0;
+
+    for( std::size_t index = 0; index <= p_index; ++index )
+    {
+        if( m_courses.at( index ).chapter > 0 )
+        {
+            ++rank;
+        }
+    }
+
+    return QStringLiteral( "%1. %2" ).arg( rank ).arg( QString::fromStdString( course.title ) );
+}
+
 void CourseController::openAnnexe( const QString & p_name )
 {
     // Le TITRE, compare sans tenir compte de la casse ni des espaces autour : un auteur ecrit ce qu'il veut, et une
@@ -213,7 +308,9 @@ QString CourseController::title() const
         return {};
     }
 
-    return QString::fromStdString( m_courses.at( static_cast<std::size_t>( m_readingIndex ) ).title );
+    // LE MEME TITRE QUE DANS LE CATALOGUE, numero compris : la page d'une lecon et sa ligne dans la liste doivent dire la
+    // MEME chose, sinon on ne sait plus laquelle on vient d'ouvrir.
+    return displayTitleFor( static_cast<std::size_t>( m_readingIndex ) );
 }
 
 QString CourseController::subtitle() const
@@ -224,6 +321,25 @@ QString CourseController::subtitle() const
     }
 
     return QString::fromStdString( m_courses.at( static_cast<std::size_t>( m_readingIndex ) ).subtitle );
+}
+
+QVariantList CourseController::currentConcepts() const
+{
+    QVariantList concepts;
+
+    if( m_readingIndex < 0 )
+    {
+        return concepts;
+    }
+
+    // Les distances telles quelles, dans l'ordre du fichier. Le domaine les a lues comme des DEMI-TONS, jamais comme des
+    // noms - et c'est ce que le controleur d'entrainement attend de son cote.
+    for( const std::int32_t semitones : m_courses.at( static_cast<std::size_t>( m_readingIndex ) ).concepts )
+    {
+        concepts.append( semitones );
+    }
+
+    return concepts;
 }
 
 QVariantList CourseController::blocks() const
@@ -331,6 +447,24 @@ void CourseController::open( int p_index )
         return;
     }
 
+    // UN TIMBRE POUR TOUTE LA LECTURE, ET LE PIANO PAR DEFAUT.
+    //
+    // Sans cela, chaque carte re-tire un instrument (voir QAudioNotePlayer::timbreIndexFor), et comparer deux accords
+    // d'une MEME lecon reviendrait a comparer deux instruments. Roger l'a entendu sur le renversement : « j'entends
+    // quand meme une grosse difference, comme si on changeait totalement d'accord » - c'etait le PIANO qui avait
+    // change, pas l'accord. La lecon compare des SONS : le son ne doit pas bouger.
+    //
+    // Et Roger a demande que ce soit le PIANO, « sauf exception des cas ou il est plus pertinent d'utiliser un autre
+    // instrument » - l'exception se declare alors dans l'en-tete du cours, par un nom.
+    const std::string & wantedInstrument = m_courses.at( static_cast<std::size_t>( p_index ) ).instrumentName;
+
+    const std::optional<std::size_t> namedInstrument =
+      wantedInstrument.empty() ? std::nullopt : domain::instrumentIndexForName( wantedInstrument );
+
+    const std::size_t instrumentIndex = namedInstrument.value_or( PIANO_INSTRUMENT_INDEX );
+
+    m_notePlayer.beginTimbreForSession( static_cast<int>( instrumentIndex ) );
+
     m_readingIndex = p_index;
 
     // ON COMMENCE AU DEBUT, ET PAR PAGES : un cours rouvert repart de sa premiere page. Reprendre a la page laissee
@@ -405,6 +539,125 @@ void CourseController::playHarmonicSeries()
     }
 
     m_notePlayer.playMelody( notes, MELODIC_GAP );
+}
+
+void CourseController::playDrone()
+{
+    // LE BOURDON DU JEU, et c'est la MEME formule que les questions de couleur : la tonique, et sa quinte.
+    //
+    // LA QUINTE OUVERTE, sans tierce : un centre qui ne colore rien lui-meme, et qui laisse donc entendre la couleur de
+    // ce qu'on pose dessus. Avec une tierce, le bourdon dirait deja majeur ou mineur, et le chapitre des modes
+    // n'aurait plus rien a faire entendre.
+    //
+    // Meme note de depart que partout ailleurs dans les cours (le do du milieu), pour que deux lecons ne fassent pas
+    // entendre deux centres differents sans le dire.
+    static constexpr std::chrono::milliseconds DRONE_DURATION{ 5000 };
+
+    const std::array<domain::Note, 2> drone{ domain::Note{ EXERCISE_ROOT_MIDI_NUMBER },
+                                             domain::Note{ EXERCISE_ROOT_MIDI_NUMBER + FIFTH_IN_SEMITONES } };
+
+    m_notePlayer.playChordFor( drone, DRONE_DURATION );
+}
+
+void CourseController::playFifthCycle( int p_fifthCount )
+{
+    // LE CERCLE DES QUINTES, ENTENDU : on monte de quinte en quinte, et CHAQUE NOTE EST RAMENEE dans l'octave de depart.
+    //
+    // Ce repli est tout : sans lui, la douzieme quinte serait sept octaves plus haut et l'oreille n'entendrait qu'une
+    // fusee. Repliee, la suite revient a son point de depart - et c'est LA, exactement la, que le cercle se dessine.
+    //
+    // Sept quintes montrent d'ou vient une gamme ; douze font le tour complet. C'est le meme geste, arrete plus tot.
+    if( p_fifthCount <= 0 )
+    {
+        return;
+    }
+
+    const auto count = static_cast<std::size_t>( p_fifthCount );
+
+    std::vector<domain::Note> cycle;
+    cycle.reserve( count );
+
+    for( std::size_t index = 0; index < count; ++index )
+    {
+        const auto steps = static_cast<std::int32_t>( index ) * FIFTH_IN_SEMITONES;
+
+        cycle.emplace_back( EXERCISE_ROOT_MIDI_NUMBER + ( steps % domain::SEMITONES_PER_OCTAVE ) );
+    }
+
+    m_notePlayer.playMelody( cycle, MELODIC_GAP );
+}
+
+void CourseController::playModeScale( int p_modeIndex )
+{
+    // LA GAMME D'UN MODE, SUR LE BOURDON - exactement ce que fait le banc d'essai des modes.
+    //
+    // LE BOURDON EST CE QUI REND LA COULEUR AUDIBLE : sans lui, sept notes sont sept notes ; avec lui, elles sont une
+    // COULEUR. Et c'est la meme formule que partout ailleurs - la tonique et sa quinte, sans tierce.
+    if( ( p_modeIndex < 0 ) || std::cmp_greater_equal( p_modeIndex, domain::MODE_COUNT ) )
+    {
+        return;
+    }
+
+    const auto mode = static_cast<domain::Mode>( p_modeIndex );
+
+    const std::vector<domain::Note> scale =
+      domain::modeScaleUpAndDown( domain::Note{ EXERCISE_ROOT_MIDI_NUMBER }, mode );
+
+    const std::array<domain::Note, 2> drone{ domain::Note{ EXERCISE_ROOT_MIDI_NUMBER },
+                                             domain::Note{ EXERCISE_ROOT_MIDI_NUMBER + FIFTH_IN_SEMITONES } };
+
+    // Meme articulation que le banc d'essai : une demi-seconde par pas, et un silence plus court que la note. Un cours
+    // qui articulerait autrement ferait entendre une autre musique que celle du banc.
+    m_notePlayer.playMelodyOverDrone(
+      scale, drone, std::chrono::milliseconds{ 500 }, std::chrono::milliseconds{ 80 } );
+}
+
+void CourseController::playChord( int p_quality, int p_inversion )
+{
+    // UN ACCORD, JOUE. La tonique vient du jeu, comme partout ailleurs : deux lecons ne doivent pas faire entendre
+    // deux centres differents sans le dire. Le domaine construit les notes depuis la seule qualite - le cours n'ecrit
+    // jamais une note, il ecrit une COULEUR.
+    if( ( p_quality < 0 ) || std::cmp_greater_equal( p_quality, domain::CHORD_QUALITY_COUNT ) )
+    {
+        return;
+    }
+
+    const domain::Chord chord{ static_cast<domain::ChordQuality>( p_quality ), EXERCISE_ROOT_MIDI_NUMBER };
+
+    const std::vector<domain::Note> root = chord.notes();
+
+    const int inversion = std::clamp( p_inversion, 0, static_cast<int>( root.size() ) - 1 );
+
+    // LE RENVERSEMENT, ET LE REGISTRE QUI NE MONTE PAS.
+    //
+    // Un renversement, c'est le MEME accord avec une AUTRE note en bas. Le repliement classique remonte la note du bas
+    // d'une octave - do, mi, sol devient mi, sol, do, une octave PLUS HAUT. Roger l'a entendu, et il a nomme la cause :
+    // « j'entends comme si l'accord montait - c'est le do qui monte, et pas le mi et le sol qui descendent ». C'est bien
+    // ce qui donne l'impression d'un AUTRE accord.
+    //
+    // On redescend donc TOUT l'accord d'une octave APRES le repliement : la TONIQUE reste a sa place, et ce sont les
+    // AUTRES notes qui descendent. Le meme accord, vraiment - seule la basse a bouge.
+    std::vector<domain::Note> voiced;
+    voiced.reserve( root.size() );
+
+    for( std::size_t index = 0; index < root.size(); ++index )
+    {
+        const std::int32_t shift = std::cmp_less( index, inversion ) ? domain::SEMITONES_PER_OCTAVE : 0;
+
+        voiced.push_back( root.at( index ).transposedBy( shift ) );
+    }
+
+    if( inversion > 0 )
+    {
+        for( domain::Note & note : voiced )
+        {
+            note = note.transposedBy( -domain::SEMITONES_PER_OCTAVE );
+        }
+    }
+
+    std::ranges::sort( voiced );
+
+    m_notePlayer.playChord( voiced );
 }
 
 void CourseController::stopPlayback()

@@ -3,8 +3,10 @@
 #include "domain/exercise/GodModePalette.h"
 #include "domain/exercise/Trophy.h"
 #include "domain/exercise/Weekend.h"
+#include "domain/music/Chord.h"
 #include "domain/music/ChordTree.h"
 #include "domain/music/Interval.h"
+#include "domain/music/Mode.h"
 #include "domain/music/Temperament.h"
 #include "domain/rhythm/RhythmPattern.h"
 #include "ui/IntervalDescription.h"
@@ -1318,30 +1320,154 @@ void ExerciseSessionController::startTrainingSession( int p_family )
     beginSession( std::move( settings ) );
 }
 
-void ExerciseSessionController::startTrainingSessionFromLesson( int p_semitones )
+void ExerciseSessionController::startTrainingSessionFromLesson( const QVariantList & p_concepts,
+                                                                int p_family,
+                                                                const QVariantList & p_targets )
 {
-    // LE COURS CHANGE LES QUESTIONS SUIVANTES, ET RIEN DE PLUS.
+    // L'EXERCICE D'UNE LECON : la famille que le cours demande, et ce qu'il ouvre dedans.
     //
-    // Roger a choisi la version qui ne triche pas : « le concept devient PRIORITAIRE en revision : biais du tirage vers
-    // ce que tu viens d'etudier (sans elargir la palette) ». Un cours ne fait donc pas APPRENDRE un intervalle - il le
-    // met en avant. L'intervalle entre dans la palette le jour ou le joueur le reconnait a l'oreille, comme les autres,
-    // et c'est la palette adaptative qui en decide.
+    // Roger, 04/10/2026 : « il faut cabler les intervalles pour acceder a la tierce. Actuellement ca ouvre le jeu avec
+    // octave et quinte juste. » Il avait raison, et la cause etait une regle mal placee : l'ancien mecanisme posait un
+    // FOCUS D'ETUDE, mais le focus ne fait que PONDERER ce que la palette contient deja (voir drawTarget). Un cours de
+    // la tierce ouvrait donc une session SANS tierce - la donnee etait bien lue, elle ne servait a rien.
     //
-    // Le focus REMPLACE le precedent, il ne s'y ajoute pas : « ce que tu viens d'etudier » est le dernier cours lu, et
-    // accumuler ferait d'un joueur curieux un joueur dont toutes les questions viennent de ses lectures.
+    // LES INTERVALLES : la palette est EXACTEMENT les `concepts` du cours - ni celle du joueur, ni ses reglages.
     //
-    // Et il est ECRIT dans le profil : une lecon lue le soir doit encore orienter les questions du lendemain. Sans cette
-    // ecriture, le mecanisme ne durerait pas plus longtemps que la session qu'il vient d'ouvrir.
-    m_studyFocus.assign( 1, p_semitones );
+    // LES ACCORDS ET LES MODES : la palette est ce que la carte ':: essai' demande (p_targets) - 'ionien, eolien' sur une
+    // page, 'tous' sur la suivante. Sans liste, c'est la palette du NIVEAU qui decide.
+    //
+    // Dans TOUS les cas la palette est FIGEE (paletteIsFixed), le mecanisme du GodMode : elle ne doit pas S'ELARGIR vers
+    // ce que le niveau connait, qui n'a rien a faire dans un exercice sur la lecon.
+    const int family = std::clamp( p_family, 0, 2 );
 
-    if( m_levelStore != nullptr )
+    leaveReviewMode();
+
+    m_gameMode = domain::GameMode::Training;
+
+    // La famille est RETENUE : « Rejouer » rejoue le meme Entrainement.
+    m_lastTrainingFamily = family;
+
+    const domain::PlayerLevel level = m_playerLevel.value_or( domain::PlayerLevel::Beginner );
+    const auto questionFamily = static_cast<domain::QuestionFamily>( family );
+
+    domain::SessionSettings settings = domain::trainingSettingsFor( level, questionFamily );
+
+    // Les cibles de la carte, en rangs - quel que soit leur sens : distance, qualite d'accord ou mode. La famille sait
+    // ce qu'elles valent.
+    std::vector<std::int32_t> targets;
+    targets.reserve( static_cast<std::size_t>( p_targets.size() ) );
+
+    for( const QVariant & entry : p_targets )
     {
-        m_levelStore->storeStudyFocus( m_studyFocus );
+        bool isNumber = false;
+        const int rank = entry.toInt( &isNumber );
+
+        if( isNumber && ( rank >= 0 ) )
+        {
+            targets.push_back( rank );
+        }
     }
 
-    // L'entrainement de la famille des INTERVALLES s'ouvre : c'est celui que le cours vient de preparer. Un cours de
-    // modes ou d'accords ouvrira la sienne le jour ou ses cartes existeront - la famille est deja un parametre.
-    startTrainingSession( 0 );
+    switch( questionFamily )
+    {
+        case domain::QuestionFamily::Chord: {
+            if( !targets.empty() )
+            {
+                std::vector<domain::ChordQuality> palette;
+
+                for( const std::int32_t rank : targets )
+                {
+                    if( std::cmp_less( rank, domain::CHORD_QUALITY_COUNT ) )
+                    {
+                        palette.push_back( static_cast<domain::ChordQuality>( rank ) );
+                    }
+                }
+
+                settings.chordPalette = std::move( palette );
+                settings.paletteIsFixed = true;
+            }
+
+            break;
+        }
+
+        case domain::QuestionFamily::Mode: {
+            if( !targets.empty() )
+            {
+                std::vector<domain::Mode> palette;
+
+                for( const std::int32_t rank : targets )
+                {
+                    if( std::cmp_less( rank, domain::MODE_COUNT ) )
+                    {
+                        palette.push_back( static_cast<domain::Mode>( rank ) );
+                    }
+                }
+
+                settings.modePalette = std::move( palette );
+                settings.paletteIsFixed = true;
+            }
+
+            break;
+        }
+
+        case domain::QuestionFamily::Interval:
+        default: {
+            // Les concepts, en distances. Un contenu qui n'en porte aucun ne fabrique PAS de session : une carte morte
+            // vaut mieux qu'une page qui plante, et le contrat des contenus dit qu'une faute coute un cours, jamais
+            // l'application.
+            std::vector<std::int32_t> concepts;
+            concepts.reserve( static_cast<std::size_t>( p_concepts.size() ) );
+
+            for( const QVariant & entry : p_concepts )
+            {
+                bool isNumber = false;
+                const int semitones = entry.toInt( &isNumber );
+
+                if( isNumber && ( semitones >= 0 ) && ( semitones <= domain::MAXIMUM_INTERVAL_SEMITONES ) )
+                {
+                    concepts.push_back( semitones );
+                }
+            }
+
+            if( concepts.empty() )
+            {
+                return;
+            }
+
+            // LE FOCUS D'ETUDE : ce que le joueur vient de lire est tire PLUS SOUVENT dans le JEU ORDINAIRE, et il est
+            // ECRIT dans le profil - une lecon lue le soir oriente les questions du lendemain.
+            m_studyFocus = concepts;
+
+            if( m_levelStore != nullptr )
+            {
+                m_levelStore->storeStudyFocus( m_studyFocus );
+            }
+
+            settings.studyFocus = m_studyFocus;
+
+            // LA PALETTE : EXACTEMENT les concepts de la lecon, et RIEN de plus. Roger : « un exercice d'intervalle
+            // particulier pour le cours, avec SEULEMENT la tierce majeure et mineure. »
+            std::vector<domain::Interval> palette;
+            palette.reserve( concepts.size() );
+
+            for( const std::int32_t semitones : concepts )
+            {
+                const domain::Interval interval = domain::intervalFromSemitones( semitones );
+
+                if( std::ranges::find( palette, interval ) == palette.end() )
+                {
+                    palette.push_back( interval );
+                }
+            }
+
+            settings.intervalPalette = std::move( palette );
+            settings.paletteIsFixed = true;
+
+            break;
+        }
+    }
+
+    beginSession( std::move( settings ) );
 }
 
 void ExerciseSessionController::restartSession()

@@ -22,6 +22,11 @@ import QtQuick.Layouts
 Item {
     id: keyCircleScreen
 
+    // LA PAGE DEMANDE A SORTIR. Elle dit l'intention, celui qui la porte decide comment - la meme regle que pour la
+    // carte de chant de l'Ecole. Sans ce signal, cette page n'avait AUCUNE porte : elle se fermait par le bouton Retour
+    // du telephone et par lui seul, ce qui suffisait depuis la garde et pas depuis une lecon.
+    signal closeRequested()
+
     // La meme nuit violette que le reste de l'application.
     Rectangle {
         anchors.fill: parent
@@ -40,14 +45,51 @@ Item {
         anchors.bottomMargin: 72
         spacing: 8
 
-        Text {
+        RowLayout {
+            // LA SORTIE, ET ELLE SE VOIT. Elle manquait completement - et un commentaire d'a cote affirmait le contraire
+            // depuis longtemps. La page se fermait par le bouton Retour du telephone, et par lui seul : depuis la garde
+            // cela suffisait, depuis une LECON non, et Roger s'est retrouve bloque ici.
+
             Layout.fillWidth: true
-            Layout.preferredWidth: 0
-            horizontalAlignment: Text.AlignHCenter
-            color: "#ffffff"
-            font.pixelSize: 19
-            font.bold: true
-            text: qsTr("Le cercle des quintes")
+            spacing: 8
+
+            Text {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 0
+                horizontalAlignment: Text.AlignHCenter
+                color: "#ffffff"
+                font.pixelSize: 19
+                font.bold: true
+                text: qsTr("Le cercle des quintes")
+            }
+
+            // Une page qu'on ouvre doit toujours avoir une porte qui se VOIT. Le mot plutot qu'un symbole : la police du
+            // jeu n'a pas tous les signes, et un carre vide n'est pas une porte.
+            Rectangle {
+                Layout.preferredWidth: 74
+                Layout.preferredHeight: 32
+                radius: 8
+                color: "#33265c"
+                border.color: "#5a4a8f"
+                border.width: 1
+
+                Text {
+                    anchors.centerIn: parent
+                    color: "#e8dcff"
+                    font.pixelSize: 13
+                    text: qsTr("Fermer")
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        ExerciseController.playTapCue();
+                        keyCircleScreen.closeRequested();
+                    }
+                }
+
+            }
+
         }
 
         Text {
