@@ -191,6 +191,10 @@ void MicrophoneController::openDetector()
             m_detector->start( [this]( float p_frequencyHz ) { onPitch( p_frequencyHz ); } );
             m_isListening = true;
 
+            // Un detecteur NEUF ne connait pas le reglage : on le lui repose, sinon un changement de peripherique
+            // rendrait le filtre muet jusqu'au prochain debut de capture.
+            applyVoicePreFilter();
+
             emit isListeningChanged();
         }
     } );
@@ -395,6 +399,9 @@ void MicrophoneController::startSingingCapture()
     m_isSingingCaptureActive = true;
     m_pitchClock.start();
 
+    // LE PRE-TRAITEMENT DE VOIX NAIT AVEC LA CAPTURE : c'est le seul moment ou l'on sait qu'on ecoute une voix.
+    applyVoicePreFilter();
+
     emit sungIntervalChanged();
     emit singingCaptureStateChanged();
 
@@ -409,7 +416,34 @@ void MicrophoneController::stopSingingCapture()
     // l'accordeur, pour toute la session, sans que personne ne l'ait demandé.
     m_isSingingCaptureActive = false;
 
+    // ... et il meurt avec elle : l'ecran qui reprend le micro pour accorder retrouve la bande large, immediatement.
+    applyVoicePreFilter();
+
     emit singingCaptureStateChanged();
+}
+
+void MicrophoneController::setVoicePreFilterEnabled( bool p_enabled )
+{
+    if( m_voicePreFilterEnabled == p_enabled )
+    {
+        return;
+    }
+
+    m_voicePreFilterEnabled = p_enabled;
+
+    applyVoicePreFilter();
+
+    emit voicePreFilterEnabledChanged();
+}
+
+void MicrophoneController::applyVoicePreFilter()
+{
+    // LE CHANT SEUL, JAMAIS L'ACCORDEUR. Le filtre suit donc la CAPTURE de chant : l'interrupteur ne fait que la
+    // laisser passer ou non, et l'accordeur - qui n'est pas en capture - garde sa bande large quoi qu'il arrive.
+    if( m_detector )
+    {
+        m_detector->setVoicePreFilterEnabled( m_voicePreFilterEnabled && m_isSingingCaptureActive );
+    }
 }
 
 QString MicrophoneController::singingTargetLabel() const

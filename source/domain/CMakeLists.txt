@@ -58,6 +58,10 @@ musichienFunction_AddLibrary(domain
     audio/SampledInstrument.cpp
     audio/PitchEstimator.h
     audio/PitchEstimator.cpp
+
+    # Le pre-traitement du CHANT, jamais de l'accordeur : passe-haut et gate adaptatif. Voir VoicePreFilter.h.
+    audio/VoicePreFilter.h
+    audio/VoicePreFilter.cpp
     audio/FastFourierTransform.h
     audio/FastFourierTransform.cpp
     audio/DrumSynthesizer.h
@@ -153,6 +157,7 @@ if(MUSICHIEN_BUILD_TESTING)
         audio/PitchEstimator_test.cpp
         audio/FastFourierTransform_test.cpp
         audio/SungIntervalDetector_test.cpp
+        audio/VoicePreFilter_test.cpp
         audio/DrumSynthesizer_test.cpp
         rhythm/Rhythm_test.cpp
         rhythm/MetronomeGrid_test.cpp

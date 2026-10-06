@@ -103,6 +103,11 @@ class MicrophoneController final : public QObject
     Q_PROPERTY( bool hasFirstNote READ hasFirstNote NOTIFY sungIntervalChanged )
     Q_PROPERTY( double sungStability READ sungStability NOTIFY sungIntervalChanged )
 
+    // L'INTERRUPTEUR DU PRE-TRAITEMENT DE VOIX. Roger : « tu peux meme rajouter une option togglable pour que je puisse
+    // rapidement tester la difference sans ou avec ». Il ne concerne QUE le chant : l'accordeur ne le voit jamais, et
+    // c'est tout le sens de la separation (voir VoicePreFilter). Vrai par defaut.
+    Q_PROPERTY( bool voicePreFilterEnabled READ voicePreFilterEnabled WRITE setVoicePreFilterEnabled NOTIFY voicePreFilterEnabledChanged )
+
     // La session : une petite serie de questions chantees, avec un score. La fin de session est affichee quand
     // singingSessionOver devient vrai.
     Q_PROPERTY( int singingQuestionIndex READ singingQuestionIndex NOTIFY singingQuestionChanged )
@@ -226,6 +231,10 @@ public:
 
     [[nodiscard]] double singingTargetStaffFraction() const;
     [[nodiscard]] bool isSingingCaptureActive() const { return m_isSingingCaptureActive; }
+
+    [[nodiscard]] bool voicePreFilterEnabled() const { return m_voicePreFilterEnabled; }
+
+    void setVoicePreFilterEnabled( bool p_enabled );
     [[nodiscard]] bool hasSungInterval() const { return m_sungIntervalDetector.reading().hasInterval(); }
     [[nodiscard]] int sungSemitones() const { return m_sungIntervalDetector.reading().semitones(); }
     [[nodiscard]] int sungVerdict() const;
@@ -248,6 +257,8 @@ signals:
     void singingTargetChanged();
     void singingMirrorChanged();
     void singingCaptureStateChanged();
+
+    void voicePreFilterEnabledChanged();
     void sungIntervalChanged();
     void singingQuestionChanged();
 
@@ -292,6 +303,12 @@ private:
     std::mt19937 m_singingRandomEngine{ std::random_device{}() };
     int m_singingTargetSemitones{ 7 };
     bool m_isSingingCaptureActive{ false };
+
+    // Vrai tant que le pre-traitement de voix accompagne le chant. Faux pour l'accordeur, toujours.
+    bool m_voicePreFilterEnabled{ true };
+
+    // Pousse l'etat courant (interrupteur ET capture) sur le detecteur. Un seul endroit decide, et c'est celui-la.
+    void applyVoicePreFilter();
 
     // Vrai pendant la transition entre les deux notes : le detecteur n'est alors PAS alimente, pour que les sons joues
     // par le jeu (la note rejouee, le compte a rebours) ne soient pas pris pour un chant. Voir beginSingingTransition.

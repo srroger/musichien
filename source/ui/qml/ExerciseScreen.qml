@@ -844,6 +844,8 @@ Item {
             ColumnLayout {
                 // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
                 // (Le compte a rebours n'est PAS dessine ici : il prend tout l'ecran, voir le splash en bas du fichier.)
+                // L'INTERRUPTEUR DE TEST. Roger : « tu peux meme rajouter une option togglable pour que je puisse
+                // rapidement tester la difference sans ou avec, histoire de juger si ca vaut le coup ».
 
                 Layout.fillWidth: true
                 // LA GARDE ETAIT LE BUG, ALORS ELLE RESTE ECRITE. Sans cette ligne, le bloc de chant s'affichait sur TOUTES
@@ -1016,6 +1018,26 @@ Item {
                         highlighted: MicrophoneController.isSingingCaptureActive
                         text: MicrophoneController.isSingingCaptureActive ? qsTr("J'écoute…") : qsTr("Je chante")
                         onClicked: MicrophoneController.isSingingCaptureActive ? MicrophoneController.stopSingingCapture() : MicrophoneController.startSingingCapture()
+                    }
+
+                }
+
+                // C'est un reglage d'ESSAI, et il ne concerne QUE le chant : l'accordeur l'ignore par construction, il
+                // n'est pas en capture (voir VoicePreFilter). A retirer une fois la decision prise.
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 8
+                    visible: exerciseScreen.singingCountdown === 0
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        text: qsTr("Filtre voix (bruit)")
+                    }
+
+                    Switch {
+                        checked: MicrophoneController.voicePreFilterEnabled
+                        onToggled: MicrophoneController.voicePreFilterEnabled = checked
                     }
 
                 }
