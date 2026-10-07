@@ -1126,6 +1126,30 @@ public:
 
     [[nodiscard]] int reviewQuestionCount() const noexcept;
 
+    // -------------------------------------------------------------------------------------------------------------
+    // LA PAGE DE FIN DU BILAN : ce que les cinquante questions ont rendu.
+    // -------------------------------------------------------------------------------------------------------------
+    //
+    // Le Bilan ne paie pas l'experience, donc il n'a JAMAIS eu droit au bilan d'Arcade - et c'est ce trou que ceci
+    // bouche. Apres cinquante questions, le joueur veut savoir ce qu'il sait faire : le resultat, la progression, et le
+    // cours a relire pour ce qui resiste encore.
+
+    // {asked, correct, firstTry, percent, firstTryPercent, durationSeconds, longestStreak}.
+    Q_PROPERTY( QVariantMap reviewResult READ reviewResult NOTIFY sessionChanged )
+
+    [[nodiscard]] QVariantMap reviewResult() const;
+
+    // Une entree par famille jouee : {name, family, before, after}. « before » vient des statistiques d'AVANT le Bilan,
+    // FIGEES a son ouverture - un Bilan qui se comparerait a lui-meme ne montrerait aucune progression.
+    Q_PROPERTY( QVariantList reviewFamilyProgress READ reviewFamilyProgress NOTIFY sessionChanged )
+
+    [[nodiscard]] QVariantList reviewFamilyProgress() const;
+
+    // Les distances des cibles d'INTERVALLE les plus faibles : ce que la page passe au catalogue pour proposer des cours.
+    Q_PROPERTY( QVariantList reviewWeakConcepts READ reviewWeakConcepts NOTIFY sessionChanged )
+
+    [[nodiscard]] QVariantList reviewWeakConcepts() const;
+
     // CE QUE LE NIVEAU ATTEND, ET QU'ON N'A PAS TRAVAILLE.
     Q_PROPERTY( QVariantList reviewLeastWorkedPoints READ reviewLeastWorkedPoints NOTIFY sessionChanged )
 
@@ -1139,6 +1163,10 @@ public:
 
     // Le joueur referme la page : le bilan n'a pas eu lieu, et RIEN n'a ete compte.
     Q_INVOKABLE void cancelReviewOpening();
+
+    // OUVRIR LE COURS PROPOSE PAR LA PAGE DE FIN. L'ecran de fin ne connait ni l'Ecole ni la navigation : il DEMANDE, et
+    // l'application decide (voir Main.qml). C'est ce qui garde un ecran sans le pouvoir de changer de page.
+    Q_INVOKABLE void requestReviewCourse( int p_index );
 
     // Le mot du moment : un encouragement AVANT une difficulte connue, et apres une reussite sur ce qui resistait.
     //
@@ -1169,6 +1197,9 @@ signals:
     void runningChanged();
     void questionChanged();
     void sessionChanged();
+
+    // Un cours a ouvrir, demande par la page de fin du Bilan : l'application l'ecoute et navigue.
+    void reviewCourseRequested( int p_index );
 
     // CE QUE LE JOUEUR A ACQUIS a change : son titre, ses trophees, ou ce que le dernier bilan vient de rapporter.
     //
@@ -1560,6 +1591,10 @@ private:
     // question ne dit plus son role : c'est cette liste, alignee sur lui, qui le dit - et c'est elle que lit
     // l'encouragement pour savoir s'il parle a bon escient. Vide hors bilan.
     std::vector<ReviewRole> m_reviewRoles;
+
+    // LES STATISTIQUES D'AVANT LE BILAN, figees a son ouverture. C'est la reference de la PROGRESSION : une fois le
+    // Bilan joue, le journal contient ses cinquante questions, donc recalculer « avant » donnerait « apres ».
+    std::vector<domain::TargetStatistics> m_reviewBeforeInsights;
 
     // LA PAGE D'OUVERTURE : visible apres le clic sur « Bilan », avant la premiere question. Les reglages prepares
     // attendent ici, parce que le bilan ne commence qu'une fois la page lue - voir beginReviewQuestions.

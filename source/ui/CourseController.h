@@ -46,6 +46,13 @@ public:
 
     [[nodiscard]] QVariantList library() const;
 
+    // LES COURS QUI ENSEIGNENT L'UN DE CES DEMI-TONS, dans l'ordre du catalogue.
+    //
+    // C'est le lien entre une FAIBLESSE et une LECTURE : la page de fin du Bilan montre ce que le joueur rate, et lui
+    // propose le cours qui l'explique. Un cours sans `concepts` (les modes, les accords, le rythme) n'y repond jamais -
+    // le lien n'existe que pour les intervalles, et une suggestion inventee vaudrait moins que pas de suggestion.
+    Q_INVOKABLE [[nodiscard]] QVariantList coursesForConcepts( const QVariantList & p_semitones ) const;
+
     // LE COURS OUVERT. Rien quand aucun ne l'est - et c'est l'etat normal quand on arrive sur la page.
     Q_PROPERTY( bool reading READ isReading NOTIFY courseChanged )
     Q_PROPERTY( QString title READ title NOTIFY courseChanged )

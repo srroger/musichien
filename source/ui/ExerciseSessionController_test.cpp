@@ -2397,6 +2397,51 @@ TEST( ExerciseSessionControllerTest, a_review_session_ignores_the_free_play_weig
     EXPECT_TRUE( sawChord ) << "le Bilan a suivi les parts du jeu libre au lieu de son propre plan";
 }
 
+TEST( ExerciseSessionControllerTest, the_bilan_end_page_reads_a_result_and_a_progress )
+{
+    // Roger, 07/10/2026 : « apres 50 questions, on aimerait quand meme avoir un "Bilan" de tout ce qu'on sait faire, et
+    // les progres ». Le Bilan ne paie pas l'experience, donc il n'a jamais eu le bilan de fin d'Arcade : ce test tient la
+    // page qui le remplace.
+    domain::NotePlayerFake notePlayer;
+    domain::QuestionLogFake log;
+
+    fillJournalWithWorkedTargets( log );
+
+    domain::SessionSettings settings = intervalOnlySettings();
+    settings.namedIntervalQuestionShare = 100;
+
+    ExerciseSessionController controller{ notePlayer, settings };
+    controller.setQuestionLog( &log );
+
+    controller.startReviewSession();
+    controller.beginReviewQuestions();
+
+    // On joue les cinquante questions en REVELANT la reponse : ce test tient le COMPTE, pas la justesse.
+    while( controller.running() && controller.isAsking() )
+    {
+        controller.revealAnswer();
+        controller.continueToNextQuestion();
+    }
+
+    ASSERT_TRUE( controller.isFinished() );
+
+    const QVariantMap result = controller.reviewResult();
+
+    EXPECT_EQ( 50, result.value( "asked" ).toInt() );
+
+    // Tout a ete revele : rien n'a ete RECONNU, donc aucune bonne reponse - et c'est exactement ce que « correct » dit.
+    EXPECT_EQ( 0, result.value( "correct" ).toInt() );
+
+    // Au moins une famille jouee, et un « avant » NON NUL : le journal du test precede le Bilan.
+    const QVariantList progress = controller.reviewFamilyProgress();
+
+    ASSERT_FALSE( progress.isEmpty() );
+    EXPECT_TRUE( progress.first().toMap().value( "hasBefore" ).toBool() );
+
+    // Et de quoi renvoyer vers un cours : les distances faibles, en demi-tons.
+    EXPECT_FALSE( controller.reviewWeakConcepts().isEmpty() );
+}
+
 TEST( ExerciseSessionControllerTest, the_dog_barks_when_the_session_ends )
 {
     // Roger : « quand le corgi anecdote apparait, ce serait bien qu'il fasse un petit son ». Le controle porte sur les

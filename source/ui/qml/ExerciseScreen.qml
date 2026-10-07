@@ -1785,255 +1785,380 @@ Item {
         ColumnLayout {
             // CE QUE LE BILAN VIENT DE RAPPORTER : les trophees tout neufs, et le titre s'il a monte.
 
+            // LA PAGE DÉFILE, ET LES DEUX BOUTONS RESTENT EN BAS : le bilan de fin d'Arcade tenait dans un ecran, celui
+            // d'un Bilan (resultat, progression, cours a revoir) ne tient plus. Une page de fin qu'on ne peut pas
+            // derouler cacherait justement ce qu'elle a de neuf.
             anchors.fill: parent
             anchors.margins: 24
             visible: ExerciseController.isFinished
             spacing: 14
 
-            Item {
+            Flickable {
+                id: endFlick
+
+                Layout.fillWidth: true
                 Layout.fillHeight: true
-            }
+                clip: true
+                contentWidth: width
+                contentHeight: Math.max(endColumn.height, endFlick.height)
 
-            Text {
-                id: starText
+                ColumnLayout {
+                    id: endColumn
 
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                text: ExerciseController.starEarned ? "⭐" : "☆"
-                font.pixelSize: 64
-
-                // A single short pop when it appears: a reward has to be felt, not only read.
-                NumberAnimation on scale {
-                    running: starText.visible
-                    from: 0.4
-                    to: 1
-                    duration: 450
-                    easing.type: Easing.OutBack
-                    loops: 1
-                }
-
-            }
-            // Le chien de la fin : content quand la partie est gagnee, triste quand elle est perdue.
-
-            // Il vient APRES l'etoile et AVANT les chiffres : l'etoile est la recompense du domaine, le chien est le mot
-            // qu'on y ajoute, et un dessin dit « bravo » ou « pas cette fois » plus vite qu'une ligne de score.
-            Image {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.preferredHeight: 150
-                fillMode: Image.PreserveAspectFit
-                source: ExerciseController.wasSessionWon ? "qrc:/assets/images/chibaWin.png" : "qrc:/assets/images/chibaLose.png"
-            }
-
-            Text {
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignHCenter
-                text: ExerciseController.sessionGrantsExperience ? qsTr("Arcade terminée") : qsTr("Session terminée")
-                color: "#ffffff"
-                font.pixelSize: 24
-                font.bold: true
-            }
-
-            // LE BILAN DE L'ARCADE : ce qu'aucun autre mode ne montre, parce qu'aucun autre mode ne le gagne.
-            ColumnLayout {
-                // LES TROIS FAMILLES, ET CE QU'ELLES ONT COUTE.
-
-                Layout.fillWidth: true
-                visible: ExerciseController.sessionGrantsExperience
-                spacing: 6
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
+                    width: endFlick.width
+                    // Centre quand le contenu est COURT, defile quand il est LONG.
+                    y: Math.max(0, (endFlick.height - height) / 2)
+                    spacing: 14
 
                     Text {
+                        id: starText
+
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
-                        color: "#cbb8e8"
-                        font.pixelSize: 16
-                        text: qsTr("⏱ %1").arg(exerciseScreen.durationLabel(exerciseScreen.rewardValue(ExerciseController.sessionDurationSeconds)))
+                        text: ExerciseController.starEarned ? "⭐" : "☆"
+                        font.pixelSize: 64
+
+                        // A single short pop when it appears: a reward has to be felt, not only read.
+                        NumberAnimation on scale {
+                            running: starText.visible
+                            from: 0.4
+                            to: 1
+                            duration: 450
+                            easing.type: Easing.OutBack
+                            loops: 1
+                        }
+
+                    }
+                    // Le chien de la fin : content quand la partie est gagnee, triste quand elle est perdue.
+
+                    // Il vient APRES l'etoile et AVANT les chiffres : l'etoile est la recompense du domaine, le chien est le mot
+                    // qu'on y ajoute, et un dessin dit « bravo » ou « pas cette fois » plus vite qu'une ligne de score.
+                    Image {
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.preferredHeight: 150
+                        fillMode: Image.PreserveAspectFit
+                        source: ExerciseController.wasSessionWon ? "qrc:/assets/images/chibaWin.png" : "qrc:/assets/images/chibaLose.png"
                     }
 
                     Text {
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
-                        color: "#cbb8e8"
-                        font.pixelSize: 16
-                        text: qsTr("🔥 série %1").arg(exerciseScreen.rewardValue(ExerciseController.sessionLongestStreak))
+                        text: ExerciseController.isReviewRunning ? qsTr("Bilan terminé") : (ExerciseController.sessionGrantsExperience ? qsTr("Arcade terminée") : qsTr("Session terminée"))
+                        color: "#ffffff"
+                        font.pixelSize: 24
+                        font.bold: true
                     }
 
-                }
-
-                // L'EXPERIENCE, et son merite : le multiplicateur ne s'affiche QUE s'il a majore, sinon la ligne dirait
-                // « x1 », ce qui n'est pas une recompense mais un constat.
-                Text {
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    color: "#ffd479"
-                    font.pixelSize: 22
-                    font.bold: true
-                    text: ExerciseController.arcadeMultiplierPercent > 100 ? qsTr("+%1 XP  ·  x%2").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned)).arg(ExerciseController.arcadeMultiplierPercent / 100) : qsTr("+%1 XP").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned))
-                }
-
-                // Roger : « on ecrit les pourcentages de reussite, et on voit 100 % partout. Mais ca n'a pas trop de sens,
-                // car forcement s'il arrive a la fin il aura du 100 % partout. » Il a raison, et l'indicateur etait
-                // structurellement muet : le taux ne descend QUE si l'on joue mal, et si l'on joue mal la partie s'arrete
-                // avant la fin - donc la ligne ne s'affiche meme pas. Ce qu'on montre desormais, c'est ce que la partie a
-                // COUTE : le nombre d'erreurs, qui est aussi le nombre de coeurs perdus.
-                Repeater {
-                    model: ExerciseController.sessionGrantsExperience ? ExerciseController.familyResults() : []
-
-                    // LE MOT DE LA FIN, sous les trois familles.
-                    Text {
-                        Layout.preferredWidth: 0
-                        Layout.minimumWidth: 0
+                    // LE BILAN DE FIN DE BILAN : ce qu'aucun autre mode ne montre, parce qu'aucun autre ne se joue en
+                    // cinquante questions. Roger : « apres 50 questions, on aimerait quand meme avoir un "Bilan" de tout
+                    // ce qu'on sait faire, et les progres, et les cours qu'il faudrait regarder ».
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        Layout.topMargin: 10
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
-                        color: "#ffd479"
-                        font.pixelSize: 14
-                        text: ExerciseController.sessionGrantsExperience ? exerciseScreen.closingAdvice() : ""
-                    }
-
-                    delegate: RowLayout {
-                        required property var modelData
-
-                        Layout.fillWidth: true
+                        visible: ExerciseController.isReviewRunning
                         spacing: 6
+
+                        // LE RESULTAT DES CINQUANTE QUESTIONS.
+                        Text {
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignHCenter
+                            color: "#ffffff"
+                            font.pixelSize: 22
+                            font.bold: true
+                            text: qsTr("%1 / %2 questions justes · %3 %").arg(ExerciseController.reviewResult.correct).arg(ExerciseController.reviewResult.asked).arg(ExerciseController.reviewResult.percent)
+                        }
 
                         Text {
                             Layout.fillWidth: true
-                            color: "#e8dcff"
-                            font.pixelSize: 14
-                            text: modelData.name
+                            horizontalAlignment: Text.AlignHCenter
+                            color: "#cbb8e8"
+                            font.pixelSize: 13
+                            text: qsTr("⏱ %1  ·  🔥 série %2  ·  %3 % du premier coup").arg(exerciseScreen.durationLabel(exerciseScreen.rewardValue(ExerciseController.reviewResult.durationSeconds))).arg(exerciseScreen.rewardValue(ExerciseController.reviewResult.longestStreak)).arg(ExerciseController.reviewResult.firstTryPercent)
                         }
 
+                        // CE QU'ON SAIT FAIRE, FAMILLE PAR FAMILLE, ET D'OU L'ON VIENT.
                         Text {
-                            horizontalAlignment: Text.AlignRight
-                            color: modelData.errors === 0 ? "#8ef2b0" : "#ff8fb0"
-                            font.pixelSize: 14
+                            Layout.fillWidth: true
+                            Layout.topMargin: 8
+                            color: "#e8dcff"
+                            font.pixelSize: 16
                             font.bold: true
-                            // La forme plurielle de Qt, et pas un « (s) » ecrit a la main : c'est ce qui permet a une
-                            // traduction de dire « 0 erreur » et « 1 erreur » comme sa langue le demande.
-                            text: modelData.errors === 0 ? qsTr("Parfait !") : qsTr("%n erreur(s)", "", modelData.errors)
+                            text: qsTr("Ce que tu sais faire")
+                        }
+
+                        Repeater {
+                            model: ExerciseController.reviewFamilyProgress
+
+                            delegate: RowLayout {
+                                required property var modelData
+
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    color: "#e8dcff"
+                                    font.pixelSize: 14
+                                    text: modelData.name
+                                }
+
+                                Text {
+                                    color: "#ffffff"
+                                    font.pixelSize: 14
+                                    font.bold: true
+                                    text: qsTr("%1 / %2").arg(modelData.correct).arg(modelData.asked)
+                                }
+
+                                // LA PROGRESSION : le taux d'AVANT, puis celui d'AUJOURD'HUI, puis une fleche.
+                                Text {
+                                    color: "#8a77ad"
+                                    font.pixelSize: 13
+                                    visible: modelData.hasBefore
+                                    text: modelData.hasBefore ? qsTr("%1 % → %2 %  %3").arg(modelData.before).arg(modelData.after).arg(modelData.after > modelData.before ? "▲" : (modelData.after < modelData.before ? "▼" : "=")) : ""
+                                }
+
+                            }
+
+                        }
+
+                        // LES COURS A REVOIR : le lien entre une faiblesse et une lecture.
+                        ColumnLayout {
+                            id: reviewCourseBlock
+
+                            // Les distances les plus faibles passent AU CATALOGUE, qui rend les cours qui les enseignent.
+                            readonly property var suggestions: CourseController.coursesForConcepts(ExerciseController.reviewWeakConcepts)
+
+                            Layout.fillWidth: true
+                            Layout.topMargin: 10
+                            spacing: 6
+                            visible: suggestions.length > 0
+
+                            Text {
+                                Layout.fillWidth: true
+                                color: "#ffd479"
+                                font.pixelSize: 16
+                                font.bold: true
+                                text: qsTr("Les cours à revoir")
+                            }
+
+                            Repeater {
+                                model: reviewCourseBlock.suggestions
+
+                                delegate: Button {
+                                    required property var modelData
+
+                                    Layout.fillWidth: true
+                                    height: 46
+                                    text: "▶ " + modelData.title
+                                    onClicked: ExerciseController.requestReviewCourse(modelData.index)
+                                }
+
+                            }
+
                         }
 
                     }
 
-                }
+                    // LE BILAN DE L'ARCADE : ce qu'aucun autre mode ne montre, parce qu'aucun autre mode ne le gagne.
+                    ColumnLayout {
+                        // LES TROIS FAMILLES, ET CE QU'ELLES ONT COUTE.
 
-                // LE MOT, sous les chiffres : un point fort et un point a travailler, tires de la partie qu'on vient de
-                // jouer. Le second n'apparait que s'il y a PLUSIEURS familles - sinon la meilleure et la pire seraient la
-                // meme ligne, dite deux fois.
-                Text {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 0
-                    Layout.minimumWidth: 0
-                    Layout.topMargin: 2
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    color: "#8ef2b0"
-                    font.pixelSize: 13
-                    visible: ExerciseController.isFinished && (exerciseScreen.strongestFamily() !== null)
-                    text: (exerciseScreen.strongestFamily() !== null) ? qsTr("Fort en %1.").arg(exerciseScreen.strongestFamily().name) : ""
-                }
+                        Layout.fillWidth: true
+                        visible: ExerciseController.sessionGrantsExperience
+                        spacing: 6
 
-                Text {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 0
-                    Layout.minimumWidth: 0
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    color: "#ff8fb0"
-                    font.pixelSize: 13
-                    visible: ExerciseController.isFinished && (exerciseScreen.weakestFamily() !== null)
-                    text: (exerciseScreen.weakestFamily() !== null) ? qsTr("À travailler : %1.").arg(exerciseScreen.weakestFamily().name) : ""
-                }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
 
-            }
+                            Text {
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignHCenter
+                                color: "#cbb8e8"
+                                font.pixelSize: 16
+                                text: qsTr("⏱ %1").arg(exerciseScreen.durationLabel(exerciseScreen.rewardValue(ExerciseController.sessionDurationSeconds)))
+                            }
 
-            // LES AUTRES MODES ne paient pas, et l'ecran le DIT plutot que d'afficher un gain qui n'a pas eu lieu.
-            Text {
-                Layout.fillWidth: true
-                Layout.preferredWidth: 0
-                Layout.minimumWidth: 0
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.WordWrap
-                color: "#8a77ad"
-                font.pixelSize: 14
-                visible: !ExerciseController.sessionGrantsExperience
-                text: qsTr("Pas d'XP ici — l'Arcade en donne. Tout compte pour tes stats.")
-            }
+                            Text {
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignHCenter
+                                color: "#cbb8e8"
+                                font.pixelSize: 16
+                                text: qsTr("🔥 série %1").arg(exerciseScreen.rewardValue(ExerciseController.sessionLongestStreak))
+                            }
 
-            // Roger : « a la fin du bilan, si il a gagne un trophee ou une recompense, il faut lui dire (et lui dire qu'ils
-            // sont dans "profil") - du coup il va y aller et se rendre compte qu'il y en a d'autres a gagner ». C'est
-            // exactement le but : le renvoyer voir la liste, ou les suivants attendent.
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.topMargin: 8
-                // ELLES SONT LUES COMME DES PROPRIETES, et c'est une CORRECTION : ecrire `titleJustIncreased` sans
-                // parentheses n'appelait PAS la methode - c'etait un objet fonction, donc toujours vrai, et le badge
-                // s'affichait a chaque fin de partie avec « Toutou ». Et une propriete notifiable est ce qui permet a
-                // cette liaison de se rafraichir quand ce que le bilan a rapporte change.
-                visible: (ExerciseController.newlyEarnedTrophies.length > 0) || ExerciseController.titleJustIncreased
-                spacing: 4
+                        }
 
-                Text {
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    color: "#ffd479"
-                    font.pixelSize: 17
-                    font.bold: true
-                    text: ExerciseController.titleJustIncreased ? qsTr("🏆 Nouveau titre : %1").arg(ExerciseController.playerTitle.name) : qsTr("🏆 Récompense !")
-                }
+                        // L'EXPERIENCE, et son merite : le multiplicateur ne s'affiche QUE s'il a majore, sinon la ligne dirait
+                        // « x1 », ce qui n'est pas une recompense mais un constat.
+                        Text {
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignHCenter
+                            color: "#ffd479"
+                            font.pixelSize: 22
+                            font.bold: true
+                            text: ExerciseController.arcadeMultiplierPercent > 100 ? qsTr("+%1 XP  ·  x%2").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned)).arg(ExerciseController.arcadeMultiplierPercent / 100) : qsTr("+%1 XP").arg(exerciseScreen.rewardValue(ExerciseController.arcadeXpEarned))
+                        }
 
-                Repeater {
-                    model: ExerciseController.newlyEarnedTrophies
+                        // Roger : « on ecrit les pourcentages de reussite, et on voit 100 % partout. Mais ca n'a pas trop de sens,
+                        // car forcement s'il arrive a la fin il aura du 100 % partout. » Il a raison, et l'indicateur etait
+                        // structurellement muet : le taux ne descend QUE si l'on joue mal, et si l'on joue mal la partie s'arrete
+                        // avant la fin - donc la ligne ne s'affiche meme pas. Ce qu'on montre desormais, c'est ce que la partie a
+                        // COUTE : le nombre d'erreurs, qui est aussi le nombre de coeurs perdus.
+                        Repeater {
+                            model: ExerciseController.sessionGrantsExperience ? ExerciseController.familyResults() : []
 
-                    delegate: Text {
-                        required property var modelData
+                            // LE MOT DE LA FIN, sous les trois familles.
+                            Text {
+                                Layout.preferredWidth: 0
+                                Layout.minimumWidth: 0
+                                Layout.fillWidth: true
+                                Layout.topMargin: 10
+                                horizontalAlignment: Text.AlignHCenter
+                                wrapMode: Text.WordWrap
+                                color: "#ffd479"
+                                font.pixelSize: 14
+                                text: ExerciseController.sessionGrantsExperience ? exerciseScreen.closingAdvice() : ""
+                            }
 
+                            delegate: RowLayout {
+                                required property var modelData
+
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    color: "#e8dcff"
+                                    font.pixelSize: 14
+                                    text: modelData.name
+                                }
+
+                                Text {
+                                    horizontalAlignment: Text.AlignRight
+                                    color: modelData.errors === 0 ? "#8ef2b0" : "#ff8fb0"
+                                    font.pixelSize: 14
+                                    font.bold: true
+                                    // La forme plurielle de Qt, et pas un « (s) » ecrit a la main : c'est ce qui permet a une
+                                    // traduction de dire « 0 erreur » et « 1 erreur » comme sa langue le demande.
+                                    text: modelData.errors === 0 ? qsTr("Parfait !") : qsTr("%n erreur(s)", "", modelData.errors)
+                                }
+
+                            }
+
+                        }
+
+                        // LE MOT, sous les chiffres : un point fort et un point a travailler, tires de la partie qu'on vient de
+                        // jouer. Le second n'apparait que s'il y a PLUSIEURS familles - sinon la meilleure et la pire seraient la
+                        // meme ligne, dite deux fois.
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            Layout.topMargin: 2
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WordWrap
+                            color: "#8ef2b0"
+                            font.pixelSize: 13
+                            visible: ExerciseController.isFinished && (exerciseScreen.strongestFamily() !== null)
+                            text: (exerciseScreen.strongestFamily() !== null) ? qsTr("Fort en %1.").arg(exerciseScreen.strongestFamily().name) : ""
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WordWrap
+                            color: "#ff8fb0"
+                            font.pixelSize: 13
+                            visible: ExerciseController.isFinished && (exerciseScreen.weakestFamily() !== null)
+                            text: (exerciseScreen.weakestFamily() !== null) ? qsTr("À travailler : %1.").arg(exerciseScreen.weakestFamily().name) : ""
+                        }
+
+                    }
+
+                    // LES AUTRES MODES ne paient pas, et l'ecran le DIT plutot que d'afficher un gain qui n'a pas eu lieu.
+                    Text {
                         Layout.fillWidth: true
                         Layout.preferredWidth: 0
                         Layout.minimumWidth: 0
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.WordWrap
-                        color: "#e8dcff"
+                        color: "#8a77ad"
+                        font.pixelSize: 14
+                        visible: !ExerciseController.sessionGrantsExperience && !ExerciseController.isReviewRunning
+                        text: qsTr("Pas d'XP ici — l'Arcade en donne. Tout compte pour tes stats.")
+                    }
+
+                    // Roger : « a la fin du bilan, si il a gagne un trophee ou une recompense, il faut lui dire (et lui dire qu'ils
+                    // sont dans "profil") - du coup il va y aller et se rendre compte qu'il y en a d'autres a gagner ». C'est
+                    // exactement le but : le renvoyer voir la liste, ou les suivants attendent.
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.topMargin: 8
+                        // ELLES SONT LUES COMME DES PROPRIETES, et c'est une CORRECTION : ecrire `titleJustIncreased` sans
+                        // parentheses n'appelait PAS la methode - c'etait un objet fonction, donc toujours vrai, et le badge
+                        // s'affichait a chaque fin de partie avec « Toutou ». Et une propriete notifiable est ce qui permet a
+                        // cette liaison de se rafraichir quand ce que le bilan a rapporte change.
+                        visible: (ExerciseController.newlyEarnedTrophies.length > 0) || ExerciseController.titleJustIncreased
+                        spacing: 4
+
+                        Text {
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignHCenter
+                            color: "#ffd479"
+                            font.pixelSize: 17
+                            font.bold: true
+                            text: ExerciseController.titleJustIncreased ? qsTr("🏆 Nouveau titre : %1").arg(ExerciseController.playerTitle.name) : qsTr("🏆 Récompense !")
+                        }
+
+                        Repeater {
+                            model: ExerciseController.newlyEarnedTrophies
+
+                            delegate: Text {
+                                required property var modelData
+
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 0
+                                Layout.minimumWidth: 0
+                                horizontalAlignment: Text.AlignHCenter
+                                wrapMode: Text.WordWrap
+                                color: "#e8dcff"
+                                font.pixelSize: 13
+                                text: "★ " + modelData.name + " · " + modelData.description
+                            }
+
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 0
+                            Layout.minimumWidth: 0
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WordWrap
+                            color: "#8a77ad"
+                            font.pixelSize: 12
+                            text: qsTr("Tout est dans ton profil.")
+                        }
+
+                    }
+
+                    // L'anecdote de sortie : on quitte sur quelque chose a apprendre, comme on est entre. Bornee en largeur
+                    // (fillWidth + WordWrap), sinon un texte long pousserait les boutons hors de l'ecran.
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.topMargin: 4
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        color: "#8a77ad"
                         font.pixelSize: 13
-                        text: "★ " + modelData.name + " · " + modelData.description
+                        font.italic: true
+                        visible: ExerciseController.anecdoteText !== ""
+                        text: ExerciseController.anecdoteText !== "" ? qsTr("« %1 »").arg(ExerciseController.anecdoteText) : ""
                     }
 
                 }
 
-                Text {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 0
-                    Layout.minimumWidth: 0
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    color: "#8a77ad"
-                    font.pixelSize: 12
-                    text: qsTr("Tout est dans ton profil.")
-                }
-
-            }
-
-            // L'anecdote de sortie : on quitte sur quelque chose a apprendre, comme on est entre. Bornee en largeur
-            // (fillWidth + WordWrap), sinon un texte long pousserait les boutons hors de l'ecran.
-            Text {
-                Layout.fillWidth: true
-                Layout.topMargin: 4
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.WordWrap
-                color: "#8a77ad"
-                font.pixelSize: 13
-                font.italic: true
-                visible: ExerciseController.anecdoteText !== ""
-                text: ExerciseController.anecdoteText !== "" ? qsTr("« %1 »").arg(ExerciseController.anecdoteText) : ""
-            }
-
-            Item {
-                Layout.fillHeight: true
             }
 
             Button {

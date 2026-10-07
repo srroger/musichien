@@ -148,6 +148,10 @@ constexpr std::size_t REVIEW_WARMUP_QUESTION_COUNT = 5;
 constexpr std::size_t REVIEW_RESISTING_QUESTION_COUNT = 15;
 constexpr std::size_t REVIEW_LEAST_WORKED_QUESTION_COUNT = 10;
 
+// COMBIEN DE DISTANCES FAIBLES la page de fin passe au catalogue pour proposer des cours. TROIS : assez pour couvrir
+// les trous du joueur, assez peu pour que la liste reste une suggestion et non un programme.
+constexpr std::size_t REVIEW_WEAK_CONCEPT_COUNT = 3;
+
 // La periode qu'un bilan regarde. Trente jours : ce que le joueur a travaille recemment, et non sa vie entiere - un
 // exercice rate il y a six mois n'est plus une faiblesse, c'est un souvenir.
 constexpr int REVIEW_PERIOD_DAYS = 30;
@@ -1277,6 +1281,7 @@ void ExerciseSessionController::leaveReviewMode() noexcept
     // fait parler toutes les parties de Roger comme des bilans : une seule fonction, donc plus rien a oublier.
     m_isReviewRunning = false;
     m_reviewRoles.clear();
+    m_reviewBeforeInsights.clear();
 }
 
 void ExerciseSessionController::startSession()
@@ -3802,6 +3807,10 @@ void ExerciseSessionController::startReviewSession()
     // normal, et le repli sur une partie ordinaire quand il n'y a rien a reviser).
     m_gameMode = domain::GameMode::Review;
 
+    // LA REFERENCE DE LA PROGRESSION, figee AVANT le Bilan : une fois joue, le journal contient ses cinquante questions,
+    // et « avant » vaudrait « apres ». C'est la meme source que la page d'ouverture - donc la meme verite.
+    m_reviewBeforeInsights = reviewInsights();
+
     std::vector<ReviewRole> roles;
 
     std::vector<domain::QuestionTarget> plan = reviewPlan( roles );
@@ -3871,6 +3880,141 @@ int ExerciseSessionController::reviewQuestionCount() const noexcept
     return 0;
 }
 
+QVariantMap ExerciseSessionController::reviewResult() const
+{
+    QVariantMap result;
+
+    if( m_session == nullptr )
+    {
+        return result;
+    }
+
+    const domain::SessionScore & score = m_session->score();
+
+    // CE QUI EST JUSTE : les questions conclues moins celles dont la reponse a ete DONNEE par l'app. Une question aidee
+    // est conclue, mais le joueur n'a rien reconnu - la compter comme une reussite mentirait sur ce qu'il sait faire.
+    const std::size_t asked = score.completedQuestionCount();
+    const std::size_t helped = score.helpedQuestionCount();
+    const std::size_t correct = ( asked >= helped ) ? ( asked - helped ) : 0;
+
+    const auto percentOf = [asked]( std::size_t p_part ) {
+        return ( asked == 0 ) ? 0 : static_cast<int>( std::lround( 100.0 * static_cast<double>( p_part ) / static_cast<double>( asked ) ) );
+    };
+
+    result.insert( QStringLiteral( "asked" ), static_cast<int>( asked ) );
+    result.insert( QStringLiteral( "correct" ), static_cast<int>( correct ) );
+    result.insert( QStringLiteral( "firstTry" ), static_cast<int>( score.firstTrySuccessCount() ) );
+    result.insert( QStringLiteral( "percent" ), percentOf( correct ) );
+    result.insert( QStringLiteral( "firstTryPercent" ), percentOf( score.firstTrySuccessCount() ) );
+    result.insert( QStringLiteral( "durationSeconds" ), m_sessionDurationSeconds );
+    result.insert( QStringLiteral( "longestStreak" ), sessionLongestStreak() );
+
+    return result;
+}
+
+QVariantList ExerciseSessionController::reviewFamilyProgress() const
+{
+    QVariantList rows;
+
+    if( m_session == nullptr )
+    {
+        return rows;
+    }
+
+    constexpr std::array<domain::QuestionFamily, domain::QUESTION_FAMILY_COUNT> FAMILIES{
+      domain::QuestionFamily::Interval, domain::QuestionFamily::Chord, domain::QuestionFamily::Mode };
+
+    constexpr std::array<std::string_view, domain::QUESTION_FAMILY_COUNT> FAMILY_NAMES{ "Intervalles", "Accords", "Modes" };
+
+    const domain::FamilyTally & tally = m_session->familyTally();
+
+    for( std::size_t index = 0; index < domain::QUESTION_FAMILY_COUNT; ++index )
+    {
+        const domain::QuestionFamily family = FAMILIES.at( index );
+
+        // Une famille a laquelle on n'a PAS joue n'a rien a dire : « 0 sur 0 » n'informe pas.
+        if( tally.askedIn( family ) == 0 )
+        {
+            continue;
+        }
+
+        // L'AVANT : les statistiques FIGEES a l'ouverture du Bilan, agregees sur la MEME famille.
+        std::size_t beforeAsked = 0;
+        std::size_t beforeCorrect = 0;
+
+        for( const domain::TargetStatistics & target : m_reviewBeforeInsights )
+        {
+            if( domain::familyOf( target.kind ) != family )
+            {
+                continue;
+            }
+
+            beforeAsked += target.statistics.questionCount;
+            beforeCorrect += target.statistics.correctCount();
+        }
+
+        QVariantMap row;
+        row.insert( QStringLiteral( "name" ), QString::fromUtf8( FAMILY_NAMES.at( index ).data() ) );
+        row.insert( QStringLiteral( "family" ), static_cast<int>( family ) );
+        row.insert( QStringLiteral( "before" ),
+                    ( beforeAsked == 0 )
+                      ? 0
+                      : static_cast<int>( std::lround( 100.0 * static_cast<double>( beforeCorrect )
+                                                       / static_cast<double>( beforeAsked ) ) ) );
+        row.insert( QStringLiteral( "after" ), static_cast<int>( tally.successPercentIn( family ) ) );
+        row.insert( QStringLiteral( "asked" ), static_cast<int>( tally.askedIn( family ) ) );
+        row.insert( QStringLiteral( "correct" ), static_cast<int>( tally.correctIn( family ) ) );
+        row.insert( QStringLiteral( "hasBefore" ), beforeAsked > 0 );
+
+        rows.append( row );
+    }
+
+    return rows;
+}
+
+QVariantList ExerciseSessionController::reviewWeakConcepts() const
+{
+    QVariantList concepts;
+
+    std::vector<std::int32_t> distances;
+
+    // La MEME source que la page d'ouverture : les cibles d'avant le Bilan, deja triees du plus FAIBLE au meilleur.
+    for( const domain::TargetStatistics & target : m_reviewBeforeInsights )
+    {
+        // Les cours n'enseignent que des INTERVALLES : une cible d'accord ou de mode n'a pas de demi-ton a proposer.
+        if( !domain::isIntervalQuestion( target.kind ) )
+        {
+            continue;
+        }
+
+        // L'unisson (0 demi-ton) ne s'enseigne pas comme une faiblesse a travailler.
+        if( target.target <= 0 )
+        {
+            continue;
+        }
+
+        // Une SEULE fois par distance : plusieurs cibles peuvent porter la meme.
+        if( std::ranges::find( distances, target.target ) != distances.end() )
+        {
+            continue;
+        }
+
+        distances.push_back( target.target );
+
+        if( distances.size() >= REVIEW_WEAK_CONCEPT_COUNT )
+        {
+            break;
+        }
+    }
+
+    for( const std::int32_t distance : distances )
+    {
+        concepts.append( distance );
+    }
+
+    return concepts;
+}
+
 void ExerciseSessionController::beginReviewQuestions()
 {
     if( !m_reviewOpeningVisible )
@@ -3899,6 +4043,12 @@ void ExerciseSessionController::cancelReviewOpening()
     m_pendingReviewSettings = domain::SessionSettings{};
 
     emit sessionChanged();
+}
+
+void ExerciseSessionController::requestReviewCourse( int p_index )
+{
+    // L'ecran DEMANDE, l'application navigue. Rien de plus ici : ce controleur ne doit pas savoir ce qu'est l'Ecole.
+    emit reviewCourseRequested( p_index );
 }
 
 QVariantList ExerciseSessionController::reviewStrongPoints() const

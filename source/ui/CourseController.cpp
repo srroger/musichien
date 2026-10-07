@@ -206,6 +206,18 @@ CourseController::CourseController( domain::NotePlayer & p_notePlayer,
         entry.insert( QStringLiteral( "order" ), course.order );
         entry.insert( QStringLiteral( "blockCount" ), static_cast<int>( course.blocks.size() ) );
 
+        // LES CONCEPTS, EN DISTANCES : ce que le cours ENSEIGNE, et ce qui permet de rapprocher une faiblesse du joueur
+        // (un intervalle qu'il rate) du cours qui l'explique. Le champ vit deja dans le domaine (Course::concepts), il
+        // etait lu et jamais transmis ; la page de fin du Bilan est ce qui en a besoin.
+        QVariantList courseConcepts;
+
+        for( const std::int32_t semitones : course.concepts )
+        {
+            courseConcepts.append( semitones );
+        }
+
+        entry.insert( QStringLiteral( "concepts" ), courseConcepts );
+
         // UN OS A MACHER N'EST PAS UN COURS, et la liste doit le dire d'un coup d'oeil - Roger : « je mettrais bien les
         // os a macher d'une autre couleur que les cours ».
         //
@@ -299,6 +311,49 @@ void CourseController::openAnnexe( const QString & p_name )
 QVariantList CourseController::library() const
 {
     return m_library;
+}
+
+QVariantList CourseController::coursesForConcepts( const QVariantList & p_semitones ) const
+{
+    QVariantList matches;
+
+    if( p_semitones.isEmpty() )
+    {
+        return matches;
+    }
+
+    // On garde l'ORDRE DU CATALOGUE : une liste de suggestions qui se rearrangerait d'une fin de Bilan a l'autre ne se
+    // lirait pas.
+    for( std::size_t index = 0; index < m_courses.size(); ++index )
+    {
+        const domain::Course & course = m_courses.at( index );
+
+        // Les ANNEXES ne sont pas des cours : on ne les propose pas comme lecture de revision.
+        if( course.chapter == 0 )
+        {
+            continue;
+        }
+
+        const bool teachesSomethingWeak = std::ranges::any_of( course.concepts, [&p_semitones]( std::int32_t p_concept ) {
+            return std::ranges::any_of( p_semitones, [p_concept]( const QVariant & p_wanted ) {
+                return p_wanted.toInt() == p_concept;
+            } );
+        } );
+
+        if( !teachesSomethingWeak )
+        {
+            continue;
+        }
+
+        QVariantMap entry;
+        entry.insert( QStringLiteral( "index" ), static_cast<int>( index ) );
+        entry.insert( QStringLiteral( "title" ), displayTitleFor( index ) );
+        entry.insert( QStringLiteral( "subtitle" ), QString::fromStdString( course.subtitle ) );
+
+        matches.append( entry );
+    }
+
+    return matches;
 }
 
 QString CourseController::title() const

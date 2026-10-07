@@ -390,6 +390,14 @@ ApplicationWindow {
 
             }
 
+            // LA PAGE DE FIN DU BILAN a demande le cours qui explique un point faible : l'application quitte la partie,
+            // ouvre la lecon, et montre l'Ecole. L'ecran de fin n'a jamais eu le pouvoir de changer de page.
+            function onReviewCourseRequested(p_index) {
+                ExerciseController.stopSession();
+                CourseController.open(p_index);
+                mainWindow.schoolIsOpen = true;
+            }
+
             target: ExerciseController
         }
 
