@@ -1389,7 +1389,6 @@ Item {
 
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.alignment: Qt.AlignVCenter
                 visible: ExerciseController.isHarmonyQuestion
                 spacing: 10
 
@@ -1484,6 +1483,10 @@ Item {
                     // La gamme de l'exercice MONTE, puis se REFERME sur sa tonique : le chemin fait donc le tour du
                     // cercle et revient a son point de depart, ce qui referme la figure - et c'est la figure qui reste a
                     // l'ecran une fois la musique finie.
+                    // LES PASTILLES RESTENT ASSEZ GRANDES : elles sont CLIQUEES sur une question de note etrangere, et
+                    // une cible qui retrecit trop fait rater la note qu'on visait.
+                    // LA TAILLE EST FIXE, ET C'EST LA CORRECTION DU CERCLE DISPARU.
+                    // LA TAILLE EST FIXE, ET C'EST LA CORRECTION DU CERCLE DISPARU.
 
                     id: modeCircle
 
@@ -1491,9 +1494,15 @@ Item {
                     // Un souffle, et pas davantage : la roue est le sujet de la question, et chaque pixel pris au-dessus
                     // d'elle est un pixel retire au dessin et aux boutons.
                     Layout.topMargin: 2
-                    // Les pastilles restent grandes : elles sont CLIQUEES sur une question de note etrangere, et une cible
-                    // qui retrecit trop fait rater la note qu'on visait.
-                    span: 304
+                    // Sans minimum, un ColumnLayout qui manque de place RETRECIT un item jusqu'a ZERO - et c'est ce qui
+                    // arrivait au cercle des que les sept modes etaient la. Roger l'a vu : « le cercle est juste absent,
+                    // il n'y a rien a la place ». On fixe donc la hauteur des DEUX cotes (minimum ET maximum) : rien ne
+                    // peut plus l'ecraser ni l'etirer. Les surcharges de LARGEUR sont retirees : elles n'apportaient rien
+                    // et pouvaient gener le layout.
+                    span: 256
+                    Layout.minimumHeight: span
+                    Layout.preferredHeight: span
+                    Layout.maximumHeight: span
                     dotSize: 46
                     visible: ExerciseController.isHarmonyQuestion
                     selectable: ExerciseController.isForeignNoteQuestion
@@ -1511,14 +1520,23 @@ Item {
                     // celle par laquelle elle a commence.
                     Connections {
                         // LA ROUE SUIT LE PASSAGE QUI SONNE, et elle le relit ICI.
+                        // `modeCircle` change de valeur quand le second passage d'une comparaison commence - c'est
+                        // tout le sujet : le premier mode se dessine pendant qu'il sonne, le second prend sa place
+                        // ensuite. La donnee n'a pas de signal a elle, donc la liaison declarative seule ne se
+                        // recalculerait pas : il faut la RELIRE ici, au moment ou le son part.
 
                         function onModePlaybackStarted() {
-                            // `modeCircle` change de valeur quand le second passage d'une comparaison commence - c'est
-                            // tout le sujet : le premier mode se dessine pendant qu'il sonne, le second prend sa place
-                            // ensuite. La lecture est donc IMPERATIVE : la donnee n'a pas de signal a elle, et une
-                            // liaison declarative ne se recalculerait pas. Le signal part au meme moment que le son,
-                            // donc le dessin et la musique changent ensemble.
-                            modeCircle.notes = ExerciseController.modeCircle;
+                            // ET ON LA RELIT EN REAFFIRMANT LA LIAISON, jamais en ecrasant la valeur.
+                            // `modeCircle.notes = ExerciseController.modeCircle` est une AFFECTATION, et une
+                            // affectation CASSE la liaison : la roue gardait alors sa derniere valeur POUR TOUJOURS.
+                            // Le cas ou cela se voit - et Roger l'a vu - est celui ou la premiere relecture tombait sur
+                            // un controleur encore vide : les douze cases restaient vides a jamais, alors que le
+                            // bourdon et le libelle, eux, toujours lies au controleur, annoncaient bel et bien un mode.
+                            // Un cercle vide sous un texte qui parle d'un mode. `Qt.binding` re-affirme une liaison
+                            // VIVANTE : elle relit tout de suite, et elle suivra encore chaque questionChanged.
+                            modeCircle.notes = Qt.binding(function() {
+                                return ExerciseController.modeCircle;
+                            });
                             modeCircle.startPlayback(ExerciseController.modeSoundLeadInMs, ExerciseController.modeSoundNoteStepMs, [0, 1, 2, 3, 4, 5, 6, 0]);
                         }
 
@@ -1613,28 +1631,32 @@ Item {
 
                 Item {
                     // LES BOUTONS DE MODE, EN RANGEES CENTREES.
-                    //
                     // Roger, 07/10/2026 : « les rangees des boutons des modes sont mal centrees : c'est left centered,
                     // du coup ca fait du vide a droite ». Un `Flow` range ses elements a GAUCHE, donc sa derniere rangee
                     // - plus courte - laissait un vide a droite. Ici, CHAQUE rangee est posee au MILIEU de la largeur,
                     // quelle que soit sa longueur.
-                    //
+
                     // La largeur et la hauteur des boutons RESTENT celles d'origine : la place verticale se prend en
                     // haut de l'ecran (le prompt tient en deux mots), jamais sur les reponses.
                     id: modeButtonGrid
 
-                    Layout.fillWidth: true
-                    visible: !ExerciseController.isModeColourQuestion
-
                     readonly property int choiceCount: ExerciseController.modeChoices.length
-                    readonly property real cellWidth: 118
-                    readonly property real cellHeight: 48
-                    readonly property real cellGap: 6
-                    // Combien de boutons tiennent sur une rangee - au moins un.
-                    readonly property int columns: Math.max(1, Math.floor((width + cellGap) / (cellWidth + cellGap)))
+                    // TAILLE REDUITE (110x44 -> 108x40) : avec les sept modes sous la roue, la place manquait.
+                    readonly property real cellWidth: 108
+                    readonly property real cellHeight: 40
+                    readonly property real cellGap: 4
+                    // Combien de boutons tiennent sur une rangee - au moins un. AVANT que la largeur soit connue, on
+                    // suppose TROIS : sinon `columns` vaut 1 et la zone reclame la hauteur de SEPT rangees, un pic qui
+                    // peut ecraser tout le reste de l'ecran le temps d'une image.
+                    readonly property int columns: (width > cellWidth) ? Math.max(1, Math.floor((width + cellGap) / (cellWidth + cellGap))) : 3
                     readonly property int rowCount: choiceCount === 0 ? 0 : Math.ceil(choiceCount / columns)
 
+                    Layout.fillWidth: true
+                    visible: !ExerciseController.isModeColourQuestion
                     implicitHeight: rowCount === 0 ? 0 : ((rowCount * cellHeight) + ((rowCount - 1) * cellGap))
+                    // UN MINIMUM : sans lui, la zone se ferait RECOUPER par le layout, et les rangees du bas passeraient
+                    // sous les boutons d'action au lieu de garder leur place.
+                    Layout.minimumHeight: implicitHeight
 
                     Repeater {
                         // LA LARGEUR, LA POLICE ET LES MARGES VONT ENSEMBLE, et c'est le NOM qui commande.
@@ -1645,7 +1667,6 @@ Item {
                         delegate: Button {
                             required property var modelData
                             required property int index
-
                             readonly property int rowIndex: Math.floor(index / modeButtonGrid.columns)
                             readonly property int itemsInRow: Math.min(modeButtonGrid.columns, modeButtonGrid.choiceCount - (rowIndex * modeButtonGrid.columns))
                             readonly property real rowWidth: (itemsInRow * modeButtonGrid.cellWidth) + ((itemsInRow - 1) * modeButtonGrid.cellGap)
@@ -1661,11 +1682,10 @@ Item {
                             // LA RANGEE EST CENTREE : on decale de la moitie du vide laisse a gauche.
                             x: ((modeButtonGrid.width - rowWidth) / 2) + ((index % modeButtonGrid.columns) * (modeButtonGrid.cellWidth + modeButtonGrid.cellGap))
                             y: rowIndex * (modeButtonGrid.cellHeight + modeButtonGrid.cellGap)
-
                             leftPadding: 4
                             rightPadding: 4
                             text: modelData.name
-                            font.pixelSize: 12
+                            font.pixelSize: 11
                             enabled: ExerciseController.isAsking
                             highlighted: wasHeard
                             // Roger : « la couleur des boutons des modes, on m'a dit que c'est pas bien visible avec les
