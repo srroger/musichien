@@ -23,6 +23,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <optional>
 #include <random>
@@ -129,8 +130,23 @@ constexpr std::int32_t FIFTH_IN_SEMITONES = 7;
 // battrait avec lui au lieu de se poser dessus.
 constexpr std::int32_t MODE_MELODY_OCTAVE_OFFSET = 24;
 
-// Combien de questions FACILES ouvrent un bilan : assez pour se mettre en confiance, pas assez pour lasser.
-constexpr std::size_t REVIEW_EASY_QUESTION_COUNT = 3;
+// COMBIEN DE QUESTIONS FAIT UN BILAN. Cinquante : Roger l'a voulu LONG - « c'est le genre de chose qu'on ne fait pas
+// souvent, le Bilan » - et un questionnaire qu'on ne prend qu'une fois de temps en temps peut se permettre la longueur.
+constexpr std::size_t REVIEW_QUESTION_COUNT = 50;
+
+// LES QUATRE INGREDIENTS D'UN BILAN, et leur part.
+//
+// Roger, 07/10/2026 : « un Bilan est une vraie longue serie de questions, basee sur nos stats : de l'echauffement sur ce
+// qu'on connait bien, des questions au hasard du niveau, des questions sur les faiblesses (ce qui resiste), et les choses
+// qu'on n'a pas eu l'occasion de travailler - le tout un peu melange ».
+//
+// L'echauffement reste COURT - Roger : « un echauffement court au tout debut » - et le reste se partage en parts larges.
+// La quatrieme part, l'aleatoire du niveau, n'est pas seulement un ingredient : c'est ce qui COMPLETE le total. Quel que
+// soit le journal, l'aleatoire prend la place laissee, donc un Bilan fait TOUJOURS REVIEW_QUESTION_COUNT questions. Voir
+// reviewPlan.
+constexpr std::size_t REVIEW_WARMUP_QUESTION_COUNT = 5;
+constexpr std::size_t REVIEW_RESISTING_QUESTION_COUNT = 15;
+constexpr std::size_t REVIEW_LEAST_WORKED_QUESTION_COUNT = 10;
 
 // La periode qu'un bilan regarde. Trente jours : ce que le joueur a travaille recemment, et non sa vie entiere - un
 // exercice rate il y a six mois n'est plus une faiblesse, c'est un souvenir.
@@ -141,12 +157,6 @@ constexpr int REVIEW_PERIOD_DAYS = 30;
 // TROIS de chaque cote : c'est ce qu'une page peut dire sans devenir une liste, et c'est assez pour que le joueur
 // reconnaisse son profil en la lisant. Au-dela, il ne lit plus, il survole - et une page qu'on survole n'explique rien.
 constexpr std::size_t REVIEW_OPENING_POINT_COUNT = 3;
-
-// COMBIEN DE QUESTIONS, DANS UN BILAN, VONT CHERCHER CE QU'ON N'A JAMAIS TRAVAILLE.
-//
-// DEUX : assez pour ouvrir une porte, trop peu pour transformer un bilan en cours. Le bilan sert d'abord a voir ou l'on en
-// est, et une ouverture qu'on n'a pas demandee se retient mieux qu'une lecon qu'on a subie.
-constexpr std::size_t REVIEW_LEAST_WORKED_QUESTION_COUNT = 2;
 
 // Le silence entre ce que le joueur a joue et la reponse, sur une question d'accord ratee.
 //
@@ -1266,7 +1276,7 @@ void ExerciseSessionController::leaveReviewMode() noexcept
     // L'etat de bilan ne doit pas SURVIVRE a un bilan. Il vit dans deux membres, et les oublier est exactement ce qui a
     // fait parler toutes les parties de Roger comme des bilans : une seule fonction, donc plus rien a oublier.
     m_isReviewRunning = false;
-    m_reviewEasyQuestionCount = 0;
+    m_reviewRoles.clear();
 }
 
 void ExerciseSessionController::startSession()
@@ -3093,7 +3103,7 @@ void ExerciseSessionController::resetProfile()
 
     // Et un bilan en cours n'a plus de plan a suivre : la remise a zero le referme.
     m_isReviewRunning = false;
-    m_reviewEasyQuestionCount = 0;
+    m_reviewRoles.clear();
 
     emit totalExperienceChanged();
     emit sessionChanged();
@@ -3778,32 +3788,31 @@ void ExerciseSessionController::recordCurrentQuestion( bool p_wasCorrect, bool p
 
 void ExerciseSessionController::startReviewSession()
 {
-    domain::SessionSettings settings = m_settings;
+    // LE BILAN SE CONSTRUIT SUR LE NIVEAU, PAS SUR LES REGLAGES DU JEU LIBRE.
+    //
+    // Roger, 07/10/2026 : « le Bilan prend en compte les settings qui ne sont normalement destines qu'a Infini et Survie ».
+    // L'Arcade fait deja exactement cela - arcadeSettingsFor part de sessionSettingsFor(niveau) - et le Bilan l'imite ici :
+    // les poids des questions, qui ne gouvernent que le jeu libre, ne le touchent donc plus du tout (ni leurs valeurs, ni
+    // leur zero). C'est aussi ce qui garantit que le Bilan reste le MEME examen quel que soit ce qu'on a regle a cote.
+    domain::SessionSettings settings =
+      domain::sessionSettingsFor( m_playerLevel.value_or( domain::PlayerLevel::Beginner ) );
 
     // LE BILAN NE PAIE PAS non plus. Roger : « l'expérience ne sera accessible qu'en salle d'arcade ». Sa recompense est
     // ailleurs - des titres, des trophees - et le mettre ici, une fois, couvre les DEUX chemins de cette fonction (le plan
     // normal, et le repli sur une partie ordinaire quand il n'y a rien a reviser).
     m_gameMode = domain::GameMode::Review;
 
-    std::size_t resistingCount = 0;
+    std::vector<ReviewRole> roles;
 
-    std::vector<domain::QuestionTarget> plan = reviewPlan( &resistingCount );
-
-    // Un genre FERME par le joueur n'entre pas dans un bilan.
-    //
-    // Ses reglages disent ce qu'il veut travailler, et un bilan qui les ignore lui poserait exactement les questions qu'il
-    // a refusees - c'est ce que Roger a vu : « j'ai beau mettre plus clair et plus sombre a 0, je l'obtiens toujours dans
-    // mes parties ». Le bilan ne passe pas par le tirage : il IMPOSE son plan, et il oubliait donc les parts.
-    std::erase_if( plan, [&settings]( const domain::QuestionTarget & p_target ) {
-        return !domain::isKindOpen( settings, p_target.kind );
-    } );
+    std::vector<domain::QuestionTarget> plan = reviewPlan( roles );
 
     if( plan.empty() )
     {
-        // Rien a reviser : pas de journal, ou trop peu de matiere pour construire un « facile puis difficile ». Le bilan
-        // devient alors une partie ordinaire, ce qui vaut mieux qu'un bouton qui refuse de s'ouvrir.
+        // Rien a reviser : pas de journal DU TOUT. Le bilan devient alors une partie ordinaire, ce qui vaut mieux qu'un
+        // bouton qui refuse de s'ouvrir. Des qu'il y a un journal, au contraire, le plan se COMPLETE a vingt-cinq
+        // questions avec de l'aleatoire du niveau - donc un Bilan fait toujours le meme nombre de questions.
         m_isReviewRunning = false;
-        m_reviewEasyQuestionCount = 0;
+        m_reviewRoles.clear();
 
         beginSession( settings );
 
@@ -3820,16 +3829,9 @@ void ExerciseSessionController::startReviewSession()
     // Et les aides restent : un bilan est un examen de passage, jamais un couperet.
     settings.aidsAllowed = true;
 
-    // L'echauffement, c'est la premiere tranche du plan, bornee : au-dela, la difficulte commence - et c'est ce qui
-    // permet a l'encouragement d'arriver au bon moment.
-    m_reviewEasyQuestionCount = std::max<std::size_t>( 1, std::min( REVIEW_EASY_QUESTION_COUNT, plan.size() / 2 ) );
-
-    // ET LA PARTIE QUI RESISTE FINIT AVANT LES CIBLES JAMAIS TRAVAILLEES.
-    //
-    // C'est LA borne de l'encouragement, et elle est nouvelle parce que le plan a un troisieme temps : sans elle, l'app
-    // dirait « c'est exactement ce qui te resistait » a propos d'une cible que le joueur n'a jamais rencontree. Ce
-    // mensonge-la, on l'a deja paye une fois.
-    m_reviewHardQuestionCount = resistingCount;
+    // CE QUE CHAQUE QUESTION EST VENUE FAIRE, dans l'ordre du plan. C'est ce que lit l'encouragement : le plan etant
+    // MELANGE, la position d'une question ne dit plus si elle resiste - seul ce role le dit.
+    m_reviewRoles = std::move( roles );
 
     m_isReviewRunning = true;
 
@@ -3850,6 +3852,23 @@ void ExerciseSessionController::startReviewSession()
 bool ExerciseSessionController::isReviewOpeningVisible() const noexcept
 {
     return m_reviewOpeningVisible;
+}
+
+int ExerciseSessionController::reviewQuestionCount() const noexcept
+{
+    // AVANT la premiere question, le plan vit dans les reglages en attente - c'est de la que la page d'ouverture lit le
+    // chiffre. Une fois le Bilan commence, c'est la session qui le porte. Hors bilan, il n'y a rien a annoncer.
+    if( m_reviewOpeningVisible )
+    {
+        return static_cast<int>( m_pendingReviewSettings.questionCount );
+    }
+
+    if( m_isReviewRunning && ( m_session != nullptr ) )
+    {
+        return questionCount();
+    }
+
+    return 0;
 }
 
 void ExerciseSessionController::beginReviewQuestions()
@@ -3876,7 +3895,7 @@ void ExerciseSessionController::cancelReviewOpening()
     // quand une page propose de commencer quelque chose.
     m_reviewOpeningVisible = false;
     m_isReviewRunning = false;
-    m_reviewEasyQuestionCount = 0;
+    m_reviewRoles.clear();
     m_pendingReviewSettings = domain::SessionSettings{};
 
     emit sessionChanged();
@@ -4177,68 +4196,84 @@ std::vector<domain::TargetStatistics> ExerciseSessionController::reviewInsights(
     return insights;
 }
 
-std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan( std::size_t * p_resistingCount ) const
+std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan( std::vector<ReviewRole> & p_roles ) const
 {
     std::vector<domain::QuestionTarget> plan;
 
-    // Les DEUX pages du bilan lisent la meme chose : la page d'ouverture montre ces cibles au joueur, et le plan les
-    // lui pose, dans l'ordre. Une seule source, donc un ecran ne peut pas annoncer autre chose que ce qui suit.
-    std::vector<domain::TargetStatistics> byTarget = reviewInsights();
+    p_roles.clear();
 
-    // UN GENRE FERME N'ENTRE PAS DANS UN BILAN, et on l'ecarte ICI plutot qu'apres coup.
-    //
-    // Le plan se coupe en TROIS temps, et la borne du deuxieme est relevee plus bas : un tri qui s'appliquerait APRES
-    // deplacerait les frontieres sans le dire, et l'encouragement se remettrait a viser la mauvaise question. Filtrer en
-    // tete garde les trois temps alignes quoi qu'il arrive - et le filtre de `startReviewSession` ne fait plus rien, ce
-    // qui est exactement ce qu'on veut : une seule regle, appliquee une seule fois.
-    std::erase_if( byTarget, [this]( const domain::TargetStatistics & p_target ) {
-        return !domain::isKindOpen( m_settings, p_target.kind );
-    } );
-
-    if( byTarget.size() < 4 )
+    // PAS DE JOURNAL, PAS DE BILAN : c'est le seul cas ou le plan reste vide, et startReviewSession en fait alors une
+    // partie ordinaire plutot qu'un bouton qui refuse de s'ouvrir.
+    if( m_questionLog == nullptr )
     {
-        // Moins de quatre cibles travaillees : il n'y a pas de « facile » et de « difficile » a opposer, seulement
-        // quelques exercices. Un bilan de deux questions n'apprendrait rien au joueur sur lui-meme.
         return plan;
     }
+
+    // Les DEUX pages du bilan lisent la meme chose : la page d'ouverture montre ces cibles au joueur, et le plan les lui
+    // pose. Une seule source, donc un ecran ne peut pas annoncer autre chose que ce qui suit.
+    std::vector<domain::TargetStatistics> byTarget = reviewInsights();
+
+    // LE BILAN IGNORE LES POIDS DU JEU LIBRE - Roger, 07/10/2026 : « le Bilan prend en compte les settings qui ne sont
+    // normalement destines qu'a Infini et Survie ». Le vault le dit deja (06 §10) : les POIDS ne gouvernent que le jeu
+    // libre, le Bilan est un plan DECIDE. On ne filtre donc plus par les parts, et l'aleatoire du niveau, plus bas, tire
+    // ses genres des parts PAR DEFAUT DU NIVEAU - jamais de celles reglees pour le jeu libre.
+
+    // Le moteur des tirages du bilan - celui des questions « au hasard du niveau ». Il est LOCAL : le plan est le seul
+    // endroit qui en tire, et la session, elle, a le sien.
+    std::mt19937 engine{ std::random_device{}() };
+
+    // Les parts du NIVEAU, et non celles du joueur : la meme source que l'Arcade, et ce qui detache le Bilan du jeu libre.
+    const domain::SessionSettings levelSettings =
+      domain::sessionSettingsFor( m_playerLevel.value_or( domain::PlayerLevel::Beginner ) );
 
     const auto toPlannedQuestion = []( const domain::TargetStatistics & p_target ) {
         return domain::QuestionTarget{ p_target.kind, p_target.target, p_target.direction };
     };
 
-    // D'ABORD ce qui va bien, du meilleur au moins bon : un bilan qui commencerait par un echec serait decourageant.
-    // Les cibles sont triees du PLUS FAIBLE au meilleur, donc on remonte la liste
-    // par la fin.
-    const std::size_t easyCount = std::min( REVIEW_EASY_QUESTION_COUNT, byTarget.size() / 2 );
+    const auto addDecided = [&plan, &p_roles]( const domain::QuestionTarget & p_target, ReviewRole p_role ) {
+        plan.push_back( p_target );
+        p_roles.push_back( p_role );
+    };
 
-    for( std::size_t index = 0; index < easyCount; ++index )
+    const auto sameTarget = []( const domain::QuestionTarget & p_left, const domain::QuestionTarget & p_right ) {
+        return ( p_left.kind == p_right.kind ) && ( p_left.target == p_right.target )
+               && ( p_left.direction == p_right.direction );
+    };
+
+    const auto alreadyPlanned = [&plan, &sameTarget]( const domain::QuestionTarget & p_target ) {
+        return std::ranges::any_of( plan, [&sameTarget, &p_target]( const domain::QuestionTarget & p_entry ) {
+            return sameTarget( p_entry, p_target );
+        } );
+    };
+
+    // 1. L'ECHAUFFEMENT : les cibles les MIEUX reussies, de la meilleure a la suivante.
+    //
+    // byTarget est triee du PLUS FAIBLE au meilleur, donc les meilleures sont a la FIN. Un bilan qui commencerait par un
+    // echec serait decourageant : le premier mot que le joueur entend de lui-meme doit etre « voila ce que tu sais
+    // faire ».
+    const std::size_t warmupCount = std::min( REVIEW_WARMUP_QUESTION_COUNT, byTarget.size() );
+
+    for( std::size_t index = 0; index < warmupCount; ++index )
     {
-        plan.push_back( toPlannedQuestion( byTarget.at( byTarget.size() - 1 - index ) ) );
+        addDecided( toPlannedQuestion( byTarget.at( byTarget.size() - 1 - index ) ), ReviewRole::WarmUp );
     }
 
-    // PUIS ce qui resiste, du plus faible au moins faible - et sans reprendre ce qui a servi d'echauffement.
-    for( std::size_t index = easyCount; index + easyCount < byTarget.size(); ++index )
+    // 2. CE QUI RESISTE : les cibles les PLUS FAIBLES, de la plus faible a la moins faible - et sans reprendre celles qui
+    // ont servi d'echauffement. On s'arrete donc AVANT la tranche des meilleures.
+    const std::size_t warmupStart = byTarget.size() - warmupCount;
+    std::size_t resistingAdded = 0;
+
+    for( std::size_t index = 0; ( index < warmupStart ) && ( resistingAdded < REVIEW_RESISTING_QUESTION_COUNT ); ++index )
     {
-        plan.push_back( toPlannedQuestion( byTarget.at( index ) ) );
+        addDecided( toPlannedQuestion( byTarget.at( index ) ), ReviewRole::Resisting );
+
+        ++resistingAdded;
     }
 
-    // ET C'EST ICI QUE FINIT CE QUI RESISTE : les deux premiers temps sont poses, le troisieme commence.
-    if( p_resistingCount != nullptr )
-    {
-        *p_resistingCount = plan.size();
-    }
-
-    // ENFIN CE QU'ON N'A JAMAIS TRAVAILLE - et c'est ce qui OUVRE le bilan au lieu de le refermer.
+    // 3. CE QU'ON N'A PRESQUE JAMAIS TRAVAILLE : ce que le NIVEAU attend et que le joueur a peu croise.
     //
-    // Jusqu'ici son plan ne naissait que des ECHECS enregistres : ce que les tirages ne proposaient jamais n'existait pas
-    // pour lui, et Roger l'a vu sans lire le code - « ca m'etonne qu'il n'y ait qu'un seul truc qui me resiste ». Une cible
-    // jamais posee n'a pas de faiblesse a reprendre, elle a une PORTE a ouvrir.
-    //
-    // ELLES VIENNENT EN DERNIER, et ce n'est pas un detail d'ordre : le bilan commence par ce qu'on sait, continue par ce
-    // qui resiste, et finit par ce qu'on n'a jamais vu. Finir sur une ouverture vaut mieux que finir sur un reproche.
-    //
-    // ET ELLES SONT FILTREES PAR LES MEMES REGLES que le reste : un genre que le joueur a ferme ne revient pas par cette
-    // porte-la. C'est le filtre de `startReviewSession` qui s'en charge, et il s'applique au plan entier.
+    // Une cible jamais posee n'a pas de faiblesse a reprendre, elle a une PORTE a ouvrir - et c'est ce qui ouvre le bilan
+    // au lieu de le refermer. Roger l'a voulu : « ca permettra de lui faire travailler ca pendant le Bilan ».
     std::size_t leastWorkedAdded = 0;
 
     for( const auto & entry : leastWorkedCandidates() )
@@ -4248,20 +4283,61 @@ std::vector<domain::QuestionTarget> ExerciseSessionController::reviewPlan( std::
             break;
         }
 
-        // MEME REGLE QUE LE RESTE, et appliquee ICI plutot qu'apres : le filtre des genres fermes s'applique au plan
-        // entier, mais il le raccourcit - et la borne de l'encouragement, relevee plus haut, ne vaudrait alors plus rien.
-        // Filtrer a la source garde les trois temps alignes quoi qu'il arrive.
-        if( !domain::isKindOpen( m_settings, entry.first.kind ) )
+        // Meme regle que le reste : une cible deja posee ne se repete pas dans le meme bilan.
+        if( alreadyPlanned( entry.first ) )
         {
             continue;
         }
 
-        plan.push_back( entry.first );
+        addDecided( entry.first, ReviewRole::LeastWorked );
 
         ++leastWorkedAdded;
     }
 
-    return plan;
+    // 4. ENFIN, AU HASARD DU NIVEAU : de quoi atteindre REVIEW_QUESTION_COUNT, et la variete qui garde un bilan d'etre une
+    // redite de ses propres statistiques.
+    //
+    // C'est ce dernier ingredient qui GARANTIT le total : une part maigre dans l'un des trois autres, et l'aleatoire prend
+    // la place laissee. Un bilan fait donc TOUJOURS vingt-cinq questions, quel que soit ce que le journal contient.
+    while( plan.size() < REVIEW_QUESTION_COUNT )
+    {
+        domain::QuestionTarget target;
+        target.kind = domain::drawQuestionKind( levelSettings, engine );
+        target.target = domain::DRAWN_TARGET;
+        target.direction = domain::IntervalDirection::Ascending;
+
+        addDecided( target, ReviewRole::LevelRandom );
+    }
+
+    // ET ON MELANGE - tout SAUF l'echauffement, qui doit rester le premier mot. C'est la demande de Roger : « le tout un
+    // peu melange ». La seule chose que l'ordre porte encore, c'est l'ouverture en douceur ; partout ailleurs, c'est le
+    // ROLE qui dit ce qu'une question est, jamais sa position (voir ReviewRole).
+    //
+    // Le plan et ses roles se melangent ENSEMBLE, par une seule permutation : les melanger separement leur ferait perdre
+    // leur alignement, et une faiblesse se presenterait alors comme un echauffement.
+    std::vector<std::size_t> order( plan.size() );
+
+    for( std::size_t index = 0; index < order.size(); ++index )
+    {
+        order.at( index ) = index;
+    }
+
+    std::shuffle( order.begin() + static_cast<std::ptrdiff_t>( warmupCount ), order.end(), engine );
+
+    std::vector<domain::QuestionTarget> shuffled;
+    std::vector<ReviewRole> shuffledRoles;
+    shuffled.reserve( plan.size() );
+    shuffledRoles.reserve( p_roles.size() );
+
+    for( const std::size_t index : order )
+    {
+        shuffled.push_back( plan.at( index ) );
+        shuffledRoles.push_back( p_roles.at( index ) );
+    }
+
+    p_roles = std::move( shuffledRoles );
+
+    return shuffled;
 }
 
 bool ExerciseSessionController::isCurrentQuestionAHardPart() const noexcept
@@ -4271,13 +4347,21 @@ bool ExerciseSessionController::isCurrentQuestionAHardPart() const noexcept
         return false;
     }
 
-    // Le rang dans le plan : au-dela de l'echauffement, c'est ce qui resiste. Le controleeur a construit le plan dans cet
-    // ordre, donc il le sait - sans recroiser les statistiques a chaque question.
-    // LE PLAN SE LIT EN TROIS TEMPS : l'echauffement, ce qui resiste, et ce qu'on n'a jamais travaille. Ce qui resiste est
-    // le DEUXIEME, et il a maintenant une FIN - les cibles jamais vues ne lui appartiennent pas, et l'app n'a aucun droit
-    // de dire qu'elles ont resiste a qui que ce soit.
-    return ( m_session->questionNumber() > m_reviewEasyQuestionCount )
-           && ( m_session->questionNumber() <= m_reviewHardQuestionCount );
+    // LE ROLE de la question, et non sa place : le plan est MELANGE, donc une faiblesse peut tomber n'importe ou. C'est
+    // ce role - porte par le plan, aligne sur lui - qui dit si l'app a le droit de parler de ce qui resiste.
+    return reviewRoleOf( m_session->questionNumber() ) == ReviewRole::Resisting;
+}
+
+ExerciseSessionController::ReviewRole ExerciseSessionController::reviewRoleOf( std::size_t p_questionNumber ) const noexcept
+{
+    // La question 1 est a l'index 0 du plan. Hors des bornes - hors bilan, ou au-dela du plan - on ne pretend rien :
+    // LevelRandom est l'etiquette la plus neutre, et elle ne declenche aucun mot.
+    if( ( p_questionNumber == 0 ) || ( p_questionNumber > m_reviewRoles.size() ) )
+    {
+        return ReviewRole::LevelRandom;
+    }
+
+    return m_reviewRoles.at( p_questionNumber - 1 );
 }
 
 QString ExerciseSessionController::encouragementText() const
@@ -4294,7 +4378,7 @@ QString ExerciseSessionController::encouragementText() const
     // Un joueur qui verrait « ce qui te resistait » sur une chose qu'il decouvre se demanderait ce qu'il a fait de mal - et
     // il n'a rien fait. Le mot juste ici ne consiste pas a l'encourager, mais a lui DIRE ce qu'on lui fait : quelque chose
     // qu'il n'a jamais croise, et c'est une bonne nouvelle.
-    if( isAsking() && ( m_session->questionNumber() > m_reviewHardQuestionCount ) )
+    if( isAsking() && ( reviewRoleOf( m_session->questionNumber() ) == ReviewRole::LeastWorked ) )
     {
         return tr( "Celle-ci, tu ne l'as jamais croisée. Écoute-la pour elle-même." );
     }
