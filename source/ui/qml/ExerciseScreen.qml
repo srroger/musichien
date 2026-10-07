@@ -759,19 +759,15 @@ Item {
                     // les boutons de modes - la clarte du mode - pour que les deux se repondent d'un coup d'oeil.
                     Row {
                         // LA TEINTE DES PASTILLES DE DEGRES EST SON PROPRE BARREAU, ET VOLONTAIREMENT SOMBRE.
-                        //
                         // Roger : « on affiche les degres dans des carres violets trop clairs dans l'interface, ca fait
                         // flashy, tres bizarre ». Le fond du probleme : la formule partagee avec les boutons de modes
                         // monte jusqu'au BLANC pour un mode clair - et un carre presque blanc PORTANT DU TEXTE BLANC est
                         // a la fois criard et illisible.
-                        //
+
                         // Ici, la clarte du mode reste LISIBLE (l'ordre clair -> obscur est conserve, puisque c'est lui
                         // qui apprend quelque chose), mais elle joue dans une plage qui reste violette et sombre : le
                         // texte blanc tient donc toujours, et la rangee ne crie plus.
-                        readonly property color badgeColour: Qt.rgba( 0.16 + ( 0.16 * ExerciseController.heardMode.brightness ),
-                                                                       0.11 + ( 0.13 * ExerciseController.heardMode.brightness ),
-                                                                       0.30 + ( 0.18 * ExerciseController.heardMode.brightness ),
-                                                                       1 )
+                        readonly property color badgeColour: Qt.rgba(0.16 + (0.16 * ExerciseController.heardMode.brightness), 0.11 + (0.13 * ExerciseController.heardMode.brightness), 0.3 + (0.18 * ExerciseController.heardMode.brightness), 1)
 
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 5
@@ -937,7 +933,7 @@ Item {
                             // CHAQUE PASTILLE ALLUME SA PROPRE NOTE, ET RIEN D'AUTRE. Roger : « pour la premiere note,
                             // aucun des deux pastilles n'est allume. Pour la deuxieme les 2 sont allumes. Il faudrait
                             // soit le 1 en 1, puis le 2 seulement en 2 ».
-                            //
+
                             // La cause : la pastille 1 attendait `hasFirstNote`, qui ne devient vrai qu'a la VALIDATION
                             // de la premiere note - donc au moment ou le splash couvre l'ecran. Elle ne s'allumait donc
                             // jamais pendant qu'on la chante. Ici, elle s'allume des que la note TIENT (la stabilite a
