@@ -1118,6 +1118,14 @@ public:
 
     [[nodiscard]] bool isReviewOpeningVisible() const noexcept;
 
+    // COMBIEN DE QUESTIONS FERA LE BILAN, annonce AVANT la premiere.
+    //
+    // La page d'ouverture le dit au joueur pour qu'il sache dans quoi il s'engage : un Bilan long se prend le week-end, et
+    // Roger a demande le chiffre sur cette page. Zero hors bilan.
+    Q_PROPERTY( int reviewQuestionCount READ reviewQuestionCount NOTIFY sessionChanged )
+
+    [[nodiscard]] int reviewQuestionCount() const noexcept;
+
     // CE QUE LE NIVEAU ATTEND, ET QU'ON N'A PAS TRAVAILLE.
     Q_PROPERTY( QVariantList reviewLeastWorkedPoints READ reviewLeastWorkedPoints NOTIFY sessionChanged )
 
@@ -1379,14 +1387,36 @@ private:
     // garde le domaine pur et le journal testable sans attendre une seconde.
     void recordCurrentQuestion( bool p_wasCorrect, bool p_wasRevealed );
 
-    // Les questions d'un BILAN, construites a partir des STATISTIQUES, en TROIS temps : ce qui va bien, ce qui resiste, et
-    // ce qu'on n'a jamais travaille. Vide quand il n'y a pas de journal, ou pas assez de matiere pour dire « facile puis
-    // difficile ».
+    // CE QU'UNE QUESTION DU BILAN EST VENUE FAIRE.
     //
-    // p_resistingCount recoit le nombre de questions AVANT le dernier temps : c'est la borne de l'encouragement, et elle
-    // est lue ICI parce que c'est ici que le plan se coupe en trois. La recalculer ailleurs serait la recalculer faux le
-    // jour ou l'un des trois temps changera.
-    [[nodiscard]] std::vector<domain::QuestionTarget> reviewPlan( std::size_t * p_resistingCount = nullptr ) const;
+    // Le plan d'un Bilan est MELANGE - un court echauffement, puis tout le reste entremnele - donc la POSITION d'une
+    // question ne dit plus son role. C'est ce role, portee par chaque question, que lit l'encouragement : il ne doit dire
+    // « c'est ce qui te resistait » que sur une question qui resiste vraiment, et « tu ne l'as jamais croisee » que sur
+    // une porte.
+    enum class ReviewRole : std::uint8_t
+    {
+        // Une chose qu'on connait bien : de quoi se mettre en confiance avant la difficulte.
+        WarmUp,
+
+        // Ce qui resiste au joueur : une faiblesse de son journal.
+        Resisting,
+
+        // Ce que le niveau attend et qu'on n'a presque jamais rencontre : une PORTE, pas un reproche.
+        LeastWorked,
+
+        // Une question au hasard du niveau : la variete qui garde un Bilan d'etre une redite de ses propres statistiques.
+        LevelRandom
+    };
+
+    // Les questions d'un BILAN : un long questionnaire de REVIEW_QUESTION_COUNT questions, melange, fait de quatre
+    // ingredients - ce qu'on connait bien, ce qui resiste, ce qu'on n'a presque jamais travaille, et des questions au
+    // hasard du niveau. Vide quand il n'y a AUCUN journal : le bilan devient alors une partie ordinaire.
+    //
+    // p_roles recoit, pour chaque question et DANS LE MEME ORDRE, ce que cette question est venue faire.
+    [[nodiscard]] std::vector<domain::QuestionTarget> reviewPlan( std::vector<ReviewRole> & p_roles ) const;
+
+    // Le role de la question en cours d'un bilan, ou LevelRandom hors bilan.
+    [[nodiscard]] ReviewRole reviewRoleOf( std::size_t p_questionNumber ) const noexcept;
 
     // CE QUE LE BILAN SAIT DU JOUEUR : les cibles de son journal, de la plus faible a la mieux reussie, gardees par la
     // meme regle que la page de statistiques - une cible vue une seule fois n'est pas un point faible.
@@ -1525,13 +1555,11 @@ private:
     // L'ecart mesure du dernier chant juge, mis de cote au moment de la reponse : le micro est resynchronise juste
     // apres, et la mesure serait perdue avec lui.
     int m_lastSungCentsOffset{ 0 };
-    std::size_t m_reviewEasyQuestionCount{ 0 };
 
-    // OU FINIT LA PARTIE QUI RESISTE, dans le plan du bilan. C'est la borne de l'encouragement, et elle n'est plus la fin
-    // du plan : depuis que les cibles JAMAIS travaillees y sont ajoutees, la derniere question n'est plus forcement une
-    // faiblesse. Sans cette borne, l'app dirait « c'est exactement ce qui te resistait » a propos d'une cible que le
-    // joueur n'a jamais rencontree - le mensonge qu'on a passe une soiree a corriger.
-    std::size_t m_reviewHardQuestionCount{ 0 };
+    // CE QUE CHAQUE QUESTION DU BILAN EST VENUE FAIRE, dans l'ordre du plan. Le plan est MELANGE, donc la POSITION d'une
+    // question ne dit plus son role : c'est cette liste, alignee sur lui, qui le dit - et c'est elle que lit
+    // l'encouragement pour savoir s'il parle a bon escient. Vide hors bilan.
+    std::vector<ReviewRole> m_reviewRoles;
 
     // LA PAGE D'OUVERTURE : visible apres le clic sur « Bilan », avant la premiere question. Les reglages prepares
     // attendent ici, parce que le bilan ne commence qu'une fois la page lue - voir beginReviewQuestions.

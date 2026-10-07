@@ -53,13 +53,22 @@ Item {
     // supplementaire speciale [...] 2-3 phrases dans le genre, qui tourneraient de maniere aleatoire en fonction de la
     // famille la plus ratee. Et si tout est parfait, un "Wow, tu peux clairement envisager de passer a l'etape
     // suivante !" »
+    // There is still no "next" button: a loop the player has to carry forward themselves feels slower
+    // than it is. A tap anywhere skips the pause instead - free, and always available.
+    // =================================================================================================================
+    // LE SPLASH DE LA TRANSITION CHANTEE
+    // =================================================================================================================
+    // Roger : « il faudrait vraiment un espece de gros splashscreen qui ecrase reellement TOUTE l'interface. On est sur
+    // un ecran de telephone, l'espace est petit, continuer de voir les vies etc. c'est pas le mieux. Il faut vraiment
+    // une page visuelle et epuree. »
 
     id: exerciseScreen
 
-    // There is still no "next" button: a loop the player has to carry forward themselves feels slower
-    // than it is. A tap anywhere skips the pause instead - free, and always available.
-    readonly property int successPause: 1200
-    readonly property int mistakePause: 1800
+    // ROGER A DEMANDE PLUS DE TEMPS (04/10/2026) : « entre chaque question, ce serait bien de laisser plus de temps pour
+    // que l'utilisateur puisse bien lire ce qui se passe ». On allonge donc les deux pauses - et comme un tap les
+    // ecourte, allonger ne coute rien a qui lit vite.
+    readonly property int successPause: 1800
+    readonly property int mistakePause: 2600
     // Elle vient du CONTROLEUR, donc du domaine et de son tempo : une mesure a 90 bpm dure deux secondes et demie, et
     // aucune constante ecrite ici ne saurait le dire sans mentir le jour ou le tempo change.
     readonly property int rhythmPause: ExerciseController.rhythmCellDurationMs + 600
@@ -67,7 +76,14 @@ Item {
     // fois quand deux modes se comparent. La pause doit donc couvrir la LECTURE ENTIERE plus le temps de lire le verdict -
     // sinon elle avance au milieu du son, ce que Roger a vu tout de suite : « pour les modes, ca va beaucoup trop vite,
     // le son se coupe en plein milieu, t'as pas le temps de lire ».
-    readonly property int modePause: ExerciseController.modeSoundDurationMs + 3000
+    readonly property int modePause: ExerciseController.modeSoundDurationMs + 4500
+    // LE COMPTE A REBOURS DE LA SECONDE NOTE : 3, 2, 1, puis zero (le jeu redemande une note). ZERO au repos, et donc
+    // aussi avant que la premiere note soit prise. Roger : « un compte a rebours avant de lui faire reapparaitre
+    // l'interface pour qu'il chante la deuxieme note ».
+    property int singingCountdown: 0
+    // VRAI pendant TOUTE la transition d'une question chantee : c'est ce qui empeche la transition de se relancer
+    // elle-meme (voir le Connections du chant). Remis a faux quand une nouvelle note recommence.
+    property bool singingTransitionDone: false
     // Horizontal offset of the whole screen during the shake. Zero is the resting state, and it is both
     // where the animation starts and where it ends.
     property real shakeOffset: 0
@@ -708,24 +724,29 @@ Item {
                             // Le VAMP : deux fois la meme gamme, sur deux centres differents. La consigne doit le dire,
                             // parce que c'est justement ce que le joueur ne peut pas deviner - il entend deux fois les
                             // memes notes, et c'est pourtant deux modes.
+                            // LE VAMP N'A PAS DE « PAREIL » : ses deux passages portent DEUX CENTRES differents, donc
+                            // « pareil » n'y serait pas un choix mais un piege - le joueur qui l'entend repondrait juste
+                            // en se trompant. Seule la comparaison a centre FIXE, plus bas, peut etre pareille. Roger l'a
+                            // vu a l'ecran : « il y a un jeu clair obscur ou on peut avoir le choix pareil et un autre
+                            // non, pourtant tu as mis le texte 'ou pareil' pour les 2 ».
                             if (ExerciseController.isModeVampQuestion)
-                                return qsTr("Deux fois la même gamme, sur deux centres différents : le second passage est-il plus clair, ou plus obscur ?");
+                                return qsTr("Le 2ᵉ passage : plus clair, ou plus obscur ?");
 
                             if (ExerciseController.isForeignNoteQuestion)
-                                return qsTr("Sept notes montent en %1 sur le bourdon : l'une n'appartient pas à la gamme. Laquelle ?").arg(ExerciseController.heardMode.name);
+                                return qsTr("Une note n'est pas dans la gamme %1 : laquelle ?").arg(ExerciseController.heardMode.name);
 
                             // LE CHANT A SA PROPRE CONSIGNE, et il la fallait : il retombait sur le generique « Ecoute
                             // bien… », que Roger a vu a l'ecran pendant une question chantee. Or on ne lui demande pas
                             // d'ecouter mais de CHANTER - et un joueur qui lit « ecoute bien » attend un son qui ne
                             // vient pas.
                             if (ExerciseController.questionKind === 2)
-                                return qsTr("Chante deux notes : %1. La seconde est celle que le jeu attend.").arg(MicrophoneController.singingTargetLabel);
+                                return qsTr("Chante la cible : %1").arg(MicrophoneController.singingTargetLabel);
 
                             if (ExerciseController.isModeColourQuestion)
-                                return qsTr("Écoute les deux modes : le second est-il plus clair, plus obscur, ou pareil ?");
+                                return qsTr("Le 2ᵉ mode : plus clair, plus obscur, ou pareil ?");
 
                             if (ExerciseController.isModeQuestion)
-                                return qsTr("Écoute ce mode sur son bourdon : lequel est-ce ?");
+                                return qsTr("Quel mode ?");
 
                             return qsTr("Écoute bien…");
                         }
@@ -737,9 +758,20 @@ Item {
                     // puisse comparer ce qu'il entend a ce qu'il sait du mode. Et la teinte est prise a la MEME source que
                     // les boutons de modes - la clarte du mode - pour que les deux se repondent d'un coup d'oeil.
                     Row {
-                        // La couleur sort de la meme formule que les boutons de modes : une seule teinte a maintenir, et
-                        // le mode le plus clair reste le plus clair partout.
-                        readonly property color badgeColour: Qt.rgba(0.3 + (0.7 * ExerciseController.heardMode.brightness), 0.2 + (0.62 * ExerciseController.heardMode.brightness), 0.55 + (0.45 * ExerciseController.heardMode.brightness), 1)
+                        // LA TEINTE DES PASTILLES DE DEGRES EST SON PROPRE BARREAU, ET VOLONTAIREMENT SOMBRE.
+                        //
+                        // Roger : « on affiche les degres dans des carres violets trop clairs dans l'interface, ca fait
+                        // flashy, tres bizarre ». Le fond du probleme : la formule partagee avec les boutons de modes
+                        // monte jusqu'au BLANC pour un mode clair - et un carre presque blanc PORTANT DU TEXTE BLANC est
+                        // a la fois criard et illisible.
+                        //
+                        // Ici, la clarte du mode reste LISIBLE (l'ordre clair -> obscur est conserve, puisque c'est lui
+                        // qui apprend quelque chose), mais elle joue dans une plage qui reste violette et sombre : le
+                        // texte blanc tient donc toujours, et la rangee ne crie plus.
+                        readonly property color badgeColour: Qt.rgba( 0.16 + ( 0.16 * ExerciseController.heardMode.brightness ),
+                                                                       0.11 + ( 0.13 * ExerciseController.heardMode.brightness ),
+                                                                       0.30 + ( 0.18 * ExerciseController.heardMode.brightness ),
+                                                                       1 )
 
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 5
@@ -827,6 +859,9 @@ Item {
             // boule et la barre de stabilite sont le composant partage avec l'accordeur ; seule la cible change.
             ColumnLayout {
                 // CE QUE LE MICRO ENTEND, EN DIRECT : la note, sa frequence, et l'ecart en cents.
+                // (Le compte a rebours n'est PAS dessine ici : il prend tout l'ecran, voir le splash en bas du fichier.)
+                // L'INTERRUPTEUR DE TEST. Roger : « tu peux meme rajouter une option togglable pour que je puisse
+                // rapidement tester la difference sans ou avec, histoire de juger si ca vaut le coup ».
 
                 Layout.fillWidth: true
                 // LA GARDE ETAIT LE BUG, ALORS ELLE RESTE ECRITE. Sans cette ligne, le bloc de chant s'affichait sur TOUTES
@@ -843,6 +878,13 @@ Item {
                 // ou le joueur la lit deja. Deux fois la meme phrase, c'est une de trop.
                 StaffBall {
                     Layout.preferredHeight: 120
+                    // LE JEU PARLE SA PROPRE COULEUR. Roger, rapporte par des joueurs : la boule suivait les regles de
+                    // l'accordeur (rouge/jaune/vert), et on croyait que c'etait rapporte au jeu. Ici, donc, le gris pale
+                    // dit « je n'ecoute pas », et le vert qui s'opacifie dit « la note tient » - voir StaffBall.
+                    gameMode: true
+                    // L'INTERFACE DISPARAIT PENDANT LA TRANSITION : Roger veut « enlever toute l'interface » quand la
+                    // premiere note est validee, le temps du compte a rebours.
+                    visible: exerciseScreen.singingCountdown === 0
                     // LA BOULE FANTOME : elle se pose sur la PREMIERE NOTE ENREGISTREE de l'essai, transposee de l'intervalle
                     // demande. Elle ne bouge plus pendant qu'on chante - c'est un repere, pas un marteau. Roger l'a dit
                     // exactement comme ca : « afficher le fantome a partir de la valeur enregistree et c'est tout ».
@@ -857,7 +899,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    visible: MicrophoneController.detectedFrequencyHz > 0
+                    visible: MicrophoneController.detectedFrequencyHz > 0 && exerciseScreen.singingCountdown === 0
                     color: "#8a77ad"
                     font.pixelSize: 13
                     text: qsTr("%1  ·  %2 cents").arg(MicrophoneController.detectedNoteLabel).arg(Math.round(MicrophoneController.detectedCents))
@@ -869,6 +911,7 @@ Item {
                     Layout.preferredHeight: 8
                     radius: 4
                     color: "#1b1035"
+                    visible: exerciseScreen.singingCountdown === 0
 
                     Rectangle {
                         height: 8
@@ -879,18 +922,115 @@ Item {
 
                 }
 
+                // LES DEUX NOTES, EN DEUX PASTILLES. Roger : les joueurs ne comprenaient PAS qu'il fallait une SECONDE
+                // note, parce qu'une phrase sous la portee ne se lit pas quand on regarde la boule. Deux pastilles, si :
+                // la premiere s'allume quand la note tient, la seconde au moment ou le jeu redemande une note.
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 14
+                    visible: exerciseScreen.singingCountdown === 0
+
+                    Repeater {
+                        model: 2
+
+                        Rectangle {
+                            // CHAQUE PASTILLE ALLUME SA PROPRE NOTE, ET RIEN D'AUTRE. Roger : « pour la premiere note,
+                            // aucun des deux pastilles n'est allume. Pour la deuxieme les 2 sont allumes. Il faudrait
+                            // soit le 1 en 1, puis le 2 seulement en 2 ».
+                            //
+                            // La cause : la pastille 1 attendait `hasFirstNote`, qui ne devient vrai qu'a la VALIDATION
+                            // de la premiere note - donc au moment ou le splash couvre l'ecran. Elle ne s'allumait donc
+                            // jamais pendant qu'on la chante. Ici, elle s'allume des que la note TIENT (la stabilite a
+                            // commence), et elle s'eteint quand la seconde prend la main : c'est ce « seulement » que
+                            // Roger a demande.
+                            readonly property bool lit: (index === 0) ? (!MicrophoneController.hasFirstNote && MicrophoneController.sungStability > 0) : (MicrophoneController.hasFirstNote && !MicrophoneController.hasSungInterval)
+
+                            width: 30
+                            height: 30
+                            radius: 15
+                            color: lit ? "#8ef2b0" : "#2a1a4a"
+                            border.color: lit ? "#8ef2b0" : "#5a4a8f"
+                            border.width: 2
+
+                            Text {
+                                anchors.centerIn: parent
+                                color: parent.lit ? "#12240f" : "#cbbde8"
+                                font.pixelSize: 15
+                                font.bold: true
+                                text: index + 1
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                // UNE SEULE LIGNE, ET COURTE. Le reste est dans les pastilles et dans le son.
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
                     color: "#cbb8e8"
-                    font.pixelSize: 13
-                    visible: !MicrophoneController.hasSungInterval
-                    text: MicrophoneController.hasFirstNote ? qsTr("Première note tenue — maintenant la deuxième") : qsTr("Tiens la première note…")
+                    font.pixelSize: 14
+                    visible: !MicrophoneController.hasSungInterval && exerciseScreen.singingCountdown === 0
+                    text: MicrophoneController.hasFirstNote ? qsTr("2ᵉ note") : qsTr("1ʳᵉ note")
+                }
+
+                Timer {
+                    id: singingCountdownTimer
+
+                    // Le premier tic (fort) part avec la validation, dans le Connections ci-dessous ; ce minuteur fait
+                    // les suivants, FAIBLES - « un ding fort puis 2 plus faibles, un peu comme un metronome, mais
+                    // toujours leger » (Roger).
+                    // Roger : « j'accelererai le compte a rebours ». Un tic toutes les 450 ms au lieu de 800 : la
+                    // transition reste lisible, mais elle ne fait plus attendre entre deux notes.
+                    interval: 450
+                    repeat: true
+                    onTriggered: {
+                        exerciseScreen.singingCountdown = exerciseScreen.singingCountdown - 1;
+                        if (exerciseScreen.singingCountdown <= 0) {
+                            stop();
+                            MicrophoneController.endSingingTransition();
+                        } else {
+                            MicrophoneController.playCountdownTick(false);
+                        }
+                    }
+                }
+
+                Connections {
+                    // LA PREMIERE NOTE VIENT D'ETRE CAPTEE. LA GARDE `singingTransitionDone` EST LE CORRECTIF DE LA
+                    // BOUCLE : `sungIntervalChanged` part a CHAQUE lecture du detecteur, donc sans ce drapeau la
+                    // transition se relancait apres elle-meme - elle rejouait une note et recommencait le compte a
+                    // rebours, sans fin. Roger : « le jeu rejoue une note. Ca fout le bordel ».
+
+                    function onSungIntervalChanged() {
+                        // UNE NOUVELLE QUESTION : tout retombe, et le detecteur se remet a ecouter.
+                        if (!MicrophoneController.hasFirstNote) {
+                            exerciseScreen.singingCountdown = 0;
+                            exerciseScreen.singingTransitionDone = false;
+                            singingCountdownTimer.stop();
+                            MicrophoneController.endSingingTransition();
+                            return ;
+                        }
+                        // ET PLUS AUCUNE NOTE N'EST JOUEE : Roger ne veut plus l'entendre (« il ne faudrait pas qu'il
+                        // rejoue quoi que ce soit »). Seuls les tics du compte a rebours portent le son, et le detecteur
+                        // est en PAUSE pendant ce temps (beginSingingTransition).
+                        if (ExerciseController.questionKind === 2 && !exerciseScreen.singingTransitionDone && !MicrophoneController.hasSungInterval) {
+                            exerciseScreen.singingTransitionDone = true;
+                            MicrophoneController.beginSingingTransition();
+                            MicrophoneController.playCountdownTick(true);
+                            exerciseScreen.singingCountdown = 3;
+                            singingCountdownTimer.restart();
+                        }
+                    }
+
+                    target: MicrophoneController
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
+                    visible: exerciseScreen.singingCountdown === 0
 
                     Button {
                         Layout.fillWidth: true
@@ -903,6 +1043,26 @@ Item {
                         highlighted: MicrophoneController.isSingingCaptureActive
                         text: MicrophoneController.isSingingCaptureActive ? qsTr("J'écoute…") : qsTr("Je chante")
                         onClicked: MicrophoneController.isSingingCaptureActive ? MicrophoneController.stopSingingCapture() : MicrophoneController.startSingingCapture()
+                    }
+
+                }
+
+                // C'est un reglage d'ESSAI, et il ne concerne QUE le chant : l'accordeur l'ignore par construction, il
+                // n'est pas en capture (voir VoicePreFilter). A retirer une fois la decision prise.
+                RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 8
+                    visible: exerciseScreen.singingCountdown === 0
+
+                    Text {
+                        color: "#8a77ad"
+                        font.pixelSize: 13
+                        text: qsTr("Filtre voix (bruit)")
+                    }
+
+                    Switch {
+                        checked: MicrophoneController.voicePreFilterEnabled
+                        onToggled: MicrophoneController.voicePreFilterEnabled = checked
                     }
 
                 }
@@ -1229,6 +1389,8 @@ Item {
                 // LE BOURDON, DIT AU JOUEUR - c'est une des deux questions qui reviennent le plus, et le jeu ne la posait
                 // jamais. Roger : « c'est quoi le bourdon (il faut lui expliquer les degres qu'on utilise) ».
 
+                id: harmonyBlock
+
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.alignment: Qt.AlignVCenter
@@ -1300,7 +1462,7 @@ Item {
                     // tout le cercle et les boutons d'actions, ce qui est dommage ». Une explication qui pousse les
                     // commandes hors de portee coute plus qu'elle n'apprend. Deux lignes au maximum.
                     visible: ExerciseController.modeCircle.length > 0
-                    text: qsTr("Le bourdon : la tonique et sa quinte, tenues sous la gamme. C'est lui qui donne le centre.")
+                    text: qsTr("Le bourdon : tonique + quinte, tenues.")
                 }
 
                 // Elle est là PENDANT la question, et c'est un choix de Roger : « je mettrais quand même la roue dans la
@@ -1453,10 +1615,30 @@ Item {
 
                 }
 
-                Flow {
+                Item {
+                    // LES BOUTONS DE MODE, EN RANGEES CENTREES.
+                    //
+                    // Roger, 07/10/2026 : « les rangees des boutons des modes sont mal centrees : c'est left centered,
+                    // du coup ca fait du vide a droite ». Un `Flow` range ses elements a GAUCHE, donc sa derniere rangee
+                    // - plus courte - laissait un vide a droite. Ici, CHAQUE rangee est posee au MILIEU de la largeur,
+                    // quelle que soit sa longueur.
+                    //
+                    // La largeur et la hauteur des boutons RESTENT celles d'origine : la place verticale se prend en
+                    // haut de l'ecran (le prompt tient en deux mots), jamais sur les reponses.
+                    id: modeButtonGrid
+
                     Layout.fillWidth: true
-                    spacing: 6
                     visible: !ExerciseController.isModeColourQuestion
+
+                    readonly property int choiceCount: ExerciseController.modeChoices.length
+                    readonly property real cellWidth: 118
+                    readonly property real cellHeight: 48
+                    readonly property real cellGap: 6
+                    // Combien de boutons tiennent sur une rangee - au moins un.
+                    readonly property int columns: Math.max(1, Math.floor((width + cellGap) / (cellWidth + cellGap)))
+                    readonly property int rowCount: choiceCount === 0 ? 0 : Math.ceil(choiceCount / columns)
+
+                    implicitHeight: rowCount === 0 ? 0 : ((rowCount * cellHeight) + ((rowCount - 1) * cellGap))
 
                     Repeater {
                         // LA LARGEUR, LA POLICE ET LES MARGES VONT ENSEMBLE, et c'est le NOM qui commande.
@@ -1466,6 +1648,11 @@ Item {
 
                         delegate: Button {
                             required property var modelData
+                            required property int index
+
+                            readonly property int rowIndex: Math.floor(index / modeButtonGrid.columns)
+                            readonly property int itemsInRow: Math.min(modeButtonGrid.columns, modeButtonGrid.choiceCount - (rowIndex * modeButtonGrid.columns))
+                            readonly property real rowWidth: (itemsInRow * modeButtonGrid.cellWidth) + ((itemsInRow - 1) * modeButtonGrid.cellGap)
                             readonly property bool isBright: modelData.brightness > 0.5
                             readonly property bool wasHeard: ExerciseController.heardMode.index !== undefined && modelData.index === ExerciseController.heardMode.index
 
@@ -1473,8 +1660,12 @@ Item {
                             // police de 14 laisse environ 72 points au texte - le style garde seize points de marge de
                             // chaque cote - et « Mixolydien » en demande quatre-vingts. Les trois valeurs sont donc
                             // reglees ENSEMBLE, sinon le prochain nom long les fera mentir de nouveau.
-                            width: 118
-                            height: 48
+                            width: modeButtonGrid.cellWidth
+                            height: modeButtonGrid.cellHeight
+                            // LA RANGEE EST CENTREE : on decale de la moitie du vide laisse a gauche.
+                            x: ((modeButtonGrid.width - rowWidth) / 2) + ((index % modeButtonGrid.columns) * (modeButtonGrid.cellWidth + modeButtonGrid.cellGap))
+                            y: rowIndex * (modeButtonGrid.cellHeight + modeButtonGrid.cellGap)
+
                             leftPadding: 4
                             rightPadding: 4
                             text: modelData.name
@@ -1541,6 +1732,11 @@ Item {
                     height: 52
                     text: qsTr("♪ Écouter")
                     enabled: ExerciseController.isAsking
+                    // LA GARDE ETAIT ABSENTE, ET C'EST LE « double bouton » DE ROGER : « pour les exercices chanter, il y
+                    // a 2 fois les boutons ecouter et passer ». La section du chant a deja SON bouton d'ecoute (qui joue
+                    // la CIBLE) ; celui-ci, qui REJOUE la question, n'a rien a faire sous une question chantee - il
+                    // s'affichait pourtant la, sans rien faire, et en double.
+                    visible: ExerciseController.questionKind !== 2
                     onClicked: ExerciseController.replay()
                 }
 
@@ -1770,7 +1966,7 @@ Item {
                 color: "#8a77ad"
                 font.pixelSize: 14
                 visible: !ExerciseController.sessionGrantsExperience
-                text: qsTr("Ici, pas d'expérience : l'Arcade seule en donne. Mais tout compte pour tes statistiques.")
+                text: qsTr("Pas d'XP ici — l'Arcade en donne. Tout compte pour tes stats.")
             }
 
             // Roger : « a la fin du bilan, si il a gagne un trophee ou une recompense, il faut lui dire (et lui dire qu'ils
@@ -1857,6 +2053,59 @@ Item {
                 height: 48
                 text: qsTr("← Retour au banc")
                 onClicked: ExerciseController.stopSession()
+            }
+
+        }
+
+    }
+
+    // Il est declare ICI, a la RACINE, et non dans le bloc du chant : c'est la seule facon de couvrir AUSSI les vies,
+    // le compteur et les boutons - l'interface du chant ne peut pas les recouvrir, ils sont ses voisins.
+    Rectangle {
+        anchors.fill: parent
+        z: 1000
+        visible: exerciseScreen.singingCountdown > 0
+        color: "#1d1033"
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: 10
+
+            // LA COCHE, DESSINEE ET NON EMOJI. Roger n'aimait pas « l'icone de la coche » - un emoji se rend
+            // differemment sur chaque telephone, avec sa propre palette et son propre trait. Ici, deux segments et un
+            // bout arrondi : c'est le dessin minimal d'une coche, et il ne bouge pas d'un appareil a l'autre.
+            Canvas {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredWidth: 76
+                Layout.preferredHeight: 76
+                onPaint: {
+                    var ctx = getContext("2d");
+                    ctx.reset();
+                    ctx.strokeStyle = "#8ef2b0";
+                    ctx.lineWidth = 9;
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+                    ctx.beginPath();
+                    ctx.moveTo(width * 0.17, height * 0.53);
+                    ctx.lineTo(width * 0.4, height * 0.77);
+                    ctx.lineTo(width * 0.84, height * 0.24);
+                    ctx.stroke();
+                }
+            }
+
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                color: "#ffd479"
+                font.pixelSize: 120
+                font.bold: true
+                text: exerciseScreen.singingCountdown.toString()
+            }
+
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                color: "#cbb8e8"
+                font.pixelSize: 16
+                text: qsTr("Prépare la 2ᵉ note")
             }
 
         }

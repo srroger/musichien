@@ -242,9 +242,10 @@ public:
 
     // Le clic du métronome : un temps simple, ou le PREMIER temps d'une mesure (accentué). Un corps par défaut, comme
     // le clic de menu : un adaptateur sans métronome se contente du clic ordinaire.
-    virtual void playMetronomeClick( bool p_accented )
+    virtual void playMetronomeClick( bool p_accented, double p_gain = 1.0 )
     {
         (void)p_accented;
+        (void)p_gain;
         playTapCue();
     }
 

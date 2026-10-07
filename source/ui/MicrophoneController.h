@@ -103,6 +103,11 @@ class MicrophoneController final : public QObject
     Q_PROPERTY( bool hasFirstNote READ hasFirstNote NOTIFY sungIntervalChanged )
     Q_PROPERTY( double sungStability READ sungStability NOTIFY sungIntervalChanged )
 
+    // L'INTERRUPTEUR DU PRE-TRAITEMENT DE VOIX. Roger : « tu peux meme rajouter une option togglable pour que je puisse
+    // rapidement tester la difference sans ou avec ». Il ne concerne QUE le chant : l'accordeur ne le voit jamais, et
+    // c'est tout le sens de la separation (voir VoicePreFilter). Vrai par defaut.
+    Q_PROPERTY( bool voicePreFilterEnabled READ voicePreFilterEnabled WRITE setVoicePreFilterEnabled NOTIFY voicePreFilterEnabledChanged )
+
     // La session : une petite serie de questions chantees, avec un score. La fin de session est affichee quand
     // singingSessionOver devient vrai.
     Q_PROPERTY( int singingQuestionIndex READ singingQuestionIndex NOTIFY singingQuestionChanged )
@@ -201,6 +206,22 @@ public:
     // Plays the interval to sing, for the beginner level. The advanced level simply does not call it.
     Q_INVOKABLE void playSingingTarget();
 
+    // LA PREMIERE NOTE EST CAPTEE : on l'ANNONCE. Un court « ding », puis ON REJOUE LA NOTE qui vient d'etre chantee -
+    // c'est l'idee de Roger : « il faudrait carrement faire un bruitage (ou rejouer la frequence qu'il vient de
+    // chanter) ». Le chanteur s'ANCRE ainsi avant la seconde note, au lieu de deviner qu'il en reste une - c'etait le
+    // vrai probleme : « les gens n'ont pas compris qu'il fallait faire une 2eme note ».
+    Q_INVOKABLE void announceFirstNote();
+
+    // Un tic du COMPTE A REBOURS qui precede la seconde note. Accentue pour le dernier, comme une mesure qui commence.
+    Q_INVOKABLE void playCountdownTick( bool p_accented );
+
+    // LA TRANSITION ENTRE LES DEUX NOTES : le jeu JOUE des sons (la note rejouee, le compte a rebours), et le micro les
+    // ENTENDRAIT - le detecteur croirait alors a un nouveau chant. Roger : « les sons font interferences avec le micro,
+    // du coup le micro croit que c'est un nouveau chant ». On met donc le detecteur en PAUSE le temps des sons : la
+    // premiere note est gardee, et rien de ce qui est joue ne compte comme chante.
+    Q_INVOKABLE void beginSingingTransition();
+    Q_INVOKABLE void endSingingTransition();
+
     // Opens the microphone and listens for two held notes.
     Q_INVOKABLE void startSingingCapture();
     Q_INVOKABLE void stopSingingCapture();
@@ -210,6 +231,10 @@ public:
 
     [[nodiscard]] double singingTargetStaffFraction() const;
     [[nodiscard]] bool isSingingCaptureActive() const { return m_isSingingCaptureActive; }
+
+    [[nodiscard]] bool voicePreFilterEnabled() const { return m_voicePreFilterEnabled; }
+
+    void setVoicePreFilterEnabled( bool p_enabled );
     [[nodiscard]] bool hasSungInterval() const { return m_sungIntervalDetector.reading().hasInterval(); }
     [[nodiscard]] int sungSemitones() const { return m_sungIntervalDetector.reading().semitones(); }
     [[nodiscard]] int sungVerdict() const;
@@ -232,6 +257,8 @@ signals:
     void singingTargetChanged();
     void singingMirrorChanged();
     void singingCaptureStateChanged();
+
+    void voicePreFilterEnabledChanged();
     void sungIntervalChanged();
     void singingQuestionChanged();
 
@@ -276,6 +303,16 @@ private:
     std::mt19937 m_singingRandomEngine{ std::random_device{}() };
     int m_singingTargetSemitones{ 7 };
     bool m_isSingingCaptureActive{ false };
+
+    // Vrai tant que le pre-traitement de voix accompagne le chant. Faux pour l'accordeur, toujours.
+    bool m_voicePreFilterEnabled{ true };
+
+    // Pousse l'etat courant (interrupteur ET capture) sur le detecteur. Un seul endroit decide, et c'est celui-la.
+    void applyVoicePreFilter();
+
+    // Vrai pendant la transition entre les deux notes : le detecteur n'est alors PAS alimente, pour que les sons joues
+    // par le jeu (la note rejouee, le compte a rebours) ne soient pas pris pour un chant. Voir beginSingingTransition.
+    bool m_singingTransition{ false };
 
     // Vrai quand l'ecran de chant a ete ouvert par une carte de cours : l'intervalle est donne, rien n'est compte, et
     // rien n'est tire au hasard. Faux des l'ouverture d'une session de jeu.

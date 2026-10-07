@@ -538,7 +538,7 @@ bool ExerciseSession::answerChord( ChordQuality p_quality )
     return resolveAnswer( p_quality == m_currentQuestion.chord.quality, std::nullopt );
 }
 
-QuestionKind ExerciseSession::drawKind()
+QuestionKind drawQuestionKind( const SessionSettings & p_settings, std::mt19937 & p_engine )
 {
     // Les parts, et leur SOMME.
     //
@@ -553,21 +553,21 @@ QuestionKind ExerciseSession::drawKind()
     //
     // L'ordre est celui de l'ecran : chaque genre prend la tranche qui suit la precedente, donc augmenter une part ne
     // deplace que les questions d'apres.
-    const std::array<KindShare, 8> shares{ KindShare{ .share = m_settings.namedIntervalQuestionShare,
+    const std::array<KindShare, 8> shares{ KindShare{ .share = p_settings.namedIntervalQuestionShare,
                                                       .kind = QuestionKind::NamedInterval },
-                                           KindShare{ .share = m_settings.singQuestionShare,
+                                           KindShare{ .share = p_settings.singQuestionShare,
                                                       .kind = QuestionKind::Sing },
-                                           KindShare{ .share = m_settings.directionQuestionShare,
+                                           KindShare{ .share = p_settings.directionQuestionShare,
                                                       .kind = QuestionKind::Direction },
-                                           KindShare{ .share = m_settings.chordQuestionShare,
+                                           KindShare{ .share = p_settings.chordQuestionShare,
                                                       .kind = QuestionKind::Chord },
-                                           KindShare{ .share = m_settings.modeColourQuestionShare,
+                                           KindShare{ .share = p_settings.modeColourQuestionShare,
                                                       .kind = QuestionKind::ModeColour },
-                                           KindShare{ .share = m_settings.modeNameQuestionShare,
+                                           KindShare{ .share = p_settings.modeNameQuestionShare,
                                                       .kind = QuestionKind::ModeName },
-                                           KindShare{ .share = m_settings.modeVampQuestionShare,
+                                           KindShare{ .share = p_settings.modeVampQuestionShare,
                                                       .kind = QuestionKind::ModeVamp },
-                                           KindShare{ .share = m_settings.foreignNoteQuestionShare,
+                                           KindShare{ .share = p_settings.foreignNoteQuestionShare,
                                                       .kind = QuestionKind::ForeignNote } };
 
     std::int32_t total = 0;
@@ -585,7 +585,7 @@ QuestionKind ExerciseSession::drawKind()
 
     std::uniform_int_distribution<std::int32_t> distribution{ 0, total - 1 };
 
-    const std::int32_t draw = distribution( m_randomEngine );
+    const std::int32_t draw = distribution( p_engine );
 
     // Une TABLE, et non une chaine de comparaisons cumulees : les bornes s'additionnent d'elles-memes, chaque genre est
     // une ligne, et un genre AJOUTE plus tard ne peut pas oublier de mettre a jour les sommes des suivants - le defaut
@@ -605,6 +605,13 @@ QuestionKind ExerciseSession::drawKind()
     // Inatteignable tant que la somme ci-dessus est celle qui borne le tirage : y arriver voudrait dire qu'une part a
     // ete oubliee en chemin.
     return QuestionKind::NamedInterval;
+}
+
+QuestionKind ExerciseSession::drawKind()
+{
+    // Le tirage vit dans drawQuestionKind : le Bilan en a besoin pour ses questions « au hasard du niveau », et une
+    // session ordinaire ne doit pas avoir sa propre copie qui deriverait.
+    return drawQuestionKind( m_settings, m_randomEngine );
 }
 
 void ExerciseSession::buildChordQuestion( Question & p_question )

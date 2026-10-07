@@ -1920,6 +1920,20 @@ ApplicationWindow {
                             text: qsTr("Ce bilan part de TES résultats des 30 derniers jours : il commence par ce que tu réussis le mieux, puis attaque ce qui te résiste encore. Son but n'est pas de te piéger, mais de faire progresser exactement ces points-là.")
                         }
 
+                        // COMBIEN DE QUESTIONS, dit AVANT de commencer : Roger l'a demande - un Bilan long se prend le
+                        // week-end, et le joueur a le droit de savoir dans quoi il s'engage.
+                        Text {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 2
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WordWrap
+                            color: "#ffd479"
+                            font.pixelSize: 16
+                            font.bold: true
+                            visible: ExerciseController.reviewQuestionCount > 0
+                            text: qsTr("%1 questions, du plus facile au plus difficile.").arg(ExerciseController.reviewQuestionCount)
+                        }
+
                         // LES POINTS FORTS. Le vert dit « acquis », et le NOMBRE DE QUESTIONS dit sur quoi il se fonde :
                         // un pourcentage sans son nombre de questions ne veut rien dire, et le montrer evite d'avoir a
                         // croire l'app sur parole.

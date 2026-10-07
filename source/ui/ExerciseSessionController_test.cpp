@@ -2169,10 +2169,9 @@ TEST( ExerciseSessionControllerTest, a_review_session_plans_its_questions )
     EXPECT_TRUE( controller.running() );
     EXPECT_FALSE( controller.isReviewOpeningVisible() );
 
-    // Le bilan est FINI : ses questions sont decidees, donc son compte est celui du plan - et il ne se perd pas, puisqu'un
-    // bilan sans vies ne peut pas s'arreter au milieu.
-    EXPECT_GT( controller.questionCount(), 0 );
-    EXPECT_LT( controller.questionCount(), 10 );
+    // Le bilan est FINI : ses questions sont decidees, donc son compte est le plan - un long questionnaire de cinquante
+    // questions, comme Roger l'a voulu - et il ne se perd pas, puisqu'un bilan sans vies ne peut pas s'arreter au milieu.
+    EXPECT_EQ( 50, controller.questionCount() );
     EXPECT_TRUE( controller.hasUnlimitedLives() );
 }
 
@@ -2336,23 +2335,24 @@ TEST( ExerciseSessionControllerTest, a_target_seen_once_is_not_what_resisted_the
 
     ASSERT_TRUE( controller.running() );
 
-    // Six cibles retenues - trois en echauffement, trois en difficulte - ET DEUX CIBLES JAMAIS TRAVAILLEES, que le plan
-    // ajoute depuis qu'il se lit en trois temps. La septieme, vue une fois, n'existe pas pour le bilan : sans la garde,
-    // elle entrerait dans le plan et le compte vaudrait un de plus.
-    EXPECT_EQ( 5, controller.questionCount() );
+    // Le Bilan fait TOUJOURS cinquante questions : c'est la demande de Roger, et le plan se complete au hasard du
+    // niveau. Ce que ce test protege n'est PAS le compte, c'est la REGLE : la cible vue une fois (0 % de reussite) n'est
+    // pas un point faible, donc elle n'entre pas dans reviewInsights() - et une cible qui n'y est pas ne peut pas se
+    // retrouver presentee comme « ce qui te resiste ».
+    EXPECT_EQ( 50, controller.questionCount() );
 }
 
-TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_player_closed )
+TEST( ExerciseSessionControllerTest, a_review_session_ignores_the_free_play_weights )
 {
-    // LE test du bug que Roger a signale, et il est critique : « j'ai beau mettre plus clair et plus sombre a 0, je
-    // l'obtiens toujours dans mes parties ».
+    // Roger, 07/10/2026 : « le Bilan prend en compte les settings qui ne sont normalement destines qu'a Infini et
+    // Survie ». Et le vault le dit deja (06 §10) : les POIDS ne gouvernent que le jeu libre ; le Bilan est un plan
+    // DECIDE. Il ne doit donc honorer AUCUNE part du joueur, meme mise a ZERO.
     //
-    // La cause : le bilan ne passe pas par le TIRAGE, il impose son plan - donc les parts ne s'appliquaient pas a lui. Il
-    // proposait au joueur de travailler exactement ce qu'il avait refuse.
+    // Ce test verifiait l'INVERSE jusqu'ici - c'etait la correction d'alors, que Roger a lui-meme reviree.
     domain::NotePlayerFake notePlayer;
     domain::QuestionLogFake log;
 
-    // Un journal qui contient des questions de MODE rattees : c'est ce que le bilan voudra faire travailler.
+    // Un journal AVEC des accords, vus assez souvent pour compter : le plan doit poser un accord, quoi qu'il arrive.
     const auto now = std::chrono::system_clock::now();
 
     for( int index = 0; index < 5; ++index )
@@ -2360,13 +2360,16 @@ TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_pla
         domain::QuestionRecord record;
 
         record.askedAt = now - std::chrono::hours{ 1 };
-        record.kind = domain::QuestionKind::ModeColour;
-        record.target = static_cast<std::int32_t>( domain::Mode::Dorian );
-        record.outcome = domain::QuestionOutcome::Failed;
+        record.kind = domain::QuestionKind::Chord;
+        record.target = 0;    // la premiere couleur d'accord : majeur
+        record.outcome = domain::QuestionOutcome::CorrectFirstTry;
 
         log.append( record );
     }
 
+    fillJournalWithWorkedTargets( log );
+
+    // Le profil FERME les accords (et tout le reste) : un plan qui suivrait les parts n'en poserait aucun.
     domain::SessionSettings settings = intervalOnlySettings();
     settings.namedIntervalQuestionShare = 100;
 
@@ -2375,16 +2378,23 @@ TEST( ExerciseSessionControllerTest, a_review_session_never_poses_a_kind_the_pla
 
     controller.startReviewSession();
 
+    ASSERT_TRUE( controller.isReviewOpeningVisible() );
+    controller.beginReviewQuestions();
+
     ASSERT_TRUE( controller.running() );
 
-    // Toute la session, question apres question : le mode est FERME, donc le bilan n'en pose aucun.
+    // Toute la session : le plan pose bien l'accord du journal, alors que sa part est a ZERO.
+    bool sawChord = false;
+
     while( controller.running() && controller.isAsking() )
     {
-        EXPECT_FALSE( controller.isModeQuestion() ) << "le bilan a pose une question que le joueur avait fermee";
+        sawChord = sawChord || controller.isChordQuestion();
 
         controller.revealAnswer();
         controller.continueToNextQuestion();
     }
+
+    EXPECT_TRUE( sawChord ) << "le Bilan a suivi les parts du jeu libre au lieu de son propre plan";
 }
 
 TEST( ExerciseSessionControllerTest, the_dog_barks_when_the_session_ends )
@@ -2781,7 +2791,9 @@ TEST( ExerciseSessionControllerTest, the_encouragement_speaks_only_during_a_revi
 
     fillJournalWithWorkedTargets( log );
 
-    // Le profil ouvre ce que le bilan doit poser : un intervalle a nommer, seul genre du journal de ce test.
+    // Le profil tente de fermer tout sauf l'intervalle : le Bilan l'IGNORE (voir
+    // a_review_session_ignores_the_free_play_weights), donc il posera aussi d'autres genres - c'est la raison pour laquelle
+    // la boucle ci-dessous revele la reponse plutot que de repondre.
     domain::SessionSettings settings = intervalOnlySettings();
     settings.namedIntervalQuestionShare = 100;
 
@@ -2799,7 +2811,9 @@ TEST( ExerciseSessionControllerTest, the_encouragement_speaks_only_during_a_revi
     // La page d'ouverture, puis ses questions : c'est le meme geste pour le joueur, et le test le fait.
     controller.beginReviewQuestions();
 
-    // Le bilan, lui, parle - au minimum quand il attaque ce qui resiste.
+    // Le bilan, lui, parle - au minimum quand il attaque ce qui resiste. On REVELE a chaque question : le plan melange des
+    // genres qui ne se repondent pas de la meme facon (un nom, un accord, un mode), et ce test ne porte pas sur la facon de
+    // repondre.
     bool spokeAtSomePoint = false;
 
     for( int question = 0; question < controller.questionCount(); ++question )
@@ -2811,15 +2825,7 @@ TEST( ExerciseSessionControllerTest, the_encouragement_speaks_only_during_a_revi
             break;
         }
 
-        if( controller.isChordQuestion() )
-        {
-            controller.answerChord( controller.heardChord().value( "quality" ).toInt() );
-        }
-        else
-        {
-            controller.answer( heardDistance( controller ) );
-        }
-
+        controller.revealAnswer();
         controller.continueToNextQuestion();
     }
 

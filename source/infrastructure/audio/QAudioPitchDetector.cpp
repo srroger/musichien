@@ -1,6 +1,7 @@
 #include "infrastructure/audio/QAudioPitchDetector.h"
 
 #include "domain/audio/PitchEstimator.h"
+#include "domain/audio/VoicePreFilter.h"
 
 #include <QAudioFormat>
 #include <QAudioSource>
@@ -76,6 +77,11 @@ private:
     double m_lastFrequency{ 0.0 };
 
     std::int32_t m_silenceFrames{ 0 };
+
+    // LE PRE-TRAITEMENT DE VOIX, eteint tant que personne ne le demande. Voir VoicePreFilter : il ne sert QU'au chant,
+    // et la capture melange les deux usages - c'est donc ce drapeau qui decide, jamais l'adaptateur.
+    musichien::domain::VoicePreFilter m_voiceFilter;
+    bool m_voicePreFilterEnabled{ false };
 };
 
 QAudioPitchDetector::QAudioPitchDetector()
@@ -113,6 +119,10 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
     // Le taux que la carte a REELLEMENT accepte.
     impl.m_sampleRate = openedSampleRate( *impl.m_source );
 
+    // Le passe-haut se recale sur ce taux : il ne peut pas etre regle avant de le connaitre.
+    impl.m_voiceFilter.configure( impl.m_sampleRate );
+    impl.m_voiceFilter.reset();
+
     // A small buffer means small chunks. On the desktop the default is a whole second at a time, which makes the ball
     // jump once a second instead of gliding; twenty milliseconds is the good middle ground between latency and load.
     impl.m_source->setBufferSize( static_cast<int>( impl.m_sampleRate ) * static_cast<int>( sizeof( std::int16_t ) ) * 20
@@ -143,7 +153,16 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
 
         for( std::size_t index = 0; index < count; ++index )
         {
-            impl.m_window.push_back( static_cast<double>( samples[index] ) / 32768.0 );
+            double value = static_cast<double>( samples[index] ) / 32768.0;
+
+            // LE PASSE-HAUT AVANT TOUT LE RESTE. Le filtre agit ECHANTILLON par ECHANTILLON, donc avant la fenetre :
+            // quand YIN regarde les 4096 echantillons, le grondement n'y est deja plus.
+            if( impl.m_voicePreFilterEnabled )
+            {
+                value = impl.m_voiceFilter.processSample( value );
+            }
+
+            impl.m_window.push_back( value );
 
             if( impl.m_window.size() < domain::PitchEstimator::WINDOW_SIZE )
             {
@@ -152,18 +171,32 @@ void QAudioPitchDetector::start( musichien::domain::PitchDetector::PitchCallback
 
             double sumSquared = 0.0;
 
-            for( const double value : impl.m_window )
+            for( const double windowValue : impl.m_window )
             {
-                sumSquared += value * value;
+                sumSquared += windowValue * windowValue;
             }
 
             const double rms = std::sqrt( sumSquared / static_cast<double>( domain::PitchEstimator::WINDOW_SIZE ) );
 
             double frequencyHz = 0.0;
 
-            if( rms * 32768.0 > SILENCE_RMS )
+            // LE GATE ADAPTATIF, puis le seuil de silence FIXE : les deux doivent dire oui. Le gate suit le bruit de
+            // fond du lieu, ce que le seuil fixe ne sait pas faire - dans une piece bruyante, le bruit passe au-dessus
+            // de lui et serait estime comme une note.
+            const bool isVoice =
+              !impl.m_voicePreFilterEnabled || impl.m_voiceFilter.isVoiceLevel( rms );
+
+            if( isVoice && ( rms * 32768.0 > SILENCE_RMS ) )
             {
-                frequencyHz = domain::PitchEstimator::estimate( impl.m_window, impl.m_sampleRate );
+                // LA PLAGE DE VOIX QUAND LE FILTRE EST LA, la plage entiere sinon : c'est le MEME interrupteur, comme
+                // Roger l'a demande. La fenetre, elle, ne bouge pas.
+                frequencyHz =
+                  impl.m_voicePreFilterEnabled
+                    ? domain::PitchEstimator::estimate( impl.m_window,
+                                                        impl.m_sampleRate,
+                                                        domain::PitchEstimator::VOICE_MINIMUM_FREQUENCY_HZ,
+                                                        domain::PitchEstimator::VOICE_MAXIMUM_FREQUENCY_HZ )
+                    : domain::PitchEstimator::estimate( impl.m_window, impl.m_sampleRate );
             }
 
             if( frequencyHz > 0.0 )
@@ -225,6 +258,18 @@ void QAudioPitchDetector::stop()
     impl.m_window.clear();
     impl.m_lastFrequency = 0.0;
     impl.m_silenceFrames = 0;
+}
+
+void QAudioPitchDetector::setVoicePreFilterEnabled( bool p_enabled )
+{
+    Impl & impl = *m_impl;
+
+    impl.m_voicePreFilterEnabled = p_enabled;
+
+    // Le filtre repart d'un etat PROPRE a chaque changement : l'activer au milieu d'une prise ferait entendre le
+    // transitoire du passe-haut, et le plancher de bruit doit etre REMESURE la ou l'on est - pas herite du reglage
+    // precedent.
+    impl.m_voiceFilter.reset();
 }
 
 }    // namespace musichien::infrastructure

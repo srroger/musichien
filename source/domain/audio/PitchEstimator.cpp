@@ -93,7 +93,10 @@ namespace
 
 }    // namespace
 
-double PitchEstimator::estimate( std::span<const double> p_window, double p_sampleRateHz )
+double PitchEstimator::estimate( std::span<const double> p_window,
+                                 double p_sampleRateHz,
+                                 double p_minimumFrequencyHz,
+                                 double p_maximumFrequencyHz )
 {
     if( p_window.size() < WINDOW_SIZE || p_sampleRateHz <= 0.0 )
     {
@@ -103,9 +106,9 @@ double PitchEstimator::estimate( std::span<const double> p_window, double p_samp
     // Le decalage le plus court interroge est celui de la note la plus aigue, le plus long celui de la plus grave.
     // Deux echantillons au minimum : un decalage d'un seul ne dit rien d'une periode.
     const auto tauMin =
-      std::max<std::size_t>( 2, static_cast<std::size_t>( p_sampleRateHz / MAXIMUM_FREQUENCY_HZ ) );
+      std::max<std::size_t>( 2, static_cast<std::size_t>( p_sampleRateHz / p_maximumFrequencyHz ) );
     const auto tauMax =
-      std::min( WINDOW_SIZE / 2, static_cast<std::size_t>( p_sampleRateHz / MINIMUM_FREQUENCY_HZ ) );
+      std::min( WINDOW_SIZE / 2, static_cast<std::size_t>( p_sampleRateHz / p_minimumFrequencyHz ) );
 
     if( tauMin >= tauMax )
     {

@@ -35,6 +35,9 @@ public:
 
     void stop() override;
 
+    // Voir VoicePreFilter : ce reglage ne concerne que le CHANT, jamais l'accordeur. Faux par defaut.
+    void setVoicePreFilterEnabled( bool p_enabled ) override;
+
 private:
     class Impl;
 

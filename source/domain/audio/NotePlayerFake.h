@@ -170,8 +170,10 @@ public:
 
     // Le metronome et la batterie sont des sons A PART : les compter separement est ce qui permet a un test de dire
     // "le clic ET la caisse claire ont ete demandes", et donc de tenir le bug du mixage ferme.
-    void playMetronomeClick( bool p_accented ) override
+    void playMetronomeClick( bool p_accented, double p_gain = 1.0 ) override
     {
+        (void)p_gain;
+
         ++m_metronomeClickCount;
 
         if( p_accented )

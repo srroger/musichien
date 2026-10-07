@@ -515,6 +515,15 @@ struct SessionSettings
 // Ecrite une fois, ici, elle ne peut plus etre oubliee a un troisieme endroit.
 [[nodiscard]] bool isKindOpen( const SessionSettings & p_settings, QuestionKind p_kind ) noexcept;
 
+// Le GENRE d'une question ORDINAIRE, tire selon les parts du joueur - le tirage que le jeu ferait s'il n'avait aucun
+// plan. C'est le meme mecanisme que drawKind, sorti ici pour etre REUTILISE : le Bilan comble ses dernieres places avec
+// des questions « au hasard du niveau », et un second tirage recopie finirait par ne plus dire la meme chose que le
+// premier.
+//
+// Le moteur est FOURNI par l'appelant : le domaine ne possede aucune source d'entropie, ce qui garde le tirage
+// reproductible dans un test.
+[[nodiscard]] QuestionKind drawQuestionKind( const SessionSettings & p_settings, std::mt19937 & p_engine );
+
 struct Question
 {
     // What the question asks. The screen reads it to know whether to show the circle or the two directions.
