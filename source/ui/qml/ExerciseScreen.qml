@@ -1389,6 +1389,8 @@ Item {
                 // LE BOURDON, DIT AU JOUEUR - c'est une des deux questions qui reviennent le plus, et le jeu ne la posait
                 // jamais. Roger : « c'est quoi le bourdon (il faut lui expliquer les degres qu'on utilise) ».
 
+                id: harmonyBlock
+
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.alignment: Qt.AlignVCenter
@@ -1613,10 +1615,30 @@ Item {
 
                 }
 
-                Flow {
+                Item {
+                    // LES BOUTONS DE MODE, EN RANGEES CENTREES.
+                    //
+                    // Roger, 07/10/2026 : « les rangees des boutons des modes sont mal centrees : c'est left centered,
+                    // du coup ca fait du vide a droite ». Un `Flow` range ses elements a GAUCHE, donc sa derniere rangee
+                    // - plus courte - laissait un vide a droite. Ici, CHAQUE rangee est posee au MILIEU de la largeur,
+                    // quelle que soit sa longueur.
+                    //
+                    // La largeur et la hauteur des boutons RESTENT celles d'origine : la place verticale se prend en
+                    // haut de l'ecran (le prompt tient en deux mots), jamais sur les reponses.
+                    id: modeButtonGrid
+
                     Layout.fillWidth: true
-                    spacing: 6
                     visible: !ExerciseController.isModeColourQuestion
+
+                    readonly property int choiceCount: ExerciseController.modeChoices.length
+                    readonly property real cellWidth: 118
+                    readonly property real cellHeight: 48
+                    readonly property real cellGap: 6
+                    // Combien de boutons tiennent sur une rangee - au moins un.
+                    readonly property int columns: Math.max(1, Math.floor((width + cellGap) / (cellWidth + cellGap)))
+                    readonly property int rowCount: choiceCount === 0 ? 0 : Math.ceil(choiceCount / columns)
+
+                    implicitHeight: rowCount === 0 ? 0 : ((rowCount * cellHeight) + ((rowCount - 1) * cellGap))
 
                     Repeater {
                         // LA LARGEUR, LA POLICE ET LES MARGES VONT ENSEMBLE, et c'est le NOM qui commande.
@@ -1626,6 +1648,11 @@ Item {
 
                         delegate: Button {
                             required property var modelData
+                            required property int index
+
+                            readonly property int rowIndex: Math.floor(index / modeButtonGrid.columns)
+                            readonly property int itemsInRow: Math.min(modeButtonGrid.columns, modeButtonGrid.choiceCount - (rowIndex * modeButtonGrid.columns))
+                            readonly property real rowWidth: (itemsInRow * modeButtonGrid.cellWidth) + ((itemsInRow - 1) * modeButtonGrid.cellGap)
                             readonly property bool isBright: modelData.brightness > 0.5
                             readonly property bool wasHeard: ExerciseController.heardMode.index !== undefined && modelData.index === ExerciseController.heardMode.index
 
@@ -1633,8 +1660,12 @@ Item {
                             // police de 14 laisse environ 72 points au texte - le style garde seize points de marge de
                             // chaque cote - et « Mixolydien » en demande quatre-vingts. Les trois valeurs sont donc
                             // reglees ENSEMBLE, sinon le prochain nom long les fera mentir de nouveau.
-                            width: 118
-                            height: 48
+                            width: modeButtonGrid.cellWidth
+                            height: modeButtonGrid.cellHeight
+                            // LA RANGEE EST CENTREE : on decale de la moitie du vide laisse a gauche.
+                            x: ((modeButtonGrid.width - rowWidth) / 2) + ((index % modeButtonGrid.columns) * (modeButtonGrid.cellWidth + modeButtonGrid.cellGap))
+                            y: rowIndex * (modeButtonGrid.cellHeight + modeButtonGrid.cellGap)
+
                             leftPadding: 4
                             rightPadding: 4
                             text: modelData.name
